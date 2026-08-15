@@ -10,6 +10,12 @@ repositories {
 }
 
 dependencies {
+
+    implementation("org.jetbrains.exposed:exposed-core:1.4.0")
+    implementation("org.jetbrains.exposed:exposed-r2dbc:1.4.0")
+    implementation("org.postgresql:r2dbc-postgresql:1.1.1.RELEASE")
+    implementation("org.jetbrains.exposed:exposed-dao:1.4.0")
+
     testImplementation(kotlin("test"))
 }
 

@@ -1,0 +1,9 @@
+project:
+  id: overmail
+  name: Overmail
+
+dependencies:
+  postgres:
+    18:
+      databases:
+        - overmail

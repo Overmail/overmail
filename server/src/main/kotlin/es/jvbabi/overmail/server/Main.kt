@@ -1,5 +1,11 @@
 package es.jvbabi.overmail.server
 
+import es.jvbabi.overmail.server.database.OvermailDatabase
+import kotlinx.coroutines.runBlocking
+
 fun main() {
-    println("Hello World!")
+    runBlocking {
+        val db = OvermailDatabase()
+        db.init()
+    }
 }

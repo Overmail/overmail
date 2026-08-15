@@ -14,7 +14,9 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-core:1.4.0")
     implementation("org.jetbrains.exposed:exposed-r2dbc:1.4.0")
     implementation("org.postgresql:r2dbc-postgresql:1.1.1.RELEASE")
-    implementation("org.jetbrains.exposed:exposed-dao:1.4.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0")
+
+    implementation("es.jvbabi.overmail:kamel:0.4.0")
 
     testImplementation(kotlin("test"))
 }
@@ -25,4 +27,9 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+}
+tasks.register<JavaExec>("runServer") {
+    group = "application"
+    mainClass.set(providers.gradleProperty("mainClass").orElse("es.jvbabi.overmail.server.MainKt"))
+    classpath = sourceSets["main"].runtimeClasspath
 }

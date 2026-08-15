@@ -3,15 +3,18 @@ package es.jvbabi.overmail.server.database
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
+import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
 import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
-class OvermailDatabase {
+class OvermailDatabase(
+    config: DatabaseConfig = DatabaseConfig(),
+) {
     val postgresqldb = R2dbcDatabase.connect(
-        url = "r2dbc:postgresql://postgres18.werkbank.studio:5432/overmail_overmail",
+        url = config.r2dbcUrl,
         driver = "postgresql",
-        user = "werkbank",
-        password = "werkbank"
+        user = config.user,
+        password = config.password
     )
 
     suspend fun init() {
@@ -21,9 +24,7 @@ class OvermailDatabase {
         }
     }
 
-    suspend fun query(block: suspend () -> Unit) {
-        suspendTransaction(this.postgresqldb) {
-            block()
-        }
+    suspend fun <T> query(block: suspend R2dbcTransaction.() -> T): T {
+        return suspendTransaction(this.postgresqldb) { block() }
     }
 }

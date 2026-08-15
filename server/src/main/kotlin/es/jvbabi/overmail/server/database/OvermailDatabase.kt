@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.database
 
+import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
 import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
@@ -16,6 +17,7 @@ class OvermailDatabase {
     suspend fun init() {
         query {
             SchemaUtils.create(Users)
+            SchemaUtils.create(ImapAccounts)
         }
     }
 

@@ -1,6 +1,8 @@
 package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.domain.repository.EmailRepository
+import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
 import es.jvbabi.overmail.server.domain.repository.ImapAccountRepository
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +12,8 @@ import kotlin.uuid.Uuid
 class ImporterManager(
     private val database: OvermailDatabase,
     private val imapAccountRepository: ImapAccountRepository,
+    private val emailUserRepository: EmailUserRepository,
+    private val emailRepository: EmailRepository,
     private val coroutineScope: CoroutineScope,
 ) {
 
@@ -35,6 +39,8 @@ class ImporterManager(
 
                     val newImporter = EmailImporter(
                         imapAccount = account,
+                        emailUserRepository = emailUserRepository,
+                        emailRepository = emailRepository,
                         coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
                     )
 

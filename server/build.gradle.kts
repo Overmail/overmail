@@ -13,6 +13,8 @@ dependencies {
 
     implementation("org.jetbrains.exposed:exposed-core:1.4.0")
     implementation("org.jetbrains.exposed:exposed-r2dbc:1.4.0")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:1.4.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("org.postgresql:r2dbc-postgresql:1.1.1.RELEASE")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.11.0")
 

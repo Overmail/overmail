@@ -1,5 +1,8 @@
 package es.jvbabi.overmail.server.database
 
+import es.jvbabi.overmail.server.database.models.EmailRecipients
+import es.jvbabi.overmail.server.database.models.EmailUsers
+import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
@@ -21,6 +24,9 @@ class OvermailDatabase(
         query {
             SchemaUtils.create(Users)
             SchemaUtils.create(ImapAccounts)
+            SchemaUtils.create(EmailUsers)
+            SchemaUtils.create(Emails)
+            SchemaUtils.create(EmailRecipients)
         }
     }
 

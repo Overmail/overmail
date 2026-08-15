@@ -2,6 +2,35 @@ project:
   id: overmail
   name: Overmail
 
+services:
+  - name: api
+    modes:
+      local:
+        port: 8080
+
+  - name: web
+    modes:
+      local:
+        port: 5173
+
+  # The only http target: Caddy decides what goes to Ktor and what goes to SvelteKit,
+  # so the split is the same locally and in a deployed image.
+  - name: caddy
+    modes:
+      docker:
+        container: caddy
+        port: 80
+
+containers:
+  - name: caddy
+    image: caddy:2-alpine
+    type: dependency
+    volumes:
+      - "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+
+http:
+  - target_service: caddy
+
 dependencies:
   postgres:
     18:

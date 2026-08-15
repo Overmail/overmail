@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.r2dbc.selectAll
 import kotlin.uuid.Uuid
 
@@ -26,6 +27,21 @@ class UserRepositoryImpl(
                     Users
                         .selectAll()
                         .where(Users.id eq id)
+                        .map { it.toUser() }
+                        .firstOrNull()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    override fun findByIdentifier(identifier: String): Flow<User?> {
+        return changes.changesOf(Users)
+            .conflate()
+            .map {
+                database.query {
+                    Users
+                        .selectAll()
+                        .where((Users.username eq identifier) or (Users.email eq identifier))
                         .map { it.toUser() }
                         .firstOrNull()
                 }

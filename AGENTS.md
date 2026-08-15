@@ -18,6 +18,17 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   jobs/                background work (IMAP import)
 ```
 
+## Configuration
+
+Everything runtime-specific comes from `data/config.json`, parsed once into `ApplicationConfig`
+and handed out through DI. The file holds credentials and is gitignored — never commit it, never
+put a credential in a Kotlin default. A missing or malformed file throws with the absolute path
+instead of falling back, so nobody ends up on the wrong database.
+
+The path is relative to the working directory, which is why `runServer` sets
+`workingDir = rootProject.projectDir`. Add new sections as their own `@Serializable` type
+(`DatabaseConfig`, `EmailConfig`) and a field on `ApplicationConfig`.
+
 ## Application wiring
 
 The Ktor `Application` is the composition root. Everything is registered in Ktor's own DI
@@ -35,12 +46,25 @@ dependencies {
 - Routes get their dependencies from the same container (`by dependencies` or
   `dependencies.resolve<T>()`); do not construct repositories inside a route.
 
+## Reverse proxy
+
+`deploy/Caddyfile` fronts both halves of the app: `/api*` goes to Ktor, everything else to
+SvelteKit in `web/`. Werkbank runs it as a container dependency and points its single `http`
+target at it, so the split is identical locally and in a deployed image — werkbank's own traefik
+never sees the individual services.
+
+The prefix is **not** stripped, so every Ktor route lives under `route("/api")`. A route added
+outside that block is unreachable through the proxy.
+
+Caddy is a werkbank container, so its upstreams are `host.docker.internal`, not `localhost`.
+
 ## HTTP and OpenAPI
 
 The spec is assembled from the live routing tree by the Ktor OpenAPI compiler plugin
 (`ktor { openApi { } }` in `server/build.gradle.kts`) — there is no checked-in openapi file, and
 adding a route is enough to document it. A KDoc comment above a route becomes its summary, so
-write one. Swagger UI sits at `/swagger`, the generated spec at `/swagger/documentation.json`.
+write one. Swagger UI sits at `/api/swagger`, the generated spec at
+`/api/swagger/documentation.json`.
 
 ## Database access
 
@@ -73,6 +97,9 @@ override fun getById(id: Uuid): Flow<Thing?> {
 A cold flow would run the write again on every collection. Subscribers pick the
 change up through their own flow anyway, because it lands in the WAL.
 
+Not every repository is backed by the database: `OutgoingMailRepository` talks to SMTP through
+Jakarta Mail (Eclipse Angus). The rule that consumers depend on the interface holds there too.
+
 ## Domain models
 
 Data classes hold resolved references (`ImapAccount`, not `imapAccountId`). The
@@ -91,8 +118,8 @@ other Exposed type.
 ```
 ./gradlew :server:compileKotlin
 ./gradlew :server:runServer     # creates the schema, talks to the shared dev DB
-curl localhost:8080/health
-curl localhost:8080/swagger/documentation.json
+curl localhost:8080/api/health
+curl localhost:8080/api/swagger/documentation.json
 ```
 
 To exercise only the HTTP layer, run a throwaway main that starts `embeddedServer(Netty, ...) {

@@ -11,7 +11,7 @@ import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
 class OvermailDatabase(
-    config: DatabaseConfig = DatabaseConfig(),
+    config: DatabaseConfig,
 ) {
     val postgresqldb = R2dbcDatabase.connect(
         url = config.r2dbcUrl,

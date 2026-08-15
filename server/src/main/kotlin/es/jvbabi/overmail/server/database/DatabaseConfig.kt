@@ -1,11 +1,19 @@
 package es.jvbabi.overmail.server.database
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * The `database` section of `data/config.json`. No defaults for the credentials on purpose:
+ * a missing entry should fail loudly instead of silently connecting somewhere else.
+ */
+@Serializable
 data class DatabaseConfig(
-    val host: String = "postgres18.werkbank.studio",
-    val port: Int = 5432,
-    val database: String = "overmail_overmail",
-    val user: String = "werkbank",
-    val password: String = "werkbank",
+    @SerialName("host") val host: String,
+    @SerialName("port") val port: Int = 5432,
+    @SerialName("database") val database: String,
+    @SerialName("username") val user: String,
+    @SerialName("password") val password: String,
 ) {
     val r2dbcUrl: String get() = "r2dbc:postgresql://$host:$port/$database"
 }

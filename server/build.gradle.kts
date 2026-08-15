@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization") version "2.4.10"
     id("io.ktor.plugin") version "3.5.2"
 }
 
@@ -32,6 +33,16 @@ dependencies {
     implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
     implementation("io.ktor:ktor-server-swagger:3.5.2")
     implementation("io.ktor:ktor-server-di:3.5.2")
+    // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
+    implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
+
+    implementation("es.jvbabi.authentikt:core:0.4.5")
+    implementation("com.auth0:java-jwt:4.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    // Eclipse Angus, the Jakarta Mail implementation. Kamel already pulls it, but only at
+    // runtime scope, so it has to be declared here to compile against jakarta.mail.
+    implementation("org.eclipse.angus:jakarta.mail:2.0.5")
     // Ktor logs through slf4j; without a binding it stays silent and warns on startup.
     implementation("ch.qos.logback:logback-classic:1.5.20")
 
@@ -42,6 +53,10 @@ dependencies {
 
 kotlin {
     jvmToolchain(26)
+    compilerOptions {
+        // authentikt is published from a pre-release Kotlin. Same workaround as in Trails.
+        freeCompilerArgs.add("-Xskip-prerelease-check")
+    }
 }
 
 tasks.test {
@@ -51,4 +66,6 @@ tasks.register<JavaExec>("runServer") {
     group = "application"
     mainClass.set(providers.gradleProperty("mainClass").orElse("es.jvbabi.overmail.server.MainKt"))
     classpath = sourceSets["main"].runtimeClasspath
+    // The server reads ./data/config.json, which lives at the repository root, not in this module.
+    workingDir = rootProject.projectDir
 }

@@ -6,4 +6,7 @@ import kotlin.uuid.Uuid
 
 interface UserRepository {
     fun getById(id: Uuid): Flow<User?>
+
+    /** Sign-in accepts either the username or the email, so both are matched here. */
+    fun findByIdentifier(identifier: String): Flow<User?>
 }

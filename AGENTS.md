@@ -7,13 +7,40 @@ Exposed 1.4 on R2DBC/Postgres, coroutines everywhere — no blocking JDBC.
 
 ```
 server/src/main/kotlin/es/jvbabi/overmail/server/
+  AppModule.kt         Application.overmail(): DI graph, routing, jobs
+  Main.kt              starts the server, nothing else
   database/models/     Exposed table objects (UuidTable)
   database/mappers/    ResultRow -> domain model extensions
   database/changes/    PostgresChangeStream (logical replication)
   domain/models/       plain data classes, no Exposed types
   domain/repository/   repository interface + Impl per aggregate
+  http/                Ktor engine, config and routes
   jobs/                background work (IMAP import)
 ```
+
+## Application wiring
+
+The Ktor `Application` is the composition root. Everything is registered in Ktor's own DI
+(`ktor-server-di`) in `AppModule.kt`, nothing is configured through an `application.conf`:
+
+```kotlin
+dependencies {
+    provide<EmailRepository> { EmailRepositoryImpl(resolve(), resolve()) }
+}
+```
+
+- Register the interface, never the `Impl`, so consumers cannot depend on the concrete type.
+- The `Application` doubles as the coroutine scope for the change stream and the importers, so
+  stopping the server tears them down.
+- Routes get their dependencies from the same container (`by dependencies` or
+  `dependencies.resolve<T>()`); do not construct repositories inside a route.
+
+## HTTP and OpenAPI
+
+The spec is assembled from the live routing tree by the Ktor OpenAPI compiler plugin
+(`ktor { openApi { } }` in `server/build.gradle.kts`) — there is no checked-in openapi file, and
+adding a route is enough to document it. A KDoc comment above a route becomes its summary, so
+write one. Swagger UI sits at `/swagger`, the generated spec at `/swagger/documentation.json`.
 
 ## Database access
 
@@ -64,4 +91,10 @@ other Exposed type.
 ```
 ./gradlew :server:compileKotlin
 ./gradlew :server:runServer     # creates the schema, talks to the shared dev DB
+curl localhost:8080/health
+curl localhost:8080/swagger/documentation.json
 ```
+
+To exercise only the HTTP layer, run a throwaway main that starts `embeddedServer(Netty, ...) {
+configureRouting() }` via `-PmainClass=...`; that keeps the shared database and the IMAP
+importers out of the loop.

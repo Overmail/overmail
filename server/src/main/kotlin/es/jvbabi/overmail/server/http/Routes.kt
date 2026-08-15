@@ -1,0 +1,29 @@
+package es.jvbabi.overmail.server.http
+
+import io.ktor.http.ContentType
+import io.ktor.openapi.OpenApiInfo
+import io.ktor.server.application.Application
+import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.openapi.OpenApiDocSource
+import io.ktor.server.routing.routing
+
+internal fun Application.configureRouting() {
+    routing {
+        // Reads the live routing tree, so every route below shows up without a checked-in spec.
+        swaggerUI("/swagger") {
+            info = OpenApiInfo(title = "Overmail", version = "1.0")
+            source = OpenApiDocSource.Routing(ContentType.Application.Json)
+            // Default is documentation.yaml, but the source above emits JSON.
+            remotePath = "documentation.json"
+        }
+
+        /**
+         * Reports whether the server is up.
+         */
+        get("/health") {
+            call.respondText("ok")
+        }
+    }
+}

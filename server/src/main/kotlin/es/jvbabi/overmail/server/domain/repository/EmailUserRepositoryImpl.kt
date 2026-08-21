@@ -16,10 +16,9 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import org.jetbrains.exposed.v1.core.and
-import org.jetbrains.exposed.v1.core.coalesce
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.r2dbc.insertIgnoreAndGetId
 import org.jetbrains.exposed.v1.r2dbc.selectAll
-import org.jetbrains.exposed.v1.r2dbc.upsertReturning
 import kotlin.uuid.Uuid
 
 class EmailUserRepositoryImpl(
@@ -72,17 +71,21 @@ class EmailUserRepositoryImpl(
             .distinctUntilChanged()
     }
 
-    override suspend fun upsert(user: User, name: String?, address: String): EmailUser {
+    override suspend fun findOrCreate(user: User, address: String): EmailUser {
         return database.query {
+            // No upsert: the row holds nothing but the key, so there would be nothing to update.
+            // insertIgnore returns null once the address is known, and the lookup then finds it --
+            // including the row a concurrent importer just committed.
+            val id = EmailUsers.insertIgnoreAndGetId {
+                it[EmailUsers.user] = user.id
+                it[EmailUsers.address] = address
+            }?.value
+
+            if (id != null) return@query EmailUser(id = id, user = user, address = address)
+
             EmailUsers
-                .upsertReturning(
-                    EmailUsers.user, EmailUsers.address,
-                    onUpdate = { it[EmailUsers.name] = coalesce(insertValue(EmailUsers.name), EmailUsers.name) },
-                ) {
-                    it[EmailUsers.user] = user.id
-                    it[EmailUsers.address] = address
-                    it[EmailUsers.name] = name
-                }
+                .selectAll()
+                .where((EmailUsers.user eq user.id) and (EmailUsers.address eq address))
                 .map { it.toEmailUser(user) }
                 .first()
         }

@@ -19,6 +19,7 @@ fun ResultRow.toEmail(
     id = this[Emails.id].value,
     imapAccount = imapAccount,
     sender = sender,
+    senderName = this[Emails.senderName],
     subject = this[Emails.subject],
     sent = this[Emails.sent],
     textContent = this[Emails.textContent],

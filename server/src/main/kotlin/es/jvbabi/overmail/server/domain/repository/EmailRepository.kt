@@ -1,9 +1,9 @@
 package es.jvbabi.overmail.server.domain.repository
 
 import es.jvbabi.overmail.server.domain.models.Email
-import es.jvbabi.overmail.server.domain.models.EmailRecipientType
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
+import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -27,17 +27,19 @@ interface EmailRepository {
      * [findDuplicate] already knows it. Never updates an existing mail: the local state (`is_read`)
      * is ours, the server's copy must not overwrite it.
      *
-     * [sent] is truncated to whole seconds, [recipients] deduplicated per email user and type.
+     * [sent] is truncated to whole seconds, [recipients] deduplicated per email user and type,
+     * keeping the named entry of an address that appears both with and without a display name.
      */
     suspend fun insert(
         imapAccount: ImapAccount,
         sender: EmailUser,
+        senderName: String?,
         subject: String,
         sent: Instant,
         rawContent: ByteArray,
         textContent: String?,
         htmlContent: String?,
         isRead: Boolean,
-        recipients: List<Pair<EmailUser, EmailRecipientType>>,
+        recipients: List<NewEmailRecipient>,
     ): Email?
 }

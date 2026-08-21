@@ -14,9 +14,9 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.EmailRecipient
-import es.jvbabi.overmail.server.domain.models.EmailRecipientType
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
+import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
@@ -91,13 +91,14 @@ class EmailRepositoryImpl(
     override suspend fun insert(
         imapAccount: ImapAccount,
         sender: EmailUser,
+        senderName: String?,
         subject: String,
         sent: Instant,
         rawContent: ByteArray,
         textContent: String?,
         htmlContent: String?,
         isRead: Boolean,
-        recipients: List<Pair<EmailUser, EmailRecipientType>>,
+        recipients: List<NewEmailRecipient>,
     ): Email? {
         val sentSecond = sent.truncatedToSecond()
 
@@ -120,6 +121,7 @@ class EmailRepositoryImpl(
             val id = Emails.insertAndGetId {
                 it[Emails.imapAccount] = imapAccount.id
                 it[Emails.sender] = sender.id
+                it[Emails.senderName] = senderName
                 it[Emails.subject] = subject
                 it[Emails.sent] = sentSecond
                 it[Emails.rawContent] = rawContent
@@ -129,16 +131,21 @@ class EmailRepositoryImpl(
             }.value
 
             val storedRecipients = recipients
-                .distinctBy { (emailUser, type) -> emailUser.id to type }
-                .map { (emailUser, type) ->
+                // The unique index is (mail, address, field), so an address listed twice in the
+                // same field has to collapse into one row. Sorting first lets the named entry win.
+                .sortedBy { it.name == null }
+                .distinctBy { it.emailUser.id to it.type }
+                .map { recipient ->
                     EmailRecipient(
                         id = EmailRecipients.insertAndGetId {
                             it[EmailRecipients.email] = id
-                            it[EmailRecipients.emailUser] = emailUser.id
-                            it[EmailRecipients.type] = type
+                            it[EmailRecipients.emailUser] = recipient.emailUser.id
+                            it[EmailRecipients.name] = recipient.name
+                            it[EmailRecipients.type] = recipient.type
                         }.value,
-                        emailUser = emailUser,
-                        type = type,
+                        emailUser = recipient.emailUser,
+                        name = recipient.name,
+                        type = recipient.type,
                     )
                 }
 
@@ -146,6 +153,7 @@ class EmailRepositoryImpl(
                 id = id,
                 imapAccount = imapAccount,
                 sender = sender,
+                senderName = senderName,
                 subject = subject,
                 sent = sentSecond,
                 textContent = textContent,

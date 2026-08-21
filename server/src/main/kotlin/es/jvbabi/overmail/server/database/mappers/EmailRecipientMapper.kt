@@ -13,5 +13,6 @@ import org.jetbrains.exposed.v1.core.ResultRow
 fun ResultRow.toEmailRecipient(emailUser: EmailUser): EmailRecipient = EmailRecipient(
     id = this[EmailRecipients.id].value,
     emailUser = emailUser,
+    name = this[EmailRecipients.name],
     type = this[EmailRecipients.type],
 )

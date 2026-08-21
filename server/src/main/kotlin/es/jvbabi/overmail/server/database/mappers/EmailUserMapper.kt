@@ -13,6 +13,5 @@ import org.jetbrains.exposed.v1.core.ResultRow
 fun ResultRow.toEmailUser(user: User): EmailUser = EmailUser(
     id = this[EmailUsers.id].value,
     user = user,
-    name = this[EmailUsers.name],
     address = this[EmailUsers.address],
 )

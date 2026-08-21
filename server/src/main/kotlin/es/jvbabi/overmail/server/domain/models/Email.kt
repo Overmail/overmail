@@ -12,6 +12,8 @@ data class Email(
     val id: Uuid,
     val imapAccount: ImapAccount,
     val sender: EmailUser,
+    /** Display name the sender used in this mail, null for a bare address. */
+    val senderName: String?,
     val subject: String,
     val sent: Instant,
     val textContent: String?,

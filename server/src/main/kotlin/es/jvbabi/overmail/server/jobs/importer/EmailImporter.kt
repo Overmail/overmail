@@ -4,6 +4,7 @@ import es.jvbabi.overmail.core.Email.Flag
 import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.domain.models.EmailRecipientType
 import es.jvbabi.overmail.server.domain.models.ImapAccount
+import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
 import kotlinx.coroutines.*
@@ -70,15 +71,16 @@ class EmailImporter(
                     val cc = mail.cc.await()
                     val bcc = mail.bcc.await()
 
-                    // Kamel's EmailUser compares by address *and* name, so one address can appear
-                    // twice with different names. Sorting first lets the named entry win.
+                    // Only the address identifies a stored email user. The display names stay on
+                    // this mail: notifications@github.com carries the acting username as its name,
+                    // so a name learned here says nothing about the next mail from that address.
                     val emailUsers = (from + to + cc + bcc)
-                        .sortedBy { it.name == null }
-                        .distinctBy { it.address }
-                        .associate { it.address to emailUserRepository.upsert(imapAccount.user, it.name, it.address) }
+                        .map { it.address }
+                        .distinct()
+                        .associateWith { emailUserRepository.findOrCreate(imapAccount.user, it) }
 
-                    val sender = from.firstOrNull()?.let { emailUsers.getValue(it.address) }
-                    if (sender == null) {
+                    val fromHeader = from.firstOrNull()
+                    if (fromHeader == null) {
                         println("Skipping mail without a From header: $subject")
                         return@forEach
                     }
@@ -87,7 +89,9 @@ class EmailImporter(
                         to to EmailRecipientType.RECIPIENT,
                         cc to EmailRecipientType.CC,
                         bcc to EmailRecipientType.BCC,
-                    ).flatMap { (users, type) -> users.map { emailUsers.getValue(it.address) to type } }
+                    ).flatMap { (users, type) ->
+                        users.map { NewEmailRecipient(emailUsers.getValue(it.address), it.name, type) }
+                    }
 
                     val raw = ByteArrayOutputStream()
                     val text = ByteArrayOutputStream()
@@ -97,7 +101,8 @@ class EmailImporter(
 
                     emailRepository.insert(
                         imapAccount = imapAccount,
-                        sender = sender,
+                        sender = emailUsers.getValue(fromHeader.address),
+                        senderName = fromHeader.name,
                         subject = subject,
                         sent = sentAt,
                         rawContent = raw.toByteArray(),

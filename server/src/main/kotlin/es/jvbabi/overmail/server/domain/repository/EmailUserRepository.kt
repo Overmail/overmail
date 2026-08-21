@@ -14,10 +14,9 @@ interface EmailUserRepository {
 
     /**
      * Inserts the address for [user] or returns the existing row, so the importer can resolve a
-     * header address without racing a second importer on the same account.
+     * header address without racing an importer of another account of the same user.
      *
-     * A null [name] leaves an already stored display name alone: plenty of mails carry the bare
-     * address, and those must not wipe a name learned from an earlier header.
+     * Takes no display name: an address keeps none, the mail it appeared in does.
      */
-    suspend fun upsert(user: User, name: String?, address: String): EmailUser
+    suspend fun findOrCreate(user: User, address: String): EmailUser
 }

@@ -9,6 +9,12 @@ object Emails : UuidTable("emails") {
     val imapAccount = reference("imap_account_id", ImapAccounts, onDelete = ReferenceOption.CASCADE)
     val sender = reference("sender_id", EmailUsers)
 
+    /**
+     * Display name the sender used in *this* mail, absent for a bare `foo@bar.tld` address. Stored
+     * per mail and not on [EmailUsers], see there.
+     */
+    val senderName = varchar("sender_name", 255).nullable()
+
     val subject = text("subject")
 
     /** Send time, stored truncated to whole seconds so it can serve as a dedup key. */

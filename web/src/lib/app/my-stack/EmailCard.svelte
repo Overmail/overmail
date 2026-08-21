@@ -18,6 +18,8 @@
         bcc = [],
         subject,
         body,
+        dim = 0,
+        tint = "transparent",
         class: className,
     }: {
         sender: EmailCardParticipant & { avatarUrl?: string };
@@ -28,6 +30,10 @@
         bcc?: EmailCardParticipant[];
         subject: string;
         body: string;
+        /** 0…1: how far the card is faded into the background while it sits behind another one. */
+        dim?: number;
+        /** Colour washed over the whole card, e.g. the decision it was classified with. */
+        tint?: string;
         class?: string;
     } = $props();
 
@@ -52,8 +58,10 @@
     );
 </script>
 
-<!-- `class` goes last, so the caller can place and rotate the card in the stack. -->
-<div class={cn("flex flex-col w-3xl h-fit bg-background rounded-2xl drop-shadow-2xl", className)}>
+<!-- box-shadow rather than drop-shadow: the card is an opaque rounded rectangle, so the cheaper
+     one looks the same, and a filter would force its own render surface on every card in the
+     stack. `class` goes last, so the caller can place and rotate the card in the stack. -->
+<div class={cn("relative flex flex-col w-3xl h-fit bg-background rounded-2xl shadow-2xl", className)}>
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <Avatar.Root class="size-12">
@@ -91,4 +99,20 @@
     <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
         {body}
     </div>
+
+    <!-- Dimmed by laying the background colour on top rather than lowering the card's opacity: a
+         card in the stack has to stay solid, or the cards behind it show through. -->
+    <div
+            class="pointer-events-none absolute inset-0 rounded-2xl bg-background transition-opacity duration-500 motion-reduce:transition-none"
+            style="opacity: {dim}"
+    ></div>
+
+    <!-- The tint animates as a colour rather than as the opacity of a coloured layer, so it also
+         washes back out when the mail is pulled into the stack again. Short: a mail that is being
+         decided on is off the screen in a fraction of the time the card takes to travel, so a slow
+         fade would never be seen. -->
+    <div
+            class="pointer-events-none absolute inset-0 rounded-2xl transition-colors duration-150 motion-reduce:transition-none"
+            style="background-color: {tint}"
+    ></div>
 </div>

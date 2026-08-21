@@ -4,7 +4,70 @@
     import KeyCap from "$lib/components/key/KeyCap.svelte";
     import EmailStack from "$lib/app/my-stack/EmailStack.svelte";
     import emails from "$lib/assets/emails.json";
+    import type {EmailStackEntry} from "$lib/app/my-stack/EmailStack.svelte";
+    import {CLASSIFICATION_KEY_CLASSES, type EmailClassification} from "$lib/app/my-stack/classification";
+    import {createHotkeys, getIsKeyHeld} from "@tanstack/svelte-hotkeys";
+    import {cn} from "$lib/utils.js";
     import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+
+    // Local state until the mail repository lands: the keys only move `currentId` around and write
+    // a classification, nothing is persisted yet.
+    let mails = $state<EmailStackEntry[]>(emails);
+    let currentId = $state<string | undefined>(mails[0]?.id);
+
+    const currentIndex = $derived(mails.findIndex((mail) => mail.id === currentId));
+
+    /** The next mail still waiting for a decision, searching from `from` in `step` direction. */
+    function undecidedFrom(from: number, step: 1 | -1): EmailStackEntry | undefined {
+        for (let i = from; i >= 0 && i < mails.length; i += step) {
+            if (!mails[i].classification) return mails[i];
+        }
+        return undefined;
+    }
+
+    function classify(to: EmailClassification["to"]) {
+        if (currentIndex < 0) return;
+
+        mails[currentIndex].classification = {to, tags: []};
+        currentId = undecidedFrom(currentIndex + 1, 1)?.id;
+    }
+
+    /** Skips the mail without deciding on it, so it stays in the stack. */
+    function next() {
+        if (currentIndex < 0) return;
+
+        currentId = undecidedFrom(currentIndex + 1, 1)?.id ?? currentId;
+    }
+
+    /**
+     * Back to the mail before this one. A decision on that mail is dropped on the way, so going
+     * back is also the undo: the card slides in from the right again.
+     */
+    function previous() {
+        const from = (currentIndex < 0 ? mails.length : currentIndex) - 1;
+        if (from < 0) return;
+
+        mails[from].classification = undefined;
+        currentId = mails[from].id;
+    }
+
+    createHotkeys([
+        {hotkey: "A", callback: () => classify("archive")},
+        {hotkey: "S", callback: () => classify("spam")},
+        {hotkey: "R", callback: () => classify("respond_later")},
+        {hotkey: "Space", callback: next},
+        {hotkey: "Backspace", callback: previous},
+    ]);
+
+    // Drives the keycaps: the same key state the hotkeys run off, so a cap can never look pressed
+    // while its shortcut is not firing. `#` has no binding yet, so its cap stays untouched.
+    const held = {
+        archive: getIsKeyHeld("A"),
+        spam: getIsKeyHeld("S"),
+        respondLater: getIsKeyHeld("R"),
+        next: getIsKeyHeld("Space"),
+        previous: getIsKeyHeld("Backspace"),
+    };
 </script>
 
 <header
@@ -26,10 +89,8 @@
 <main class="flex flex-1 flex-col">
     <div class="relative flex flex-1">
         <div class="flex flex-1 overflow-hidden relative">
-            <!-- pb-32 keeps the cards clear of the shortcut bar, so a mail can be scrolled to its
-                 end without the last lines sitting under the keys. -->
-            <div class="absolute inset-0 flex justify-center pt-8 pb-32">
-                <EmailStack {emails} class="h-full" />
+            <div class="absolute inset-0 flex justify-center">
+                <EmailStack emails={mails} {currentId} class="h-full" />
             </div>
         </div>
 
@@ -46,17 +107,17 @@
             <!-- relative, so the keys paint above the absolutely positioned blur layers. -->
             <div class="relative flex h-full flex-row items-center justify-center gap-6">
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="A" class="size-10" />
+                    <KeyCap key="A" isPressed={held.archive.held} label="Archivieren" onclick={() => classify("archive")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.archive)} />
                     <span class="flex flex-row items-center gap-1"><ArchiveIcon /> Archivieren</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="S" class="size-10" />
+                    <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
                     <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="R" class="size-10" />
+                    <KeyCap key="R" isPressed={held.respondLater.held} label="Später antworten" onclick={() => classify("respond_later")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.respond_later)} />
                     <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> Später antworten</span>
                 </div>
 
@@ -66,12 +127,12 @@
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="␣" class="size-10" />
+                    <KeyCap key="␣" isPressed={held.next.held} label="Weiter" onclick={next} class="size-10" />
                     <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> Weiter</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="⌫" class="size-10" />
+                    <KeyCap key="⌫" isPressed={held.previous.held} label="Vorige Mail" onclick={previous} class="size-10" />
                     <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> Vorige Mail</span>
                 </div>
             </div>

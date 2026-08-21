@@ -27,11 +27,11 @@
         data-pressed={isPressed ? "" : undefined}
         {onclick}
         class={cn(
-            "flex h-12 w-12 items-center justify-center rounded-md border border-b-4 bg-background font-sans text-xl text-foreground",
+            "flex h-12 w-12 items-center justify-center rounded-md border border-b-4 bg-background font-mono text-lg text-foreground",
             "transition-[translate,border-width,background-color,border-color] duration-75 ease-out",
             // Pressed: the bevel collapses and the cap moves down by exactly what it lost, so the
             // bottom edge stays put and only the top of the key sinks.
-            isPressed && "translate-y-[3px] border-b bg-muted",
+            isPressed && "translate-y-0.75 border-b bg-muted",
             className,
         )}
 ><kbd class="font-sans">{key}</kbd></button>

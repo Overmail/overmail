@@ -1,7 +1,6 @@
-/** What the user decided to do with a mail. */
+/** What the user decided to do with a mail. Tags sit on the mail itself, not on the decision. */
 export type EmailClassification = {
 	to: 'archive' | 'spam' | 'respond_later' | 'keep';
-	tags: string[];
 };
 
 type Decision = EmailClassification['to'];

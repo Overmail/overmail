@@ -17,6 +17,7 @@
         cc = [],
         bcc = [],
         subject,
+        tags = [],
         body,
         dim = 0,
         tint = "transparent",
@@ -29,6 +30,7 @@
         cc?: EmailCardParticipant[];
         bcc?: EmailCardParticipant[];
         subject: string;
+        tags?: string[];
         body: string;
         /** 0…1: how far the card is faded into the background while it sits behind another one. */
         dim?: number;
@@ -93,6 +95,14 @@
     <div class="px-8 pt-6 flex flex-row flex-wrap items-center gap-x-8 text-xl">
         {subject}
     </div>
+
+    {#if tags.length}
+        <div class="px-8 pt-3 flex flex-row flex-wrap items-center gap-1">
+            {#each tags as tag (tag)}
+                <span class="rounded-sm bg-muted px-2 py-0.5 text-sm text-muted-foreground">{tag}</span>
+            {/each}
+        </div>
+    {/if}
 
     <div class="mx-4 my-4 h-px bg-accent"></div>
 

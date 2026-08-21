@@ -6,9 +6,12 @@
     import emails from "$lib/assets/emails.json";
     import type {EmailStackEntry} from "$lib/app/my-stack/EmailStack.svelte";
     import {CLASSIFICATION_KEY_CLASSES, type EmailClassification} from "$lib/app/my-stack/classification";
+    import TagInput from "$lib/app/my-stack/TagInput.svelte";
+    import {KNOWN_TAGS} from "$lib/app/my-stack/tags";
     import {createHotkeys, getIsKeyHeld} from "@tanstack/svelte-hotkeys";
     import {cn} from "$lib/utils.js";
-    import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+    import { ArchiveIcon, ArrowBendDownLeftIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+    import { fade } from "svelte/transition";
 
     // Local state until the mail repository lands: the keys only move `currentId` around and write
     // a classification, nothing is persisted yet.
@@ -16,6 +19,10 @@
     let currentId = $state<string | undefined>(mails[0]?.id);
 
     const currentIndex = $derived(mails.findIndex((mail) => mail.id === currentId));
+
+    // What the tag input is working on. Kept aside while tagging and written to the mail on Enter,
+    // so leaving with Escape drops the edit instead of half-tagging the mail.
+    let draftTags = $state<string[]>([]);
 
     /** The next mail still waiting for a decision, searching from `from` in `step` direction. */
     function undecidedFrom(from: number, step: 1 | -1): EmailStackEntry | undefined {
@@ -28,7 +35,7 @@
     function classify(to: EmailClassification["to"]) {
         if (currentIndex < 0) return;
 
-        mails[currentIndex].classification = {to, tags: []};
+        mails[currentIndex].classification = {to};
         currentId = undecidedFrom(currentIndex + 1, 1)?.id;
     }
 
@@ -51,16 +58,38 @@
         currentId = mails[from].id;
     }
 
+    function startTagging() {
+        if (currentIndex < 0) return;
+
+        draftTags = [...(mails[currentIndex].tags ?? [])];
+        isTagging = true;
+    }
+
+    /** Enter on an empty field: the draft goes to the mail and the stack takes over again. */
+    function commitTags() {
+        if (currentIndex >= 0) mails[currentIndex].tags = draftTags;
+        isTagging = false;
+    }
+
+    // While tagging, every stack key is off and only Escape is left: a tag is typed, and a tag
+    // name that contains an "a" must not archive the mail under it.
+    const whileNotTagging = () => ({enabled: !isTagging});
+
     createHotkeys([
-        {hotkey: "A", callback: () => classify("archive")},
-        {hotkey: "S", callback: () => classify("spam")},
-        {hotkey: "R", callback: () => classify("respond_later")},
-        {hotkey: "Space", callback: next},
-        {hotkey: "Backspace", callback: previous},
+        {hotkey: "A", callback: () => classify("archive"), options: whileNotTagging},
+        {hotkey: "S", callback: () => classify("spam"), options: whileNotTagging},
+        {hotkey: "R", callback: () => classify("respond_later"), options: whileNotTagging},
+        {hotkey: "Space", callback: next, options: whileNotTagging},
+        {hotkey: "Backspace", callback: previous, options: whileNotTagging},
+        // '#' sits on its own key on a German layout and on Shift+3 on a US one, and the matcher
+        // compares Shift strictly, so both spellings are bound.
+        {hotkey: {key: "#"}, callback: startTagging, options: whileNotTagging},
+        {hotkey: {key: "#", shift: true}, callback: startTagging, options: whileNotTagging},
+        {hotkey: "Escape", callback: () => (isTagging = false)},
     ]);
 
     // Drives the keycaps: the same key state the hotkeys run off, so a cap can never look pressed
-    // while its shortcut is not firing. `#` has no binding yet, so its cap stays untouched.
+    // while its shortcut is not firing. `#` is left out: the bar it sits in is gone while tagging.
     const held = {
         archive: getIsKeyHeld("A"),
         spam: getIsKeyHeld("S"),
@@ -68,6 +97,9 @@
         next: getIsKeyHeld("Space"),
         previous: getIsKeyHeld("Backspace"),
     };
+
+    /** Whether the stack is waiting for a tag for the current mail. */
+    let isTagging = $state(false);
 </script>
 
 <header
@@ -105,37 +137,54 @@
             <div class="pointer-events-none absolute inset-0 backdrop-blur-lg mask-[linear-gradient(to_bottom,transparent_75%,black_100%)]"></div>
 
             <!-- relative, so the keys paint above the absolutely positioned blur layers. -->
-            <div class="relative flex h-full flex-row items-center justify-center gap-6">
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="A" isPressed={held.archive.held} label="Archivieren" onclick={() => classify("archive")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.archive)} />
-                    <span class="flex flex-row items-center gap-1"><ArchiveIcon /> Archivieren</span>
-                </div>
+            {#if !isTagging}
+                <div
+                        class="absolute top-0 left-0 flex w-full h-full flex-row items-center justify-center gap-6"
+                        transition:fade={{duration: 100}}
+                >
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="A" isPressed={held.archive.held} label="Archivieren" onclick={() => classify("archive")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.archive)} />
+                        <span class="flex flex-row items-center gap-1"><ArchiveIcon /> Archivieren</span>
+                    </div>
 
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
-                    <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
-                </div>
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
+                        <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
+                    </div>
 
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="R" isPressed={held.respondLater.held} label="Später antworten" onclick={() => classify("respond_later")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.respond_later)} />
-                    <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> Später antworten</span>
-                </div>
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="R" isPressed={held.respondLater.held} label="Später antworten" onclick={() => classify("respond_later")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.respond_later)} />
+                        <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> Später antworten</span>
+                    </div>
 
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="#" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><TagIcon /> Taggen</span>
-                </div>
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="#" label="Taggen" onclick={startTagging} class="size-10" />
+                        <span class="flex flex-row items-center gap-1"><TagIcon /> Taggen</span>
+                    </div>
 
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="␣" isPressed={held.next.held} label="Weiter" onclick={next} class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> Weiter</span>
-                </div>
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="␣" isPressed={held.next.held} label="Weiter" onclick={next} class="size-10" />
+                        <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> Weiter</span>
+                    </div>
 
-                <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="⌫" isPressed={held.previous.held} label="Vorige Mail" onclick={previous} class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> Vorige Mail</span>
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="⌫" isPressed={held.previous.held} label="Vorige Mail" onclick={previous} class="size-10" />
+                        <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> Vorige Mail</span>
+                    </div>
                 </div>
-            </div>
+            {:else}
+                <div
+                        class="absolute top-0 left-0 flex w-full h-full flex-row items-center justify-center gap-6"
+                        transition:fade={{duration: 100}}
+                >
+                    <TagInput bind:tags={draftTags} suggestions={KNOWN_TAGS} onclose={commitTags} class="w-xl" />
+
+                    <div class="flex flex-row items-center justify-center gap-2">
+                        <KeyCap key="ESC" label="Vorige Mail" onclick={() => isTagging = false} class="size-10" />
+                        <span class="flex flex-row items-center gap-1"><ArrowBendDownLeftIcon /> Zurück</span>
+                    </div>
+                </div>
+            {/if}
         </div>
     </div>
 </main>

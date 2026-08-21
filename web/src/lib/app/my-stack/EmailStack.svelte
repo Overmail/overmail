@@ -12,6 +12,7 @@
         bcc?: EmailCardParticipant[];
         subject: string;
         body: string;
+        tags?: string[];
         /** Absent as long as the mail is still waiting for a decision. */
         classification?: EmailClassification;
     };

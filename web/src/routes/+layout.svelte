@@ -4,6 +4,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { authRepository, type Session } from '$lib/repository/AuthRepository';
+	import * as Sidebar from '$lib/components/ui/sidebar';
+	import AppSidebar from "$lib/app/shell/AppSidebar.svelte";
 
 	let { children } = $props();
 
@@ -34,15 +36,17 @@
 	<p>Checking session…</p>
 {:else if isAuthRoute || session}
 	{#if session}
-		<p>
-			Signed in as {session.username} ({session.email})
-			<button
-				onclick={async () => {
-					await authRepository.logout();
-					goto('/auth');
-				}}>Log out</button
-			>
-		</p>
+
+		<Sidebar.Provider>
+			<AppSidebar />
+			<!-- Renders the <main> and stretches to the wrapper's min-h-svh, so pages can size
+			     their content with flex-1 instead of a percentage height that has nothing to
+			     resolve against. -->
+			<Sidebar.Inset>
+				{@render children()}
+			</Sidebar.Inset>
+		</Sidebar.Provider>
+	{:else}
+		{@render children()}
 	{/if}
-	{@render children()}
 {/if}

@@ -11,6 +11,7 @@
         SidebarMenuItem
     } from "$lib/components/ui/sidebar";
     import {HouseIcon, StackIcon} from "phosphor-svelte";
+    import InstallButton from "$lib/app/pwa/InstallButton.svelte";
     import {page} from "$app/state";
 
     const items = [
@@ -53,6 +54,6 @@
     </SidebarContent>
 
     <SidebarFooter>
-
+        <InstallButton />
     </SidebarFooter>
 </Sidebar>

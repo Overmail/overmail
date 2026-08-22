@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.http.ai.aiProcessing
 import es.jvbabi.overmail.server.http.avatars.avatars
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.threads.threads
+import es.jvbabi.overmail.server.http.webapp.agent.agentProcess
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -76,6 +77,12 @@ internal fun Application.configureRouting() {
             // the way that screen needs them.
             route("/webapp/home") {
                 route("/email-graph") { emailGraph() }
+            }
+
+            route("/webapp/agent") {
+                // A socket rather than a poll: the agent goes from mail to mail on its own clock,
+                // and the display is meant to follow it.
+                route("/process") { agentProcess() }
             }
         }
     }

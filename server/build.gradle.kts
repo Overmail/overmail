@@ -38,6 +38,7 @@ dependencies {
     implementation("io.ktor:ktor-server-di:3.5.2")
     implementation("io.ktor:ktor-server-auth:3.5.2")
     implementation("io.ktor:ktor-server-auth-jwt:3.5.2")
+    implementation("io.ktor:ktor-server-websockets:3.5.2")
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
     implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")

@@ -35,7 +35,10 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if !checked}
-	<div transition:fade={{duration: 200}} class="absolute top-0 left-0 z-20 flex flex-col items-center justify-center gap-4 w-screen h-screen">
+	<!-- `fixed inset-0` rather than a viewport height: on a phone `h-screen` is 100vh, which is
+	     the viewport as it stands with the address bar out of the way and so taller than what is
+	     on screen -- the logo would sit below the optical middle and the loader under the bar. -->
+	<div transition:fade={{duration: 200}} class="fixed inset-0 z-20 flex flex-col items-center justify-center gap-4">
 		<CheckingSession />
 	</div>
 {:else if isAuthRoute || session}

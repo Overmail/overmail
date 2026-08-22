@@ -14,9 +14,11 @@ import es.jvbabi.overmail.server.ai.steps.ThreadPlacement
 import es.jvbabi.overmail.server.ai.steps.threadMaterial
 import es.jvbabi.overmail.server.ai.steps.normalised
 import es.jvbabi.overmail.server.ai.steps.tagReviewMaterial
+import es.jvbabi.overmail.server.ai.steps.withoutOwnerIdentity
 import es.jvbabi.overmail.server.ai.steps.withoutThreadTitle
 import es.jvbabi.overmail.server.domain.models.EmailTag
 import es.jvbabi.overmail.server.domain.models.TaggedMail
+import es.jvbabi.overmail.server.domain.models.AgentStep
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
@@ -25,7 +27,11 @@ import es.jvbabi.overmail.server.domain.repository.ThreadRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
@@ -67,6 +73,17 @@ class AiProcessingQueue(
     /** Whether the queue is working through the mailbox right now. */
     val isRunning: Boolean get() = queueJob?.isActive == true
 
+    private val _currentWork = MutableStateFlow<ProcessingMail?>(null)
+
+    /**
+     * The mail the queue has in its hands right now, null while it has none. Kept here rather than
+     * read back off the database: a mail is stamped only once it has been through, so between the
+     * two there is nothing in the rows that says which one is being looked at.
+     *
+     * Read through `AgentRepository`, which is what serves it to the outside.
+     */
+    val currentWork: StateFlow<ProcessingMail?> = _currentWork.asStateFlow()
+
     /** Starts working through the mailbox, or leaves the run that is already going alone. */
     fun start() {
         if (isRunning) return
@@ -87,24 +104,46 @@ class AiProcessingQueue(
 
     /** Runs until the job is cancelled or the surrounding scope goes. */
     private suspend fun run() {
-        emailRepository
-            .getUnprocessedIdsOldestFirst()
-            .collect { ids ->
-                // Sequential on purpose: mails are handled in the order they were sent, and the
-                // model call this is going to become should not fan out over the whole mailbox.
-                ids.forEach { id ->
-                    val email = emailRepository.getById(id).first() ?: return@forEach
-                    // A mail that could not be processed stays unstamped and is picked up again on
-                    // the next emission: a model that is down should not silently skip the inbox.
-                    try {
-                        process(email)
-                    } catch (cause: Exception) {
-                        println("Processing failed for '${email.subject}': ${cause.message}")
-                        return@forEach
+        try {
+            emailRepository
+                .getUnprocessedIdsOldestFirst()
+                .collect { ids ->
+                    // Sequential on purpose: mails are handled in the order they were sent, and the
+                    // model call this is going to become should not fan out over the whole mailbox.
+                    ids.forEach { id ->
+                        val email = emailRepository.getById(id).first() ?: return@forEach
+                        _currentWork.value = ProcessingMail(
+                            emailId = email.id,
+                            userId = email.imapAccount.user.id,
+                            subject = email.subject,
+                            senderName = email.senderName,
+                            senderAddress = email.sender.address,
+                            step = AgentStep.ORIGIN,
+                        )
+                        // A mail that could not be processed stays unstamped and is picked up again on
+                        // the next emission: a model that is down should not silently skip the inbox.
+                        try {
+                            process(email)
+                        } catch (cause: Exception) {
+                            println("Processing failed for '${email.subject}': ${cause.message}")
+                            return@forEach
+                        }
+                        emailRepository.markAiProcessed(id)
                     }
-                    emailRepository.markAiProcessed(id)
+                    // The emission is worked off; the collect now waits for the next one, and
+                    // waiting is what idle means here.
+                    _currentWork.value = null
                 }
-            }
+        } finally {
+            // Also on cancellation, so a stopped queue does not leave a mail standing as if it
+            // were still being looked at. Setting a state flow does not suspend, so this runs.
+            _currentWork.value = null
+        }
+    }
+
+    /** Moves the mail on to its next pass, for anyone watching. */
+    private fun enter(step: AgentStep) {
+        _currentWork.update { mail -> mail?.copy(step = step) }
     }
 
     private suspend fun process(email: Email) {
@@ -154,6 +193,7 @@ class AiProcessingQueue(
                 " ${origin.person}@${origin.institution}"
         )
 
+        enter(AgentStep.TAGS)
         val tags = analyzer.run(MailTagsStep, context)
         val taggedAt = Clock.System.now()
 
@@ -161,7 +201,14 @@ class AiProcessingQueue(
             "[TAGS]: took ${(taggedAt - senderIdentificationAt).inWholeSeconds}s," +
                 " inout/thinking/output: ${tags.usage.report()}"
         )
-        val suggested = tags.value.normalised().tags
+        val answered = tags.value.normalised().tags
+        // What the prompt rules out and a model reaches for anyway: filing a mail under the
+        // mailbox it sits in -- the owner's own name, or a word out of their own address. It is
+        // dropped here rather than argued about again.
+        val suggested = answered.withoutOwnerIdentity(context.owner)
+        answered.filterNot { it in suggested }.forEach {
+            println("  x ${it.tag} (says no more than whose mailbox this is)")
+        }
 
         // Mails around this one: filed under the same tags -- identifiers included, they are tags
         // too -- or carrying the same subject under a reply prefix, which is the other mail of a
@@ -221,6 +268,7 @@ class AiProcessingQueue(
         val ownThread = threads[email.id]
         val threadsByMail = threads - email.id
 
+        enter(AgentStep.THREAD)
         val start = Clock.System.now()
         val answer = analyzer.run(
             MailThreadStep,
@@ -294,6 +342,7 @@ class AiProcessingQueue(
         neighbours: List<TaggedMail>,
         placement: ThreadPlacement?,
     ): List<MailTag> {
+        enter(AgentStep.REVIEW)
         val start = Clock.System.now()
         val review = analyzer.run(
             MailTagReviewStep,
@@ -310,9 +359,16 @@ class AiProcessingQueue(
 
         // What the prompt rules out and a model reaches for anyway: filing the mails of a thread
         // under the thread's own title. It is dropped here rather than argued about again.
-        val revised = review.value.tags.withoutThreadTitle(placement)
-        review.value.tags.filterNot { it in revised }.forEach {
+        val withoutTitle = review.value.tags.withoutThreadTitle(placement)
+        review.value.tags.filterNot { it in withoutTitle }.forEach {
             println("  x ${it.tag} (the thread's title is not a tag)")
+        }
+
+        // The same for the tag that only names the mailbox: the review reaches for it as readily
+        // as the step before it, and on a mail the owner wrote themselves more readily still.
+        val revised = withoutTitle.withoutOwnerIdentity(context.owner)
+        withoutTitle.filterNot { it in revised }.forEach {
+            println("  x ${it.tag} (says no more than whose mailbox this is)")
         }
 
         review.value.corrections.forEach { correction ->
@@ -330,10 +386,13 @@ class AiProcessingQueue(
                 }
             }
 
-            correction.add.withoutThreadTitle(placement).forEach { suggestion ->
-                file(neighbour.id, email.imapAccount.user, suggestion)
-                println("  [${correction.mail}] + ${suggestion.tag}: ${suggestion.reason}")
-            }
+            correction.add
+                .withoutThreadTitle(placement)
+                .withoutOwnerIdentity(context.owner)
+                .forEach { suggestion ->
+                    file(neighbour.id, email.imapAccount.user, suggestion)
+                    println("  [${correction.mail}] + ${suggestion.tag}: ${suggestion.reason}")
+                }
         }
 
         return revised.ifEmpty { suggested }

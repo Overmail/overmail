@@ -83,7 +83,9 @@ val MailTagReviewStep = MailAnalysisStep(
           round: a mail that was filed without a tag its siblings all have.
         - A tag that turns out to be a one-off after all, once you see what the others carry.
         - A mail the owner wrote themselves is marked as such in the list. It is filed like the mail
-          it answers -- same matter, same tags -- and never under the owner's own name.
+          it answers -- same matter, same tags -- and never under the owner's own name, nor under
+          anything read off their own address: their domain says whose mailbox this is, not what a
+          mail in it is about.
 
         Rules:
         - Sitting in the same thread is no reason for a tag. "This mail is part of the thread X"

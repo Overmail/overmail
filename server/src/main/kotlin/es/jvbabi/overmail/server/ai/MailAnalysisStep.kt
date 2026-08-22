@@ -80,6 +80,12 @@ private val SHARED_RULES = """
     - Never invent, guess or complete information that is not in the mail. When something is not
       there, the answer is null -- an empty field is a correct answer, not a failure.
     - Prefer explicit evidence: what the mail writes out beats what it seems to imply.
+    - Read past what the mail's own program put there instead of its writer: "Gesendet von meinem
+      iPhone", "Sent from my Samsung Mobile", "Von unterwegs gesendet", "Get Outlook for iOS" and
+      the like. Such a line names the device or the app the mail was typed on. It says nothing
+      about the matter, nothing about who wrote the mail and nothing about who they write for --
+      the same line sits under mails that have nothing to do with each other. A signature naming a
+      person or a company is a different matter and does count.
     - Two mails of the same kind must get the same answer.
     - Answer with the requested structure only. No explanation, no reasoning, no extra fields.
 """.trimIndent()

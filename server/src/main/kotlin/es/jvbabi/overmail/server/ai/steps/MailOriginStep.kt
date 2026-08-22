@@ -46,6 +46,9 @@ val MailOriginStep = MailAnalysisStep(
           gmail.com, gmx.de, web.de, outlook.com, icloud.com, posteo.de, mailbox.org and the like.
         - Answer with the organisation's name, not with its domain: "Schulverwalter", not
           "schulverwalter.de"; "WebKit", not "webkit.org".
+        - The device or mail app a mail was typed on is no organisation: "Gesendet von meinem
+          iPhone" makes neither "iPhone" nor Apple the institution, and "Sent from my Samsung
+          Mobile" makes neither Samsung nor "Samsung Mobile" one.
         - Answer null when a private person writes on their own behalf.
     """.trimIndent(),
 )

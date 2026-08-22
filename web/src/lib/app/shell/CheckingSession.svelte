@@ -2,7 +2,9 @@
     import favicon from "$lib/assets/favicon.svg";
 </script>
 
-<div class="flex flex-col items-center justify-center gap-4 w-screen h-screen">
+<!-- Fills whatever it is put in rather than the viewport: the layout hands it a `fixed inset-0`
+     box, which is the one measure a phone's address bar cannot make wrong. -->
+<div class="flex flex-col items-center justify-center gap-4 w-full h-full">
     <img src={favicon} alt="Logo" class="w-16 h-16" />
     <p class="text-2xl font-medium">Overmail</p>
 

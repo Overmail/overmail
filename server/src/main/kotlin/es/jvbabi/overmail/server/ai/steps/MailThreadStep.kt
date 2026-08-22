@@ -56,6 +56,9 @@ val MailThreadStep = MailAnalysisStep(
           no further judgement needed, list the mail.
         - The same conversation: mails that answer each other. The subject carries a reply or
           forward prefix, the body quotes what came before, the same people write back and forth.
+          Both sides of it are in this mailbox: a mail the owner wrote and the mail it answers are
+          one conversation, and there the sender of one is the recipient of the other. Which of the
+          listed mails the owner wrote is marked; do not read that as a different party.
 
         Where neither an identifier nor a reply chain ties the mails together, they have to be
         plainly about the same single thing. Sharing a tag is not enough, and sharing a sender is
@@ -104,7 +107,7 @@ fun threadMaterial(
 
     neighbours.forEachIndexed { index, mail ->
         textWithNewLine("[${index + 1}] ${mail.subject}")
-        textWithNewLine("      from: ${mail.sender}")
+        textWithNewLine("      from: ${mail.from()}")
         mail.excerpt?.let { textWithNewLine("      text: $it") }
         textWithNewLine("      tags: ${mail.tags.joinToString { it.tag.name }.ifEmpty { "-" }}")
         threadsByMail[mail.id]?.let { textWithNewLine("      thread: \"${it.title}\"") }

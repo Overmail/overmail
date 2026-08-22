@@ -34,6 +34,11 @@ data class TaggedMail(
     val sent: Instant,
     /** Address the mail came from. */
     val sender: String,
+    /**
+     * Whether the owner wrote this mail themselves. The sent folder is imported as well, so a
+     * neighbouring mail is about as likely to be the owner's own answer as the other party's mail.
+     */
+    val fromOwner: Boolean,
     /** The opening of the mail, enough to tell what it was. Absent for a mail without a text part. */
     val excerpt: String?,
     val tags: List<EmailTag>,

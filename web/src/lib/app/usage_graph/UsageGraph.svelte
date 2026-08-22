@@ -19,7 +19,8 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	// `state` is renamed on the way in: a local binding under that name would turn every `$state`
 	// in this file into a store subscription.
@@ -43,17 +44,12 @@
 		 */
 		label?: string;
 		/**
-		 * Rendered over the card the pointer is on, and it draws its own bubble — what belongs in
-		 * it is the caller's business, since only the caller knows what was counted. Without it the
-		 * graph ignores the pointer entirely.
+		 * What stands in the bubble over the card the pointer is on. Only the caller knows what was
+		 * counted, so only the caller can word it; the bubble itself is the tooltip's, so this is
+		 * its contents and not a box of its own. Without it the graph ignores the pointer entirely.
 		 */
 		tooltip?: Snippet<[UsageGraphDay]>;
 	} = $props();
-
-	/** `size-3` and `gap-1` below, in pixels. The tooltip is placed off these, so they go together. */
-	const CARD_PX = 12;
-	const GAP_PX = 4;
-	const PITCH_PX = CARD_PX + GAP_PX;
 
 	const ROWS = 7;
 
@@ -83,62 +79,132 @@
 		`${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, '0')}-${`${date.getDate()}`.padStart(2, '0')}`;
 
 	/**
-	 * How many cards stand empty before 1 January, so every row is one weekday.
+	 * How many slots stand in front of 1 January, so that every row is one weekday.
 	 *
 	 * Monday first, as the week is written here — `getDay()` counts from Sunday.
 	 */
-	const leadingCells = $derived((new Date(year, 0, 1).getDay() + 6) % 7);
+	const offsetOf = (of: number) => (new Date(of, 0, 1).getDay() + 6) % 7;
 
 	/**
-	 * Every day of [year] with where it sits. Cards fill a column before starting the next, so a
-	 * card's row is its weekday and its column is its week.
+	 * One place in the grid.
+	 *
+	 * Slots are the fixed thing here: slot 0 is the card in the top left corner, and they run down
+	 * a column before starting the next — the same places, whatever year is on screen.
 	 */
-	const cells = $derived.by(() => {
-		const total = isLeapYear(year) ? 366 : 365;
+	type Slot = {
+		/** The day this slot stands for, or null for a slot the year does not reach. */
+		date: string | null;
+		count: number;
+		/** A day that has not happened yet, and therefore has nothing to say rather than nothing. */
+		ahead: boolean;
+		row: number;
+		column: number;
+		/** What the card is worth, as a percentage of [color]. */
+		share: number;
+	};
 
-		return Array.from({ length: total }, (_, index) => {
-			const position = index + leadingCells;
+	/** A year as it is drawn: how many weeks wide it comes out, and what stands in every slot. */
+	type Drawing = { columns: number; slots: Slot[] };
 
-			return {
-				date: isoDate(new Date(year, 0, 1 + index)),
-				row: position % ROWS,
-				column: Math.floor(position / ROWS)
-			};
-		});
-	});
+	/**
+	 * [of] against [days], slot by slot — the whole translation between a date and where it is
+	 * drawn, and the only place the year's offset is applied.
+	 *
+	 * A year opens on a different weekday each time — 2026 on a Thursday, 2025 on a Wednesday — and
+	 * that moves which day lands in which slot. It does not move the slots. So a year that is
+	 * switched leaves every card standing where it is and changes what it is worth, which is a
+	 * colour the card transitions into; nothing is laid out anew, so there is nothing to jump. The
+	 * slots the year does not reach, before 1 January and after 31 December, stand empty.
+	 *
+	 * A day is measured against the busiest day of its own year, so the graph is read within itself
+	 * rather than against a scale nobody stated. Without counts every card comes out empty, which
+	 * is the flat grid the first load shimmers over.
+	 */
+	function draw(of: number, days: ReadonlyMap<string, number> | null): Drawing {
+		const offset = offsetOf(of);
+		const total = isLeapYear(of) ? 366 : 365;
+		const columns = Math.ceil((offset + total) / ROWS);
+		const busiest = days?.size ? Math.max(...days.values()) : 0;
+		// Read as the drawing is made rather than kept ticking: a year is redrawn often enough,
+		// and a graph that is open at midnight showing yesterday's edge is nobody's problem.
+		// `yyyy-mm-dd` sorts the way the calendar does, so a plain comparison is the whole test.
+		const today = isoDate(new Date());
+
+		return {
+			columns,
+			slots: Array.from({ length: columns * ROWS }, (_, slot): Slot => {
+				const day = slot - offset;
+				const date = day >= 0 && day < total ? isoDate(new Date(of, 0, 1 + day)) : null;
+				const count = (date === null ? 0 : days?.get(date)) ?? 0;
+
+				return {
+					date,
+					count,
+					ahead: date !== null && date > today,
+					row: slot % ROWS,
+					column: Math.floor(slot / ROWS),
+					share:
+						count === 0 || busiest === 0
+							? 0
+							: Math.round((MIN_SHARE + (1 - MIN_SHARE) * (count / busiest)) * 100)
+				};
+			})
+		};
+	}
 
 	const isLoading = $derived(usage.type === 'loading');
 	const counts = $derived(usage.type === 'data' ? usage.days : null);
 
-	const countOn = (date: string) => counts?.get(date) ?? 0;
+	/**
+	 * The last drawing that had its counts in. Kept while the next ones are on their way: the year
+	 * on the heading has already changed, and the grid holds what it had under the shimmer instead
+	 * of emptying itself and filling up again.
+	 */
+	let drawn = $state<Drawing | null>(null);
 
-	/** What the fullest card is measured against. Nothing counted yet means nothing to measure. */
-	const busiest = $derived(counts?.size ? Math.max(...counts.values()) : 0);
+	// Counts are what this waits for, and the year is only read along with them, never tracked:
+	// the two arrive as separate props and the year is set first, so a run on the year alone would
+	// draw exactly the mismatch this is here to avoid -- the new year's weekdays under the old
+	// year's numbers.
+	$effect(() => {
+		if (counts !== null) drawn = draw(untrack(() => year), counts);
+	});
+
+	/** What is on screen: the drawing that has its counts, or an empty year until the first lands. */
+	const shown = $derived(drawn ?? draw(year, null));
+
+	// The slot the pointer is on, and the card standing in it. The card is kept rather than
+	// measured: the bubble is hung off the element itself and places itself against it.
+	let hoveredSlot = $state<number | null>(null);
+	let hoveredCard = $state<HTMLElement | null>(null);
+	const hovered = $derived(hoveredSlot === null ? null : (shown.slots[hoveredSlot] ?? null));
 
 	/**
-	 * How much of [color] a day is worth, as a percentage: its own count against the busiest day of
-	 * the year, so the graph is read within itself rather than against a scale nobody stated.
-	 *
-	 * Zero while loading as well as on a day nothing arrived — the shimmer wants one flat surface,
-	 * and an empty day is empty either way.
+	 * Over a slot that is a day, and only while the counts on screen are the ones that were asked
+	 * for: the cards hold the last drawing over when a year is switched, and a number read off that
+	 * would be last year's against a day of this one.
 	 */
-	const shareOn = (date: string) => {
-		const count = countOn(date);
-		if (count === 0 || busiest === 0) return 0;
-		return Math.round((MIN_SHARE + (1 - MIN_SHARE) * (count / busiest)) * 100);
-	};
+	const hasBubble = $derived(tooltip !== undefined && hovered?.date != null && !isLoading);
 
-	// Which card the pointer is on, by index into [cells]. Only tracked when there is a tooltip to
-	// show for it, so a graph without one costs nothing per card.
-	let hoveredIndex = $state<number | null>(null);
-	const hovered = $derived(hoveredIndex === null ? null : (cells[hoveredIndex] ?? null));
+	// Nothing triggers this tooltip -- the pointer on a card does, and the tooltip is told. Bound
+	// rather than handed down, so it can still be closed out from under us.
+	let isOpen = $state(false);
+
+	$effect(() => {
+		isOpen = hasBubble;
+	});
+
+	function leave() {
+		hoveredSlot = null;
+		hoveredCard = null;
+	}
 </script>
 
 <div class="flex w-fit gap-1">
 	<!--
-		Its own grid beside the cards rather than a first column inside them, so the card grid keeps
-		starting at zero: the tooltip is placed off that origin, and a rail of unknown width in front
-		of it would shift every card by however wide the longest name happens to render.
+		Its own grid beside the cards rather than a first column inside them, so the cards keep their
+		own box: a rail of unknown width in front of them would push every one of them along by
+		however wide the longest name happens to render.
 
 		Same seven rows and the same gap, so the two line up without either knowing the other's size.
 	-->
@@ -150,48 +216,54 @@
 		{/each}
 	</div>
 
-	<!-- The tooltip is positioned against this box, so the grid is what it wraps and nothing more. -->
-	<div class="relative w-fit">
-		<!--
-			One picture rather than 365 of them: a reader is told what the graph is, and the cards
-			below it are the drawing. The colour is stated once here too, so the caller's string
-			reaches exactly one place and every card only carries its own share of it.
-		-->
-		<div
-			class="grid w-fit grid-flow-col grid-rows-7 gap-1"
-			style="--usage-tint: {color}"
-			role="img"
-			aria-label={label}
-			onmouseleave={() => (hoveredIndex = null)}
-		>
-			{#each Array.from({ length: leadingCells }) as _, index (index)}
-				<div class="size-3"></div>
-			{/each}
+	<Tooltip.Provider delayDuration={0}>
+		<Tooltip.Root bind:open={isOpen} disableHoverableContent>
+			<!--
+				One picture rather than 365 of them: a reader is told what the graph is, and the cards
+				below it are the drawing. The colour is stated once here too, so the caller's string
+				reaches exactly one place and every card only carries its own share of it.
 
-			{#each cells as cell, index (cell.date)}
-				<div
-					class="card size-3 overflow-hidden rounded-xs"
-					class:shimmer={isLoading}
-					class:enter={counts !== null}
-					style="--wave-delay: {(cell.row + cell.column) *
-						WAVE_STEP_MS}ms; --tint-share: {shareOn(cell.date)}%"
-					aria-hidden="true"
-					onmouseenter={() => (hoveredIndex = tooltip ? index : null)}
-				></div>
-			{/each}
-		</div>
-
-		{#if tooltip && hovered}
-			<!-- Placed off the grid's own geometry rather than off a measured element: the pitch is
-			     known, and reading a rect back would cost a layout per card the pointer crosses. -->
+				Keyed by slot, the one thing that does not move: a card is where it is and what it
+				stands for is looked up, so a year that is switched updates the cards that are already
+				there instead of tearing the grid down and putting a new one up.
+			-->
 			<div
-				class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full pb-1"
-				style="left: {hovered.column * PITCH_PX + CARD_PX / 2}px; top: {hovered.row * PITCH_PX}px"
+				class="grid w-fit grid-flow-col grid-rows-7 gap-1"
+				style="--usage-tint: {color}"
+				role="img"
+				aria-label={label}
+				onmouseleave={leave}
 			>
-				{@render tooltip({ date: hovered.date, count: countOn(hovered.date) })}
+				{#each shown.slots as slot, index (index)}
+					<div
+						class="card enter size-3 overflow-hidden rounded-xs"
+						class:blank={slot.date === null}
+						class:ahead={slot.ahead}
+						class:shimmer={isLoading}
+						style="--wave-delay: {(slot.row + slot.column) *
+							WAVE_STEP_MS}ms; --tint-share: {slot.share}%"
+						aria-hidden="true"
+						onmouseenter={(event) => {
+							hoveredSlot = index;
+							hoveredCard = event.currentTarget;
+						}}
+					></div>
+				{/each}
 			</div>
-		{/if}
-	</div>
+
+			{#if tooltip && hovered?.date}
+				<!--
+					Hung off the card the pointer is on rather than placed by hand off the grid's
+					geometry: the bubble is portalled out of the graph, so it is neither clipped by
+					the box the graph scrolls in nor left to argue about stacking with anything
+					around it.
+				-->
+				<Tooltip.Content customAnchor={hoveredCard} sideOffset={6}>
+					{@render tooltip({ date: hovered.date, count: hovered.count })}
+				</Tooltip.Content>
+			{/if}
+		</Tooltip.Root>
+	</Tooltip.Provider>
 </div>
 
 <style>
@@ -200,11 +272,14 @@
 		so the counts land in about half the time the wave takes to cross.
 	*/
 	.card {
+		/* The shimmer overlay is placed against the card, so the card is what it is placed in. */
+		position: relative;
+
 		/*
 			Mixed into the empty card rather than laid over it: the tint is whatever the caller
 			handed over and knows nothing about the theme, so a flat fill would be unreadable in one
-			of them. A share of 0% is the empty card exactly, which is what a quiet day and the whole
-			loading state both are.
+			of them. A share of 0% is the empty card exactly, which is what a quiet day, a slot
+			outside the year and the whole loading state all are.
 		*/
 		background-color: color-mix(
 			in oklab,
@@ -216,12 +291,47 @@
 	}
 
 	/*
+		A slot the year does not reach — the days of the week before 1 January, the tail after 31
+		December. Drawn as nothing rather than left out, so that a year which opens on another
+		weekday moves the gap by fading one card in and another out, with no card appearing in a
+		place where none stood.
+	*/
+	.blank {
+		background-color: transparent;
+	}
+
+	/* Nothing is being counted there, so there is nothing to say it is being counted. */
+	.blank::after {
+		animation: none;
+	}
+
+	/*
+		A day that has not happened yet. The same card, mixed most of the way into the page: an
+		empty day and a day that could not have had anything on it should not read alike, and the
+		year ahead of today is the larger part of the grid for most of a year.
+
+		Faded through the colour rather than through `opacity`, which the card is already spending
+		on its way in — a card that entered at full strength and then dropped to a third of it once
+		the animation let go would be a blink of its own.
+	*/
+	.ahead {
+		background-color: color-mix(
+			in oklab,
+			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--accent))
+				30%,
+			transparent
+		);
+	}
+
+	/*
 		The grid itself arrives in one piece, undelayed: what is being waited for is the counts, and
 		staggering the empty cards as well made the year look like it was being built rather than
 		filled in. So every card is put down at once, and the colour then walks across them.
 
-		Runs once: the class goes on when the first counts land and stays on, so a day whose count
-		moves later only transitions its colour.
+		Sits on the card from the start rather than going on when the counts land: an animation
+		replays every time its class is put back on, so counts arriving -- or a year being switched
+		-- would fade all 365 cards out and in again over a grid that is already on screen. Now it
+		plays once as the grid is put down, and everything after that is colour.
 	*/
 	.enter {
 		animation: card-enter 320ms ease-out;
@@ -242,18 +352,24 @@
 		The light passes over the cards themselves rather than as a sheet across the grid: a band
 		drawn over the top would light the gaps too, and the shape being waited for is the cards.
 		Each one carries its own delay, so the wave travels down and to the right.
-	*/
-	.shimmer {
-		position: relative;
-	}
 
-	.shimmer::after {
+		The overlay sits on every card and only the animation comes and goes. Taking the whole
+		thing away with the class dropped it wherever the wave happened to stand, and a card that
+		is a tenth ink one frame and none the next is a blink -- times 365, right at the moment the
+		counts land. Without the animation it holds at nothing, and whatever it was showing when
+		the counts arrived fades out from there.
+	*/
+	.card::after {
 		content: '';
 		position: absolute;
 		inset: 0;
 		/* The theme's ink, so this darkens on a light card and lightens on a dark one. */
 		background-color: var(--foreground);
 		opacity: 0;
+		transition: opacity 400ms ease-out;
+	}
+
+	.shimmer::after {
 		animation: card-shimmer 2.4s ease-in-out infinite;
 		animation-delay: var(--wave-delay);
 	}
@@ -270,7 +386,8 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.card {
+		.card,
+		.card::after {
 			transition: none;
 		}
 

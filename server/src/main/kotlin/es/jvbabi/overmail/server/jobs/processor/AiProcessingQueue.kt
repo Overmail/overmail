@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.jobs.processor
 
 import es.jvbabi.overmail.server.ai.MailAnalyzer
 import es.jvbabi.overmail.server.ai.MailContext
+import es.jvbabi.overmail.server.ai.MailDirection
 import es.jvbabi.overmail.server.ai.MailParticipant
 import es.jvbabi.overmail.server.ai.TokenUsage
 import es.jvbabi.overmail.server.ai.steps.MailOriginStep
@@ -116,6 +117,14 @@ class AiProcessingQueue(
             owner = MailParticipant(
                 name = email.imapAccount.user.name,
                 address = email.imapAccount.username,
+            ),
+            // Which side of this mail the owner is on. Worked out here rather than left to the
+            // model: the sent folder is imported too, so the From line is the owner's own address
+            // about as often as it is the counterparty's.
+            direction = MailDirection.of(
+                ownerAddress = email.imapAccount.username,
+                senderAddress = email.sender.address,
+                recipientAddresses = email.recipients.map { it.emailUser.address },
             ),
             sender = MailParticipant(email.senderName, email.sender.address),
             recipients = email.recipients.map { MailParticipant(it.name, it.emailUser.address) },

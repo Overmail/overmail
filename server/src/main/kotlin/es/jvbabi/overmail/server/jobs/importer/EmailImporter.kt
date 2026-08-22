@@ -43,7 +43,7 @@ class EmailImporter(
             val folders = client.getFolders().onEach { println(it.fullName) }
             val inbox = folders.firstOrNull { it.name == "INBOX" }
             val sent = folders.firstOrNull { it.name == "Sent" || it.name == "Sent Items" }
-            val messages = folders.firstOrNull { it.name == "Archiv.Nachrichten" }
+            val messages = folders.firstOrNull { it.fullName == "Archiv.Nachrichten" }
 
             if (inbox == null) {
                 println("No INBOX folder found for account ${imapAccount.username}")
@@ -117,7 +117,12 @@ class EmailImporter(
                     val text = ByteArrayOutputStream()
                     val html = ByteArrayOutputStream()
                     // getContent parses through a piped stream and blocks the calling thread.
-                    withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
+                    try {
+                        withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
+                    } catch (e: Exception) {
+                        println("Failed to get content for mail: $subject, error: ${e.message}")
+                        return@forEach
+                    }
 
                     emailRepository.insert(
                         imapAccount = imapAccount,

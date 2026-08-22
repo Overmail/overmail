@@ -70,6 +70,11 @@ val MailTagsStep = MailAnalysisStep(
         - Nothing the mailbox already knows by itself: a date, a year, a month, the sender's
           address, who else was on the mail. Those are filters, not tags. A year keeps its place
           inside an identifier ("RE-2026-114"), but never stands as a tag of its own.
+        - The owner's own name and their own organisation are never tags: they fit every mail in
+          this mailbox and so tell none of them apart. On an outgoing mail the party worth filing
+          under is the recipient, not the sender.
+        - A mail the owner wrote is filed under the same matter as the mail it answers. Who wrote
+          it changes nothing about what it is about.
         - Nothing so wide it would fit any mail ("Information", "Nachricht", "Anfrage"), nothing so
           narrow it fits this one alone -- unless it is an identifier.
         - One short reason per tag, saying where in the mail you read it off. Your own words.

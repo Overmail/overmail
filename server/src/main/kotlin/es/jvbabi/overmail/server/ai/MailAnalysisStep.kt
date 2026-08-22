@@ -57,8 +57,13 @@ class MailAnalysisStep<T>(
  */
 private val SHARED_RULES = """
     /no_think
-    You analyse a single email. You are given the mailbox owner, the sender, the recipients, the
-    subject and the body, and you answer one specific question about that mail.
+    You analyse a single email. You are given the mailbox owner, which side of the mail they are
+    on, the sender, the recipients, the subject and the body, and you answer one specific question
+    about that mail.
+
+    The mailbox holds what its owner received as well as what they wrote, so they can be the sender
+    just as well as a recipient. Which one they are is stated as "Direction": take it from there
+    rather than working it out from the addresses, and never take the owner for the other party.
 
     Rules for every answer:
     - Use only what the mail itself shows: its text, its signature, its addresses.

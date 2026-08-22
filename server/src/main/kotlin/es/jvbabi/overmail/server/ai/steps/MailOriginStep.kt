@@ -34,7 +34,8 @@ val MailOriginStep = MailAnalysisStep(
           "Pest Control Officer", "Team", "Redaktion", "Bugzilla", "noreply" are all wrong answers.
         - Notification systems (bug trackers, ticket systems, build servers) send on behalf of a
           human: name that human if the mail names one, otherwise answer null.
-        - The sender may be the mailbox owner writing themselves; name them in that case.
+        - On an outgoing mail the sender is the mailbox owner: name them, and the institution they
+          wrote on behalf of -- never the party they wrote to.
 
         institution: the organisation the mail was sent on behalf of.
         - A company, authority, school, or the project whose system sent the mail.

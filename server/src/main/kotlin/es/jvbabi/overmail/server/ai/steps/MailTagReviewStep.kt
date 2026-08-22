@@ -70,6 +70,8 @@ val MailTagReviewStep = MailAnalysisStep(
         - A tag the neighbours carry that this mail plainly belongs under too, and the other way
           round: a mail that was filed without a tag its siblings all have.
         - A tag that turns out to be a one-off after all, once you see what the others carry.
+        - A mail the owner wrote themselves is marked as such in the list. It is filed like the mail
+          it answers -- same matter, same tags -- and never under the owner's own name.
 
         Rules:
         - Changing an older mail is the exception. Propose it only when the mail is plainly filed
@@ -112,7 +114,7 @@ fun tagReviewMaterial(
     neighbours.forEachIndexed { index, mail ->
         val sameThread = if (placement != null && mail.id in placement.memberIds) " -- same thread" else ""
         textWithNewLine("[${index + 1}] ${mail.subject}$sameThread")
-        textWithNewLine("      from: ${mail.sender}")
+        textWithNewLine("      from: ${mail.from()}")
         mail.excerpt?.let { textWithNewLine("      text: $it") }
         textWithNewLine("      tags: ${mail.tags.joinToString { "${it.tag.name} (${it.owner()})" }.ifEmpty { "-" }}")
     }

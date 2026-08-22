@@ -52,6 +52,7 @@ private data class NeighbourRow(
     val subject: String,
     val sent: Instant,
     val sender: String,
+    val fromOwner: Boolean,
     val excerpt: String?,
 )
 
@@ -212,7 +213,16 @@ class TagRepositoryImpl(
                     val excerpt = Emails.textContent.substring(1, EXCERPT_LENGTH)
 
                     val mails = (Emails innerJoin ImapAccounts innerJoin EmailUsers)
-                        .select(Emails.id, Emails.subject, Emails.sent, EmailUsers.address, excerpt)
+                        .select(
+                            Emails.id,
+                            Emails.subject,
+                            Emails.sent,
+                            EmailUsers.address,
+                            // The address the account fetches with, to tell the owner's own mails
+                            // from the ones written to them.
+                            ImapAccounts.username,
+                            excerpt,
+                        )
                         .where((ImapAccounts.user eq user.id) and (Emails.sent less before) and matches)
                         .withDistinct()
                         .orderBy(Emails.sent, SortOrder.DESC)
@@ -223,6 +233,7 @@ class TagRepositoryImpl(
                                 subject = it[Emails.subject],
                                 sent = it[Emails.sent],
                                 sender = it[EmailUsers.address],
+                                fromOwner = it[EmailUsers.address].equals(it[ImapAccounts.username], ignoreCase = true),
                                 excerpt = it[excerpt]?.replace(Regex("\\s+"), " ")?.trim()?.ifEmpty { null },
                             )
                         }
@@ -244,6 +255,7 @@ class TagRepositoryImpl(
                             subject = mail.subject,
                             sent = mail.sent,
                             sender = mail.sender,
+                            fromOwner = mail.fromOwner,
                             excerpt = mail.excerpt,
                             tags = tagsByMail[mail.id].orEmpty(),
                         )

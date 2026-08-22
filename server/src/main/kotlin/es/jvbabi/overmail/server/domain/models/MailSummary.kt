@@ -18,7 +18,23 @@ data class MailSummary(
     val recipients: List<MailParticipant>,
     val cc: List<MailParticipant>,
     val bcc: List<MailParticipant>,
+    val isRead: Boolean,
+    /** Whether the mail sits in the archive; how it got there is not a listing's business. */
+    val isArchived: Boolean,
+    /**
+     * The matter the mail sits in, null while nothing has filed it. A mail may sit in more than
+     * one; a listing shows the first, which is enough to group by.
+     */
+    val thread: MailThreadRef?,
     val tags: List<EmailTag>,
+)
+
+/** The matter a mail sits in, as a listing needs it: what it is called and how big it is. */
+data class MailThreadRef(
+    val id: Uuid,
+    val title: String,
+    /** Mails the thread holds altogether, not the ones of it that are on this page. */
+    val size: Int,
 )
 
 /**

@@ -5,15 +5,18 @@ import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.database.mappers.toMailThread
 import es.jvbabi.overmail.server.database.mappers.toMailThreadEntry
 import es.jvbabi.overmail.server.database.models.EmailThreads
+import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.Threads
 import es.jvbabi.overmail.server.domain.models.MailThread
 import es.jvbabi.overmail.server.domain.models.MailThreadEntry
+import es.jvbabi.overmail.server.domain.models.ThreadOverview
 import es.jvbabi.overmail.server.domain.models.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
@@ -24,6 +27,7 @@ import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
 import org.jetbrains.exposed.v1.r2dbc.update
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.firstOrNull as firstRowOrNull
 
@@ -42,6 +46,54 @@ class ThreadRepositoryImpl(
                         .where(Threads.user eq user.id)
                         .map { it.toMailThread(user) }
                         .toList()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    override fun getOverviewForUser(user: User): Flow<List<ThreadOverview>> {
+        return changes.changesOf(Threads, EmailThreads, Emails)
+            .conflate()
+            .map {
+                database.query {
+                    val threads = Threads
+                        .selectAll()
+                        .where(Threads.user eq user.id)
+                        .map { it.toMailThread(user) }
+                        .toList()
+                        .associateBy { it.id }
+
+                    if (threads.isEmpty()) return@query emptyList()
+
+                    // One pass over every membership, ordered the way the mails will be shown, so
+                    // the lists below come out sorted without sorting them: a thread's mails
+                    // newest first, and the send time of the first one it collects is the thread's
+                    // own rank.
+                    val rows = (EmailThreads innerJoin Emails)
+                        .select(EmailThreads.thread, EmailThreads.email, Emails.sent)
+                        .where(EmailThreads.thread inList threads.keys.toList())
+                        .orderBy(Emails.sent to SortOrder.DESC, Emails.id to SortOrder.DESC)
+                        .toList()
+
+                    val mailsOf = LinkedHashMap<Uuid, MutableList<Uuid>>()
+                    val lastSentOf = HashMap<Uuid, Instant>()
+
+                    for (row in rows) {
+                        val threadId = row[EmailThreads.thread].value
+                        mailsOf.getOrPut(threadId) { mutableListOf() } += row[EmailThreads.email].value
+                        lastSentOf.putIfAbsent(threadId, row[Emails.sent])
+                    }
+
+                    // `mailsOf` keeps the order the memberships came in, so the thread whose newest
+                    // mail is newest is first. A thread nothing is filed under any more is not in
+                    // here at all, which is what leaves it out of the list.
+                    mailsOf.map { (threadId, mailIds) ->
+                        ThreadOverview(
+                            thread = threads.getValue(threadId),
+                            mailIds = mailIds,
+                            lastSentAt = lastSentOf.getValue(threadId),
+                        )
+                    }
                 }
             }
             .distinctUntilChanged()

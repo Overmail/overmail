@@ -10,6 +10,8 @@ import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
+import es.jvbabi.overmail.server.domain.repository.ArchiveRepository
+import es.jvbabi.overmail.server.domain.repository.ArchiveRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
@@ -71,6 +73,7 @@ private fun Application.configureDependencies() {
         provide<OutgoingMailRepository> { OutgoingMailRepositoryImpl(resolve()) }
         provide<TagRepository> { TagRepositoryImpl(resolve(), resolve()) }
         provide<ThreadRepository> { ThreadRepositoryImpl(resolve(), resolve()) }
+        provide<ArchiveRepository> { ArchiveRepositoryImpl(resolve(), resolve()) }
         provide<JwtService> { JwtService() }
 
         provide<MailAnalyzer> { MailAnalyzer(resolve()) }

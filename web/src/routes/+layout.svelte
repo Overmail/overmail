@@ -6,6 +6,8 @@
 	import { authRepository, type Session } from '$lib/repository/AuthRepository';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import AppSidebar from "$lib/app/shell/AppSidebar.svelte";
+	import CheckingSession from "$lib/app/shell/CheckingSession.svelte";
+    import { fade } from 'svelte/transition';
 
 	let { children } = $props();
 
@@ -33,7 +35,9 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if !checked}
-	<p>Checking session…</p>
+	<div transition:fade={{duration: 200}} class="absolute top-0 left-0 z-20 flex flex-col items-center justify-center gap-4 w-screen h-screen">
+		<CheckingSession />
+	</div>
 {:else if isAuthRoute || session}
 	{#if session}
 

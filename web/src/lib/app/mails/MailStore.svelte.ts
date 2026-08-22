@@ -64,12 +64,27 @@ export class MailStore {
 	#inFlight = new Set<Edge>();
 	/** Ends whose last request failed, skipped until [retry]. */
 	#failed = new Set<Edge>();
+	/** Ends the server has run dry, so nothing asks them again. */
+	#exhausted = new Set<Edge>();
 	/** Bumped by [reset], so a request still in flight for the old list lands nowhere. */
 	#generation = 0;
 
-	constructor(repository: MailRepository = mailRepository, pageSize: number = PAGE_SIZE) {
+	/**
+	 * Narrows the whole store to the mails that sit in some thread, or to the ones that sit in
+	 * none. Undefined for the mailbox as it is. Part of every request and of the count that comes
+	 * back with them, so a narrowed store is a list in its own right -- which is how the grouped
+	 * view gets a stretch of just the unfiled mails.
+	 */
+	readonly #filed: boolean | undefined;
+
+	constructor(
+		repository: MailRepository = mailRepository,
+		pageSize: number = PAGE_SIZE,
+		options: { filed?: boolean } = {}
+	) {
 		this.#repository = repository;
 		this.#pageSize = pageSize;
+		this.#filed = options.filed;
 	}
 
 	/**
@@ -93,7 +108,19 @@ export class MailStore {
 		const fromTail = this.total - first - this.#tail;
 		if (fromHead <= 0 || fromTail <= 0) return;
 
-		this.#load(fromHead <= fromTail ? 'head' : 'tail');
+		// The nearer end, and the other one when that one has nothing left to give -- an end that
+		// ran dry must not leave the range unread while the other could still cover it.
+		const nearer = fromHead <= fromTail ? 'head' : 'tail';
+		const other = nearer === 'head' ? 'tail' : 'head';
+		this.#load(this.#canLoad(nearer) ? nearer : other);
+	}
+
+	/**
+	 * Extends the newest-first stretch by a page. What a reader walking down the list needs, and
+	 * the only way on when the row order is not the mailbox's -- see the grouped table.
+	 */
+	loadMore(): void {
+		this.#load('head');
 	}
 
 	/** Asks again for whatever failed. */
@@ -109,6 +136,7 @@ export class MailStore {
 		this.#generation += 1;
 		this.#inFlight.clear();
 		this.#failed.clear();
+		this.#exhausted.clear();
 		this.#cursor = {};
 		this.#known = new Set();
 		this.#head = 0;
@@ -161,11 +189,17 @@ export class MailStore {
 	}
 
 	#load(edge: Edge): void {
-		if (this.#inFlight.has(edge) || this.#failed.has(edge)) return;
-		// The two ends have met: there is nothing between them left to ask for.
-		if (this.total > 0 && this.#head + this.#tail >= this.total) return;
-
+		if (!this.#canLoad(edge)) return;
 		void this.#loadFrom(edge);
+	}
+
+	#canLoad(edge: Edge): boolean {
+		if (this.#inFlight.has(edge) || this.#failed.has(edge)) return false;
+		if (this.#exhausted.has(edge)) return false;
+		// The two ends have met: there is nothing between them left to ask for.
+		if (this.total > 0 && this.#head + this.#tail >= this.total) return false;
+
+		return true;
 	}
 
 	async #loadFrom(edge: Edge): Promise<void> {
@@ -174,10 +208,11 @@ export class MailStore {
 		this.#syncStatus();
 
 		try {
-			const page = await this.#repository.listMails(this.#queryFor(edge));
+			const query = this.#queryFor(edge);
+			const page = await this.#repository.listMails(query);
 			// Reset while this was in flight: these rows belong to a list that no longer exists.
 			if (generation !== this.#generation) return;
-			this.#apply(edge, page);
+			this.#apply(edge, page, query.before === undefined && query.after === undefined);
 		} catch {
 			if (generation === this.#generation) this.#failed.add(edge);
 		} finally {
@@ -189,17 +224,24 @@ export class MailStore {
 	}
 
 	#queryFor(edge: Edge): MailPageQuery {
+		const window = { limit: this.#pageSize, filed: this.#filed };
+
 		return edge === 'head'
-			? { limit: this.#pageSize, sort: 'desc', before: this.#cursor.head }
-			: { limit: this.#pageSize, sort: 'asc', after: this.#cursor.tail };
+			? { ...window, sort: 'desc' as const, before: this.#cursor.head }
+			: { ...window, sort: 'asc' as const, after: this.#cursor.tail };
 	}
 
-	#apply(edge: Edge, page: MailPage): void {
-		this.total = page.total;
+	#apply(edge: Edge, page: MailPage, isUnbounded: boolean): void {
 		this.initialized = true;
 
-		const next = this.entries.slice(0, page.total);
-		while (next.length < page.total) next.push(undefined);
+		// Only off a request that carried no cursor. `total` counts the window that was asked for,
+		// and every later request narrows that window to what is left beyond its cursor -- taking
+		// it from those would shrink the list by a page each time until the two ends appear to
+		// have met, which is a wall somewhere in the middle of the mailbox.
+		if (isUnbounded) this.total = page.total;
+
+		const next = this.entries.slice(0, this.total);
+		while (next.length < this.total) next.push(undefined);
 
 		const fresh = page.mails.filter((mail) => !this.#known.has(mail.id));
 		for (const mail of fresh) this.#known.add(mail.id);
@@ -209,21 +251,26 @@ export class MailStore {
 			fresh.forEach((mail, at) => (next[this.#head + at] = mail));
 		} else {
 			// Ascending, so the first row is the oldest one there is, which sits at the very end.
-			fresh.forEach((mail, at) => (next[page.total - 1 - this.#tail - at] = mail));
+			fresh.forEach((mail, at) => (next[this.total - 1 - this.#tail - at] = mail));
 		}
+
+		// A page the server could not fill means this end has read everything on its side. Said
+		// outright rather than left to the two ends meeting: a count taken once at the start can
+		// be out of date, and an end that keeps asking would poll an empty answer forever.
+		if (page.mails.length < this.#pageSize) this.#exhausted.add(edge);
 
 		const last = page.mails.at(-1);
 		if (last) {
 			// The cursors are exclusive and send times are stored at second precision, so each is
-			// put a second short of the last row and the overlap dropped by id above. Cutting at
-			// the send time itself would lose the rest of that second whenever a page ends inside
-			// one.
+			// put a second past the last row -- reading down, `before` a second later; reading up,
+			// `after` a second earlier -- and the overlap dropped by id above. Cutting at the send
+			// time itself would lose the rest of that second whenever a page ends inside one.
 			const overfullSecond = fresh.length === 0 && page.mails.length === this.#pageSize;
 			// That case means a single second holds more mail than a page does. Stepping past the
 			// second is the only way on; it is the one way this list can miss a mail.
 			this.#cursor[edge] = overfullSecond
 				? last.sent_at
-				: shiftSecond(last.sent_at, edge === 'head' ? -1 : 1);
+				: shiftSecond(last.sent_at, edge === 'head' ? 1 : -1);
 		}
 
 		this.#commit(next);

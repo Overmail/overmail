@@ -29,6 +29,13 @@ object Emails : UuidTable("emails") {
     val isRead = bool("is_read").default(false)
 
     /**
+     * Whether the mail sits in the archive right now. Denormalised on purpose: the record of
+     * how it got there is [Archived], and a listing must not join the newest row per mail out of
+     * it just to know the state.
+     */
+    val isArchived = bool("is_archived").default(false)
+
+    /**
      * When the AI last worked through this mail, null for a mail it has not seen yet. That is what
      * fills the processing queue, so it has to survive a restart -- the mailbox is not classified
      * afresh on every start.

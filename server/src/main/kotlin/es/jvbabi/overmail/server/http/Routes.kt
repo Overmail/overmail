@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.http.ai.aiProcessing
 import es.jvbabi.overmail.server.http.mails.mails
+import es.jvbabi.overmail.server.http.threads.threads
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -60,6 +61,9 @@ internal fun Application.configureRouting() {
 
             // The mailbox itself, cut for no screen in particular.
             route("/mails") { mails() }
+
+            // The threads themselves, as the skeleton a grouped list is laid out from.
+            route("/threads") { threads() }
 
             // Operating the mail agent, not a domain object of its own.
             route("/ai") { aiProcessing() }

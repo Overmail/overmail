@@ -25,6 +25,7 @@ fun ResultRow.toEmail(
     textContent = this[Emails.textContent],
     htmlContent = this[Emails.htmlContent],
     isRead = this[Emails.isRead],
+    isArchived = this[Emails.isArchived],
     lastAiProcessingAt = this[Emails.lastAiProcessingAt],
     recipients = recipients,
 )

@@ -24,6 +24,12 @@ interface EmailRepository {
      * mailbox without walking through everything in front of it: ordering the other way makes the
      * oldest mails the first page, and [before] becomes [after].
      *
+     * [threadId] narrows the window to one matter, [ids] to a named handful and [filed] to the
+     * mails that sit in some thread or in none. None of the three is a stretch of the list -- a
+     * thread's mails sit wherever they were sent -- which is what they are for: a caller that
+     * knows what it wants asks for exactly that instead of walking there. Anything belonging to
+     * another user matches nothing, like any mail that is not [user]'s.
+     *
      * Summaries rather than [Email]s, see [es.jvbabi.overmail.server.domain.models.MailSummary]:
      * a listing wants the headers, not the bodies. The page reports how many mails the window
      * holds in total, counted in the same transaction so it cannot disagree with the rows.
@@ -34,6 +40,9 @@ interface EmailRepository {
         after: Instant? = null,
         before: Instant? = null,
         newestFirst: Boolean = true,
+        threadId: Uuid? = null,
+        ids: Collection<Uuid>? = null,
+        filed: Boolean? = null,
     ): Flow<MailPage>
 
     /**

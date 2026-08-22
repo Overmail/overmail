@@ -11,10 +11,12 @@ import es.jvbabi.overmail.server.database.mappers.toTag
 import es.jvbabi.overmail.server.database.mappers.toUser
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailTags
+import es.jvbabi.overmail.server.database.models.EmailThreads
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Tags
+import es.jvbabi.overmail.server.database.models.Threads
 import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.EmailRecipient
@@ -24,6 +26,7 @@ import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.MailPage
 import es.jvbabi.overmail.server.domain.models.MailParticipant
 import es.jvbabi.overmail.server.domain.models.MailSummary
+import es.jvbabi.overmail.server.domain.models.MailThreadRef
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
@@ -43,9 +46,11 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.notInSubQuery
 import org.jetbrains.exposed.v1.datetime.Date
 import org.jetbrains.exposed.v1.datetime.Year
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
@@ -82,10 +87,21 @@ class EmailRepositoryImpl(
         after: Instant?,
         before: Instant?,
         newestFirst: Boolean,
+        threadId: Uuid?,
+        ids: Collection<Uuid>?,
+        filed: Boolean?,
     ): Flow<MailPage> {
-        return changes.changesOf(Emails, EmailRecipients, EmailUsers, EmailTags, Tags, ImapAccounts)
+        return changes
+            .changesOf(
+                Emails, EmailRecipients, EmailUsers, EmailTags, Tags, EmailThreads, Threads,
+                ImapAccounts,
+            )
             .conflate()
-            .map { database.query { loadSummaries(user, limit, after, before, newestFirst) } }
+            .map {
+                database.query {
+                    loadSummaries(user, limit, after, before, newestFirst, threadId, ids, filed)
+                }
+            }
             .distinctUntilChanged()
     }
 
@@ -285,6 +301,8 @@ class EmailRepositoryImpl(
                 textContent = textContent,
                 htmlContent = htmlContent,
                 isRead = isRead,
+                // Nothing archives a mail on import; that only ever happens later.
+                isArchived = false,
                 lastAiProcessingAt = null,
                 recipients = storedRecipients,
             )
@@ -302,10 +320,25 @@ class EmailRepositoryImpl(
         after: Instant?,
         before: Instant?,
         newestFirst: Boolean,
+        threadId: Uuid?,
+        ids: Collection<Uuid>?,
+        filed: Boolean?,
     ): MailPage {
         var where = (ImapAccounts.user eq user.id) as Op<Boolean>
         if (after != null) where = where and (Emails.sent greater after)
         if (before != null) where = where and (Emails.sent less before)
+        if (threadId != null) {
+            val inThread = EmailThreads
+                .select(EmailThreads.email)
+                .where(EmailThreads.thread eq threadId)
+            where = where and (Emails.id inSubQuery inThread)
+        }
+        if (ids != null) where = where and (Emails.id inList ids.distinct())
+        if (filed != null) {
+            val inAnyThread = EmailThreads.select(EmailThreads.email)
+            where = where and
+                if (filed) Emails.id inSubQuery inAnyThread else Emails.id notInSubQuery inAnyThread
+        }
 
         // Counted rather than derived from the rows: the point of the number is to say how much
         // is behind the page, which the page itself cannot know.
@@ -321,7 +354,10 @@ class EmailRepositoryImpl(
         // Joined over the sender reference of `Emails`, so the address comes along without a
         // second lookup; the recipients below need one because there are many per mail.
         val rows = (Emails innerJoin ImapAccounts innerJoin EmailUsers)
-            .select(Emails.id, Emails.subject, Emails.sent, Emails.senderName, EmailUsers.address)
+            .select(
+                Emails.id, Emails.subject, Emails.sent, Emails.senderName, Emails.isRead,
+                Emails.isArchived, EmailUsers.address,
+            )
             .where(where)
             // The id only breaks ties, and turns around with the send time so that reading the
             // mailbox from the other end walks the same order backwards. Send times are stored at
@@ -342,6 +378,8 @@ class EmailRepositoryImpl(
             .where(EmailRecipients.email inList ids)
             .toList()
             .groupBy { it[EmailRecipients.email].value }
+
+        val threads = loadThreads(ids)
 
         // Every tag of the mail, filed by the agent or by the user: a listing shows how a mail
         // ended up filed, not who did the filing.
@@ -370,11 +408,45 @@ class EmailRepositoryImpl(
                 recipients = addressed[EmailRecipientType.RECIPIENT].orEmpty(),
                 cc = addressed[EmailRecipientType.CC].orEmpty(),
                 bcc = addressed[EmailRecipientType.BCC].orEmpty(),
+                isRead = row[Emails.isRead],
+                isArchived = row[Emails.isArchived],
+                thread = threads[id],
                 tags = tags[id].orEmpty(),
             )
         }
 
         return MailPage(mails = mails, total = total)
+    }
+
+    /**
+     * The matter each of [ids] sits in, absent for a mail nothing has filed. A mail may sit in
+     * several; the first one wins, which is all a listing can show anyway.
+     *
+     * The sizes come from a second lookup rather than from a join on the first: the point of the
+     * number is how big the thread is, and a join would only ever count the part of it that is on
+     * this page.
+     */
+    private suspend fun loadThreads(ids: List<Uuid>): Map<Uuid, MailThreadRef> {
+        val memberships = (EmailThreads innerJoin Threads)
+            .select(EmailThreads.email, Threads.id, Threads.title)
+            .where(EmailThreads.email inList ids)
+            .map { Triple(it[EmailThreads.email].value, it[Threads.id].value, it[Threads.title]) }
+            .toList()
+
+        if (memberships.isEmpty()) return emptyMap()
+
+        val entries = EmailThreads.id.count()
+        val sizes = EmailThreads
+            .select(EmailThreads.thread, entries)
+            .where(EmailThreads.thread inList memberships.map { it.second }.distinct())
+            .groupBy(EmailThreads.thread)
+            .map { it[EmailThreads.thread].value to it[entries].toInt() }
+            .toList()
+            .toMap()
+
+        return memberships.associate { (mail, thread, title) ->
+            mail to MailThreadRef(id = thread, title = title, size = sizes[thread] ?: 1)
+        }
     }
 
     /**

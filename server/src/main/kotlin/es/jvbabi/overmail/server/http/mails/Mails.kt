@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.mails
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.MailParticipant
 import es.jvbabi.overmail.server.domain.models.MailSummary
+import es.jvbabi.overmail.server.domain.models.MailThreadRef
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import io.ktor.http.HttpStatusCode
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** How many mails a page holds when the caller does not say. */
 private const val DEFAULT_LIMIT = 300
@@ -27,6 +29,12 @@ private const val DEFAULT_LIMIT = 300
  * recipients and tags, so a page of ten thousand would be megabytes of JSON.
  */
 private const val MAX_LIMIT = 1000
+
+/**
+ * The most ids one request may name. Lower than [MAX_LIMIT] because they travel in the query
+ * string: a uuid is 36 characters, and a few hundred of them is already a long URL.
+ */
+private const val MAX_IDS = 200
 
 /** Listing the caller's mails. */
 fun Route.mails() {
@@ -45,6 +53,13 @@ fun Route.mails() {
          * `sort` is `desc` (newest first, the default) or `asc`. Reading from the far end of a
          * long mailbox is what `asc` is for: the oldest mails become the first page and the cursor
          * to carry along is `after`, so nobody has to walk through everything in between.
+         *
+         * `thread` narrows the window to one matter, `ids` (comma separated, at most [MAX_IDS])
+         * to a named handful, and `filed` (`true`/`false`) to the mails that sit in some thread or
+         * in none. None of the three is a stretch of the list -- a thread's mails sit wherever
+         * they were sent -- which is what they are for: a caller that knows what it wants asks for
+         * exactly that instead of paging there. `total` then counts what was asked for rather than
+         * the mailbox.
          */
         get {
             // Inside `authenticate` there is a user, or the request never got here.
@@ -64,6 +79,27 @@ fun Route.mails() {
                 else -> return@get call.respond(HttpStatusCode.BadRequest)
             }
 
+            val threadId = call.parameters["thread"]?.let {
+                runCatching { Uuid.parse(it) }.getOrNull()
+                    ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
+
+            val ids = call.parameters["ids"]?.let { raw ->
+                val named = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                if (named.isEmpty() || named.size > MAX_IDS) return@get call.respond(HttpStatusCode.BadRequest)
+                named.map { id ->
+                    runCatching { Uuid.parse(id) }.getOrNull()
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                }
+            }
+
+            val filed = when (call.parameters["filed"]) {
+                null -> null
+                "true" -> true
+                "false" -> false
+                else -> return@get call.respond(HttpStatusCode.BadRequest)
+            }
+
             val after = call.parameters["after"]?.let {
                 it.toInstantOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             }
@@ -75,7 +111,7 @@ fun Route.mails() {
             // repository pulls the database provider, and starting up must not wait on that.
             val emailRepository = application.dependencies.resolve<EmailRepository>()
             val page = emailRepository
-                .getSummariesForUser(user, limit, after, before, newestFirst)
+                .getSummariesForUser(user, limit, after, before, newestFirst, threadId, ids, filed)
                 .first()
 
             call.respond(
@@ -105,7 +141,15 @@ private fun MailSummary.toResponse() = MailResponse(
     cc = cc.map { it.toResponse() },
     bcc = bcc.map { it.toResponse() },
     sentAt = sent.toString(),
+    isRead = isRead,
+    thread = thread?.toResponse(),
     tags = tags.map { TagResponse(id = it.tag.id.toString(), name = it.tag.name) },
+)
+
+private fun MailThreadRef.toResponse() = ThreadResponse(
+    id = id.toString(),
+    title = title,
+    size = size,
 )
 
 private fun MailParticipant.toResponse() = ParticipantResponse(address = address, name = name)
@@ -134,7 +178,19 @@ data class MailResponse(
     @SerialName("bcc") val bcc: List<ParticipantResponse>,
     /** ISO-8601, whole seconds, as mails are stored. */
     @SerialName("sent_at") val sentAt: String,
+    @SerialName("is_read") val isRead: Boolean,
+    /** The matter the mail sits in, absent while nothing has filed it. */
+    @SerialName("thread") val thread: ThreadResponse? = null,
     @SerialName("tags") val tags: List<TagResponse>,
+)
+
+/** The matter a mail sits in. */
+@Serializable
+data class ThreadResponse(
+    @SerialName("id") val id: String,
+    @SerialName("title") val title: String,
+    /** Mails the thread holds altogether, not the ones of it on this page. */
+    @SerialName("size") val size: Int,
 )
 
 /** Someone the mail names, as it spelled them out. */

@@ -6,10 +6,14 @@
     import AgentReset from "$lib/app/home/AgentReset.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
     import {MailStore} from "$lib/app/mails/MailStore.svelte";
+    import {ThreadedMailStore} from "$lib/app/mails/ThreadedMailStore.svelte";
 
     // Owned by the page rather than shared from a module: a module-level instance would be one
     // list for every server-rendered request. A live connection takes this instance instead.
     const mails = new MailStore();
+    // The two arrangements page in completely different ways -- flat by position, grouped off the
+    // thread skeleton -- so each keeps its own state and neither has to undo the other's.
+    const threadedMails = new ThreadedMailStore();
 </script>
 
 <header
@@ -37,5 +41,5 @@
 <main class="flex flex-1 flex-col gap-10 p-4 lg:p-6">
     <EmailGraph />
     <AgentReset />
-    <MailTable store={mails} />
+    <MailTable store={mails} threaded={threadedMails} />
 </main>

@@ -56,6 +56,11 @@ val MailTagReviewStep = MailAnalysisStep(
         - corrections: for the listed mails, tags to add or to remove. Refer to a mail by the number
           it is listed under. Leave this out for every mail that is filed correctly.
 
+        The mail at hand may already be filed, by a user or by a run that was cut short before it
+        got through. What it carries is listed with who put it there, and this is where that gets
+        tidied up: an agent tag you leave out of `tags` comes off the mail. Repeat it to keep it. A
+        tag marked as the user's stays whatever you answer, so repeat those as well.
+
         What to look for:
         - Mails marked as being in the same thread are one and the same matter. Their tags should
           agree: what one of them is filed under, the others belong under too, unless a mail
@@ -83,12 +88,19 @@ val MailTagReviewStep = MailAnalysisStep(
 /** The neighbourhood as the review reads it: the suggestion first, then what came before. */
 fun tagReviewMaterial(
     suggested: List<MailTag>,
+    alreadyFiled: List<EmailTag>,
     neighbours: List<TaggedMail>,
     placement: ThreadPlacement?,
 ): String = text {
     textWithNewLine("Tags just suggested for the mail at hand:")
     suggested.forEach { textWithNewLine("- ${it.tag}: ${it.reason}") }
     textWithNewLine("")
+
+    if (alreadyFiled.isNotEmpty()) {
+        textWithNewLine("The mail at hand is already filed under:")
+        alreadyFiled.forEach { textWithNewLine("- ${it.tag.name} (${it.owner()})") }
+        textWithNewLine("")
+    }
 
     placement?.let {
         textWithNewLine("This mail was just put into the thread \"${it.thread.title}\".")

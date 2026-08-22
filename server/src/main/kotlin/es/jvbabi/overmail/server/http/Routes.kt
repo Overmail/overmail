@@ -1,14 +1,23 @@
 package es.jvbabi.overmail.server.http
 
+import es.jvbabi.overmail.server.auth.SESSION_AUTH
+import es.jvbabi.overmail.server.domain.models.User
+import es.jvbabi.overmail.server.http.ai.aiProcessing
+import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.principal
 import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.openapi.OpenApiDocSource
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import kotlinx.serialization.Serializable
 
 internal fun Application.configureRouting() {
     routing {
@@ -29,6 +38,41 @@ internal fun Application.configureRouting() {
             get("/health") {
                 call.respondText("ok")
             }
+
+            authenticate(SESSION_AUTH) {
+                /**
+                 * Reports who the session token belongs to.
+                 */
+                get("/test") {
+                    // Inside `authenticate` there is a user, or the request never got here.
+                    val user = call.principal<User>() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+
+                    call.respond(
+                        SignedInUser(
+                            id = user.id.toString(),
+                            username = user.username,
+                            email = user.email,
+                        )
+                    )
+                }
+            }
+
+            // Operating the mail agent, not a domain object of its own.
+            route("/ai") { aiProcessing() }
+
+            // Routes that exist for a screen of the web app rather than for a domain object, cut
+            // the way that screen needs them.
+            route("/webapp/home") {
+                route("/email-graph") { emailGraph() }
+            }
         }
     }
 }
+
+/** Who the caller is, as `/api/test` reports it. */
+@Serializable
+data class SignedInUser(
+    val id: String,
+    val username: String,
+    val email: String,
+)

@@ -128,13 +128,17 @@
 
 
         <div class="absolute bottom-0 left-0 z-50 w-full h-32 bg-linear-to-b from-transparent to-background">
-            <!-- Progressive blur: each layer blurs the backdrop of the ones above it and is masked
-                 to start further down, so the blur ramps up towards the bottom instead of showing
-                 a hard seam at the top edge. -->
-            <div class="pointer-events-none absolute inset-0 backdrop-blur-[2px] mask-[linear-gradient(to_bottom,transparent_0%,black_25%)]"></div>
-            <div class="pointer-events-none absolute inset-0 backdrop-blur-xs mask-[linear-gradient(to_bottom,transparent_25%,black_50%)]"></div>
-            <div class="pointer-events-none absolute inset-0 backdrop-blur-sm mask-[linear-gradient(to_bottom,transparent_50%,black_75%)]"></div>
-            <div class="pointer-events-none absolute inset-0 backdrop-blur-lg mask-[linear-gradient(to_bottom,transparent_75%,black_100%)]"></div>
+            <!-- One masked backdrop-filter, where this used to be four stacked ones for a blur that
+                 ramps up towards the bottom. The ramp is what made it expensive: what a
+                 backdrop-filter costs is not its own blur but the backdrop it needs, and that
+                 backdrop is everything painted below it - the whole stack - flattened into one
+                 texture. That happens once per backdrop-filter element per frame, so four layers
+                 meant flattening the stack four times a frame for as long as anything on the page
+                 moved. One layer with a soft mask reads almost the same: a constant blur fading in
+                 rather than one growing stronger, under a gradient that washes it out towards the
+                 bottom anyway. If this still stutters, the blur has to go - drop this one line and
+                 the gradient on the parent carries the effect on its own. -->
+            <div class="pointer-events-none absolute inset-0 backdrop-blur-[10px] mask-[linear-gradient(to_bottom,transparent_0%,black_70%)]"></div>
 
             <!-- relative, so the keys paint above the absolutely positioned blur layers. -->
             {#if !isTagging}

@@ -13,23 +13,29 @@ import es.jvbabi.overmail.server.ai.steps.ThreadPlacement
 import es.jvbabi.overmail.server.ai.steps.threadMaterial
 import es.jvbabi.overmail.server.ai.steps.normalised
 import es.jvbabi.overmail.server.ai.steps.tagReviewMaterial
+import es.jvbabi.overmail.server.domain.models.EmailTag
 import es.jvbabi.overmail.server.domain.models.TaggedMail
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
  * Walks the mailbox from the oldest mail to the newest and hands every mail to the AI once.
  *
- * The queue is the order the repository hands out plus the set of mails already seen: newly
- * imported mails simply appear at the end of that order and are picked up on the next emission.
- * That set lives in memory, so a restart runs the whole mailbox through again -- fine while this
- * only prints, and the point where a processed marker on the mail will have to go.
+ * The queue is what the repository hands out: every mail without a processing timestamp, oldest
+ * first. A mail is stamped once it has been through, so newly imported mails appear at the end of
+ * the next emission and a restart picks up where the last run left off instead of classifying the
+ * whole mailbox afresh.
  */
 class AiProcessingQueue(
     private val emailRepository: EmailRepository,
@@ -37,7 +43,12 @@ class AiProcessingQueue(
     private val threadRepository: ThreadRepository,
     /** Runs the analysis steps a mail is put through, configured from the `ai` section. */
     private val analyzer: MailAnalyzer,
+    private val coroutineScope: CoroutineScope,
 ) {
+
+    // Volatile: a request thread reads and writes this, the queue itself runs on another.
+    @Volatile
+    private var queueJob: Job? = null
 
     private companion object {
         /**
@@ -51,28 +62,37 @@ class AiProcessingQueue(
         const val NEIGHBOURS = 10
     }
 
-    private val processed = mutableSetOf<Uuid>()
+    /** Whether the queue is working through the mailbox right now. */
+    val isRunning: Boolean get() = queueJob?.isActive == true
 
-    /** Runs until the surrounding scope is cancelled. */
-    suspend fun start() {
-        // Everything the agent filed goes first, so a run starts from what a human left behind and
-        // the whole mailbox is classified afresh. This is here to make the pipeline testable, and
-        // it is the first thing to take out once its results are meant to survive a restart.
-        val tags = tagRepository.clearAgentWork()
-        val threads = threadRepository.clearAgentWork()
-        println(
-            "Cleared ${tags.links} agent filings and ${tags.created} agent tags," +
-                " ${threads.links} thread memberships and ${threads.created} agent threads"
-        )
+    /** Starts working through the mailbox, or leaves the run that is already going alone. */
+    fun start() {
+        if (isRunning) return
+        queueJob = coroutineScope.launch { run() }
+    }
 
+    /**
+     * Puts the queue down. The mail in the model's hands right now is dropped where it is: it
+     * stays unstamped, so the next [start] picks it up again.
+     *
+     * Waits for that mail to actually be let go, so a caller that clears the agent's work
+     * afterwards cannot have it written again behind their back.
+     */
+    suspend fun stop() {
+        queueJob?.cancelAndJoin()
+        queueJob = null
+    }
+
+    /** Runs until the job is cancelled or the surrounding scope goes. */
+    private suspend fun run() {
         emailRepository
-            .getAllIdsOldestFirst()
+            .getUnprocessedIdsOldestFirst()
             .collect { ids ->
                 // Sequential on purpose: mails are handled in the order they were sent, and the
                 // model call this is going to become should not fan out over the whole mailbox.
-                ids.filterNot { it in processed }.forEach { id ->
+                ids.forEach { id ->
                     val email = emailRepository.getById(id).first() ?: return@forEach
-                    // A mail that could not be processed stays unmarked and is picked up again on
+                    // A mail that could not be processed stays unstamped and is picked up again on
                     // the next emission: a model that is down should not silently skip the inbox.
                     try {
                         process(email)
@@ -80,7 +100,7 @@ class AiProcessingQueue(
                         println("Processing failed for '${email.subject}': ${cause.message}")
                         return@forEach
                     }
-                    processed += id
+                    emailRepository.markAiProcessed(id)
                 }
             }
     }
@@ -102,6 +122,14 @@ class AiProcessingQueue(
             subject = email.subject,
             body = email.textContent.orEmpty().take(BODY_LIMIT),
         )
+
+        // What the mail already carries: a run that was cut short before it stamped the mail
+        // leaves its tags behind, and a user may have filed the mail themselves. Handed to the
+        // review as context rather than thrown away -- that is where it gets tidied up.
+        val alreadyFiled = tagRepository.getForEmail(email).first()
+        if (alreadyFiled.isNotEmpty()) {
+            println("  already filed under: ${alreadyFiled.joinToString { it.tag.name }}")
+        }
 
         val sender = analyzer.run(MailOriginStep, context)
         val senderIdentificationAt = Clock.System.now()
@@ -146,13 +174,25 @@ class AiProcessingQueue(
         val filed = if (neighbours.isEmpty()) {
             suggested
         } else {
-            review(email, context, suggested, neighbours, placement)
+            review(email, context, suggested, alreadyFiled, neighbours, placement)
         }
 
         filed.forEach { suggestion ->
             file(email.id, email.imapAccount.user, suggestion)
             println("  ${suggestion.tag}: ${suggestion.reason}")
         }
+
+        // The answer is the complete filing of this mail, so what the agent had put there and this
+        // run does not name again comes off: an interrupted run must not leave its tags behind. A
+        // tag a user attached is not the agent's to take off, `detachAgentTag` sees to that.
+        val kept = filed.map { it.tag.trim().lowercase() }.toSet()
+        alreadyFiled
+            .filter { it.createdByAgent && it.tag.name.lowercase() !in kept }
+            .forEach { stale ->
+                if (tagRepository.detachAgentTag(email.id, stale.tag.id)) {
+                    println("  - ${stale.tag.name} (left over)")
+                }
+            }
     }
 
     /**
@@ -165,10 +205,18 @@ class AiProcessingQueue(
         neighbours: List<TaggedMail>,
     ): ThreadPlacement? {
         val user = email.imapAccount.user
-        val threadsByMail = threadRepository.threadsOf(user, neighbours.map { it.id })
+        // The mail itself is asked for along with the neighbours: an interrupted run may have put
+        // it into a thread already, and that should not turn into a second one.
+        val threads = threadRepository.threadsOf(user, neighbours.map { it.id } + email.id)
+        val ownThread = threads[email.id]
+        val threadsByMail = threads - email.id
 
         val start = Clock.System.now()
-        val answer = analyzer.run(MailThreadStep, context, threadMaterial(neighbours, threadsByMail))
+        val answer = analyzer.run(
+            MailThreadStep,
+            context,
+            threadMaterial(neighbours, threadsByMail, ownThread),
+        )
         val decidedAt = Clock.System.now()
 
         val choice = answer.value
@@ -184,8 +232,9 @@ class AiProcessingQueue(
         if (sameMatter.isEmpty()) return null
 
         // Whether this joins or opens a thread follows from those mails, not from the model: if
-        // any of them already sits in one, that is the thread.
-        val existing = sameMatter.firstNotNullOfOrNull { threadsByMail[it.id] }
+        // any of them already sits in one, that is the thread. Failing that, the thread this mail
+        // was left in by an earlier run serves, so a retry continues it instead of opening a second.
+        val existing = sameMatter.firstNotNullOfOrNull { threadsByMail[it.id] } ?: ownThread
         val thread = existing ?: threadRepository.create(
             user = user,
             // A title is what the step is asked for, but a missing one must not cost the thread.
@@ -222,6 +271,7 @@ class AiProcessingQueue(
         email: Email,
         context: MailContext,
         suggested: List<MailTag>,
+        alreadyFiled: List<EmailTag>,
         neighbours: List<TaggedMail>,
         placement: ThreadPlacement?,
     ): List<MailTag> {
@@ -229,7 +279,7 @@ class AiProcessingQueue(
         val review = analyzer.run(
             MailTagReviewStep,
             context,
-            tagReviewMaterial(suggested, neighbours, placement),
+            tagReviewMaterial(suggested, alreadyFiled, neighbours, placement),
         )
         val reviewedAt = Clock.System.now()
 

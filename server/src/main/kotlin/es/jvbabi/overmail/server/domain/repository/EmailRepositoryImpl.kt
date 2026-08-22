@@ -17,20 +17,33 @@ import es.jvbabi.overmail.server.domain.models.EmailRecipient
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
+import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.datetime.Date
+import org.jetbrains.exposed.v1.datetime.Year
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
 import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
+import org.jetbrains.exposed.v1.r2dbc.update
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.firstOrNull as firstRowOrNull
@@ -54,19 +67,95 @@ class EmailRepositoryImpl(
             .distinctUntilChanged()
     }
 
-    override fun getAllIdsOldestFirst(): Flow<List<Uuid>> {
+    override fun getDailyCountsForUser(user: User, year: Int): Flow<Map<LocalDate, Int>> {
+        val from = LocalDate(year, 1, 1).atStartOfDayIn(TimeZone.UTC)
+        val until = LocalDate(year + 1, 1, 1).atStartOfDayIn(TimeZone.UTC)
+
+        return changes.changesOf(Emails, ImapAccounts)
+            .conflate()
+            .map {
+                database.query {
+                    // Counted and grouped in the database rather than over loaded mails: a year of
+                    // a busy mailbox is tens of thousands of rows, and all that is wanted of them
+                    // is one number per day.
+                    // Suppressed, not outdated: kotlinx' `Instant` is now a typealias of the one
+                    // in `kotlin.time`, which makes the deprecated `Date` overload and its
+                    // replacement the same signature, and the call resolves to the deprecated one.
+                    @Suppress("DEPRECATION")
+                    val day = Date(Emails.sent)
+                    val mails = Emails.id.count()
+
+                    (Emails innerJoin ImapAccounts)
+                        .select(day, mails)
+                        .where(
+                            (ImapAccounts.user eq user.id) and
+                                (Emails.sent greaterEq from) and
+                                (Emails.sent less until)
+                        )
+                        .groupBy(day)
+                        // Only so the answer reads as a year does; nothing depends on the order.
+                        .orderBy(day, SortOrder.ASC)
+                        .map { it[day] to it[mails].toInt() }
+                        .toList()
+                        .toMap()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    override fun getYearsWithMailForUser(user: User): Flow<List<Int>> {
+        return changes.changesOf(Emails, ImapAccounts)
+            .conflate()
+            .map {
+                database.query {
+                    // Same deprecation as in `getDailyCountsForUser`, same reason.
+                    @Suppress("DEPRECATION")
+                    val year = Year(Emails.sent)
+
+                    (Emails innerJoin ImapAccounts)
+                        .select(year)
+                        .where(ImapAccounts.user eq user.id)
+                        .groupBy(year)
+                        .orderBy(year, SortOrder.ASC)
+                        .map { it[year] }
+                        .toList()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    override fun getUnprocessedIdsOldestFirst(): Flow<List<Uuid>> {
         return changes.changesOf(Emails)
             .conflate()
             .map {
                 database.query {
                     Emails
                         .select(Emails.id)
+                        .where(Emails.lastAiProcessingAt.isNull())
                         .orderBy(Emails.sent, SortOrder.ASC)
                         .map { it[Emails.id].value }
                         .toList()
                 }
             }
             .distinctUntilChanged()
+    }
+
+    override suspend fun markAiProcessed(id: Uuid) {
+        val now = Clock.System.now()
+
+        database.query {
+            Emails.update({ Emails.id eq id }) {
+                it[Emails.lastAiProcessingAt] = now
+            }
+        }
+    }
+
+    override suspend fun clearAiProcessing(): Int {
+        return database.query {
+            Emails.update({ Emails.lastAiProcessingAt.isNotNull() }) {
+                it[Emails.lastAiProcessingAt] = null
+            }
+        }
     }
 
     /** No `distinctUntilChanged` here: `ByteArray` compares by identity, so it would never drop. */
@@ -174,6 +263,7 @@ class EmailRepositoryImpl(
                 textContent = textContent,
                 htmlContent = htmlContent,
                 isRead = isRead,
+                lastAiProcessingAt = null,
                 recipients = storedRecipients,
             )
         }

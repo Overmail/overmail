@@ -113,6 +113,9 @@ other Exposed type.
 - Comments and identifiers in English, KDoc only where the *why* is non-obvious.
 - Register new tables in `OvermailDatabase.init()`, parents before children.
 
+### Kotlin
+- `@Serializable` classes should have every property annotated with a `@SerialName` with snake_case, so the JSON is stable even if the property name changes. Exceptions are external APIs which may have another naming scheme, still use `@SerialName` to match the external API.
+
 ## Verify
 
 ```

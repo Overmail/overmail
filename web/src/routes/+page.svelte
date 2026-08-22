@@ -2,6 +2,8 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import {Separator} from "$lib/components/ui/separator";
     import {Button} from "$lib/components/ui/button";
+    import EmailGraph from "$lib/app/home/EmailGraph.svelte";
+    import AgentReset from "$lib/app/home/AgentReset.svelte";
 </script>
 
 <header
@@ -25,3 +27,8 @@
         </div>
     </div>
 </header>
+
+<main class="flex flex-1 flex-col gap-10 p-4 lg:p-6">
+    <EmailGraph />
+    <AgentReset />
+</main>

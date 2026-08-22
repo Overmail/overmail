@@ -33,6 +33,8 @@ dependencies {
     implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
     implementation("io.ktor:ktor-server-swagger:3.5.2")
     implementation("io.ktor:ktor-server-di:3.5.2")
+    implementation("io.ktor:ktor-server-auth:3.5.2")
+    implementation("io.ktor:ktor-server-auth-jwt:3.5.2")
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
     implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
@@ -46,7 +48,7 @@ dependencies {
     // Ktor logs through slf4j; without a binding it stays silent and warns on startup.
     implementation("ch.qos.logback:logback-classic:1.5.20")
 
-    implementation("es.jvbabi.overmail:kamel:0.4.0")
+    implementation("es.jvbabi.overmail:kamel:0.5.2")
 
     implementation("ai.koog:koog-agents:1.1.1")
 

@@ -37,10 +37,6 @@
     /** How far down the stack we still offset a card; deeper ones would share the last position. */
     const MAX_DEPTH = 4;
 
-    /** Only the top two cards are blurred: deeper ones are almost fully dimmed anyway, and every
-     *  blur is a filter pass that has to be redrawn while the stack moves. */
-    const MAX_BLUR_DEPTH = 2;
-
     /**
      * How many decided mails are kept mounted behind the current one. They are off screen and only
      * there so that taking a decision back can slide the card in again; undoing further back than
@@ -98,9 +94,6 @@
                         ? "translate(-50%, 0)"
                         : `translate(calc(-50% + ${jitter(id, 2, 10)}px), ${depth * 10 + jitter(id, 3, 6)}px)`
                             + ` rotate(${jitter(id, 1, 2.5)}deg)`,
-                // 0 means no filter at all rather than blur(0px): even a zero blur costs the card
-                // its own render surface, and the current card is the biggest one on screen.
-                blur: current || done || depth > MAX_BLUR_DEPTH ? 0 : 1,
                 // Faded, not transparent: the cards behind have to stay solid.
                 dim: current || done ? 0 : Math.min(0.3 + depth * 0.15, 0.8),
                 // The cards behind can't be scrolled, so a long mail would only rasterise metres of
@@ -125,12 +118,22 @@
 <div class={cn("relative isolate w-3xl", className)}>
     <!-- One markup branch for every state, only the classes and the transform change: swapping
          elements per state would drop the transition exactly when a card moves. -->
-    {#each stack as { id, card, current, transform, blur, dim, tint, clip, delay, z } (id)}
+    {#each stack as { id, card, current, transform, dim, tint, clip, delay, z } (id)}
+        <!-- Transform and opacity only, and no filter anywhere on a card: the cards behind the
+             current one used to carry a 1px blur, which is barely visible under the dimming but
+             gives every one of them its own render surface - and those surfaces are re-applied
+             every time the shortcut bar below needs its backdrop. Dimming alone puts them back.
+
+             will-change puts every card on its own compositor layer for good, not just while it
+             moves. The cards are metre-high boxes of text with a shadow, and everything that
+             resizes the area around them - the sidebar sliding in and out above all - moves the
+             stack sideways a pixel at a time. On a layer that is a move; without one it is five
+             full repaints per frame. -->
         <div
-                class="absolute inset-y-0 left-1/2 px-8 pt-10 transition-[transform,filter]
-                       duration-500 ease-out motion-reduce:transition-none
+                class="absolute inset-y-0 left-1/2 px-8 pt-10 transition-transform
+                       duration-500 ease-out will-change-transform motion-reduce:transition-none
                        {current ? 'overflow-y-auto pb-40' : 'pointer-events-none'}"
-                style="z-index: {z}; transform: {transform}; transition-delay: {delay}ms; {blur ? `filter: blur(${blur}px)` : ''}"
+                style="z-index: {z}; transform: {transform}; transition-delay: {delay}ms"
                 aria-hidden={current ? undefined : "true"}
         >
             <EmailCard {...card} {dim} {tint} class={clip ? "max-h-full overflow-hidden" : undefined} />

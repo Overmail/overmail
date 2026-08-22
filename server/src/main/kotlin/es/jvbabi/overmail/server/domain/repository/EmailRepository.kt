@@ -4,7 +4,9 @@ import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
+import es.jvbabi.overmail.server.domain.models.User
 import kotlinx.coroutines.flow.Flow
+import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -13,11 +15,41 @@ interface EmailRepository {
     fun getById(id: Uuid): Flow<Email?>
 
     /**
-     * Ids of every stored mail, oldest send time first. Ids rather than mails: a consumer that
-     * works through the whole mailbox would otherwise pull every sender and recipient along on
-     * each emission, and it only needs to know what is there and in which order.
+     * How many mails of [user] arrived on each day of [year], counted over every account they
+     * have. A day nothing arrived on is absent rather than held at zero: the caller draws the year
+     * either way, so a zero entry would only be a second way of saying the same thing.
+     *
+     * Days are UTC days, and so is the year they are cut out of -- the send time carries no zone
+     * of its own, and picking the viewer's would make the same mailbox count differently per
+     * reader.
      */
-    fun getAllIdsOldestFirst(): Flow<List<Uuid>>
+    fun getDailyCountsForUser(user: User, year: Int): Flow<Map<LocalDate, Int>>
+
+    /**
+     * The years [user] has mail in at all, oldest first, so a caller can offer the years there is
+     * something to show for instead of guessing at a range. UTC years, as in
+     * [getDailyCountsForUser].
+     */
+    fun getYearsWithMailForUser(user: User): Flow<List<Int>>
+
+    /**
+     * Ids of the mails the AI has not worked through yet, oldest send time first. Ids rather than
+     * mails: a consumer that works through the whole mailbox would otherwise pull every sender and
+     * recipient along on each emission, and it only needs to know what is there and in which order.
+     *
+     * A mail leaves this list once [markAiProcessed] stamped it, so a newly imported mail simply
+     * appears at the end of the next emission.
+     */
+    fun getUnprocessedIdsOldestFirst(): Flow<List<Uuid>>
+
+    /** Stamps the mail as worked through by the AI, with the current time. */
+    suspend fun markAiProcessed(id: Uuid)
+
+    /**
+     * Takes [markAiProcessed]'s stamp off every mail, which puts the whole mailbox back into
+     * [getUnprocessedIdsOldestFirst]. Returns how many mails carried one.
+     */
+    suspend fun clearAiProcessing(): Int
 
     /** Loads the raw source on demand, see [Email]. */
     fun getRawContent(id: Uuid): Flow<ByteArray?>

@@ -29,7 +29,8 @@ class OvermailDatabase(
             SchemaUtils.create(Users)
             SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(EmailUsers)
-            SchemaUtils.create(Emails)
+            // Columns added to an existing mailbox come in here, `create` alone would skip them.
+            SchemaUtils.createMissingTablesAndColumns(Emails)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(Tags)
             SchemaUtils.create(EmailTags)

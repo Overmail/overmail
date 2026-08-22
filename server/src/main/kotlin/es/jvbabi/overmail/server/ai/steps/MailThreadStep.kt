@@ -16,10 +16,10 @@ data class ThreadChoice(
     @property:LLMDescription("Numbers of the listed mails that are the same matter as this one. Empty when this mail stands alone.")
     val sameMatter: List<Int> = emptyList(),
 
-    @property:LLMDescription("Short German title for the matter, needed when none of those mails is in a thread yet. Names the matter, not the mail.")
+    @property:LLMDescription("Short German title for the matter, needed when none of those mails is in a thread yet. Names the matter, not the mail, and carries the identifier of the matter whenever the mails have one.")
     val title: String? = null,
 
-    @property:LLMDescription("A better title, when the thread those mails are already in no longer covers the matter. Null to keep it.")
+    @property:LLMDescription("A better title, when the thread those mails are already in no longer covers the matter or is missing an identifier the mails carry. Null to keep it.")
     val betterTitle: String? = null,
 
     @property:LLMDescription("One short sentence in German saying why they belong together.")
@@ -63,10 +63,25 @@ val MailThreadStep = MailAnalysisStep(
         thing, two newsletters never are, and a mass announcement to all customers is nobody's case.
         In that situation an empty answer is the right one.
 
+        The mail at hand may already sit in a thread, left there by a run that was cut short. That
+        is shown when it is the case; it is a decision like any other, so weigh it against what you
+        see rather than following it.
+
         Also give a title when you list any mail: short, German, naming the matter rather than
-        repeating the subject line, no date. When the listed mails already sit in a thread, its
-        title is shown -- keep it, and only propose a better one when it no longer covers what the
-        matter has become.
+        repeating the subject line, no date.
+
+        Where the mails carry an identifier -- an order, invoice, ticket, contract or bug number --
+        it belongs in the title, and it is the part that does the work: it is what tells this matter
+        from the next one of the same kind. "eBay-Bestellung 03-12345-67890", not "Bestellung bei
+        eBay", of which the mailbox may hold a dozen and which would read the same on every one of
+        them. Write the identifier as the mails write it, and keep the word in front of it short.
+
+        Without an identifier, name the matter as narrowly as the mails allow -- what was ordered,
+        which contract, which trip -- so that the title still fits this matter alone.
+
+        When the listed mails already sit in a thread, its title is shown -- keep it, and only
+        propose a better one when it no longer covers what the matter has become, or when it lacks
+        an identifier the mails plainly carry.
     """.trimIndent(),
 )
 
@@ -78,7 +93,13 @@ val MailThreadStep = MailAnalysisStep(
 fun threadMaterial(
     neighbours: List<TaggedMail>,
     threadsByMail: Map<Uuid, MailThread>,
+    ownThread: MailThread?,
 ): String = text {
+    ownThread?.let {
+        textWithNewLine("The mail at hand already sits in the thread \"${it.title}\".")
+        textWithNewLine("")
+    }
+
     textWithNewLine("Mails around this one, newest first:")
 
     neighbours.forEachIndexed { index, mail ->

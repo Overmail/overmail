@@ -40,12 +40,22 @@ class EmailImporter(
 
             client.testConnection()
 
-            val folders = client.getFolders()
+            val folders = client.getFolders().onEach { println(it.fullName) }
             val inbox = folders.firstOrNull { it.name == "INBOX" }
+            val sent = folders.firstOrNull { it.name == "Sent" || it.name == "Sent Items" }
+            val messages = folders.firstOrNull { it.name == "Archiv.Nachrichten" }
 
             if (inbox == null) {
                 println("No INBOX folder found for account ${imapAccount.username}")
                 return@launch
+            }
+
+            if (sent == null) {
+                println("No Sent folder found for account ${imapAccount.username}")
+            }
+
+            if (messages == null) {
+                println("No Messages folder found for account ${imapAccount.username}")
             }
 
             while (isActive) {
@@ -54,7 +64,17 @@ class EmailImporter(
                     envelope = true
                     flags = true
                     uid = true
-                }
+                } + sent?.getMails {
+                    getAll()
+                    envelope = true
+                    flags = true
+                    uid = true
+                }.orEmpty() + messages?.getMails {
+                    getAll()
+                    envelope = true
+                    flags = true
+                    uid = true
+                }.orEmpty()
                 mails.forEach { mail ->
                     // A missing subject stores as "", never null: the dedup below compares it with
                     // `=`, and NULL never equals NULL, so such mails would import over and over.

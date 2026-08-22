@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.auth
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
 import java.io.File
 import java.security.SecureRandom
@@ -26,7 +27,8 @@ class JwtService(storageDirectory: String = "./data") {
 
     private val algorithm = Algorithm.HMAC256(loadOrCreateSecret(storageDirectory))
 
-    private val verifier = JWT.require(algorithm)
+    /** Handed to Ktor's authentication, which does its own verifying. */
+    val verifier: JWTVerifier = JWT.require(algorithm)
         .withIssuer(ISSUER)
         .withAudience(AUDIENCE)
         .build()

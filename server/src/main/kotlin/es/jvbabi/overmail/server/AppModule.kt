@@ -80,6 +80,7 @@ private fun Application.configureDependencies() {
                 tagRepository = resolve(),
                 threadRepository = resolve(),
                 analyzer = resolve(),
+                coroutineScope = this@configureDependencies,
             ) }
 
         provide<ImporterManager> {
@@ -101,6 +102,8 @@ private fun Application.startImporter() {
 }
 
 private fun Application.startAiProcessing() {
+    // The queue launches into the application scope itself, so that it can be stopped again
+    // without taking this coroutine down with it; resolving it is what needs the launch.
     launch {
         dependencies.resolve<AiProcessingQueue>().start()
     }

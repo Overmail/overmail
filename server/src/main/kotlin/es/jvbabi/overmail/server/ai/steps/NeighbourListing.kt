@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.ai.steps
 
+import es.jvbabi.overmail.server.ai.NO_SUBJECT
 import es.jvbabi.overmail.server.domain.models.TaggedMail
 
 /**
@@ -11,3 +12,11 @@ import es.jvbabi.overmail.server.domain.models.TaggedMail
  */
 internal fun TaggedMail.from(): String =
     if (fromOwner) "$sender (the mailbox owner)" else sender
+
+/**
+ * The subject of a neighbouring mail as the steps list it, with a missing one spelled out.
+ *
+ * Left blank, the line reads as though the listing were broken, and the mail below it is the one
+ * that gets compared instead.
+ */
+internal fun TaggedMail.subjectLine(): String = subject.ifBlank { NO_SUBJECT }

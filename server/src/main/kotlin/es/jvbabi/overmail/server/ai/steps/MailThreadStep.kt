@@ -106,7 +106,7 @@ fun threadMaterial(
     textWithNewLine("Mails around this one, newest first:")
 
     neighbours.forEachIndexed { index, mail ->
-        textWithNewLine("[${index + 1}] ${mail.subject}")
+        textWithNewLine("[${index + 1}] ${mail.subjectLine()}")
         textWithNewLine("      from: ${mail.from()}")
         mail.excerpt?.let { textWithNewLine("      text: $it") }
         textWithNewLine("      tags: ${mail.tags.joinToString { it.tag.name }.ifEmpty { "-" }}")

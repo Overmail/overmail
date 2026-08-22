@@ -4,6 +4,12 @@
     import {Button} from "$lib/components/ui/button";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import AgentReset from "$lib/app/home/AgentReset.svelte";
+    import MailTable from "$lib/app/mails/MailTable.svelte";
+    import {MailStore} from "$lib/app/mails/MailStore.svelte";
+
+    // Owned by the page rather than shared from a module: a module-level instance would be one
+    // list for every server-rendered request. A live connection takes this instance instead.
+    const mails = new MailStore();
 </script>
 
 <header
@@ -31,4 +37,5 @@
 <main class="flex flex-1 flex-col gap-10 p-4 lg:p-6">
     <EmailGraph />
     <AgentReset />
+    <MailTable store={mails} />
 </main>

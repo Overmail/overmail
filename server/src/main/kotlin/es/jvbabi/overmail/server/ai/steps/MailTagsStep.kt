@@ -50,6 +50,13 @@ val MailTagsStep = MailAnalysisStep(
         - The organisation, project or product behind it.
         - Any number or code the mail carries for that matter.
 
+        A mail without a subject, or with hardly any text, is filed all the same -- and that is
+        the normal case for automated mail. What is left says enough: who wrote it and which
+        organisation they write for, what the sender's domain is, what the signature and the
+        footer carry, what the addresses show, and what kind of mail it plainly is -- a
+        notification, a newsletter, a delivery note, a receipt, a calendar invitation. File it
+        under that. One tag you can stand behind is worth far more here than none.
+
         This is the level asked for. A mail "[Bug 304729] CSS-Zoom not working on iFrames" from the
         WebKit bug tracker is filed under: WebKit, Bug-Report, Softwareentwicklung, 304729. Note
         what is not in there: not "iFrames" and not "CSS-Zoom" -- nobody searches for those to find
@@ -78,8 +85,10 @@ val MailTagsStep = MailAnalysisStep(
         - Nothing so wide it would fit any mail ("Information", "Nachricht", "Anfrage"), nothing so
           narrow it fits this one alone -- unless it is an identifier.
         - One short reason per tag, saying where in the mail you read it off. Your own words.
-        - Three to six tags for a mail with substance. Fewer when there is less to file, none when
-          there is nothing.
+        - Three to six tags for a mail with substance, fewer when there is less to file, and never
+          none: every mail gets at least one tag. A missing subject, a short text or a mail that is
+          hard to place is no reason to answer with nothing -- fall back to what the envelope
+          shows, the sender's organisation and the kind of mail it is.
     """.trimIndent(),
 )
 

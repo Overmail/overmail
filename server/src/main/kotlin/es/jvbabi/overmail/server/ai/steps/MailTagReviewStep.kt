@@ -84,6 +84,11 @@ val MailTagReviewStep = MailAnalysisStep(
         - New tags follow the same rules as before: German nouns, bare identifiers, filing labels
           rather than keywords.
         - Every added tag needs its short reason, as usual.
+        - The mail at hand keeps at least one tag. This step tidies a filing up, it does not empty
+          it: when what was suggested turns out not to fit, answer with what does fit instead --
+          the matter of its thread, the sender's organisation, the kind of mail it is -- rather
+          than leaving the mail unfiled. The same goes for a correction: do not strip an older mail
+          down to nothing.
     """.trimIndent(),
 )
 
@@ -113,7 +118,7 @@ fun tagReviewMaterial(
 
     neighbours.forEachIndexed { index, mail ->
         val sameThread = if (placement != null && mail.id in placement.memberIds) " -- same thread" else ""
-        textWithNewLine("[${index + 1}] ${mail.subject}$sameThread")
+        textWithNewLine("[${index + 1}] ${mail.subjectLine()}$sameThread")
         textWithNewLine("      from: ${mail.from()}")
         mail.excerpt?.let { textWithNewLine("      text: $it") }
         textWithNewLine("      tags: ${mail.tags.joinToString { "${it.tag.name} (${it.owner()})" }.ifEmpty { "-" }}")

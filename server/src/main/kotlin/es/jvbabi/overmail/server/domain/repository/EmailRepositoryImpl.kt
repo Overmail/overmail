@@ -4,18 +4,26 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.database.mappers.toEmail
 import es.jvbabi.overmail.server.database.mappers.toEmailRecipient
+import es.jvbabi.overmail.server.database.mappers.toEmailTag
 import es.jvbabi.overmail.server.database.mappers.toEmailUser
 import es.jvbabi.overmail.server.database.mappers.toImapAccount
+import es.jvbabi.overmail.server.database.mappers.toTag
 import es.jvbabi.overmail.server.database.mappers.toUser
 import es.jvbabi.overmail.server.database.models.EmailRecipients
+import es.jvbabi.overmail.server.database.models.EmailTags
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.Tags
 import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.EmailRecipient
+import es.jvbabi.overmail.server.domain.models.EmailRecipientType
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
+import es.jvbabi.overmail.server.domain.models.MailPage
+import es.jvbabi.overmail.server.domain.models.MailParticipant
+import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
@@ -32,6 +40,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
@@ -64,6 +73,19 @@ class EmailRepositoryImpl(
         return changes.changesOf(Emails, EmailRecipients, EmailUsers, ImapAccounts, Users)
             .conflate()
             .map { database.query { loadEmails(Emails.id eq id).firstOrNull() } }
+            .distinctUntilChanged()
+    }
+
+    override fun getSummariesForUser(
+        user: User,
+        limit: Int,
+        after: Instant?,
+        before: Instant?,
+        newestFirst: Boolean,
+    ): Flow<MailPage> {
+        return changes.changesOf(Emails, EmailRecipients, EmailUsers, EmailTags, Tags, ImapAccounts)
+            .conflate()
+            .map { database.query { loadSummaries(user, limit, after, before, newestFirst) } }
             .distinctUntilChanged()
     }
 
@@ -267,6 +289,92 @@ class EmailRepositoryImpl(
                 recipients = storedRecipients,
             )
         }
+    }
+
+    /**
+     * The page [getSummariesForUser] describes: how much the window holds, then the mails
+     * themselves, then their recipients and tags in one lookup each. Selected column by column
+     * rather than through [loadEmails], which would pull both bodies of every mail along.
+     */
+    private suspend fun loadSummaries(
+        user: User,
+        limit: Int,
+        after: Instant?,
+        before: Instant?,
+        newestFirst: Boolean,
+    ): MailPage {
+        var where = (ImapAccounts.user eq user.id) as Op<Boolean>
+        if (after != null) where = where and (Emails.sent greater after)
+        if (before != null) where = where and (Emails.sent less before)
+
+        // Counted rather than derived from the rows: the point of the number is to say how much
+        // is behind the page, which the page itself cannot know.
+        val mailCount = Emails.id.count()
+        val total = (Emails innerJoin ImapAccounts)
+            .select(mailCount)
+            .where(where)
+            .map { it[mailCount].toInt() }
+            .firstRowOrNull() ?: 0
+
+        val order = if (newestFirst) SortOrder.DESC else SortOrder.ASC
+
+        // Joined over the sender reference of `Emails`, so the address comes along without a
+        // second lookup; the recipients below need one because there are many per mail.
+        val rows = (Emails innerJoin ImapAccounts innerJoin EmailUsers)
+            .select(Emails.id, Emails.subject, Emails.sent, Emails.senderName, EmailUsers.address)
+            .where(where)
+            // The id only breaks ties, and turns around with the send time so that reading the
+            // mailbox from the other end walks the same order backwards. Send times are stored at
+            // second precision, so a page can well end in the middle of a second, and without a
+            // second key the rows of that second would come back in a different order per query --
+            // a caller paging through the mailbox would see one of them twice and another not at
+            // all.
+            .orderBy(Emails.sent to order, Emails.id to order)
+            .limit(limit)
+            .toList()
+
+        if (rows.isEmpty()) return MailPage(mails = emptyList(), total = total)
+
+        val ids = rows.map { it[Emails.id].value }
+
+        val recipients = (EmailRecipients innerJoin EmailUsers)
+            .select(EmailRecipients.email, EmailRecipients.name, EmailRecipients.type, EmailUsers.address)
+            .where(EmailRecipients.email inList ids)
+            .toList()
+            .groupBy { it[EmailRecipients.email].value }
+
+        // Every tag of the mail, filed by the agent or by the user: a listing shows how a mail
+        // ended up filed, not who did the filing.
+        val tags = (EmailTags innerJoin Tags)
+            .selectAll()
+            .where(EmailTags.email inList ids)
+            .toList()
+            // The mails are the caller's own, so every tag on them is theirs as well.
+            .groupBy({ it[EmailTags.email].value }) { it.toEmailTag(it.toTag(user)) }
+
+        val mails = rows.map { row ->
+            val id = row[Emails.id].value
+            val addressed = recipients[id].orEmpty().groupBy(
+                { it[EmailRecipients.type] },
+                { MailParticipant(address = it[EmailUsers.address], name = it[EmailRecipients.name]) },
+            )
+
+            MailSummary(
+                id = id,
+                subject = row[Emails.subject],
+                sent = row[Emails.sent],
+                sender = MailParticipant(
+                    address = row[EmailUsers.address],
+                    name = row[Emails.senderName],
+                ),
+                recipients = addressed[EmailRecipientType.RECIPIENT].orEmpty(),
+                cc = addressed[EmailRecipientType.CC].orEmpty(),
+                bcc = addressed[EmailRecipientType.BCC].orEmpty(),
+                tags = tags[id].orEmpty(),
+            )
+        }
+
+        return MailPage(mails = mails, total = total)
     }
 
     /**

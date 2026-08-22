@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.domain.repository
 import es.jvbabi.overmail.server.domain.models.Email
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
+import es.jvbabi.overmail.server.domain.models.MailPage
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.User
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,27 @@ import kotlin.uuid.Uuid
 interface EmailRepository {
     fun getForImapAccount(imapAccount: ImapAccount): Flow<List<Email>>
     fun getById(id: Uuid): Flow<Email?>
+
+    /**
+     * At most [limit] mails of [user], counted over every account they have. [after] and [before]
+     * cut the window down and are both exclusive, so the send time of the last mail of a page can
+     * be handed back as the cursor for the next one.
+     *
+     * [newestFirst] turns the page around, which is how a caller reaches the far end of a long
+     * mailbox without walking through everything in front of it: ordering the other way makes the
+     * oldest mails the first page, and [before] becomes [after].
+     *
+     * Summaries rather than [Email]s, see [es.jvbabi.overmail.server.domain.models.MailSummary]:
+     * a listing wants the headers, not the bodies. The page reports how many mails the window
+     * holds in total, counted in the same transaction so it cannot disagree with the rows.
+     */
+    fun getSummariesForUser(
+        user: User,
+        limit: Int,
+        after: Instant? = null,
+        before: Instant? = null,
+        newestFirst: Boolean = true,
+    ): Flow<MailPage>
 
     /**
      * How many mails of [user] arrived on each day of [year], counted over every account they

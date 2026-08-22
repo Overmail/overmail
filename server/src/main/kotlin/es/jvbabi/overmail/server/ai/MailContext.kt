@@ -76,8 +76,17 @@ data class MailContext(
         textWithNewLine("Direction: ${direction.statement}")
         textWithNewLine("From: $sender")
         textWithNewLine("To: ${recipients.joinToString().ifBlank { "-" }}")
-        textWithNewLine("Subject: $subject")
+        // A mail may arrive without a subject or without any text at all. Both are said outright
+        // rather than left as an empty line: a model handed a blank reads the line below as the
+        // subject, or answers that it cannot tell anything about the mail.
+        textWithNewLine("Subject: ${subject.ifBlank { NO_SUBJECT }}")
         textWithNewLine("")
-        textWithNewLine(body)
+        textWithNewLine(body.ifBlank { NO_BODY })
     }
 }
+
+/** What stands where the subject would: a mail without one is filed all the same. */
+const val NO_SUBJECT = "(none -- this mail carries no subject line)"
+
+/** What stands where the text would, for a mail that is only an envelope. */
+private const val NO_BODY = "(none -- this mail carries no text)"

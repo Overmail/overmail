@@ -64,9 +64,17 @@ class MailAnalyzer(config: AiConfig) {
     /**
      * Puts [context] through [step]. The agent is built per call: it is a prompt, a schema and a
      * strategy, and holds no connection of its own -- that sits in [executor] and is shared.
+     *
+     * [material] is for a step that needs more than the mail itself, such as the neighbouring
+     * mails a tagging is reviewed against. It goes to the model as a second message, after the
+     * mail, so a step that needs nothing extra reads exactly as it did before.
      */
-    suspend fun <T> run(step: MailAnalysisStep<T>, context: MailContext): StepResult<T> =
-        agentFor(step).run(context).also { result ->
+    suspend fun <T> run(
+        step: MailAnalysisStep<T>,
+        context: MailContext,
+        material: String? = null,
+    ): StepResult<T> =
+        agentFor(step, material).run(context).also { result ->
             // Thinking is switched off twice over, in the request and in the prompt. If a model
             // thinks anyway it costs the step its latency, and nothing about the answer would show
             // it -- so say so rather than let it pass.
@@ -75,17 +83,27 @@ class MailAnalyzer(config: AiConfig) {
             }
         }
 
-    private fun <T> agentFor(step: MailAnalysisStep<T>): AIAgent<MailContext, StepResult<T>> = AIAgent(
+    private fun <T> agentFor(
+        step: MailAnalysisStep<T>,
+        material: String?,
+    ): AIAgent<MailContext, StepResult<T>> = AIAgent(
         promptExecutor = executor,
         agentConfig = AIAgentConfig(
-            prompt = prompt(step.id, params = params) { system(step.systemPrompt) },
+            // The backend's params carry temperature and the thinking switch; the step adds what
+            // its own answer is allowed to cost.
+            prompt = prompt(step.id, params = params.copy(maxTokens = step.maxOutputTokens)) {
+                system(step.systemPrompt)
+            },
             model = models.getValue(step.tier),
             // One request per mail, no tools to come back from.
             maxAgentIterations = 1,
         ),
         strategy = functionalStrategy(step.id) { context ->
             llm.writeSession {
-                appendPrompt { user(context.asMessage()) }
+                appendPrompt {
+                    user(context.asMessage())
+                    material?.let { user(it) }
+                }
 
                 val response = requestLLMStructured(step.serializer).getOrThrow()
                 StepResult(response.data, response.message.usage())

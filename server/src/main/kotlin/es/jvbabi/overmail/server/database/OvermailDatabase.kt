@@ -3,7 +3,11 @@ package es.jvbabi.overmail.server.database
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
+import es.jvbabi.overmail.server.database.models.EmailTags
+import es.jvbabi.overmail.server.database.models.EmailThreads
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.Tags
+import es.jvbabi.overmail.server.database.models.Threads
 import es.jvbabi.overmail.server.database.models.Users
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
 import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
@@ -27,6 +31,10 @@ class OvermailDatabase(
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)
             SchemaUtils.create(EmailRecipients)
+            SchemaUtils.create(Tags)
+            SchemaUtils.create(EmailTags)
+            SchemaUtils.create(Threads)
+            SchemaUtils.create(EmailThreads)
         }
     }
 

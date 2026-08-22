@@ -34,6 +34,13 @@ class MailAnalysisStep<T>(
     val serializer: KSerializer<T>,
 
     val tier: ModelTier = ModelTier.FAST,
+
+    /**
+     * Hard ceiling on the answer. A step knows roughly how long its own answer is, and a model
+     * that starts deliberating instead of answering should cost a failed request rather than
+     * minutes of a queue that runs over the whole mailbox.
+     */
+    val maxOutputTokens: Int = 600,
 ) {
     /**
      * What the step sends as its system prompt. The shared rules come first: they are the ones a

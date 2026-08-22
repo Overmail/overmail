@@ -1,0 +1,139 @@
+package es.jvbabi.overmail.server.domain.repository
+
+import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
+import es.jvbabi.overmail.server.database.mappers.toMailThread
+import es.jvbabi.overmail.server.database.mappers.toMailThreadEntry
+import es.jvbabi.overmail.server.database.models.EmailThreads
+import es.jvbabi.overmail.server.database.models.Threads
+import es.jvbabi.overmail.server.domain.models.MailThread
+import es.jvbabi.overmail.server.domain.models.MailThreadEntry
+import es.jvbabi.overmail.server.domain.models.User
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.notInSubQuery
+import org.jetbrains.exposed.v1.r2dbc.deleteWhere
+import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
+import org.jetbrains.exposed.v1.r2dbc.select
+import org.jetbrains.exposed.v1.r2dbc.selectAll
+import org.jetbrains.exposed.v1.r2dbc.update
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.firstOrNull as firstRowOrNull
+
+class ThreadRepositoryImpl(
+    private val database: OvermailDatabase,
+    private val changes: PostgresChangeStream,
+) : ThreadRepository {
+
+    override fun getForUser(user: User): Flow<List<MailThread>> {
+        return changes.changesOf(Threads)
+            .conflate()
+            .map {
+                database.query {
+                    Threads
+                        .selectAll()
+                        .where(Threads.user eq user.id)
+                        .map { it.toMailThread(user) }
+                        .toList()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    override suspend fun threadsOf(user: User, mailIds: Collection<Uuid>): Map<Uuid, MailThread> {
+        if (mailIds.isEmpty()) return emptyMap()
+
+        return database.query {
+            (EmailThreads innerJoin Threads)
+                .selectAll()
+                .where((EmailThreads.email inList mailIds) and (Threads.user eq user.id))
+                .toList()
+                .associate { it[EmailThreads.email].value to it.toMailThread(user) }
+        }
+    }
+
+    override suspend fun create(user: User, title: String, createdByAgent: Boolean): MailThread {
+        val createdAt = Clock.System.now()
+
+        return database.query {
+            val id = Threads.insertAndGetId {
+                it[Threads.user] = user.id
+                it[Threads.title] = title.trim().take(255)
+                it[Threads.createdAt] = createdAt
+                it[Threads.createdByAgent] = createdByAgent
+            }.value
+
+            MailThread(
+                id = id,
+                user = user,
+                title = title.trim().take(255),
+                createdAt = createdAt,
+                createdByAgent = createdByAgent,
+            )
+        }
+    }
+
+    override suspend fun attach(
+        emailId: Uuid,
+        thread: MailThread,
+        reason: String?,
+        createdByAgent: Boolean,
+    ): MailThreadEntry? {
+        return database.query {
+            val isMember = EmailThreads
+                .selectAll()
+                .where((EmailThreads.email eq emailId) and (EmailThreads.thread eq thread.id))
+                .firstRowOrNull() != null
+
+            if (isMember) return@query null
+
+            val createdAt = Clock.System.now()
+            val id = EmailThreads.insertAndGetId {
+                it[EmailThreads.email] = emailId
+                it[EmailThreads.thread] = thread.id
+                it[EmailThreads.reason] = reason
+                it[EmailThreads.createdAt] = createdAt
+                it[EmailThreads.createdByAgent] = createdByAgent
+            }.value
+
+            MailThreadEntry(
+                id = id,
+                thread = thread,
+                reason = reason,
+                createdAt = createdAt,
+                createdByAgent = createdByAgent,
+            )
+        }
+    }
+
+    override suspend fun retitleAgentThread(threadId: Uuid, title: String): Boolean {
+        val trimmed = title.trim().take(255)
+        if (trimmed.isEmpty()) return false
+
+        return database.query {
+            Threads.update({ (Threads.id eq threadId) and (Threads.createdByAgent eq true) }) {
+                it[Threads.title] = trimmed
+            } > 0
+        }
+    }
+
+    override suspend fun clearAgentWork(): ClearedAgentWork {
+        return database.query {
+            val links = EmailThreads.deleteWhere { EmailThreads.createdByAgent eq true }
+
+            val threads = Threads.deleteWhere {
+                (Threads.createdByAgent eq true) and
+                    (Threads.id notInSubQuery EmailThreads.select(EmailThreads.thread))
+            }
+
+            ClearedAgentWork(links = links, created = threads)
+        }
+    }
+}

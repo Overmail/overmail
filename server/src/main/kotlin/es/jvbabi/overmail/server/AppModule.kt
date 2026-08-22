@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server
 
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
+import es.jvbabi.overmail.server.auth.installSessionAuth
 import es.jvbabi.overmail.server.ai.MailAnalyzer
 import es.jvbabi.overmail.server.config.AiConfig
 import es.jvbabi.overmail.server.config.ApplicationConfig
@@ -17,6 +18,10 @@ import es.jvbabi.overmail.server.domain.repository.ImapAccountRepository
 import es.jvbabi.overmail.server.domain.repository.ImapAccountRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.OutgoingMailRepository
 import es.jvbabi.overmail.server.domain.repository.OutgoingMailRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.TagRepository
+import es.jvbabi.overmail.server.domain.repository.TagRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.ThreadRepository
+import es.jvbabi.overmail.server.domain.repository.ThreadRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.UserRepository
 import es.jvbabi.overmail.server.domain.repository.UserRepositoryImpl
 import es.jvbabi.overmail.server.http.configureRouting
@@ -39,6 +44,8 @@ fun Application.overmail() {
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
     installOvermailAuthentikt()
+    // Before the routes: a route cannot ask for an authentication that is not installed yet.
+    installSessionAuth()
     configureRouting()
     startImporter()
     startAiProcessing()
@@ -62,11 +69,18 @@ private fun Application.configureDependencies() {
         provide<EmailUserRepository> { EmailUserRepositoryImpl(resolve(), resolve()) }
         provide<EmailRepository> { EmailRepositoryImpl(resolve(), resolve()) }
         provide<OutgoingMailRepository> { OutgoingMailRepositoryImpl(resolve()) }
+        provide<TagRepository> { TagRepositoryImpl(resolve(), resolve()) }
+        provide<ThreadRepository> { ThreadRepositoryImpl(resolve(), resolve()) }
         provide<JwtService> { JwtService() }
 
         provide<MailAnalyzer> { MailAnalyzer(resolve()) }
 
-        provide<AiProcessingQueue> { AiProcessingQueue(emailRepository = resolve(), analyzer = resolve()) }
+        provide<AiProcessingQueue> { AiProcessingQueue(
+                emailRepository = resolve(),
+                tagRepository = resolve(),
+                threadRepository = resolve(),
+                analyzer = resolve(),
+            ) }
 
         provide<ImporterManager> {
             ImporterManager(

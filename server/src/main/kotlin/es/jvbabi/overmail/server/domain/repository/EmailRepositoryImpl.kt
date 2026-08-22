@@ -54,6 +54,21 @@ class EmailRepositoryImpl(
             .distinctUntilChanged()
     }
 
+    override fun getAllIdsOldestFirst(): Flow<List<Uuid>> {
+        return changes.changesOf(Emails)
+            .conflate()
+            .map {
+                database.query {
+                    Emails
+                        .select(Emails.id)
+                        .orderBy(Emails.sent, SortOrder.ASC)
+                        .map { it[Emails.id].value }
+                        .toList()
+                }
+            }
+            .distinctUntilChanged()
+    }
+
     /** No `distinctUntilChanged` here: `ByteArray` compares by identity, so it would never drop. */
     override fun getRawContent(id: Uuid): Flow<ByteArray?> {
         return changes.changesOf(Emails)

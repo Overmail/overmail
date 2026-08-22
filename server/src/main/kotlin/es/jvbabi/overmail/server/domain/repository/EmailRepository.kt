@@ -12,6 +12,13 @@ interface EmailRepository {
     fun getForImapAccount(imapAccount: ImapAccount): Flow<List<Email>>
     fun getById(id: Uuid): Flow<Email?>
 
+    /**
+     * Ids of every stored mail, oldest send time first. Ids rather than mails: a consumer that
+     * works through the whole mailbox would otherwise pull every sender and recipient along on
+     * each emission, and it only needs to know what is there and in which order.
+     */
+    fun getAllIdsOldestFirst(): Flow<List<Uuid>>
+
     /** Loads the raw source on demand, see [Email]. */
     fun getRawContent(id: Uuid): Flow<ByteArray?>
 

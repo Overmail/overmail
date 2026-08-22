@@ -2,6 +2,8 @@ package es.jvbabi.overmail.server
 
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
+import es.jvbabi.overmail.server.ai.MailAnalyzer
+import es.jvbabi.overmail.server.config.AiConfig
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.DatabaseConfig
@@ -19,6 +21,7 @@ import es.jvbabi.overmail.server.domain.repository.UserRepository
 import es.jvbabi.overmail.server.domain.repository.UserRepositoryImpl
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.processor.AiProcessingQueue
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -38,6 +41,7 @@ fun Application.overmail() {
     installOvermailAuthentikt()
     configureRouting()
     startImporter()
+    startAiProcessing()
 }
 
 private fun Application.configureDependencies() {
@@ -45,6 +49,7 @@ private fun Application.configureDependencies() {
         provide<ApplicationConfig> { ApplicationConfig.load() }
         provide<DatabaseConfig> { resolve<ApplicationConfig>().database }
         provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
+        provide<AiConfig> { resolve<ApplicationConfig>().ai }
 
         // Creating the schema on first resolution keeps it in one place; the providers below are
         // the only way to reach the database, so nothing can query it before this ran.
@@ -58,6 +63,10 @@ private fun Application.configureDependencies() {
         provide<EmailRepository> { EmailRepositoryImpl(resolve(), resolve()) }
         provide<OutgoingMailRepository> { OutgoingMailRepositoryImpl(resolve()) }
         provide<JwtService> { JwtService() }
+
+        provide<MailAnalyzer> { MailAnalyzer(resolve()) }
+
+        provide<AiProcessingQueue> { AiProcessingQueue(emailRepository = resolve(), analyzer = resolve()) }
 
         provide<ImporterManager> {
             ImporterManager(
@@ -74,5 +83,11 @@ private fun Application.configureDependencies() {
 private fun Application.startImporter() {
     launch {
         dependencies.resolve<ImporterManager>().start()
+    }
+}
+
+private fun Application.startAiProcessing() {
+    launch {
+        dependencies.resolve<AiProcessingQueue>().start()
     }
 }

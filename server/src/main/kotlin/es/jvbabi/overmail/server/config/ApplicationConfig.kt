@@ -21,6 +21,7 @@ data class ApplicationConfig(
 
     @SerialName("database") val database: DatabaseConfig,
     @SerialName("email") val email: EmailConfig,
+    @SerialName("ai") val ai: AiConfig,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }

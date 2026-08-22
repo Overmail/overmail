@@ -8,4 +8,5 @@ fun ResultRow.toUser(): User = User(
     id = this[Users.id].value,
     username = this[Users.username],
     email = this[Users.email],
+    name = this[Users.name],
 )

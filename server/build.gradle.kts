@@ -48,6 +48,8 @@ dependencies {
 
     implementation("es.jvbabi.overmail:kamel:0.4.0")
 
+    implementation("ai.koog:koog-agents:1.1.1")
+
     testImplementation(kotlin("test"))
 }
 

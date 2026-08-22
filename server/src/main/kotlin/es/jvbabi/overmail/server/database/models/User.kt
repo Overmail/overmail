@@ -5,4 +5,5 @@ import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 object Users : UuidTable("users") {
     val username = varchar("username", 255).uniqueIndex()
     val email = varchar("email", 255).uniqueIndex()
+    val name = varchar("name", 255)
 }

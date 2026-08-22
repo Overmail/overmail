@@ -12,6 +12,8 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.domain.repository.ArchiveRepository
 import es.jvbabi.overmail.server.domain.repository.ArchiveRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.EmailAvatarRepository
+import es.jvbabi.overmail.server.domain.repository.EmailAvatarRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
@@ -26,7 +28,10 @@ import es.jvbabi.overmail.server.domain.repository.ThreadRepository
 import es.jvbabi.overmail.server.domain.repository.ThreadRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.UserRepository
 import es.jvbabi.overmail.server.domain.repository.UserRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepository
+import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepositoryImpl
 import es.jvbabi.overmail.server.http.configureRouting
+import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.jobs.processor.AiProcessingQueue
 import io.ktor.serialization.kotlinx.json.json
@@ -74,9 +79,23 @@ private fun Application.configureDependencies() {
         provide<TagRepository> { TagRepositoryImpl(resolve(), resolve()) }
         provide<ThreadRepository> { ThreadRepositoryImpl(resolve(), resolve()) }
         provide<ArchiveRepository> { ArchiveRepositoryImpl(resolve(), resolve()) }
+        provide<EmailAvatarRepository> { EmailAvatarRepositoryImpl(resolve(), resolve()) }
+        // No database of its own: this one only talks to third parties.
+        provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }
 
         provide<MailAnalyzer> { MailAnalyzer(resolve()) }
+
+        // Started from a route rather than on boot: filling the cache is a button, see
+        // AvatarRefresher.
+        provide<AvatarRefresher> {
+            AvatarRefresher(
+                emailUserRepository = resolve(),
+                avatarRepository = resolve(),
+                iconRepository = resolve(),
+                coroutineScope = this@configureDependencies,
+            )
+        }
 
         provide<AiProcessingQueue> { AiProcessingQueue(
                 emailRepository = resolve(),

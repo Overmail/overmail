@@ -19,4 +19,20 @@ interface EmailUserRepository {
      * Takes no display name: an address keeps none, the mail it appeared in does.
      */
     suspend fun findOrCreate(user: User, address: String): EmailUser
+
+    /**
+     * Every address of [user]'s address book, once each. What the avatar resolvers work through:
+     * an address is one lookup no matter how many mails it appeared in.
+     */
+    fun distinctAddresses(user: User): Flow<List<String>>
+
+    /** The same, narrowed to the addresses no picture has been found for yet. */
+    fun distinctAddressesWithoutAvatar(user: User): Flow<List<String>>
+
+    /**
+     * Points [user]'s entry for [address] at a stored picture.
+     *
+     * @return how many rows were linked, which is at most one -- the address is unique per user.
+     */
+    suspend fun linkAvatar(user: User, address: String, avatarId: Uuid): Int
 }

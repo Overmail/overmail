@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.http.ai.aiProcessing
+import es.jvbabi.overmail.server.http.avatars.avatars
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.threads.threads
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
@@ -67,6 +68,9 @@ internal fun Application.configureRouting() {
 
             // Operating the mail agent, not a domain object of its own.
             route("/ai") { aiProcessing() }
+
+            // The pictures of the people in the mailbox, and filling that cache up.
+            route("/avatars") { avatars() }
 
             // Routes that exist for a screen of the web app rather than for a domain object, cut
             // the way that screen needs them.

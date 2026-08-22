@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.database
 
 import es.jvbabi.overmail.server.database.models.Archived
+import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
@@ -29,8 +30,11 @@ class OvermailDatabase(
         query {
             SchemaUtils.create(Users)
             SchemaUtils.create(ImapAccounts)
-            SchemaUtils.create(EmailUsers)
-            // Columns added to an existing mailbox come in here, `create` alone would skip them.
+            // Before the email users: their `avatar_id` points here.
+            SchemaUtils.create(EmailAvatars)
+            // Columns added to an existing address book come in here, `create` alone would skip
+            // them -- same reason as for the mails below.
+            SchemaUtils.createMissingTablesAndColumns(EmailUsers)
             SchemaUtils.createMissingTablesAndColumns(Emails)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(Tags)

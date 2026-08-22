@@ -4,6 +4,7 @@
     import {Button} from "$lib/components/ui/button";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import AgentReset from "$lib/app/home/AgentReset.svelte";
+    import AvatarCache from "$lib/app/home/AvatarCache.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
     import {MailStore} from "$lib/app/mails/MailStore.svelte";
     import {ThreadedMailStore} from "$lib/app/mails/ThreadedMailStore.svelte";
@@ -41,5 +42,6 @@
 <main class="flex flex-1 flex-col gap-10 p-4 lg:p-6">
     <EmailGraph />
     <AgentReset />
+    <AvatarCache />
     <MailTable store={mails} threaded={threadedMails} />
 </main>

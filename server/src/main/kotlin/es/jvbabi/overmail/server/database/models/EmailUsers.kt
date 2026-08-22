@@ -16,6 +16,13 @@ object EmailUsers : UuidTable("email_users") {
 
     val address = varchar("address", 320)
 
+    /**
+     * The picture we found for [address], null while none was resolved (yet). `SET NULL` on
+     * delete: dropping the cache is what puts an address back in front of the resolvers, so the
+     * link has to come off with the row rather than block its deletion.
+     */
+    val avatar = optReference("avatar_id", EmailAvatars, onDelete = ReferenceOption.SET_NULL)
+
     init {
         uniqueIndex(user, address)
     }

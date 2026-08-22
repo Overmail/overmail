@@ -22,8 +22,8 @@ data class ThreadChoice(
     @property:LLMDescription("A better title, when the thread those mails are already in no longer covers the matter or is missing an identifier the mails carry. Null to keep it.")
     val betterTitle: String? = null,
 
-    @property:LLMDescription("One short sentence in German saying why they belong together.")
-    val reason: String? = null,
+    @property:LLMDescription("Always required. One short sentence in German saying what ties the listed mails to this one -- the identifier both carry, the mail this one answers. Names what stands in the mails; when you list none, say why this mail stands alone.")
+    val reason: String,
 )
 
 /** Where a mail ended up, and which of the neighbouring mails sit in the same thread. */
@@ -45,6 +45,12 @@ val MailThreadStep = MailAnalysisStep(
     serializer = serializer<ThreadChoice>(),
     tier = ModelTier.CAPABLE,
     maxOutputTokens = 400,
+    // A membership with nothing written next to it cannot be checked afterwards, by the user
+    // looking at their thread least of all -- so an answer without one is asked for again.
+    validate = { choice ->
+        "You listed mails as the same matter but gave no reason. Name what ties them to this mail."
+            .takeIf { choice.sameMatter.isNotEmpty() && choice.reason.isBlank() }
+    },
     instructions = """
         Say which of the listed mails are the same matter as the mail at hand.
 
@@ -69,6 +75,12 @@ val MailThreadStep = MailAnalysisStep(
         The mail at hand may already sit in a thread, left there by a run that was cut short. That
         is shown when it is the case; it is a decision like any other, so weigh it against what you
         see rather than following it.
+
+        Say in one German sentence why, every time -- the shared identifier, the mail this one
+        answers, the case both are about. That sentence is what the owner of the mailbox reads
+        later to see whether the mails were put together rightly, so it names what stands in the
+        mails rather than restating that they belong together. It is asked for even when you list
+        nothing, and then says what sets this mail apart from the ones listed.
 
         Also give a title when you list any mail: short, German, naming the matter rather than
         repeating the subject line, no date.

@@ -32,6 +32,19 @@ val MailTagsStep = MailAnalysisStep(
     serializer = serializer<MailTags>(),
     // Tagging weighs what a mail is about rather than reading a fact off it.
     tier = ModelTier.CAPABLE,
+    // A tag with nothing written next to it cannot be checked, neither here nor by the user
+    // reading it later; and a mail without a single tag is unfiled, which the prompt rules out.
+    validate = { answer ->
+        when {
+            answer.tags.isEmpty() -> "You suggested no tag at all. Every mail gets at least one, " +
+                "from what the envelope shows if the text gives nothing."
+
+            else -> answer.tags.firstOrNull { it.tag.isBlank() || it.reason.isBlank() }?.let {
+                "The tag \"${it.tag}\" came without a reason. Every tag needs one short German " +
+                    "sentence saying where in this mail you read it off."
+            }
+        }
+    },
     instructions = """
         Tag this mail so that its owner finds it again months from now, when they remember the
         matter but not a single word of the text. Tags are what they will type into a search box,

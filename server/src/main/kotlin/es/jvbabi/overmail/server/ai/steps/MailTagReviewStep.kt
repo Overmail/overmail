@@ -46,6 +46,16 @@ val MailTagReviewStep = MailAnalysisStep(
     tier = ModelTier.CAPABLE,
     // A revised set for this mail plus corrections for up to ten others.
     maxOutputTokens = 1200,
+    // The reason is what makes a tag checkable afterwards, and this step is where the weak ones
+    // come from: a tag copied off a sibling is easy to write down and hard to justify.
+    validate = { review ->
+        (review.tags + review.corrections.flatMap { it.add })
+            .firstOrNull { it.tag.isBlank() || it.reason.isBlank() }
+            ?.let {
+                "The tag \"${it.tag}\" came without a reason. Every tag you answer with needs one " +
+                    "short German sentence naming what in that mail it is read off."
+            }
+    },
     instructions = """
         You are looking at a mail, at the tags just suggested for it, and at the mails filed under
         those tags before it. Make the filing of this neighbourhood consistent.
@@ -62,9 +72,11 @@ val MailTagReviewStep = MailAnalysisStep(
         tag marked as the user's stays whatever you answer, so repeat those as well.
 
         What to look for:
-        - Mails marked as being in the same thread are one and the same matter. Their tags should
-          agree: what one of them is filed under, the others belong under too, unless a mail
-          plainly differs. This is the strongest reason to change anything here.
+        - Mails marked as being in the same thread are one and the same matter, so their tags
+          should agree: a tag one of them carries is worth holding against this mail. Holding
+          against is the whole of it -- the thread says where to look, it does not settle what
+          comes of it. The tag goes on only where this mail itself shows the same thing, and the
+          reason says what shows it.
         - The same thing filed under two names ("Rechnung" and "Rechnungen", "Bug-Report" and
           "Bugreport"). Keep the name the neighbourhood already uses and drop the variant.
         - A tag the neighbours carry that this mail plainly belongs under too, and the other way
@@ -74,6 +86,14 @@ val MailTagReviewStep = MailAnalysisStep(
           it answers -- same matter, same tags -- and never under the owner's own name.
 
         Rules:
+        - Sitting in the same thread is no reason for a tag. "This mail is part of the thread X"
+          says nothing about the mail: it repeats a decision another step made, and repeating it
+          is how a whole thread ends up filed under something none of its mails is about. Go back
+          to the mail every time -- its subject, its sender, what its text says -- and put the tag
+          on only when you find it there. What you find is what the reason names.
+        - The title of a thread is not a tag. It names one matter and one only, which is what a
+          title is for and precisely what a tag must not be. An identifier out of it may well be a
+          tag; the sentence around it is not.
         - Changing an older mail is the exception. Propose it only when the mail is plainly filed
           wrong or inconsistently -- not to make it tidier, and never to impose a taste.
         - You see each of those mails with its sender and the opening of its text. That is enough
@@ -86,9 +106,9 @@ val MailTagReviewStep = MailAnalysisStep(
         - Every added tag needs its short reason, as usual.
         - The mail at hand keeps at least one tag. This step tidies a filing up, it does not empty
           it: when what was suggested turns out not to fit, answer with what does fit instead --
-          the matter of its thread, the sender's organisation, the kind of mail it is -- rather
-          than leaving the mail unfiled. The same goes for a correction: do not strip an older mail
-          down to nothing.
+          the sender's organisation, what the mail is plainly about, the kind of mail it is --
+          rather than leaving the mail unfiled. The same goes for a correction: do not strip an
+          older mail down to nothing.
     """.trimIndent(),
 )
 
@@ -111,6 +131,10 @@ fun tagReviewMaterial(
 
     placement?.let {
         textWithNewLine("This mail was just put into the thread \"${it.thread.title}\".")
+        // Said where the title is, not thirty lines up in the prompt: this is the moment the
+        // title is in front of the model and looks like something to file under.
+        textWithNewLine("That title names the matter for the thread list. It is not a tag, and")
+        textWithNewLine("belonging to the thread is not by itself a reason for one.")
         textWithNewLine("")
     }
 
@@ -123,6 +147,21 @@ fun tagReviewMaterial(
         mail.excerpt?.let { textWithNewLine("      text: $it") }
         textWithNewLine("      tags: ${mail.tags.joinToString { "${it.tag.name} (${it.owner()})" }.ifEmpty { "-" }}")
     }
+}
+
+/**
+ * Takes out the tag the review reaches for when the thread is fresh in view: the title of that
+ * thread, put on as a tag of its own. It names one matter and one only, so it files nothing --
+ * every mail it would ever be found on is already in the thread it came from.
+ *
+ * The prompt says as much, and this is here because saying it is not enough: the title sits in
+ * the material right next to the tags, and a model that has just been told these mails are one
+ * matter writes it down as the thing they have in common. Only the title as a whole goes; a tag
+ * that merely contains a word of it, an identifier above all, is left alone.
+ */
+fun List<MailTag>.withoutThreadTitle(placement: ThreadPlacement?): List<MailTag> {
+    val title = placement?.thread?.title?.trim() ?: return this
+    return filterNot { it.tag.trim().equals(title, ignoreCase = true) }
 }
 
 /** Who put a tag on a mail. Only the agent's own may be taken off again. */

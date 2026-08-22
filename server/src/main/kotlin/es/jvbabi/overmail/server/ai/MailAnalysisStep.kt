@@ -41,6 +41,16 @@ class MailAnalysisStep<T>(
      * minutes of a queue that runs over the whole mailbox.
      */
     val maxOutputTokens: Int = 600,
+
+    /**
+     * What a usable answer carries beyond the shape the schema enforces. Returns what is wrong
+     * with an answer, or null when it is fine; a step that answers something unusable is asked
+     * once more with that sentence attached, see [MailAnalyzer.run].
+     *
+     * For what a JSON schema cannot say: that a field is only needed once another one is filled,
+     * that a required string must not arrive empty.
+     */
+    val validate: (T) -> String? = { null },
 ) {
     /**
      * What the step sends as its system prompt. The shared rules come first: they are the ones a

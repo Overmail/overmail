@@ -68,13 +68,41 @@ class MailAnalyzer(config: AiConfig) {
      * [material] is for a step that needs more than the mail itself, such as the neighbouring
      * mails a tagging is reviewed against. It goes to the model as a second message, after the
      * mail, so a step that needs nothing extra reads exactly as it did before.
+     *
+     * An answer the step itself rejects buys one more request, and the last one is what comes
+     * back -- a second miss is logged rather than thrown, since a mail filed with a gap in it is
+     * still better than a mail the queue never gets past.
      */
     suspend fun <T> run(
         step: MailAnalysisStep<T>,
         context: MailContext,
         material: String? = null,
+    ): StepResult<T> {
+        val first = attempt(step, context, material)
+        // What the schema cannot ask for -- a reason that is there because another field is filled
+        // -- is asked for here, and an answer that misses it is worth one more request: the step
+        // is cheap next to the mail arriving filed without it.
+        val complaint = step.validate(first.value) ?: return first
+
+        System.err.println("[${step.id}] unusable answer: $complaint -- asking once more")
+        val second = attempt(step, context, material, complaint)
+
+        step.validate(second.value)?.let { again ->
+            System.err.println("[${step.id}] still unusable: $again -- taking it as it is")
+        }
+
+        // Both requests were spent on this step, so both are what it cost.
+        return StepResult(second.value, first.usage + second.usage)
+    }
+
+    /** One request. [complaint] is what was wrong with the answer before it, if there was one. */
+    private suspend fun <T> attempt(
+        step: MailAnalysisStep<T>,
+        context: MailContext,
+        material: String?,
+        complaint: String? = null,
     ): StepResult<T> =
-        agentFor(step, material).run(context).also { result ->
+        agentFor(step, material, complaint).run(context).also { result ->
             // Thinking is switched off twice over, in the request and in the prompt. If a model
             // thinks anyway it costs the step its latency, and nothing about the answer would show
             // it -- so say so rather than let it pass.
@@ -86,6 +114,7 @@ class MailAnalyzer(config: AiConfig) {
     private fun <T> agentFor(
         step: MailAnalysisStep<T>,
         material: String?,
+        complaint: String?,
     ): AIAgent<MailContext, StepResult<T>> = AIAgent(
         promptExecutor = executor,
         agentConfig = AIAgentConfig(
@@ -103,6 +132,11 @@ class MailAnalyzer(config: AiConfig) {
                 appendPrompt {
                     user(context.asMessage())
                     material?.let { user(it) }
+                    // The attempt that failed is not in this conversation -- every request is a
+                    // fresh agent -- so what was wrong with it is stated rather than pointed at.
+                    complaint?.let {
+                        user("Your last answer to this was not usable: $it Answer again, in the same structure.")
+                    }
                 }
 
                 val response = requestLLMStructured(step.serializer).getOrThrow()

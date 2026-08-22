@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.ai.steps.ThreadPlacement
 import es.jvbabi.overmail.server.ai.steps.threadMaterial
 import es.jvbabi.overmail.server.ai.steps.normalised
 import es.jvbabi.overmail.server.ai.steps.tagReviewMaterial
+import es.jvbabi.overmail.server.ai.steps.withoutThreadTitle
 import es.jvbabi.overmail.server.domain.models.EmailTag
 import es.jvbabi.overmail.server.domain.models.TaggedMail
 import es.jvbabi.overmail.server.domain.models.Email
@@ -251,13 +252,22 @@ class AiProcessingQueue(
             createdByAgent = true,
         )
 
-        threadRepository.attach(email.id, thread, choice.reason, createdByAgent = true)
-        println("  ${if (existing == null) "+>" else "->"} ${thread.title}: ${choice.reason}")
+        // Every membership the agent writes carries its reason. The column is nullable for the
+        // user's sake -- someone who files a mail by hand owes nobody an explanation -- and the
+        // step is asked again when it leaves the reason out, so a blank here is what is left after
+        // two tries and is worth saying out loud rather than writing as if it were a choice.
+        val reason = choice.reason.trim().ifBlank { null }
+        if (reason == null) {
+            System.err.println("[mail-thread] '${email.subject}' joined a thread with no reason given")
+        }
+
+        threadRepository.attach(email.id, thread, reason, createdByAgent = true)
+        println("  ${if (existing == null) "+>" else "->"} ${thread.title}: ${reason ?: "-"}")
 
         sameMatter
             .filter { threadsByMail[it.id]?.id != thread.id }
             .forEach { mail ->
-                threadRepository.attach(mail.id, thread, choice.reason, createdByAgent = true)
+                threadRepository.attach(mail.id, thread, reason, createdByAgent = true)
                 println("     ${mail.subject}")
             }
 
@@ -298,6 +308,13 @@ class AiProcessingQueue(
                 " ${neighbours.size} neighbours"
         )
 
+        // What the prompt rules out and a model reaches for anyway: filing the mails of a thread
+        // under the thread's own title. It is dropped here rather than argued about again.
+        val revised = review.value.tags.withoutThreadTitle(placement)
+        review.value.tags.filterNot { it in revised }.forEach {
+            println("  x ${it.tag} (the thread's title is not a tag)")
+        }
+
         review.value.corrections.forEach { correction ->
             // The model answers with the numbers the mails were listed under, so anything outside
             // that range is a mail it invented.
@@ -313,13 +330,13 @@ class AiProcessingQueue(
                 }
             }
 
-            correction.add.forEach { suggestion ->
+            correction.add.withoutThreadTitle(placement).forEach { suggestion ->
                 file(neighbour.id, email.imapAccount.user, suggestion)
                 println("  [${correction.mail}] + ${suggestion.tag}: ${suggestion.reason}")
             }
         }
 
-        return review.value.tags.ifEmpty { suggested }
+        return revised.ifEmpty { suggested }
     }
 
     /** Files one mail under one suggested tag, creating the tag on first use. */

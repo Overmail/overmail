@@ -12,6 +12,7 @@ import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.clients.openai.base.models.ReasoningEffort
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.executor.model.PromptExecutor
+import ai.koog.prompt.executor.model.StructureFixingParser
 import ai.koog.prompt.executor.ollama.client.OllamaClient
 import ai.koog.prompt.executor.ollama.client.OllamaParams
 import ai.koog.prompt.llm.LLMCapability
@@ -20,12 +21,57 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.params.LLMParams
+import ai.koog.prompt.structure.LLMStructuredParsingError
 import es.jvbabi.overmail.server.config.AiConfig
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 private const val OPENAI = "openai"
 private const val OLLAMA = "ollama"
+
+/**
+ * How often a malformed answer is handed back to be written again as valid JSON.
+ *
+ * Small models get the shape right and the syntax wrong: a non-breaking space where the quotation
+ * mark belongs, a smart quote around a German word. The answer is there, it just cannot be read,
+ * and asking for the same text again is far cheaper than asking for the whole analysis again.
+ */
+private const val STRUCTURE_FIX_RETRIES = 2
+
+/**
+ * What is said to the model when its answer could not be read. Not a description of the JSON
+ * error: the model that wrote the broken text has already been asked to repair it and could not,
+ * so this asks for the answer afresh rather than for the same text again.
+ */
+private const val UNREADABLE_COMPLAINT =
+    "It was not valid JSON and could not be read at all. Answer with the requested structure as " +
+        "plain JSON, using ordinary ASCII quotation marks and spaces and nothing around it."
+
+/**
+ * The model answered, and the answer could not be read. Its own kind of failure: unlike a model
+ * that is unreachable, this is worth asking about again straight away, and unlike an answer that is
+ * merely incomplete there is nothing in it to keep.
+ */
+private class UnreadableAnswerException(cause: Throwable) : Exception(cause.message, cause)
+
+/**
+ * Whether a failure is the answer's fault rather than the connection's. Koog wraps what the JSON
+ * parser threw, and the wrapping differs by how the request was made, so the chain is walked
+ * instead of matching on the top exception.
+ */
+private fun Throwable.isUnreadableAnswer(): Boolean {
+    var cause: Throwable? = this
+    // Bounded, so a cause that points at itself cannot spin here.
+    repeat(10) {
+        when (cause) {
+            null -> return false
+            is LLMStructuredParsingError, is SerializationException -> return true
+            else -> cause = cause?.cause
+        }
+    }
+    return false
+}
 
 /** What one step answered, and what the run cost. */
 data class StepResult<T>(
@@ -48,6 +94,12 @@ class MailAnalyzer(config: AiConfig) {
     private val models: Map<ModelTier, LLModel>
     private val params: LLMParams
 
+    /**
+     * Rewrites an answer that came back as broken JSON. Always the fast model: this is a
+     * transcription job, not an analysis -- the content is already there.
+     */
+    private val fixingParser: StructureFixingParser
+
     init {
         val backend = backendFor(config)
 
@@ -58,6 +110,10 @@ class MailAnalyzer(config: AiConfig) {
             // what a step asks for, not a promise that two models are configured.
             ModelTier.FAST to backend.model(config.fastModel ?: config.model),
             ModelTier.CAPABLE to backend.model(config.model),
+        )
+        fixingParser = StructureFixingParser(
+            model = models.getValue(ModelTier.FAST),
+            retries = STRUCTURE_FIX_RETRIES,
         )
     }
 
@@ -78,14 +134,34 @@ class MailAnalyzer(config: AiConfig) {
         context: MailContext,
         material: String? = null,
     ): StepResult<T> {
-        val first = attempt(step, context, material)
+        val first = try {
+            attempt(step, context, material)
+        } catch (unreadable: UnreadableAnswerException) {
+            // The repairs inside the request are already spent at this point, so what is left is
+            // to ask for the answer again from the top. Rethrown if that fails too: the mail then
+            // stays unstamped and comes round again, which is better than filing it half done.
+            System.err.println("[${step.id}] unreadable answer: ${unreadable.message} -- asking once more")
+            val retried = attempt(step, context, material, UNREADABLE_COMPLAINT)
+            step.validate(retried.value)?.let { complaint ->
+                System.err.println("[${step.id}] readable but unusable: $complaint -- taking it as it is")
+            }
+            return retried
+        }
+
         // What the schema cannot ask for -- a reason that is there because another field is filled
         // -- is asked for here, and an answer that misses it is worth one more request: the step
         // is cheap next to the mail arriving filed without it.
         val complaint = step.validate(first.value) ?: return first
 
         System.err.println("[${step.id}] unusable answer: $complaint -- asking once more")
-        val second = attempt(step, context, material, complaint)
+        val second = try {
+            attempt(step, context, material, complaint)
+        } catch (unreadable: UnreadableAnswerException) {
+            // The first answer parsed and was merely imperfect, so it is worth more than nothing:
+            // dropping it here would cost the mail its filing over the retry, not over itself.
+            System.err.println("[${step.id}] retry came back unreadable: ${unreadable.message} -- keeping the first answer")
+            return first
+        }
 
         step.validate(second.value)?.let { again ->
             System.err.println("[${step.id}] still unusable: $again -- taking it as it is")
@@ -95,21 +171,32 @@ class MailAnalyzer(config: AiConfig) {
         return StepResult(second.value, first.usage + second.usage)
     }
 
-    /** One request. [complaint] is what was wrong with the answer before it, if there was one. */
+    /**
+     * One request. [complaint] is what was wrong with the answer before it, if there was one.
+     *
+     * @throws UnreadableAnswerException when the model answered but its JSON could not be read,
+     *   even after the repairs. Anything else -- a model that is down, a request that timed out --
+     *   comes out as it is: those are not answered by asking again straight away.
+     */
     private suspend fun <T> attempt(
         step: MailAnalysisStep<T>,
         context: MailContext,
         material: String?,
         complaint: String? = null,
     ): StepResult<T> =
-        agentFor(step, material, complaint).run(context).also { result ->
-            // Thinking is switched off twice over, in the request and in the prompt. If a model
-            // thinks anyway it costs the step its latency, and nothing about the answer would show
-            // it -- so say so rather than let it pass.
-            result.usage.reasoningCharacters?.let { characters ->
-                System.err.println("[${step.id}] model thought for $characters characters despite thinking being off")
+        runCatching { agentFor(step, material, complaint).run(context) }
+            .getOrElse { cause ->
+                if (cause.isUnreadableAnswer()) throw UnreadableAnswerException(cause)
+                throw cause
             }
-        }
+            .also { result ->
+                // Thinking is switched off twice over, in the request and in the prompt. If a model
+                // thinks anyway it costs the step its latency, and nothing about the answer would
+                // show it -- so say so rather than let it pass.
+                result.usage.reasoningCharacters?.let { characters ->
+                    System.err.println("[${step.id}] model thought for $characters characters despite thinking being off")
+                }
+            }
 
     private fun <T> agentFor(
         step: MailAnalysisStep<T>,
@@ -139,7 +226,10 @@ class MailAnalyzer(config: AiConfig) {
                     }
                 }
 
-                val response = requestLLMStructured(step.serializer).getOrThrow()
+                // The fixing parser is what stands between a small model's punctuation and a mail
+                // that never gets filed, see STRUCTURE_FIX_RETRIES.
+                val response = requestLLMStructured(step.serializer, fixingParser = fixingParser)
+                    .getOrThrow()
                 StepResult(response.data, response.message.usage())
             }
         },

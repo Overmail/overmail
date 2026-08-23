@@ -22,7 +22,8 @@ const RECONNECT_DELAYS = [250, 1_000, 3_000, 6_000];
 /** What the stack asks the server for. A command id is added on the way out. */
 type StackCommand =
 	| { type: 'load_mails'; limit: number; before?: string }
-	| { type: 'set_tags'; mail: string; tags: string[] };
+	| { type: 'set_tags'; mail: string; tags: string[] }
+	| { type: 'set_archived'; mail: string; archived: boolean };
 
 /**
  * What the server sends down the socket. `reply_to` names the command it answers; an event without
@@ -37,6 +38,7 @@ type StackEvent =
 			before?: string | null;
 	  }
 	| { type: 'mail_tags'; reply_to?: number | null; mail: string; tags: MailTag[] }
+	| { type: 'mail_archived'; reply_to?: number | null; mail: string; archived: boolean }
 	| { type: 'tags'; reply_to?: number | null; tags: MailTag[] }
 	| { type: 'error'; reply_to?: number | null; command?: string | null; message: string };
 
@@ -57,8 +59,8 @@ export type SocketFactory = (url: string) => WebSocket;
  * The stack screen's channel to the server.
  *
  * A socket rather than a request per ask, because the screen's traffic belongs on a connection that
- * is already open: the mails, the tags the reader files them under, and the tag list the
- * autocomplete runs on, which the server sends by itself whenever it changes. Bodies are the one
+ * is already open: the mails, the tags the reader files them under, the archive they put them in,
+ * and the tag list the autocomplete runs on, which the server sends along whenever it changes. Bodies are the one
  * exception and stay on `MailRepository.getContent` -- they are big, the browser caches them, and
  * nothing about them is live.
  *
@@ -70,8 +72,8 @@ export type SocketFactory = (url: string) => WebSocket;
  * is the screen's retry button.
  *
  * Resending is safe because every command says what should be true rather than what to change --
- * `set_tags` carries the whole set of tags for a mail, so running it twice leaves the same thing
- * behind.
+ * `set_tags` carries the whole set of tags for a mail and `set_archived` the state it should be in,
+ * so running either twice leaves the same thing behind.
  *
  * Reconnecting is driven by what is outstanding, not by a keepalive of its own: nothing here holds
  * a connection open for a screen that is not asking for anything.
@@ -121,6 +123,15 @@ export class StackSocket {
 		if (event.type !== 'mail_tags') throw new Error(`Filed tags, got ${event.type}`);
 
 		return event.tags;
+	}
+
+	/**
+	 * Puts a mail into the archive, or takes it back out -- which is what taking a decision back on
+	 * the stack means. Resolves once the change is stored.
+	 */
+	async setArchived(mail: string, archived: boolean): Promise<void> {
+		const event = await this.#request({ type: 'set_archived', mail, archived });
+		if (event.type !== 'mail_archived') throw new Error(`Archived a mail, got ${event.type}`);
 	}
 
 	/** Hangs up for good and fails whatever was still on its way. Leaving the screen calls this. */

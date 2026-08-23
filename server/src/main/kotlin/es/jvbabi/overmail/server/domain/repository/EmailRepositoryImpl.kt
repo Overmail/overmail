@@ -86,6 +86,7 @@ class EmailRepositoryImpl(
         threadId: Uuid?,
         ids: Collection<Uuid>?,
         filed: Boolean?,
+        archived: Boolean?,
     ): Flow<MailPage> {
         return changes
             .changesOf(
@@ -95,7 +96,7 @@ class EmailRepositoryImpl(
             .conflate()
             .map {
                 database.query {
-                    loadSummaries(user, limit, after, before, newestFirst, threadId, ids, filed)
+                    loadSummaries(user, limit, after, before, newestFirst, threadId, ids, filed, archived)
                 }
             }
             .distinctUntilChanged()
@@ -284,6 +285,7 @@ class EmailRepositoryImpl(
         threadId: Uuid?,
         ids: Collection<Uuid>?,
         filed: Boolean?,
+        archived: Boolean?,
     ): MailPage {
         var where = (ImapAccounts.user eq user.id) as Op<Boolean>
         if (after != null) where = where and (Emails.sent greater after)
@@ -295,6 +297,9 @@ class EmailRepositoryImpl(
             where = where and (Emails.id inSubQuery inThread)
         }
         if (ids != null) where = where and (Emails.id inList ids.distinct())
+        // Off the mail's own flag, not off the newest archive entry: the two say the same thing and
+        // a listing must not join the history for it, see `Emails.isArchived`.
+        if (archived != null) where = where and (Emails.isArchived eq archived)
         if (filed != null) {
             val inAnyThread = EmailThreads.select(EmailThreads.email)
             where = where and

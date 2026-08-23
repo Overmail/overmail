@@ -64,10 +64,13 @@ export type StackEntry = {
  *
  * The top of the stack lives here rather than in the page, because the refill is measured from it.
  *
- * Tags are written through: [setTags] shows the reader's edit at once and files it over the socket,
- * and the tags that come back replace it, so what is on the card is what the server stored. The
- * list to complete from is [knownTags], which the server sends by itself whenever it changes. A
- * decision is still local -- that is the next thing to plug in here.
+ * Writes go out as the reader makes them and are shown before the server has heard of them, because
+ * they are already on the next mail by the time it has: [setTags] files a mail under tags, creating
+ * the ones that do not exist yet, and archiving a mail puts it away. What comes back replaces what
+ * was shown, and a write that could not be made is taken back off the card. The list the
+ * autocomplete completes from is [knownTags], which the server keeps up to date on its own.
+ *
+ * Only the archive decision is stored so far; spam and "answer later" stay in this list.
  */
 export class StackStore {
 	/** Every mail read so far, newest first, decided ones included. */
@@ -164,16 +167,19 @@ export class StackStore {
 		this.ensureFilled();
 	}
 
-	/** Files a decision on the top mail and moves on. Local for now, see [StackStore]. */
+	/** Files a decision on the top mail and moves on, see [StackStore] for what is stored. */
 	classify(to: EmailClassification['to']): void {
 		const top = this.top;
 		if (!top) return;
 
 		const below = this.#indexOf(this.topId) + 1;
+		const id = top.mail.id;
 		top.classification = { to };
 		// Nothing below means the ones skipped over further up are all that is left; the stack
 		// comes round to them rather than ending on a mail nobody decided on.
 		this.topId = (this.#undecidedFrom(below) ?? this.waiting[0])?.mail.id;
+
+		if (to === 'archive') this.#archive(id, true);
 		this.ensureFilled();
 	}
 
@@ -198,8 +204,12 @@ export class StackStore {
 		if (from < 0) return;
 
 		const entry = this.entries[from];
+		const undone = entry.classification;
 		entry.classification = undefined;
 		this.topId = entry.mail.id;
+
+		// Undoing an archived mail takes it back out of the archive; the history keeps both changes.
+		if (undone?.to === 'archive') this.#archive(entry.mail.id, false);
 	}
 
 	/**
@@ -222,6 +232,20 @@ export class StackStore {
 			.setTags(id, tags)
 			.then((filed) => this.#writeTags(id, filed.map((tag) => tag.name)))
 			.catch(() => this.#writeTags(id, before));
+	}
+
+	/**
+	 * Puts a mail into the archive or takes it back out. A write that could not be made drops the
+	 * decision, so the card comes back rather than the stack claiming it filed something it did not.
+	 */
+	#archive(id: string, archived: boolean): void {
+		void this.#socket.setArchived(id, archived).catch(() => {
+			const entry = this.entries[this.#indexOf(id)];
+			if (!entry) return;
+
+			entry.classification = archived ? undefined : { to: 'archive' };
+			this.ensureFilled();
+		});
 	}
 
 	#writeTags(id: string, tags: string[]): void {

@@ -24,8 +24,9 @@ interface EmailRepository {
      * mailbox without walking through everything in front of it: ordering the other way makes the
      * oldest mails the first page, and [before] becomes [after].
      *
-     * [threadId] narrows the window to one matter, [ids] to a named handful and [filed] to the
-     * mails that sit in some thread or in none. None of the three is a stretch of the list -- a
+     * [threadId] narrows the window to one matter, [ids] to a named handful, [filed] to the mails
+     * that sit in some thread or in none, and [archived] to the ones in the archive or the ones out
+     * of it -- null for the mailbox as it stands, archive included. None of the three is a stretch of the list -- a
      * thread's mails sit wherever they were sent -- which is what they are for: a caller that
      * knows what it wants asks for exactly that instead of walking there. Anything belonging to
      * another user matches nothing, like any mail that is not [user]'s.
@@ -43,6 +44,7 @@ interface EmailRepository {
         threadId: Uuid? = null,
         ids: Collection<Uuid>? = null,
         filed: Boolean? = null,
+        archived: Boolean? = null,
     ): Flow<MailPage>
 
     /**

@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.webapp.mystack
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.User
+import es.jvbabi.overmail.server.domain.repository.ArchiveRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.http.mails.MailResponse
@@ -44,14 +45,18 @@ private const val MAX_TAGS = 50
 /** The `type` of each command, so the failures can name the one they belong to. */
 private const val LOAD_MAILS = "load_mails"
 private const val SET_TAGS = "set_tags"
+private const val SET_ARCHIVED = "set_archived"
 
 /**
  * The stack screen's own channel.
  *
- * Everything the screen does with mails goes over this socket: asking for the next mails, and
- * filing them under tags. Bodies are the one exception, they stay on
+ * Everything the screen does with mails goes over this socket: asking for the next mails, filing
+ * them under tags and putting them into the archive. Bodies are the one exception, they stay on
  * `GET /api/mails/{id}/content` -- they are big, the browser caches them, and nothing about them is
  * live.
+ *
+ * Mails already in the archive are never handed out: the stack is what the reader still has to
+ * decide on, and a mail they archived is decided.
  *
  * Two directions, told apart by whether an event carries `reply_to`: a command is answered with
  * exactly one event carrying its `id`, and everything without one is the server keeping the screen
@@ -80,6 +85,7 @@ fun Route.myStack() {
             val dependencies = call.application.dependencies
             val emailRepository = dependencies.resolve<EmailRepository>()
             val tagRepository = dependencies.resolve<TagRepository>()
+            val archiveRepository = dependencies.resolve<ArchiveRepository>()
 
             // The caller's tags, now and whenever they change. Its own coroutine, because it
             // outlives any one command; it ends with the session, which is what this scope is.
@@ -88,6 +94,7 @@ fun Route.myStack() {
                     sendEvent(StackEvent.Tags(tags.map { TagResponse(it.id.toString(), it.name) }))
                 }
             }
+
 
             while (true) {
                 val command = try {
@@ -110,9 +117,16 @@ fun Route.myStack() {
                 val answer = when (command) {
                     is StackCommand.LoadMails -> emailRepository.mailsFor(user, command)
                     is StackCommand.SetTags -> setTags(user, command, emailRepository, tagRepository)
+                    is StackCommand.SetArchived ->
+                        setArchived(user, command, emailRepository, archiveRepository)
                 }
 
                 sendEvent(answer)
+
+                // A tag the reader just made belongs in the list the autocomplete runs on, and this
+                // socket is the one that made it: said outright rather than left to the change
+                // stream, so the screen is right even while nothing watches the write ahead log.
+                if (answer is StackEvent.MailTags) sendEvent(tagsOf(user, tagRepository))
             }
         }
     }
@@ -135,7 +149,9 @@ private suspend fun EmailRepository.mailsFor(user: User, command: StackCommand.L
             ?: return StackEvent.Failed(command.id, LOAD_MAILS, "before is not a timestamp")
     }
 
-    val page = getSummariesForUser(user, limit, before = before).first()
+    // Never the archive: a mail the reader put away is one they decided on, and handing it back
+    // would put it on the stack a second time.
+    val page = getSummariesForUser(user, limit, before = before, archived = false).first()
 
     return StackEvent.Mails(
         replyTo = command.id,
@@ -206,6 +222,44 @@ private suspend fun setTags(
     )
 }
 
+/**
+ * Puts one mail into the archive or takes it back out, and records the change.
+ *
+ * States what should be true rather than what to change, like [setTags]: the same command run twice
+ * leaves the same thing behind, which is what lets a client resend it after a reconnect. The
+ * repository writes nothing when the mail is in that state already.
+ *
+ * A mail in the archive is still found here, unlike in [mailsFor] -- otherwise taking one back out
+ * would answer that it does not exist.
+ */
+private suspend fun setArchived(
+    user: User,
+    command: StackCommand.SetArchived,
+    emailRepository: EmailRepository,
+    archiveRepository: ArchiveRepository,
+): StackEvent {
+    val mailId = runCatching { Uuid.parse(command.mail) }.getOrNull()
+        ?: return StackEvent.Failed(command.id, SET_ARCHIVED, "mail is not an id")
+
+    // Doubles as the check that the mail is the caller's, see setTags.
+    emailRepository.summaryOf(user, mailId)
+        ?: return StackEvent.Failed(command.id, SET_ARCHIVED, "no such mail")
+
+    archiveRepository.setArchived(mailId, command.archived, createdByAgent = false)
+
+    return StackEvent.MailArchived(
+        replyTo = command.id,
+        mail = command.mail,
+        archived = command.archived,
+    )
+}
+
+/** The caller's tags as the event that carries them. */
+private suspend fun tagsOf(user: User, tagRepository: TagRepository): StackEvent.Tags =
+    StackEvent.Tags(
+        tagRepository.getForUser(user).first().map { TagResponse(it.id.toString(), it.name) }
+    )
+
 /** One of the caller's mails as the listing reports it, or null if it is not theirs. */
 private suspend fun EmailRepository.summaryOf(user: User, mailId: Uuid): MailSummary? =
     getSummariesForUser(user, limit = 1, ids = listOf(mailId)).first().mails.firstOrNull()
@@ -254,6 +308,18 @@ sealed interface StackCommand {
         @SerialName("mail") val mail: String,
         @SerialName("tags") val tags: List<String>,
     ) : StackCommand
+
+    /**
+     * Puts one mail into the archive, or takes it back out with `archived` false -- which is what
+     * the reader taking a decision back on the stack means.
+     */
+    @Serializable
+    @SerialName(SET_ARCHIVED)
+    data class SetArchived(
+        @SerialName("id") override val id: Long? = null,
+        @SerialName("mail") val mail: String,
+        @SerialName("archived") val archived: Boolean,
+    ) : StackCommand
 }
 
 /** What the server sends down the socket. */
@@ -285,6 +351,15 @@ sealed interface StackEvent {
         @SerialName("reply_to") override val replyTo: Long? = null,
         @SerialName("mail") val mail: String,
         @SerialName("tags") val tags: List<TagResponse>,
+    ) : StackEvent
+
+    /** Where one mail stands with the archive, after a [StackCommand.SetArchived]. */
+    @Serializable
+    @SerialName("mail_archived")
+    data class MailArchived(
+        @SerialName("reply_to") override val replyTo: Long? = null,
+        @SerialName("mail") val mail: String,
+        @SerialName("archived") val archived: Boolean,
     ) : StackEvent
 
     /**

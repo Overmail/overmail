@@ -8,8 +8,12 @@
 	import AppSidebar from "$lib/app/shell/AppSidebar.svelte";
 	import CheckingSession from "$lib/app/shell/CheckingSession.svelte";
     import { fade } from 'svelte/transition';
+	import { onMount } from 'svelte';
+	import { registerServiceWorker } from '$lib/app/pwa/serviceWorker';
 
 	let { children } = $props();
+
+	onMount(registerServiceWorker);
 
 	let session = $state<Session | null>(null);
 	let checked = $state(false);

@@ -32,13 +32,19 @@ import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepositoryImpl
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.plugins.di.resolve
+import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Ktor application is the composition root: it owns the object graph and the coroutine scope
@@ -48,11 +54,28 @@ fun Application.overmail() {
     configureDependencies()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
+    installWebSockets()
     installOvermailAuthentikt()
     // Before the routes: a route cannot ask for an authentication that is not installed yet.
     installSessionAuth()
     configureRouting()
     startImporter()
+}
+
+/**
+ * The socket the stack screen runs on, see `http/webapp/mystack`.
+ *
+ * With a converter, so a handler receives and sends its own command and event types instead of
+ * parsing frames. The ping is what keeps a screen that sits idle for minutes connected: a reverse
+ * proxy drops a connection nothing travels on, and the reader may well stare at one mail for
+ * longer than that.
+ */
+private fun Application.installWebSockets() {
+    install(WebSockets) {
+        contentConverter = KotlinxWebsocketSerializationConverter(Json)
+        pingPeriod = 15.seconds
+        timeout = 30.seconds
+    }
 }
 
 private fun Application.configureDependencies() {

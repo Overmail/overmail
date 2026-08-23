@@ -121,19 +121,51 @@ fun Route.mails() {
                 )
             )
         }
+
+        /**
+         * The body of one mail, as the text and the HTML part it carried.
+         *
+         * Its own request rather than a field of the listing: bodies run to tens of thousands of
+         * characters each, and a page of them would go over the wire for mails nobody ever opens.
+         * A caller lists the headers and asks for the body of the mail it is about to show.
+         *
+         * A mail of somebody else answers like one that does not exist -- which ids are taken is
+         * not the caller's business.
+         */
+        get("/{id}/content") {
+            val user = call.principal<User>() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+
+            val id = call.parameters["id"]?.let { runCatching { Uuid.parse(it) }.getOrNull() }
+                ?: return@get call.respond(HttpStatusCode.BadRequest)
+
+            val emailRepository = application.dependencies.resolve<EmailRepository>()
+            val email = emailRepository.getById(id).first()
+            if (email == null || email.imapAccount.user.id != user.id) {
+                return@get call.respond(HttpStatusCode.NotFound)
+            }
+
+            call.respond(
+                MailContentResponse(
+                    id = email.id.toString(),
+                    text = email.textContent,
+                    html = email.htmlContent,
+                )
+            )
+        }
     }
 }
 
 /**
  * Reads a query parameter as an instant, either ISO-8601 or as whole seconds since the epoch.
- * Null when it is neither.
+ * Null when it is neither. Internal, so the cursor means the same thing on the stack's socket.
  */
-private fun String.toInstantOrNull(): Instant? {
+internal fun String.toInstantOrNull(): Instant? {
     toLongOrNull()?.let { return runCatching { Instant.fromEpochSeconds(it) }.getOrNull() }
     return runCatching { Instant.parse(this) }.getOrNull()
 }
 
-private fun MailSummary.toResponse() = MailResponse(
+/** Internal, so a mail has one wire shape whichever channel it goes out on. */
+internal fun MailSummary.toResponse() = MailResponse(
     id = id.toString(),
     subject = subject,
     sender = sender.toResponse(),
@@ -199,6 +231,16 @@ data class ParticipantResponse(
     @SerialName("address") val address: String,
     /** Display name from this mail, absent for a bare address. */
     @SerialName("name") val name: String?,
+)
+
+/** The body of one mail, as `GET /api/mails/{id}/content` reports it. */
+@Serializable
+data class MailContentResponse(
+    @SerialName("id") val id: String,
+    /** The plain text part, absent when the mail carried none. */
+    @SerialName("text") val text: String?,
+    /** The HTML part, absent when the mail carried none. */
+    @SerialName("html") val html: String?,
 )
 
 /** A tag the mail is filed under. */

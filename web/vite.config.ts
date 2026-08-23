@@ -17,6 +17,9 @@ export default defineConfig({
 				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
+			// Registered by hand in $lib/app/pwa/serviceWorker.ts, which can recover
+			// from a registration made in the other build mode.
+			serviceWorker: { register: false },
 		}),
 	]
 });

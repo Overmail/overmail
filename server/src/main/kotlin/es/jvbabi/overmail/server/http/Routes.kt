@@ -6,12 +6,15 @@ import es.jvbabi.overmail.server.http.avatars.avatars
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.threads.threads
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
+import es.jvbabi.overmail.server.http.webapp.mystack.myStack
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.application.install
+import io.ktor.server.routing.IgnoreTrailingSlash
 import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -22,6 +25,10 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 
 internal fun Application.configureRouting() {
+    // `/api/webapp/my-stack` and `/api/webapp/my-stack/` are the same route, here and everywhere
+    // else: a client should not have to guess which spelling of a path this server wants.
+    install(IgnoreTrailingSlash)
+
     routing {
         // Caddy forwards /api* unchanged and sends everything else to SvelteKit, so every route
         // this server owns has to live under /api.
@@ -73,6 +80,9 @@ internal fun Application.configureRouting() {
             route("/webapp/home") {
                 route("/email-graph") { emailGraph() }
             }
+
+            // The stack screen's socket, which is the whole channel that screen runs on.
+            route("/webapp/my-stack") { myStack() }
         }
     }
 }

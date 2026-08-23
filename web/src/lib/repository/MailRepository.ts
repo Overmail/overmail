@@ -46,6 +46,15 @@ export type MailPage = {
 	total: number;
 };
 
+/** The body of one mail, in the shapes it carried. */
+export type MailContent = {
+	id: string;
+	/** The plain text part, null when the mail carried none. */
+	text: string | null;
+	/** The HTML part, null when the mail carried none. */
+	html: string | null;
+};
+
 /** Which end of the mailbox a page is read from. */
 export type MailSort = 'desc' | 'asc';
 
@@ -96,6 +105,19 @@ export class MailRepository {
 		if (!response.ok) throw new Error(`Could not list mails: ${response.status}`);
 
 		return (await response.json()) as MailPage;
+	}
+
+	/**
+	 * The body of one mail.
+	 *
+	 * Its own request, as the route is: a listing carries no bodies, so whoever wants to show one
+	 * asks for it per mail once it is about to be shown.
+	 */
+	async getContent(id: string): Promise<MailContent> {
+		const response = await fetch(`${API}/${id}/content`, { credentials: 'include' });
+		if (!response.ok) throw new Error(`Could not load the body of ${id}: ${response.status}`);
+
+		return (await response.json()) as MailContent;
 	}
 }
 

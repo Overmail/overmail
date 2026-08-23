@@ -1,73 +1,71 @@
+<script module lang="ts">
+    /**
+     * One formatter for the whole stack. Building an Intl formatter costs far more than using one,
+     * and the card takes the send time as text, see `EmailCard`.
+     */
+    const SENT_FORMAT = new Intl.DateTimeFormat(undefined, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+</script>
+
 <script lang="ts">
     import * as Sidebar from "$lib/components/ui/sidebar";
+    import * as Empty from "$lib/components/ui/empty";
     import {Separator} from "$lib/components/ui/separator";
+    import {Button} from "$lib/components/ui/button";
     import KeyCap from "$lib/components/key/KeyCap.svelte";
     import EmailStack from "$lib/app/my-stack/EmailStack.svelte";
-    import emails from "$lib/assets/emails.json";
     import type {EmailStackEntry} from "$lib/app/my-stack/EmailStack.svelte";
-    import {CLASSIFICATION_KEY_CLASSES, type EmailClassification} from "$lib/app/my-stack/classification";
+    import type {EmailCardParticipant} from "$lib/app/my-stack/EmailCard.svelte";
+    import {StackStore, type StackEntry} from "$lib/app/my-stack/StackStore.svelte";
+    import {avatarStore} from "$lib/app/avatars/AvatarStore.svelte";
+    import {CLASSIFICATION_KEY_CLASSES} from "$lib/app/my-stack/classification";
     import TagInput from "$lib/app/my-stack/TagInput.svelte";
     import {KNOWN_TAGS} from "$lib/app/my-stack/tags";
+    import type {MailParticipant} from "$lib/repository/MailRepository";
     import {createHotkeys, getIsKeyHeld} from "@tanstack/svelte-hotkeys";
     import {cn} from "$lib/utils.js";
-    import { ArchiveIcon, ArrowBendDownLeftIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+    import { ArchiveIcon, ArrowBendDownLeftIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, TrayIcon, WarningIcon } from "phosphor-svelte";
     import { fade } from "svelte/transition";
 
-    // Local state until the mail repository lands: the keys only move `currentId` around and write
-    // a classification, nothing is persisted yet.
-    let mails = $state<EmailStackEntry[]>(emails);
-    let currentId = $state<string | undefined>(mails[0]?.id);
+    // Owned by the page rather than shared from a module, like the mailbox on the home page: a
+    // module-level instance would be one stack for every server-rendered request.
+    const stack = new StackStore();
 
-    const currentIndex = $derived(mails.findIndex((mail) => mail.id === currentId));
+    // What this reads is how many mails are still waiting, which is exactly what a decision
+    // changes and therefore when the next pack is due -- and nothing the store writes while a
+    // request is out, so it does not run again for every step of the request it starts. The first
+    // pack comes from here too: a stack that has nothing in it has run down.
+    $effect(() => stack.ensureFilled());
+
+    // Leaving the screen hangs the socket up; nothing else holds it.
+    $effect(() => () => stack.close());
+
+    // One list of pictures for the whole mailbox, so it is asked for here rather than per card.
+    $effect(() => avatarStore.ensureLoaded());
+
+    // Which mail is on top belongs to the store, not here: the stack refills by how much is left
+    // in front of the top card, so it is the store that has to know where that is.
+    const entries = $derived(stack.entries);
 
     // What the tag input is working on. Kept aside while tagging and written to the mail on Enter,
     // so leaving with Escape drops the edit instead of half-tagging the mail.
     let draftTags = $state<string[]>([]);
 
-    /** The next mail still waiting for a decision, searching from `from` in `step` direction. */
-    function undecidedFrom(from: number, step: 1 | -1): EmailStackEntry | undefined {
-        for (let i = from; i >= 0 && i < mails.length; i += step) {
-            if (!mails[i].classification) return mails[i];
-        }
-        return undefined;
-    }
-
-    function classify(to: EmailClassification["to"]) {
-        if (currentIndex < 0) return;
-
-        mails[currentIndex].classification = {to};
-        currentId = undecidedFrom(currentIndex + 1, 1)?.id;
-    }
-
-    /** Skips the mail without deciding on it, so it stays in the stack. */
-    function next() {
-        if (currentIndex < 0) return;
-
-        currentId = undecidedFrom(currentIndex + 1, 1)?.id ?? currentId;
-    }
-
-    /**
-     * Back to the mail before this one. A decision on that mail is dropped on the way, so going
-     * back is also the undo: the card slides in from the right again.
-     */
-    function previous() {
-        const from = (currentIndex < 0 ? mails.length : currentIndex) - 1;
-        if (from < 0) return;
-
-        mails[from].classification = undefined;
-        currentId = mails[from].id;
-    }
-
     function startTagging() {
-        if (currentIndex < 0) return;
+        if (!stack.top) return;
 
-        draftTags = [...(mails[currentIndex].tags ?? [])];
+        draftTags = [...stack.top.tags];
         isTagging = true;
     }
 
     /** Enter on an empty field: the draft goes to the mail and the stack takes over again. */
     function commitTags() {
-        if (currentIndex >= 0) mails[currentIndex].tags = draftTags;
+        stack.setTags(draftTags);
         isTagging = false;
     }
 
@@ -76,11 +74,11 @@
     const whileNotTagging = () => ({enabled: !isTagging});
 
     createHotkeys([
-        {hotkey: "A", callback: () => classify("archive"), options: whileNotTagging},
-        {hotkey: "S", callback: () => classify("spam"), options: whileNotTagging},
-        {hotkey: "R", callback: () => classify("respond_later"), options: whileNotTagging},
-        {hotkey: "Space", callback: next, options: whileNotTagging},
-        {hotkey: "Backspace", callback: previous, options: whileNotTagging},
+        {hotkey: "A", callback: () => stack.classify("archive"), options: whileNotTagging},
+        {hotkey: "S", callback: () => stack.classify("spam"), options: whileNotTagging},
+        {hotkey: "R", callback: () => stack.classify("respond_later"), options: whileNotTagging},
+        {hotkey: "Space", callback: () => stack.skip(), options: whileNotTagging},
+        {hotkey: "Backspace", callback: () => stack.back(), options: whileNotTagging},
         // '#' sits on its own key on a German layout and on Shift+3 on a US one, and the matcher
         // compares Shift strictly, so both spellings are bound.
         {hotkey: {key: "#"}, callback: startTagging, options: whileNotTagging},
@@ -100,6 +98,41 @@
 
     /** Whether the stack is waiting for a tag for the current mail. */
     let isTagging = $state(false);
+
+    /** The mails as the cards want them: display names, formatted times and pictures. */
+    const cards = $derived(entries.map(toCard));
+
+    function toCard(entry: StackEntry): EmailStackEntry {
+        const {mail} = entry;
+
+        return {
+            id: mail.id,
+            sender: {
+                ...toCardParticipant(mail.sender),
+                // Absent for an address no picture was found for; the card falls back to initials.
+                avatarUrl: avatarStore.urlFor(mail.sender.address) ?? undefined,
+            },
+            sent: SENT_FORMAT.format(new Date(mail.sent_at)),
+            to: mail.recipients.map(toCardParticipant),
+            cc: mail.cc.map(toCardParticipant),
+            bcc: mail.bcc.map(toCardParticipant),
+            subject: mail.subject,
+            body: entry.body,
+            tags: entry.tags,
+            classification: entry.classification,
+        };
+    }
+
+    function toCardParticipant(participant: MailParticipant): EmailCardParticipant {
+        return {name: participant.name ?? undefined, address: participant.address};
+    }
+
+    // Only once a pack has come back and nothing is on its way or has failed: an empty list says
+    // nothing before that, a full mailbox would read as a finished stack, and a failed request is
+    // the header's message rather than a finished one.
+    const isEmpty = $derived(
+        stack.initialized && stack.waiting.length === 0 && stack.status === 'idle',
+    );
 </script>
 
 <header
@@ -110,7 +143,14 @@
         <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
         <h1 class="text-base font-medium">Stack</h1>
         <div class="ms-auto flex items-center gap-2">
-            <!-- End of header -->
+            <!-- The stack itself keeps working on what it has; asking again is the way out of a
+                 failed request, and it belongs where it is reachable with a card on screen. -->
+            {#if stack.status === 'error'}
+                <span class="text-muted-foreground text-sm">Mails konnten nicht geladen werden.</span>
+                <Button variant="outline" size="sm" onclick={() => stack.retry()}>
+                    Erneut versuchen
+                </Button>
+            {/if}
         </div>
     </div>
 </header>
@@ -121,9 +161,35 @@
 <main class="flex flex-1 flex-col">
     <div class="relative flex flex-1">
         <div class="flex flex-1 overflow-hidden relative">
-            <div class="absolute inset-0 flex justify-center">
-                <EmailStack emails={mails} {currentId} class="h-full" />
+            <!-- No centring here any more: the stack fills this box so that every card's scroll
+                 container reaches the right-hand edge, and the card inside it is what gets
+                 centred. -->
+            <div class="absolute inset-0">
+                <EmailStack emails={cards} currentId={stack.topId} class="h-full" />
             </div>
+
+            <!-- Beside the cards rather than instead of them: the stack stays mounted while the
+                 last decided card is still flying out, and this is what is left behind once it is
+                 gone -- which is what the delay on the fade waits for. -->
+            {#if isEmpty}
+                <div
+                        class="absolute inset-0 flex items-center justify-center px-8 pb-32"
+                        transition:fade={{duration: 200, delay: 400}}
+                >
+                    <Empty.Root>
+                        <Empty.Header>
+                            <Empty.Media variant="icon">
+                                <TrayIcon />
+                            </Empty.Media>
+                            <Empty.Title>Stack abgearbeitet</Empty.Title>
+                            <Empty.Description>
+                                Jede Mail ist entschieden. Was neu importiert wird, landet wieder
+                                hier.
+                            </Empty.Description>
+                        </Empty.Header>
+                    </Empty.Root>
+                </div>
+            {/if}
         </div>
 
 
@@ -147,17 +213,17 @@
                         transition:fade={{duration: 100}}
                 >
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="A" isPressed={held.archive.held} label="Archivieren" onclick={() => classify("archive")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.archive)} />
+                        <KeyCap key="A" isPressed={held.archive.held} label="Archivieren" onclick={() => stack.classify("archive")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.archive)} />
                         <span class="flex flex-row items-center gap-1"><ArchiveIcon /> Archivieren</span>
                     </div>
 
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
+                        <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => stack.classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
                         <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
                     </div>
 
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="R" isPressed={held.respondLater.held} label="Später antworten" onclick={() => classify("respond_later")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.respond_later)} />
+                        <KeyCap key="R" isPressed={held.respondLater.held} label="Später antworten" onclick={() => stack.classify("respond_later")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.respond_later)} />
                         <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> Später antworten</span>
                     </div>
 
@@ -167,12 +233,12 @@
                     </div>
 
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="␣" isPressed={held.next.held} label="Weiter" onclick={next} class="size-10" />
+                        <KeyCap key="␣" isPressed={held.next.held} label="Weiter" onclick={() => stack.skip()} class="size-10" />
                         <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> Weiter</span>
                     </div>
 
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="⌫" isPressed={held.previous.held} label="Vorige Mail" onclick={previous} class="size-10" />
+                        <KeyCap key="⌫" isPressed={held.previous.held} label="Vorige Mail" onclick={() => stack.back()} class="size-10" />
                         <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> Vorige Mail</span>
                     </div>
                 </div>

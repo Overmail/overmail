@@ -8,6 +8,7 @@
 
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar";
+    import {Skeleton} from "$lib/components/ui/skeleton";
     import {cn} from "$lib/utils.js";
 
     let {
@@ -31,7 +32,8 @@
         bcc?: EmailCardParticipant[];
         subject: string;
         tags?: string[];
-        body: string;
+        /** Absent while the body's own request is still out; the card then shows its shape. */
+        body?: string;
         /** 0…1: how far the card is faded into the background while it sits behind another one. */
         dim?: number;
         /** Colour washed over the whole card, e.g. the decision it was classified with. */
@@ -106,9 +108,20 @@
 
     <div class="mx-4 my-4 h-px bg-accent"></div>
 
-    <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
-        {body}
-    </div>
+    {#if body === undefined}
+        <!-- Lines in the shape of text rather than a spinner: everything above this is already
+             there, so the card reads as one that is still filling in rather than as one that is
+             loading. -->
+        <div class="pb-8 px-8 flex flex-col gap-3">
+            <Skeleton class="h-4 w-full" />
+            <Skeleton class="h-4 w-11/12" />
+            <Skeleton class="h-4 w-4/6" />
+        </div>
+    {:else}
+        <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
+            {body}
+        </div>
+    {/if}
 
     <!-- Dimmed by laying the background colour on top rather than lowering the card's opacity: a
          card in the stack has to stay solid, or the cards behind it show through. -->

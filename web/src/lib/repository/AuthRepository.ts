@@ -5,6 +5,15 @@ export const STEP_IDENTIFIER = 'authentikt-builtin/email';
 export const STEP_EMAIL_VERIFICATION = 'overmail/email-verification';
 export const STEP_DONE = 'authentikt-builtin/done';
 
+/**
+ * Query parameters that carry a flow across a page load. The names are authentikt's own: it
+ * appends these when it redirects a browser into the login UI itself (OAuth authorize, device
+ * flow verification link), so reading them here means those hand-offs land in the running flow
+ * instead of starting a fresh one.
+ */
+export const FLOW_ACTIVE_PARAM = '_authentikt_flow_active';
+export const FLOW_ID_PARAM = '_authentikt_session_id';
+
 export type Session = {
 	user_id: string;
 	username: string;
@@ -39,10 +48,27 @@ export class AuthRepository {
 
 	/** Which step the flow is waiting on right now. */
 	async checkFlow(sessionId: string): Promise<FlowStep> {
+		const step = await this.readFlow(sessionId);
+		if (!step) throw new Error(`Could not read the login flow ${sessionId}`);
+		return step;
+	}
+
+	/**
+	 * Same request, but a flow the server does not know is an answer rather than a failure.
+	 *
+	 * Flow sessions live in the server's memory only, so an id that came in over the URL can be
+	 * stale -- a restart, a bookmark, a link someone kept -- and the check route does not answer
+	 * politely for one it cannot find. Null means "start a new flow".
+	 */
+	async resumeFlow(sessionId: string): Promise<FlowStep | null> {
+		return await this.readFlow(sessionId);
+	}
+
+	private async readFlow(sessionId: string): Promise<FlowStep | null> {
 		const response = await fetch(`${API}/authentikt/flow/${sessionId}/check`, {
 			credentials: 'include'
 		});
-		if (!response.ok) throw new Error(`Could not read the login flow: ${response.status}`);
+		if (!response.ok) return null;
 		return (await response.json()) as FlowStep;
 	}
 

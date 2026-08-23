@@ -7,26 +7,16 @@
     // as the button stretching out into the window and the content coming into view behind it.
     import AgentFab from "./AgentFab.svelte";
     import AgentPanel, {PANEL_SIZE} from "./AgentPanel.svelte";
-    import {agentRepository, type AgentProcessStatus} from "$lib/repository/AgentRepository";
 
-    let status = $state<AgentProcessStatus | null>(null);
     let isOpen = $state(false);
 
     /**
      * What the button measures, which is what the card is wide while it is shut. Measured rather
-     * than stated: the button is a circle when the agent idles and a pill when it works, and
-     * `width: max-content` is a keyword the browser cannot animate away from -- an explicit pixel
-     * width is what makes the morph a transition. It stands in until the first measurement.
+     * than stated: `width: max-content` is a keyword the browser cannot animate away from -- an
+     * explicit pixel width is what makes the morph a transition. It stands in until the first
+     * measurement.
      */
     let fabWidth = $state(0);
-
-    // In an effect rather than at module scope: this only runs in the browser, and the socket is
-    // hung up when the card goes. One connection feeds both the button and the panel.
-    $effect(() => {
-        const connection = agentRepository.watchProcess({onStatus: (pushed) => (status = pushed)});
-
-        return () => connection.close();
-    });
 
     // A click next to the card leaves it alone -- it is a window, not a popover, and reaching for
     // the mail underneath must not cost what is on it. It closes by its own button, or by Escape.
@@ -55,7 +45,7 @@
             class="absolute bottom-0 right-0 w-max transition-opacity
                    {isOpen ? 'opacity-100 delay-200 duration-150' : 'pointer-events-none opacity-0 duration-100'}"
     >
-        <AgentPanel {status} onClose={() => (isOpen = false)} />
+        <AgentPanel onClose={() => (isOpen = false)} />
     </div>
 
     <div
@@ -65,6 +55,6 @@
     >
         <!-- Only opens: once it is open the button is behind the panel, and the way back out is
              the panel's own close button. -->
-        <AgentFab {status} expanded={isOpen} onclick={() => (isOpen = true)} />
+        <AgentFab expanded={isOpen} onclick={() => (isOpen = true)} />
     </div>
 </div>

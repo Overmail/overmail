@@ -35,13 +35,6 @@ object Emails : UuidTable("emails") {
      */
     val isArchived = bool("is_archived").default(false)
 
-    /**
-     * When the AI last worked through this mail, null for a mail it has not seen yet. That is what
-     * fills the processing queue, so it has to survive a restart -- the mailbox is not classified
-     * afresh on every start.
-     */
-    val lastAiProcessingAt = timestamp("last_ai_processing_at").nullable()
-
     init {
         /**
          * Narrows the dedup lookup (account + send second + subject) to a handful of rows. The

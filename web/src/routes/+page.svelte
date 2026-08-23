@@ -3,7 +3,6 @@
     import {Separator} from "$lib/components/ui/separator";
     import {Button} from "$lib/components/ui/button";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
-    import AgentReset from "$lib/app/home/AgentReset.svelte";
     import AgentCard from "$lib/app/agent/AgentCard.svelte";
     import AvatarCache from "$lib/app/home/AvatarCache.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
@@ -43,7 +42,6 @@
 <main class="flex flex-1 flex-col gap-10 p-4 lg:p-6">
     <EmailGraph />
     <AgentCard />
-    <AgentReset />
     <AvatarCache />
     <MailTable store={mails} threaded={threadedMails} />
 </main>

@@ -47,8 +47,6 @@ import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.inSubQuery
-import org.jetbrains.exposed.v1.core.isNotNull
-import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.notInSubQuery
 import org.jetbrains.exposed.v1.datetime.Date
@@ -56,8 +54,6 @@ import org.jetbrains.exposed.v1.datetime.Year
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
 import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
-import org.jetbrains.exposed.v1.r2dbc.update
-import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.firstOrNull as firstRowOrNull
@@ -160,40 +156,6 @@ class EmailRepositoryImpl(
                 }
             }
             .distinctUntilChanged()
-    }
-
-    override fun getUnprocessedIdsOldestFirst(): Flow<List<Uuid>> {
-        return changes.changesOf(Emails)
-            .conflate()
-            .map {
-                database.query {
-                    Emails
-                        .select(Emails.id)
-                        .where(Emails.lastAiProcessingAt.isNull())
-                        .orderBy(Emails.sent, SortOrder.ASC)
-                        .map { it[Emails.id].value }
-                        .toList()
-                }
-            }
-            .distinctUntilChanged()
-    }
-
-    override suspend fun markAiProcessed(id: Uuid) {
-        val now = Clock.System.now()
-
-        database.query {
-            Emails.update({ Emails.id eq id }) {
-                it[Emails.lastAiProcessingAt] = now
-            }
-        }
-    }
-
-    override suspend fun clearAiProcessing(): Int {
-        return database.query {
-            Emails.update({ Emails.lastAiProcessingAt.isNotNull() }) {
-                it[Emails.lastAiProcessingAt] = null
-            }
-        }
     }
 
     /** No `distinctUntilChanged` here: `ByteArray` compares by identity, so it would never drop. */
@@ -303,7 +265,6 @@ class EmailRepositoryImpl(
                 isRead = isRead,
                 // Nothing archives a mail on import; that only ever happens later.
                 isArchived = false,
-                lastAiProcessingAt = null,
                 recipients = storedRecipients,
             )
         }

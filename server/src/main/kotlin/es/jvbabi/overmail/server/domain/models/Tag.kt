@@ -23,23 +23,3 @@ data class EmailTag(
     val createdAt: Instant,
     val createdByAgent: Boolean,
 )
-
-/**
- * A mail in the neighbourhood of the one being worked on: enough of it to see what it was and how
- * it ended up filed, without loading its senders and recipients.
- */
-data class TaggedMail(
-    val id: Uuid,
-    val subject: String,
-    val sent: Instant,
-    /** Address the mail came from. */
-    val sender: String,
-    /**
-     * Whether the owner wrote this mail themselves. The sent folder is imported as well, so a
-     * neighbouring mail is about as likely to be the owner's own answer as the other party's mail.
-     */
-    val fromOwner: Boolean,
-    /** The opening of the mail, enough to tell what it was. Absent for a mail without a text part. */
-    val excerpt: String?,
-    val tags: List<EmailTag>,
-)

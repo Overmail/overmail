@@ -22,14 +22,11 @@
 </script>
 
 <script lang="ts">
-    // The open state of the card, and the shell the chat with the agent is to live in. What the
-    // agent is doing sits in a card at the top of it, not in the content.
+    // The open state of the card, and the shell the chat with the agent is to live in.
     import {XIcon} from "phosphor-svelte";
     import {Button} from "$lib/components/ui/button";
-    import AgentImportCard from "./AgentImportCard.svelte";
-    import type {AgentProcessStatus} from "$lib/repository/AgentRepository";
 
-    let {status, onClose}: {status: AgentProcessStatus | null; onClose: () => void} = $props();
+    let {onClose}: {onClose: () => void} = $props();
 </script>
 
 <div class="flex flex-col {PANEL_SIZE}">
@@ -45,8 +42,6 @@
             <XIcon class="size-4" />
         </Button>
     </header>
-
-    <AgentImportCard {status} />
 
     <!-- The chat goes in here. -->
 </div>

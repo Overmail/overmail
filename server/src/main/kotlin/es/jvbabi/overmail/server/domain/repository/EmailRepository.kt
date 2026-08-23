@@ -63,25 +63,6 @@ interface EmailRepository {
      */
     fun getYearsWithMailForUser(user: User): Flow<List<Int>>
 
-    /**
-     * Ids of the mails the AI has not worked through yet, oldest send time first. Ids rather than
-     * mails: a consumer that works through the whole mailbox would otherwise pull every sender and
-     * recipient along on each emission, and it only needs to know what is there and in which order.
-     *
-     * A mail leaves this list once [markAiProcessed] stamped it, so a newly imported mail simply
-     * appears at the end of the next emission.
-     */
-    fun getUnprocessedIdsOldestFirst(): Flow<List<Uuid>>
-
-    /** Stamps the mail as worked through by the AI, with the current time. */
-    suspend fun markAiProcessed(id: Uuid)
-
-    /**
-     * Takes [markAiProcessed]'s stamp off every mail, which puts the whole mailbox back into
-     * [getUnprocessedIdsOldestFirst]. Returns how many mails carried one.
-     */
-    suspend fun clearAiProcessing(): Int
-
     /** Loads the raw source on demand, see [Email]. */
     fun getRawContent(id: Uuid): Flow<ByteArray?>
 

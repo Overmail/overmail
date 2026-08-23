@@ -2,11 +2,9 @@ package es.jvbabi.overmail.server.http
 
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
-import es.jvbabi.overmail.server.http.ai.aiProcessing
 import es.jvbabi.overmail.server.http.avatars.avatars
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.threads.threads
-import es.jvbabi.overmail.server.http.webapp.agent.agentProcess
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -67,9 +65,6 @@ internal fun Application.configureRouting() {
             // The threads themselves, as the skeleton a grouped list is laid out from.
             route("/threads") { threads() }
 
-            // Operating the mail agent, not a domain object of its own.
-            route("/ai") { aiProcessing() }
-
             // The pictures of the people in the mailbox, and filling that cache up.
             route("/avatars") { avatars() }
 
@@ -77,12 +72,6 @@ internal fun Application.configureRouting() {
             // the way that screen needs them.
             route("/webapp/home") {
                 route("/email-graph") { emailGraph() }
-            }
-
-            route("/webapp/agent") {
-                // A socket rather than a poll: the agent goes from mail to mail on its own clock,
-                // and the display is meant to follow it.
-                route("/process") { agentProcess() }
             }
         }
     }

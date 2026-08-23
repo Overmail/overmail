@@ -40,7 +40,7 @@ sw.addEventListener('fetch', (event) => {
 	const url = new URL(request.url);
 	if (url.origin !== sw.location.origin) return;
 
-	// Mail, sessions and agent state are never useful stale, and range requests
+	// Mail and sessions are never useful stale, and range requests
 	// (attachments, audio) break when they are answered from a full cached body.
 	if (url.pathname.startsWith(`${base}/api/`) || request.headers.has('range')) return;
 

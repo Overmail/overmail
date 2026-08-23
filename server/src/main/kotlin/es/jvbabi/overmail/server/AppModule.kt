@@ -3,15 +3,12 @@ package es.jvbabi.overmail.server
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.installSessionAuth
-import es.jvbabi.overmail.server.ai.MailAnalyzer
 import es.jvbabi.overmail.server.config.AiConfig
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
-import es.jvbabi.overmail.server.domain.repository.AgentRepository
-import es.jvbabi.overmail.server.domain.repository.AgentRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.ArchiveRepository
 import es.jvbabi.overmail.server.domain.repository.ArchiveRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailAvatarRepository
@@ -35,19 +32,13 @@ import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepositoryImpl
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
-import es.jvbabi.overmail.server.jobs.processor.AiProcessingQueue
-import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.plugins.di.resolve
-import io.ktor.server.websocket.WebSockets
-import io.ktor.server.websocket.pingPeriod
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Ktor application is the composition root: it owns the object graph and the coroutine scope
@@ -57,18 +48,11 @@ fun Application.overmail() {
     configureDependencies()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
-    // The agent status socket sends typed frames; the ping keeps the connection alive through a
-    // proxy that drops what has been quiet, and an idle agent is quiet for a long time.
-    install(WebSockets) {
-        contentConverter = KotlinxWebsocketSerializationConverter(Json)
-        pingPeriod = 15.seconds
-    }
     installOvermailAuthentikt()
     // Before the routes: a route cannot ask for an authentication that is not installed yet.
     installSessionAuth()
     configureRouting()
     startImporter()
-    startAiProcessing()
 }
 
 private fun Application.configureDependencies() {
@@ -95,12 +79,7 @@ private fun Application.configureDependencies() {
         provide<EmailAvatarRepository> { EmailAvatarRepositoryImpl(resolve(), resolve()) }
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
-        // Reads the queue as well as the mails: what the agent has in its hands is not in the
-        // rows, see AgentRepositoryImpl.
-        provide<AgentRepository> { AgentRepositoryImpl(resolve(), resolve(), resolve()) }
         provide<JwtService> { JwtService() }
-
-        provide<MailAnalyzer> { MailAnalyzer(resolve()) }
 
         // Started from a route rather than on boot: filling the cache is a button, see
         // AvatarRefresher.
@@ -112,14 +91,6 @@ private fun Application.configureDependencies() {
                 coroutineScope = this@configureDependencies,
             )
         }
-
-        provide<AiProcessingQueue> { AiProcessingQueue(
-                emailRepository = resolve(),
-                tagRepository = resolve(),
-                threadRepository = resolve(),
-                analyzer = resolve(),
-                coroutineScope = this@configureDependencies,
-            ) }
 
         provide<ImporterManager> {
             ImporterManager(
@@ -136,13 +107,5 @@ private fun Application.configureDependencies() {
 private fun Application.startImporter() {
     launch {
         dependencies.resolve<ImporterManager>().start()
-    }
-}
-
-private fun Application.startAiProcessing() {
-    // The queue launches into the application scope itself, so that it can be stopped again
-    // without taking this coroutine down with it; resolving it is what needs the launch.
-    launch {
-        dependencies.resolve<AiProcessingQueue>().start()
     }
 }

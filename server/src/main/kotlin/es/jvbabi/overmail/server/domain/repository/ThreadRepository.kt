@@ -37,16 +37,4 @@ interface ThreadRepository {
         reason: String?,
         createdByAgent: Boolean,
     ): MailThreadEntry?
-
-    /**
-     * Renames a thread the agent opened. A thread a user named stays as they named it. Returns
-     * whether the title changed.
-     */
-    suspend fun retitleAgentThread(threadId: Uuid, title: String): Boolean
-
-    /**
-     * Throws away what the agent built: its memberships first, then the threads it opened that no
-     * mail sits in any more. A thread a user has filed a mail into survives.
-     */
-    suspend fun clearAgentWork(): ClearedAgentWork
 }

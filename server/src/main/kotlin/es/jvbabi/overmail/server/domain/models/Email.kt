@@ -21,8 +21,6 @@ data class Email(
     val isRead: Boolean,
     /** Whether the mail sits in the archive, see [ArchiveEntry] for how it got there. */
     val isArchived: Boolean,
-    /** When the AI last worked through this mail, null while it has not seen it yet. */
-    val lastAiProcessingAt: Instant?,
     val recipients: List<EmailRecipient>,
 )
 

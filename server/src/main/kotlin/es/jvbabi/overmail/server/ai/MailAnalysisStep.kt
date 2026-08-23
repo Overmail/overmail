@@ -5,7 +5,7 @@ import kotlinx.serialization.KSerializer
 /**
  * How hard a step is, and therefore what it is worth running on. Extraction that only has to read
  * what is written can take the fast model; a step that has to weigh or interpret gets the capable
- * one. Which model each tier resolves to is [MailAnalyzer]'s business.
+ * one. Which model each tier resolves to is the caller's business.
  */
 enum class ModelTier {
     /** Reading facts straight out of the mail. */
@@ -18,10 +18,10 @@ enum class ModelTier {
 /**
  * One specialised look at a mail: its own prompt, its own output schema, its own model.
  *
- * Steps are never merged. Every one of them answers a single question ([MailOrigin] answers who
- * sent the mail and nothing else), which is what keeps a prompt short enough to be reliable, lets
- * a step be re-prompted or swapped without touching the others, and lets each pick the model it
- * actually needs. [SHARED_RULES] are prepended to every step's [instructions].
+ * Steps are never merged. Every one of them answers a single question -- who sent the mail, and
+ * nothing else -- which is what keeps a prompt short enough to be reliable, lets a step be
+ * re-prompted or swapped without touching the others, and lets each pick the model it actually
+ * needs. [SHARED_RULES] are prepended to every step's [instructions].
  */
 class MailAnalysisStep<T>(
     /** Identifies the prompt, and shows up in Koog's traces. */
@@ -44,8 +44,8 @@ class MailAnalysisStep<T>(
 
     /**
      * What a usable answer carries beyond the shape the schema enforces. Returns what is wrong
-     * with an answer, or null when it is fine; a step that answers something unusable is asked
-     * once more with that sentence attached, see [MailAnalyzer.run].
+     * with an answer, or null when it is fine; a step that answers something unusable is worth
+     * asking once more with that sentence attached.
      *
      * For what a JSON schema cannot say: that a field is only needed once another one is filled,
      * that a required string must not arrive empty.

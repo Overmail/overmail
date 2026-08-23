@@ -20,12 +20,9 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
-import org.jetbrains.exposed.v1.core.notInSubQuery
-import org.jetbrains.exposed.v1.r2dbc.deleteWhere
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
 import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
-import org.jetbrains.exposed.v1.r2dbc.update
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -162,30 +159,6 @@ class ThreadRepositoryImpl(
                 createdAt = createdAt,
                 createdByAgent = createdByAgent,
             )
-        }
-    }
-
-    override suspend fun retitleAgentThread(threadId: Uuid, title: String): Boolean {
-        val trimmed = title.trim().take(255)
-        if (trimmed.isEmpty()) return false
-
-        return database.query {
-            Threads.update({ (Threads.id eq threadId) and (Threads.createdByAgent eq true) }) {
-                it[Threads.title] = trimmed
-            } > 0
-        }
-    }
-
-    override suspend fun clearAgentWork(): ClearedAgentWork {
-        return database.query {
-            val links = EmailThreads.deleteWhere { EmailThreads.createdByAgent eq true }
-
-            val threads = Threads.deleteWhere {
-                (Threads.createdByAgent eq true) and
-                    (Threads.id notInSubQuery EmailThreads.select(EmailThreads.thread))
-            }
-
-            ClearedAgentWork(links = links, created = threads)
         }
     }
 }

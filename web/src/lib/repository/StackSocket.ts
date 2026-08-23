@@ -1,4 +1,4 @@
-import type { Mail, MailPage } from '$lib/repository/MailRepository';
+import type { Mail, MailPage, MailTag } from '$lib/repository/MailRepository';
 
 /** Where the socket lives. Under `/api`, so the proxy sends it to Ktor like everything else. */
 const PATH = '/api/webapp/my-stack/';
@@ -19,25 +19,34 @@ const ANSWER_TIMEOUT = 10_000;
  */
 const RECONNECT_DELAYS = [250, 1_000, 3_000, 6_000];
 
-/** What the stack asks the server for. */
-type StackCommand = {
-	type: 'load_mails';
-	limit: number;
-	/** Exclusive upper bound on the send time; absent for the first pack. */
-	before?: string;
-};
+/** What the stack asks the server for. A command id is added on the way out. */
+type StackCommand =
+	| { type: 'load_mails'; limit: number; before?: string }
+	| { type: 'set_tags'; mail: string; tags: string[] };
 
-/** What the server sends down the socket. */
+/**
+ * What the server sends down the socket. `reply_to` names the command it answers; an event without
+ * one is the server keeping the screen in sync on its own.
+ */
 type StackEvent =
-	| { type: 'mails'; mails: Mail[]; total: number; before?: string | null }
-	| { type: 'error'; command?: string | null; message: string };
+	| {
+			type: 'mails';
+			reply_to?: number | null;
+			mails: Mail[];
+			total: number;
+			before?: string | null;
+	  }
+	| { type: 'mail_tags'; reply_to?: number | null; mail: string; tags: MailTag[] }
+	| { type: 'tags'; reply_to?: number | null; tags: MailTag[] }
+	| { type: 'error'; reply_to?: number | null; command?: string | null; message: string };
 
 /** A command that has been asked for and not answered yet. */
 type Pending = {
+	id: number;
 	frame: string;
 	/** Whether it went out on the socket that is open now; false again after a reconnect. */
 	sent: boolean;
-	resolve: (page: MailPage) => void;
+	resolve: (event: StackEvent) => void;
 	reject: (cause: Error) => void;
 };
 
@@ -47,17 +56,22 @@ export type SocketFactory = (url: string) => WebSocket;
 /**
  * The stack screen's channel to the server.
  *
- * A socket rather than a request per pack, because the rest of the screen's traffic belongs on a
- * connection that is already open: the decisions the reader makes, and the mails that arrive while
- * they work. Bodies are the one exception and stay on `MailRepository.getContent` -- they are big,
- * the browser caches them, and nothing about them is live.
+ * A socket rather than a request per ask, because the screen's traffic belongs on a connection that
+ * is already open: the mails, the tags the reader files them under, and the tag list the
+ * autocomplete runs on, which the server sends by itself whenever it changes. Bodies are the one
+ * exception and stay on `MailRepository.getContent` -- they are big, the browser caches them, and
+ * nothing about them is live.
  *
  * Opened on the first ask rather than in the constructor, so this can be built while the page is
  * rendered on the server. A socket that drops with nothing outstanding is simply forgotten and the
- * next ask opens a new one; a drop with a command in flight reconnects on its own and sends that
- * command again, so a proxy timeout or a lost minute of network never reaches the reader. The
- * caller only ever hears about it once [RECONNECT_DELAYS] is used up: then the pack is rejected,
- * and asking again is the screen's retry button.
+ * next ask opens a new one; a drop with commands in flight reconnects on its own and sends them
+ * again, so a proxy timeout or a lost minute of network never reaches the reader. The caller only
+ * hears about it once [RECONNECT_DELAYS] is used up: then the command is rejected, and asking again
+ * is the screen's retry button.
+ *
+ * Resending is safe because every command says what should be true rather than what to change --
+ * `set_tags` carries the whole set of tags for a mail, so running it twice leaves the same thing
+ * behind.
  *
  * Reconnecting is driven by what is outstanding, not by a keepalive of its own: nothing here holds
  * a connection open for a screen that is not asking for anything.
@@ -66,33 +80,47 @@ export class StackSocket {
 	readonly #createSocket: SocketFactory;
 
 	#socket: WebSocket | null = null;
-	/**
-	 * Commands asked for and not answered yet, oldest first. The server answers every command with
-	 * exactly one event, in the order the commands came in, so the answers line up with the asks by
-	 * position. The day the server also sends events nobody asked for, this needs a command id.
-	 */
+	/** Commands asked for and not answered yet, oldest first; matched by their id. */
 	#pending: Pending[] = [];
+	/** Numbers the commands are told apart by. */
+	#lastId = 0;
 	/** Which reconnect is next. Back to zero as soon as an answer arrives. */
 	#attempt = 0;
 	#reconnecting: ReturnType<typeof setTimeout> | null = null;
 	#timeout: ReturnType<typeof setTimeout> | null = null;
 	/** Set by [close]: the screen is gone, so nothing reopens the socket. */
 	#closed = false;
+	#tagsListener: ((tags: MailTag[]) => void) | null = null;
 
 	constructor(createSocket: SocketFactory = (url) => new WebSocket(url)) {
 		this.#createSocket = createSocket;
 	}
 
-	/** The next pack of mails, newest first, ending before `before`. */
-	requestMails(query: { limit: number; before?: string }): Promise<MailPage> {
-		if (this.#closed) return Promise.reject(new Error('The stack socket is closed'));
+	/**
+	 * Watches the caller's tag list, which the server sends when the socket opens and again on every
+	 * change. One listener; the store is it.
+	 */
+	onTags(listener: (tags: MailTag[]) => void): void {
+		this.#tagsListener = listener;
+	}
 
-		const command: StackCommand = { type: 'load_mails', ...query };
+	/** The next mails, newest first, ending before `before`. */
+	async requestMails(query: { limit: number; before?: string }): Promise<MailPage> {
+		const event = await this.#request({ type: 'load_mails', ...query });
+		if (event.type !== 'mails') throw new Error(`Asked for mails, got ${event.type}`);
 
-		return new Promise<MailPage>((resolve, reject) => {
-			this.#pending.push({ frame: JSON.stringify(command), sent: false, resolve, reject });
-			this.#flush();
-		});
+		return { mails: event.mails, total: event.total };
+	}
+
+	/**
+	 * Files a mail under exactly these tags, by name, creating the ones that do not exist yet.
+	 * Answers with the tags the mail ends up carrying, in the spelling the server stored.
+	 */
+	async setTags(mail: string, tags: string[]): Promise<MailTag[]> {
+		const event = await this.#request({ type: 'set_tags', mail, tags });
+		if (event.type !== 'mail_tags') throw new Error(`Filed tags, got ${event.type}`);
+
+		return event.tags;
 	}
 
 	/** Hangs up for good and fails whatever was still on its way. Leaving the screen calls this. */
@@ -105,6 +133,18 @@ export class StackSocket {
 		socket?.close();
 
 		this.#failPending(new Error('The stack socket was closed'));
+	}
+
+	#request(command: StackCommand): Promise<StackEvent> {
+		if (this.#closed) return Promise.reject(new Error('The stack socket is closed'));
+
+		const id = (this.#lastId += 1);
+		const frame = JSON.stringify({ ...command, id });
+
+		return new Promise<StackEvent>((resolve, reject) => {
+			this.#pending.push({ id, frame, sent: false, resolve, reject });
+			this.#flush();
+		});
 	}
 
 	/** Sends everything that has not gone out yet, opening the socket if it has to. */
@@ -155,17 +195,26 @@ export class StackSocket {
 			return;
 		}
 
-		const waiting = this.#pending.shift();
-		if (!waiting) return;
-
-		// An answer of any kind means the connection works, an `error` event included: that one is
-		// the server turning a command down, not the socket failing.
+		// Anything at all means the connection works, an `error` event included: that one is the
+		// server turning a command down, not the socket failing.
 		this.#attempt = 0;
+
+		if (event.reply_to === undefined || event.reply_to === null) {
+			// Sent on the server's own initiative. An error without a command is one this client
+			// cannot act on either -- the answer it was waiting for then runs into the timeout.
+			if (event.type === 'tags') this.#tagsListener?.(event.tags);
+			return;
+		}
+
+		const at = this.#pending.findIndex((waiting) => waiting.id === event.reply_to);
+		if (at < 0) return;
+
+		const [waiting] = this.#pending.splice(at, 1);
 		this.#clearTimeout();
 		this.#armTimeout();
 
-		if (event.type === 'mails') waiting.resolve({ mails: event.mails, total: event.total });
-		else waiting.reject(new Error(event.message));
+		if (event.type === 'error') waiting.reject(new Error(event.message));
+		else waiting.resolve(event);
 	}
 
 	/** Puts the socket aside so the next flush builds a new one, and marks its frames unsent. */

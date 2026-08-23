@@ -2,7 +2,8 @@ import {
 	mailRepository,
 	type Mail,
 	type MailPage,
-	type MailRepository
+	type MailRepository,
+	type MailTag
 } from '$lib/repository/MailRepository';
 import { StackSocket } from '$lib/repository/StackSocket';
 import { mailBodyText } from '$lib/app/mails/body';
@@ -62,8 +63,11 @@ export type StackEntry = {
  * letting the browser cache.
  *
  * The top of the stack lives here rather than in the page, because the refill is measured from it.
- * Decisions go nowhere else yet: [classify] and [setTags] write to this list only, which is the
- * seam the archive and the tag repositories plug into later.
+ *
+ * Tags are written through: [setTags] shows the reader's edit at once and files it over the socket,
+ * and the tags that come back replace it, so what is on the card is what the server stored. The
+ * list to complete from is [knownTags], which the server sends by itself whenever it changes. A
+ * decision is still local -- that is the next thing to plug in here.
  */
 export class StackStore {
 	/** Every mail read so far, newest first, decided ones included. */
@@ -77,6 +81,15 @@ export class StackStore {
 
 	/** The mail on top of the stack: the one a decision applies to. */
 	topId = $state<string | undefined>(undefined);
+
+	/**
+	 * Every tag the reader has, as the server keeps reporting it: what the tag input completes from.
+	 * Empty until the socket is open, which is as soon as the first mails are asked for.
+	 */
+	knownTags = $state<MailTag[]>([]);
+
+	/** The names of [knownTags], which is all the tag input works in. */
+	knownTagNames: string[] = $derived(this.knownTags.map((tag) => tag.name));
 
 	/** Every mail still waiting for a decision, in the order the stack shows them. */
 	waiting: StackEntry[] = $derived(this.entries.filter((entry) => !entry.classification));
@@ -119,6 +132,10 @@ export class StackStore {
 		this.#socket = socket;
 		this.#repository = repository;
 		this.#minAhead = minAhead;
+
+		// Not asked for: the server sends the list when the socket opens and on every change, so
+		// this is the only thing that has to be in place for the autocomplete to be current.
+		socket.onTags((tags) => (this.knownTags = tags));
 	}
 
 	/** Hangs up. Leaving the screen is what calls this; the mails stay in the list. */
@@ -185,9 +202,31 @@ export class StackStore {
 		this.topId = entry.mail.id;
 	}
 
-	/** Replaces the tags of the top mail. Local for now, see [StackStore]. */
+	/**
+	 * Files the top mail under exactly these tags, creating the ones that do not exist yet.
+	 *
+	 * Shown on the card before the server has heard of it, because the reader is already on the next
+	 * mail by then. What comes back replaces it -- the stored spelling of a tag that only differed
+	 * in case, say -- and a write that could not be made puts the old tags back rather than leaving
+	 * the card claiming something that is not filed.
+	 */
 	setTags(tags: string[]): void {
-		if (this.top) this.top.tags = [...tags];
+		const entry = this.top;
+		if (!entry) return;
+
+		const before = entry.tags;
+		const id = entry.mail.id;
+		entry.tags = [...tags];
+
+		void this.#socket
+			.setTags(id, tags)
+			.then((filed) => this.#writeTags(id, filed.map((tag) => tag.name)))
+			.catch(() => this.#writeTags(id, before));
+	}
+
+	#writeTags(id: string, tags: string[]): void {
+		const entry = this.entries[this.#indexOf(id)];
+		if (entry) entry.tags = tags;
 	}
 
 	/** Where a mail sits in [entries], or -1 for none and for no mail on top. */

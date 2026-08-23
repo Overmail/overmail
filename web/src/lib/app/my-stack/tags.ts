@@ -1,23 +1,4 @@
 /**
- * The tags that already exist, in the order they were created. A placeholder for whatever the
- * repository will hand out later; the stack only ever reads it to make suggestions.
- */
-export const KNOWN_TAGS = [
-	'Rechnung',
-	'Newsletter',
-	'Reise',
-	'Bewerbung',
-	'Steuer',
-	'Familie',
-	'Hosting',
-	'Sicherheit',
-	'Vertrag',
-	'Support',
-	'Bestellung',
-	'Termin'
-];
-
-/**
  * Tags whose letters contain the query in order, best match first. Typing "rng" finds "Rechnung",
  * which is the point: the query is a sketch of the tag, not a prefix of it.
  */

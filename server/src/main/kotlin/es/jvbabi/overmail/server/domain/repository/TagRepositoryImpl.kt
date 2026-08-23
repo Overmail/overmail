@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.toList
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.lowerCase
+import org.jetbrains.exposed.v1.r2dbc.deleteWhere
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
 import org.jetbrains.exposed.v1.r2dbc.selectAll
 import kotlin.time.Clock
@@ -121,6 +122,12 @@ class TagRepositoryImpl(
                 createdAt = createdAt,
                 createdByAgent = createdByAgent,
             )
+        }
+    }
+
+    override suspend fun detach(emailId: Uuid, tag: Tag): Boolean {
+        return database.query {
+            EmailTags.deleteWhere { (email eq emailId) and (EmailTags.tag eq tag.id) } > 0
         }
     }
 }

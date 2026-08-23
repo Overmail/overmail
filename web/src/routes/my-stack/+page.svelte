@@ -25,7 +25,6 @@
     import {avatarStore} from "$lib/app/avatars/AvatarStore.svelte";
     import {CLASSIFICATION_KEY_CLASSES} from "$lib/app/my-stack/classification";
     import TagInput from "$lib/app/my-stack/TagInput.svelte";
-    import {KNOWN_TAGS} from "$lib/app/my-stack/tags";
     import type {MailParticipant} from "$lib/repository/MailRepository";
     import {createHotkeys, getIsKeyHeld} from "@tanstack/svelte-hotkeys";
     import {cn} from "$lib/utils.js";
@@ -247,7 +246,7 @@
                         class="absolute top-0 left-0 flex w-full h-full flex-row items-center justify-center gap-6"
                         transition:fade={{duration: 100}}
                 >
-                    <TagInput bind:tags={draftTags} suggestions={KNOWN_TAGS} onclose={commitTags} class="w-xl" />
+                    <TagInput bind:tags={draftTags} suggestions={stack.knownTagNames} onclose={commitTags} class="w-xl" />
 
                     <div class="flex flex-row items-center justify-center gap-2">
                         <KeyCap key="ESC" label="Vorige Mail" onclick={() => isTagging = false} class="size-10" />

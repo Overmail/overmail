@@ -1,9 +1,10 @@
 package es.jvbabi.overmail.server.database.models
 
+import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 
 object ImapAccounts : UuidTable("imap_accounts") {
-    val user = reference("user_id", Users)
+    val user = reference("user_id", Users, onDelete = ReferenceOption.CASCADE)
     val host = varchar("host", 255)
     val port = integer("port")
     val username = varchar("username", 255)

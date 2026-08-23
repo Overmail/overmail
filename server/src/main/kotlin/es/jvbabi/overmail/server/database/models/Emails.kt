@@ -7,7 +7,7 @@ import org.jetbrains.exposed.v1.datetime.timestamp
 object Emails : UuidTable("emails") {
     /** The account the mail was imported through; also determines who owns it. */
     val imapAccount = reference("imap_account_id", ImapAccounts, onDelete = ReferenceOption.CASCADE)
-    val sender = reference("sender_id", EmailUsers)
+    val sender = reference("sender_id", EmailUsers, onDelete = ReferenceOption.CASCADE)
 
     /**
      * Display name the sender used in *this* mail, absent for a bare `foo@bar.tld` address. Stored

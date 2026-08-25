@@ -53,7 +53,11 @@ fun Route.mails() {
          *
          * `thread` narrows the window to one matter, `ids` (comma separated, at most [MAX_IDS])
          * to a named handful, and `filed` (`true`/`false`) to the mails that sit in some thread or
-         * in none. None of the three is a stretch of the list -- a thread's mails sit wherever
+         * in none.
+         *
+         * Spam is left out unless asked for: `spam` is `false` by default, `true` for the flagged
+         * mails alone and `all` for the mailbox with them in it. A reader who filed mail as spam
+         * has decided about it, so a listing that shows it again would be showing decided mail. None of the three is a stretch of the list -- a thread's mails sit wherever
          * they were sent -- which is what they are for: a caller that knows what it wants asks for
          * exactly that instead of paging there. `total` then counts what was asked for rather than
          * the mailbox.
@@ -97,6 +101,13 @@ fun Route.mails() {
                 else -> return@get call.respond(HttpStatusCode.BadRequest)
             }
 
+            val spam = when (call.parameters["spam"]) {
+                null, "false" -> false
+                "true" -> true
+                "all" -> null
+                else -> return@get call.respond(HttpStatusCode.BadRequest)
+            }
+
             val after = call.parameters["after"]?.let {
                 it.toInstantOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             }
@@ -108,7 +119,7 @@ fun Route.mails() {
             // repository pulls the database provider, and starting up must not wait on that.
             val emailRepository = application.dependencies.resolve<EmailRepository>()
             val page = emailRepository
-                .getSummariesForUser(user, limit, after, before, newestFirst, threadId, ids, filed)
+                .getSummariesForUser(user, limit, after, before, newestFirst, threadId, ids, filed, spam = spam)
                 .first()
 
             call.respond(

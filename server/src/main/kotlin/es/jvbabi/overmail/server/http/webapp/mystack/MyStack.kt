@@ -55,8 +55,8 @@ private const val SET_ARCHIVED = "set_archived"
  * `GET /api/mails/{id}/content` -- they are big, the browser caches them, and nothing about them is
  * live.
  *
- * Mails already in the archive are never handed out: the stack is what the reader still has to
- * decide on, and a mail they archived is decided.
+ * Mails already in the archive or flagged as spam are never handed out: the stack is what the
+ * reader still has to decide on, and either of those is decided.
  *
  * Two directions, told apart by whether an event carries `reply_to`: a command is answered with
  * exactly one event carrying its `id`, and everything without one is the server keeping the screen
@@ -151,7 +151,8 @@ private suspend fun EmailRepository.mailsFor(user: User, command: StackCommand.L
 
     // Never the archive: a mail the reader put away is one they decided on, and handing it back
     // would put it on the stack a second time.
-    val page = getSummariesForUser(user, limit, before = before, archived = false).first()
+    // Nor spam: a mail a filter caught, or that the reader flagged themselves, is decided too.
+    val page = getSummariesForUser(user, limit, before = before, archived = false, spam = false).first()
 
     return StackEvent.Mails(
         replyTo = command.id,

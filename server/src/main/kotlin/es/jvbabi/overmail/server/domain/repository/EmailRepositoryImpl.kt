@@ -87,6 +87,7 @@ class EmailRepositoryImpl(
         ids: Collection<Uuid>?,
         filed: Boolean?,
         archived: Boolean?,
+        spam: Boolean?,
     ): Flow<MailPage> {
         return changes
             .changesOf(
@@ -96,7 +97,7 @@ class EmailRepositoryImpl(
             .conflate()
             .map {
                 database.query {
-                    loadSummaries(user, limit, after, before, newestFirst, threadId, ids, filed, archived)
+                    loadSummaries(user, limit, after, before, newestFirst, threadId, ids, filed, archived, spam)
                 }
             }
             .distinctUntilChanged()
@@ -286,6 +287,7 @@ class EmailRepositoryImpl(
         ids: Collection<Uuid>?,
         filed: Boolean?,
         archived: Boolean?,
+        spam: Boolean?,
     ): MailPage {
         var where = (ImapAccounts.user eq user.id) as Op<Boolean>
         if (after != null) where = where and (Emails.sent greater after)
@@ -300,6 +302,9 @@ class EmailRepositoryImpl(
         // Off the mail's own flag, not off the newest archive entry: the two say the same thing and
         // a listing must not join the history for it, see `Emails.isArchived`.
         if (archived != null) where = where and (Emails.isArchived eq archived)
+        // Same again for spam, and for the same reason: `Emails.isSpam` says what the newest row
+        // of `email_spam` says.
+        if (spam != null) where = where and (Emails.isSpam eq spam)
         if (filed != null) {
             val inAnyThread = EmailThreads.select(EmailThreads.email)
             where = where and

@@ -137,6 +137,7 @@
             bcc: mail.bcc.map(toCardParticipant),
             subject: mail.subject,
             body: entry.body,
+            html: entry.html,
             tags: entry.tags,
             classification: entry.classification,
         };

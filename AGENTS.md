@@ -115,6 +115,8 @@ other Exposed type.
 
 ### Kotlin
 - `@Serializable` classes should have every property annotated with a `@SerialName` with snake_case, so the JSON is stable even if the property name changes. Exceptions are external APIs which may have another naming scheme, still use `@SerialName` to match the external API.
+- Each API route shold be in its own file, named after the route. The file should contain a KDoc comment with a summary of the route, and the route should be registered in `configureRouting()`.
+- Routes that have an ID field (like /user/:id) should have a function like `ApplicationCall.getENTITYbySlug()` that returns the entity or throws a 404. Entities which should not be exposed publicly should also have a function like `ApplicationCall.getENTITYbySlugWithRequiredPrincipalAsOwner()` that checks the principal and throws a 403 if the principal is not the owner of the entity.
 
 ## Verify
 

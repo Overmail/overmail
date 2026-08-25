@@ -32,6 +32,8 @@ export type StackEntry = {
 	mail: Mail;
 	/** Absent while the body's own request is still out, see [StackStore]. */
 	body?: string;
+	/** The mail's HTML part, absent while the body is still out and when it carried none. */
+	html?: string;
 	/** Absent as long as the mail is still waiting for a decision. */
 	classification?: EmailClassification;
 	/** The tags the mail carries, seeded from the listing and edited from here on. */
@@ -363,7 +365,10 @@ export class StackStore {
 		try {
 			const content = await this.#repository.getContent(id);
 			const entry = this.entries[this.#indexOf(id)];
-			if (entry) entry.body = mailBodyText(content);
+			if (entry) {
+				entry.body = mailBodyText(content);
+				entry.html = content.html ?? undefined;
+			}
 		} catch {
 			// Left without a body and asked for again the next time the stack moves: one mail whose
 			// body did not arrive must not stop the stack, and the header alone is enough to

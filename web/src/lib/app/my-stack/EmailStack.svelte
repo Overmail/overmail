@@ -13,6 +13,8 @@
         subject: string;
         /** Absent while the body's own request is still out, see `EmailCard`. */
         body?: string;
+        /** The mail's HTML part, see `EmailCard`. */
+        html?: string;
         tags?: string[];
         /** Absent as long as the mail is still waiting for a decision. */
         classification?: EmailClassification;

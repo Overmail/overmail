@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.database
 
 import es.jvbabi.overmail.server.database.models.Archived
 import es.jvbabi.overmail.server.database.models.EmailAvatars
+import es.jvbabi.overmail.server.database.models.Filters
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
@@ -42,6 +43,7 @@ class OvermailDatabase(
             SchemaUtils.create(Threads)
             SchemaUtils.create(EmailThreads)
             SchemaUtils.create(Archived)
+            SchemaUtils.create(Filters)
         }
     }
 

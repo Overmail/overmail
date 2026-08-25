@@ -23,6 +23,8 @@ import es.jvbabi.overmail.server.domain.repository.OutgoingMailRepository
 import es.jvbabi.overmail.server.domain.repository.OutgoingMailRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.SpamFilterRepository
+import es.jvbabi.overmail.server.domain.repository.SpamFilterRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
 import es.jvbabi.overmail.server.domain.repository.ThreadRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.UserRepository
@@ -104,6 +106,7 @@ private fun Application.configureDependencies() {
         provide<ThreadRepository> { ThreadRepositoryImpl(resolve(), resolve()) }
         provide<ArchiveRepository> { ArchiveRepositoryImpl(resolve(), resolve()) }
         provide<EmailAvatarRepository> { EmailAvatarRepositoryImpl(resolve(), resolve()) }
+        provide<SpamFilterRepository> { SpamFilterRepositoryImpl(resolve(), resolve()) }
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }

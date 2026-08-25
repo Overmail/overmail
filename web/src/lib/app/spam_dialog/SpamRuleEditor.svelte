@@ -72,6 +72,17 @@
        renderer's own for the cascade to come down on this side, which is why they carry an
        ancestor they do not otherwise need. */
 
+    /* No frame around the canvas: the box it sits in already has one. */
+    :global(.blocklyMainBackground) {
+        stroke: none;
+    }
+
+    /* A hairline between the palette and the canvas, like any other pair of panes in the app. */
+    :global(.blocklyFlyoutBackground) {
+        stroke: var(--border);
+        stroke-width: 1;
+    }
+
     /* The group labels in the palette, as the section labels they are. */
     :global(.blocklyFlyout .blocklyFlyoutLabel .blocklyFlyoutLabelText) {
         fill: var(--muted-foreground);

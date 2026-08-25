@@ -93,3 +93,47 @@
      instead of under the body, because the dialog switches pointer events off for everything
      outside itself and pulls stray focus back in. -->
 <div bind:this={anchor} class="fixed size-0"></div>
+
+<style>
+    /* Blockly's stylesheet and its renderer's are both prepended to <head> so that app CSS can
+       override them -- see Css.inject. Prepended, not weaker: these selectors have to match the
+       renderer's own for the cascade to come down on this side, which is why they carry an
+       ancestor they do not otherwise need. */
+
+    /* The group labels in the palette, as the section labels they are. */
+    :global(.blocklyFlyout .blocklyFlyoutLabel .blocklyFlyoutLabelText) {
+        fill: var(--muted-foreground);
+        font-size: 8pt;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    /* The palette already sits on its own surface; the label needs no plate of its own. */
+    :global(.blocklyFlyout .blocklyFlyoutLabel .blocklyFlyoutLabelBackground) {
+        fill: transparent;
+    }
+
+    /* The menu a dropdown field opens. Blockly paints it in the block's colour from an inline
+       style, so only its shape is set here. */
+    :global(.blocklyDropDownDiv) {
+        border-radius: var(--radius-lg);
+        border-width: 1px;
+        box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.45);
+        padding: 0.25rem;
+    }
+
+    :global(.blocklyDropDownDiv .blocklyDropdownMenu .blocklyMenuItem) {
+        border-radius: var(--radius-sm);
+        font-size: 0.8125rem;
+        padding: 0.375rem 1.25rem 0.375rem 0.625rem;
+    }
+
+    :global(.blocklyDropDownDiv .blocklyDropdownMenu .blocklyMenuItemHighlight) {
+        background-color: rgb(255 255 255 / 0.16);
+    }
+
+    /* The text field on a comparison block. */
+    :global(.blocklyWidgetDiv .blocklyHtmlInput) {
+        border-radius: var(--radius-sm);
+    }
+</style>

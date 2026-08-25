@@ -10,6 +10,53 @@ import { SPAM_THEME, SPAM_TOOLBOX, defineSpamBlocks } from './blocks';
  * of the module: on the server there is nothing for Blockly to inject into.
  */
 
+/**
+ * The palette, with one padding value instead of three. The flyout derives its inset from its own
+ * corner radius and its gap from that inset again -- and both are readonly by the time a subclass
+ * can see them, hence the assign.
+ */
+class SpamFlyout extends Blockly.VerticalFlyout {
+	constructor(options: Blockly.Options) {
+		super(options);
+
+		Object.assign(this, {
+			// Left and top inside the palette. What sits to the right of the widest block is the
+			// room Blockly keeps for the scrollbar and cannot be given back.
+			MARGIN: 12,
+			// Between a label and the group under it. Everything else says how far apart it wants
+			// to be itself, see SPAM_TOOLBOX.
+			GAP_Y: 8
+		});
+	}
+}
+
+/**
+ * Blockly's own metrics are built for a classroom whiteboard. These bring the blocks down to the
+ * size of the rest of the app: tighter padding, smaller notches, and the radii the app uses
+ * elsewhere. Written out one by one rather than through zelos' grid unit, because the grid unit is
+ * read in the constructor and overrides only land afterwards.
+ */
+const RENDERER_OVERRIDES = {
+	// Blocks connect above and below only, so the puzzle tab is dead weight -- and the palette's
+	// left inset is measured from it.
+	TAB_WIDTH: 0,
+	CORNER_RADIUS: 8,
+	MIN_BLOCK_HEIGHT: 32,
+	SMALL_PADDING: 4,
+	MEDIUM_PADDING: 6,
+	MEDIUM_LARGE_PADDING: 8,
+	LARGE_PADDING: 12,
+	NOTCH_WIDTH: 24,
+	FIELD_BORDER_RECT_RADIUS: 6,
+	FIELD_BORDER_RECT_X_PADDING: 6,
+	FIELD_BORDER_RECT_Y_PADDING: 4,
+	FIELD_DROPDOWN_SVG_ARROW_PADDING: 6,
+	STATEMENT_INPUT_PADDING_LEFT: 12,
+	STATEMENT_INPUT_SPACER_MIN_WIDTH: 120,
+	TOP_ROW_PRECEDES_STATEMENT_MIN_HEIGHT: 12,
+	BOTTOM_ROW_AFTER_STATEMENT_MIN_HEIGHT: 16
+};
+
 export type SpamEditorOptions = {
 	/**
 	 * Where the blocks go. Needs a size of its own: Blockly measures this element and fills it,
@@ -50,6 +97,8 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 		toolbox: SPAM_TOOLBOX,
 		theme: SPAM_THEME,
 		renderer: 'zelos',
+		rendererOverrides: RENDERER_OVERRIDES,
+		plugins: { flyoutsVerticalToolbox: SpamFlyout },
 		// Cursors, the zoom sprites and the dropdown arrow. A copy of node_modules/blockly/media
 		// under static/, rather than Blockly's CDN, so the installed app keeps its blocks when
 		// the network is gone -- re-copy it when Blockly is updated.

@@ -32,7 +32,9 @@ const MATCH_OPTIONS = SPAM_MATCHES.map((match) => [MATCH_LABELS[match], match]);
  */
 const BLOCK_STYLES = {
 	spam_root_blocks: { colourPrimary: '#dc2626', colourTertiary: '#991b1b' },
-	spam_logic_blocks: { colourPrimary: '#7c3aed', colourTertiary: '#5b21b6' },
+	// Neutral for the wrappers, colour for the leaves: what a rule is about are its comparisons,
+	// and "alle davon" is structure around them rather than another thing to read.
+	spam_logic_blocks: { colourPrimary: '#475569', colourTertiary: '#334155' },
 	spam_match_blocks: { colourPrimary: '#0d9488', colourTertiary: '#0f766e' }
 };
 
@@ -62,21 +64,30 @@ export const SPAM_THEME = {
 		selectedGlowColour: '#a1a1aa',
 		insertionMarkerColour: '#a1a1aa'
 	},
-	fontStyle: { family: '"DM Sans Variable", sans-serif', weight: '600', size: 11 },
+	// Points, not pixels -- that is what the renderer's stylesheet writes them as, so 10 here is
+	// the ~13px the rest of the app calls small text.
+	fontStyle: { family: '"DM Sans Variable", sans-serif', weight: '600', size: 10 },
 	// The root block has neither a previous connection nor a next one, so it -- and only it -- gets
 	// the hat, which is exactly the "everything inside me is one rule" it stands for.
 	startHats: true
 };
 
-/** No categories: four blocks fit in one flyout, and a flyout that is always open is one less click. */
+/**
+ * No categories: four blocks fit in one flyout, and a flyout that is always open is one less click.
+ *
+ * The gaps are spelled out because the flyout would otherwise put its one default gap after every
+ * item alike, which reads as an even column of blocks with the group labels floating between them.
+ * A label follows its group closely (the flyout's own gap, see `SpamFlyout`) and the last block of
+ * a group carries the wider one.
+ */
 export const SPAM_TOOLBOX: Blockly.utils.toolbox.ToolboxInfo = {
 	kind: 'flyoutToolbox',
 	contents: [
 		{ kind: 'label', text: 'Bedingung', id: undefined },
-		{ kind: 'block', type: SPAM_BLOCKS.match },
+		{ kind: 'block', type: SPAM_BLOCKS.match, gap: 20 },
 		{ kind: 'label', text: 'Verknüpfen', id: undefined },
-		{ kind: 'block', type: SPAM_BLOCKS.and },
-		{ kind: 'block', type: SPAM_BLOCKS.or },
+		{ kind: 'block', type: SPAM_BLOCKS.and, gap: 8 },
+		{ kind: 'block', type: SPAM_BLOCKS.or, gap: 8 },
 		{ kind: 'block', type: SPAM_BLOCKS.not }
 	]
 };

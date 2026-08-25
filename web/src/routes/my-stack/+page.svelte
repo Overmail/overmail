@@ -30,6 +30,7 @@
     import {cn} from "$lib/utils.js";
     import { ArchiveIcon, ArrowBendDownLeftIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, TrayIcon, WarningIcon } from "phosphor-svelte";
     import { fade } from "svelte/transition";
+    import SpamDialog from "$lib/app/spam_dialog/SpamDialog.svelte";
 
     // Owned by the page rather than shared from a module, like the mailbox on the home page: a
     // module-level instance would be one stack for every server-rendered request.
@@ -68,20 +69,35 @@
         isTagging = false;
     }
 
-    // While tagging, every stack key is off and only Escape is left: a tag is typed, and a tag
-    // name that contains an "a" must not archive the mail under it.
-    const whileNotTagging = () => ({enabled: !isTagging});
+    /**
+     * Spam is the one decision that asks a question afterwards: should mail like this keep landing
+     * here? The mail is read before the decision, because deciding moves the stack on and the
+     * filter is about the mail that was on it.
+     */
+    function classifySpam() {
+        const decided = cards.find((card) => card.id === stack.topId);
+
+        stack.classify("spam");
+
+        if (!decided) return;
+        filterFor = decided;
+        isFiltering = true;
+    }
+
+    // While a tag or a filter is being written, every stack key is off and only Escape is left:
+    // both of them are typed into, and a name that contains an "a" must not archive a mail.
+    const whileStackListens = () => ({enabled: !isTagging && !isFiltering});
 
     createHotkeys([
-        {hotkey: "A", callback: () => stack.classify("archive"), options: whileNotTagging},
-        {hotkey: "S", callback: () => stack.classify("spam"), options: whileNotTagging},
-        {hotkey: "R", callback: () => stack.classify("respond_later"), options: whileNotTagging},
-        {hotkey: "Space", callback: () => stack.skip(), options: whileNotTagging},
-        {hotkey: "Backspace", callback: () => stack.back(), options: whileNotTagging},
+        {hotkey: "A", callback: () => stack.classify("archive"), options: whileStackListens},
+        {hotkey: "S", callback: classifySpam, options: whileStackListens},
+        {hotkey: "R", callback: () => stack.classify("respond_later"), options: whileStackListens},
+        {hotkey: "Space", callback: () => stack.skip(), options: whileStackListens},
+        {hotkey: "Backspace", callback: () => stack.back(), options: whileStackListens},
         // '#' sits on its own key on a German layout and on Shift+3 on a US one, and the matcher
         // compares Shift strictly, so both spellings are bound.
-        {hotkey: {key: "#"}, callback: startTagging, options: whileNotTagging},
-        {hotkey: {key: "#", shift: true}, callback: startTagging, options: whileNotTagging},
+        {hotkey: {key: "#"}, callback: startTagging, options: whileStackListens},
+        {hotkey: {key: "#", shift: true}, callback: startTagging, options: whileStackListens},
         {hotkey: "Escape", callback: () => (isTagging = false)},
     ]);
 
@@ -97,6 +113,10 @@
 
     /** Whether the stack is waiting for a tag for the current mail. */
     let isTagging = $state(false);
+
+    /** Whether a spam filter is being written, and for which mail. */
+    let isFiltering = $state(false);
+    let filterFor = $state<EmailStackEntry | undefined>(undefined);
 
     /** The mails as the cards want them: display names, formatted times and pictures. */
     const cards = $derived(entries.map(toCard));
@@ -217,7 +237,7 @@
                     </div>
 
                     <div class="flex flex-row items-center justify-center gap-2">
-                        <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={() => stack.classify("spam")} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
+                        <KeyCap key="S" isPressed={held.spam.held} label="Spam" onclick={classifySpam} class={cn("size-10", CLASSIFICATION_KEY_CLASSES.spam)} />
                         <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
                     </div>
 
@@ -257,3 +277,9 @@
         </div>
     </div>
 </main>
+
+<!-- Up once a mail was decided as spam, with that mail beside the rule so the filter can be held
+     against it while it is written. What comes back has nowhere to go yet: there is no route that
+     saves a filter and nothing that would read one, so creating it closes the dialog and drops it.
+     -->
+<SpamDialog bind:open={isFiltering} mail={filterFor} />

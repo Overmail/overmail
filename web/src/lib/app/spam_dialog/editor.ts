@@ -113,13 +113,6 @@ export type SpamEditorOptions = {
 	 * it never gives it one.
 	 */
 	host: HTMLElement;
-	/**
-	 * Where Blockly puts its dropdowns, text-field editors and tooltips. They are positioned in
-	 * page coordinates, so this has to be an element whose own origin is the page origin -- and it
-	 * has to sit inside the dialog, because the modal switches pointer events off for everything
-	 * outside it and pulls stray focus back in.
-	 */
-	widgetHost: HTMLElement;
 	/** The rule the editor opens with, or null for a bare root block. */
 	initial: SpamRule | null;
 	/** Called once on startup and after every change the user makes to the blocks. */
@@ -144,9 +137,14 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 	// says. Our own blocks bring their German along in their definitions.
 	Blockly.setLocale(De as unknown as Record<string, string>);
 
-	// Before `inject`: the widget div is created during injection, and it is created wherever the
-	// parent container points at that moment.
-	Blockly.common.setParentContainer(options.widgetHost);
+	// Nothing sets a parent container here on purpose. Blockly's dropdowns, field editors and
+	// tooltips then land in the injection div, which is the one place they can be: it is what
+	// `setMainWorkspace` hands the focus manager as the root that popovers live in. Anywhere else
+	// and focusing a dropdown reads as focus leaving that root, which hides the dropdown from
+	// inside the call that is still opening it -- and the exception that follows takes the running
+	// gesture down with it. The div sits inside the dialog either way, so the modal leaves its
+	// pointer events and its focus alone, and Blockly positions the popovers relative to whatever
+	// contains them.
 
 	const workspace = Blockly.inject(options.host, {
 		toolbox: SPAM_TOOLBOX,
@@ -192,14 +190,6 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 
 			return true;
 		},
-		dispose: () => {
-			workspace.dispose();
-
-			// The dialog's DOM goes away with it, and a parent container pointing into a detached
-			// tree would swallow the dropdowns of whatever opens Blockly next.
-			if (Blockly.common.getParentContainer() === options.widgetHost) {
-				Blockly.common.setParentContainer(document.body);
-			}
-		}
+		dispose: () => workspace.dispose()
 	};
 }

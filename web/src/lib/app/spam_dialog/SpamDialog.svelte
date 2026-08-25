@@ -54,17 +54,15 @@
          from there on. The rows are spelled out so that the canvas takes everything the header and
          the buttons leave.
 
-         `translate: none` undoes the centring the classes do with a transform. A transform makes
-         the dialog's box the frame of reference for everything positioned inside it, and Blockly's
-         dropdowns and field editors are positioned in page coordinates — see the editor. Pinned to
-         all four sides, the dialog needs no transform to sit where it should. -->
-    <!-- No focus trap. The trap watches every DOM change inside the dialog and pulls focus back
-         to what it remembers, and Blockly moves its own focus around constantly -- a block into
-         the drag layer, a field editor into a popover of its own. The two take turns calling
-         focus() until Blockly's focus manager throws inside the click that opens a dropdown, and
-         a gesture that throws is never cleaned up: the block then hangs on the pointer with no way
-         to drop it. Blockly keeps focus inside the canvas by itself; what is lost is Tab stopping
-         at the dialog's edge. -->
+         The geometry is an inline style because the classes centre the dialog with a transform,
+         which a box pinned to all four sides does not need -- and `translate: none` is the only
+         way to be rid of it, since the class stays in the list.
+
+         No focus trap: it refocuses whatever it last remembered as soon as that element leaves the
+         dialog, and Blockly takes its field editors apart when they close. The trap would then
+         pull focus to the name field behind Blockly's back, every time a value is edited. Blockly
+         keeps focus inside its canvas by itself; what is lost is Tab stopping at the dialog's
+         edge. -->
     <Dialog.Content
             class="inset-0 grid-rows-[auto_1fr_auto] h-auto w-auto max-w-none rounded-none sm:max-w-none xl:inset-8 xl:rounded-4xl"
             style="translate: none;"

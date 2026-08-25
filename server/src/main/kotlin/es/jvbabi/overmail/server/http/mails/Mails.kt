@@ -1,24 +1,17 @@
 package es.jvbabi.overmail.server.http.mails
 
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
-import es.jvbabi.overmail.server.domain.models.MailParticipant
-import es.jvbabi.overmail.server.domain.models.MailSummary
-import es.jvbabi.overmail.server.domain.models.MailThreadRef
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
-import es.jvbabi.overmail.server.domain.spam.SpamRule
-import es.jvbabi.overmail.server.domain.spam.SpamRuleMatcher
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.plugins.di.resolve
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -40,7 +33,7 @@ private const val MAX_LIMIT = 1000
  */
 private const val MAX_IDS = 200
 
-/** Listing the caller's mails. */
+/** `GET /api/mails`. */
 fun Route.mails() {
 
     authenticate(SESSION_AUTH) {
@@ -125,74 +118,6 @@ fun Route.mails() {
                 )
             )
         }
-
-        /**
-         * The body of one mail, as the text and the HTML part it carried.
-         *
-         * Its own request rather than a field of the listing: bodies run to tens of thousands of
-         * characters each, and a page of them would go over the wire for mails nobody ever opens.
-         * A caller lists the headers and asks for the body of the mail it is about to show.
-         *
-         * A mail of somebody else answers like one that does not exist -- which ids are taken is
-         * not the caller's business.
-         */
-        get("/{id}/content") {
-            val user = call.principal<User>() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-
-            val id = call.parameters["id"]?.let { runCatching { Uuid.parse(it) }.getOrNull() }
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
-
-            val emailRepository = application.dependencies.resolve<EmailRepository>()
-            val email = emailRepository.getById(id).first()
-            if (email == null || email.imapAccount.user.id != user.id) {
-                return@get call.respond(HttpStatusCode.NotFound)
-            }
-
-            call.respond(
-                MailContentResponse(
-                    id = email.id.toString(),
-                    text = email.textContent,
-                    html = email.htmlContent,
-                )
-            )
-        }
-
-        /**
-         * Whether a spam rule holds for one mail, with the rule itself as the body.
-         *
-         * The editor sends the rule it currently shows after every change, so that whoever is
-         * writing it can see whether it would catch the mail in front of them. Nothing is stored
-         * and nothing is filed: this only answers the question.
-         *
-         * A rule the reader cannot make sense of -- an unknown operator, a regex that will not
-         * compile -- is the caller's mistake and answers 400. A mail of somebody else answers like
-         * one that does not exist, as everywhere else here.
-         */
-        post("/{id}/validate-rule") {
-            val user = call.principal<User>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
-
-            val id = call.parameters["id"]?.let { runCatching { Uuid.parse(it) }.getOrNull() }
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-
-            val rule = runCatching { call.receive<SpamRule>() }.getOrNull()
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
-
-            val emailRepository = application.dependencies.resolve<EmailRepository>()
-            val email = emailRepository.getById(id).first()
-            if (email == null || email.imapAccount.user.id != user.id) {
-                return@post call.respond(HttpStatusCode.NotFound)
-            }
-
-            val matcher = application.dependencies.resolve<SpamRuleMatcher>()
-            val matches = try {
-                matcher.matches(rule, email)
-            } catch (_: IllegalArgumentException) {
-                // The only thing in a rule that can fail this late is a regex nothing compiles.
-                return@post call.respond(HttpStatusCode.BadRequest)
-            }
-
-            call.respond(RuleMatchResponse(matches = matches))
-        }
     }
 }
 
@@ -205,28 +130,6 @@ internal fun String.toInstantOrNull(): Instant? {
     return runCatching { Instant.parse(this) }.getOrNull()
 }
 
-/** Internal, so a mail has one wire shape whichever channel it goes out on. */
-internal fun MailSummary.toResponse() = MailResponse(
-    id = id.toString(),
-    subject = subject,
-    sender = sender.toResponse(),
-    recipients = recipients.map { it.toResponse() },
-    cc = cc.map { it.toResponse() },
-    bcc = bcc.map { it.toResponse() },
-    sentAt = sent.toString(),
-    isRead = isRead,
-    thread = thread?.toResponse(),
-    tags = tags.map { TagResponse(id = it.tag.id.toString(), name = it.tag.name) },
-)
-
-private fun MailThreadRef.toResponse() = ThreadResponse(
-    id = id.toString(),
-    title = title,
-    size = size,
-)
-
-private fun MailParticipant.toResponse() = ParticipantResponse(address = address, name = name)
-
 /** A page of mails, as `GET /api/mails` reports it. */
 @Serializable
 data class MailListResponse(
@@ -237,62 +140,4 @@ data class MailListResponse(
      * Counted in the same transaction as the rows, so the two cannot disagree.
      */
     @SerialName("total") val total: Int,
-)
-
-/** One mail of the listing. */
-@Serializable
-data class MailResponse(
-    @SerialName("id") val id: String,
-    @SerialName("subject") val subject: String,
-    @SerialName("sender") val sender: ParticipantResponse,
-    /** The `To` field. */
-    @SerialName("recipients") val recipients: List<ParticipantResponse>,
-    @SerialName("cc") val cc: List<ParticipantResponse>,
-    @SerialName("bcc") val bcc: List<ParticipantResponse>,
-    /** ISO-8601, whole seconds, as mails are stored. */
-    @SerialName("sent_at") val sentAt: String,
-    @SerialName("is_read") val isRead: Boolean,
-    /** The matter the mail sits in, absent while nothing has filed it. */
-    @SerialName("thread") val thread: ThreadResponse? = null,
-    @SerialName("tags") val tags: List<TagResponse>,
-)
-
-/** The matter a mail sits in. */
-@Serializable
-data class ThreadResponse(
-    @SerialName("id") val id: String,
-    @SerialName("title") val title: String,
-    /** Mails the thread holds altogether, not the ones of it on this page. */
-    @SerialName("size") val size: Int,
-)
-
-/** Someone the mail names, as it spelled them out. */
-@Serializable
-data class ParticipantResponse(
-    @SerialName("address") val address: String,
-    /** Display name from this mail, absent for a bare address. */
-    @SerialName("name") val name: String?,
-)
-
-/** The body of one mail, as `GET /api/mails/{id}/content` reports it. */
-@Serializable
-data class MailContentResponse(
-    @SerialName("id") val id: String,
-    /** The plain text part, absent when the mail carried none. */
-    @SerialName("text") val text: String?,
-    /** The HTML part, absent when the mail carried none. */
-    @SerialName("html") val html: String?,
-)
-
-/** A tag the mail is filed under. */
-@Serializable
-data class TagResponse(
-    @SerialName("id") val id: String,
-    @SerialName("name") val name: String,
-)
-
-/** Whether a rule holds, as `POST /api/mails/{id}/validate-rule` reports it. */
-@Serializable
-data class RuleMatchResponse(
-    @SerialName("matches") val matches: Boolean,
 )

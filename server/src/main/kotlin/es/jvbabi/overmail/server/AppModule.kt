@@ -31,6 +31,7 @@ import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepository
 import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepositoryImpl
 import es.jvbabi.overmail.server.domain.spam.SpamRuleMatcher
 import es.jvbabi.overmail.server.http.configureRouting
+import es.jvbabi.overmail.server.http.installStatusPages
 import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -55,6 +56,8 @@ fun Application.overmail() {
     configureDependencies()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
+    // Before the routes, so what they throw is answered rather than logged as a fault.
+    installStatusPages()
     installWebSockets()
     installOvermailAuthentikt()
     // Before the routes: a route cannot ask for an authentication that is not installed yet.

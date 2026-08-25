@@ -3,7 +3,9 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.http.avatars.avatars
+import es.jvbabi.overmail.server.http.mails.mailContent
 import es.jvbabi.overmail.server.http.mails.mails
+import es.jvbabi.overmail.server.http.mails.validateRule
 import es.jvbabi.overmail.server.http.threads.threads
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import es.jvbabi.overmail.server.http.webapp.mystack.myStack
@@ -66,8 +68,13 @@ internal fun Application.configureRouting() {
                 }
             }
 
-            // The mailbox itself, cut for no screen in particular.
-            route("/mails") { mails() }
+            // The mailbox itself, cut for no screen in particular. One route per file, so this
+            // is the list of what a mail answers to.
+            route("/mails") {
+                mails()
+                mailContent()
+                validateRule()
+            }
 
             // The threads themselves, as the skeleton a grouped list is laid out from.
             route("/threads") { threads() }

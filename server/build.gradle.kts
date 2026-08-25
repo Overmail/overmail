@@ -36,6 +36,7 @@ dependencies {
     implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
     implementation("io.ktor:ktor-server-swagger:3.5.2")
     implementation("io.ktor:ktor-server-di:3.5.2")
+    implementation("io.ktor:ktor-server-status-pages:3.5.2")
     implementation("io.ktor:ktor-server-auth:3.5.2")
     implementation("io.ktor:ktor-server-auth-jwt:3.5.2")
     implementation("io.ktor:ktor-server-websockets:3.5.2")

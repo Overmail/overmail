@@ -24,26 +24,26 @@ sealed interface SpamRule {
      */
     @Serializable
     @SerialName("and")
-    data class And(val operands: List<SpamRule>) : SpamRule
+    data class And(@SerialName("operands") val operands: List<SpamRule>) : SpamRule
 
     /** True when at least one operand is. */
     @Serializable
     @SerialName("or")
-    data class Or(val operands: List<SpamRule>) : SpamRule
+    data class Or(@SerialName("operands") val operands: List<SpamRule>) : SpamRule
 
     /** True when its operand is not. */
     @Serializable
     @SerialName("not")
-    data class Not(val operand: SpamRule) : SpamRule
+    data class Not(@SerialName("operand") val operand: SpamRule) : SpamRule
 
     /** One part of the mail held against one text. */
     @Serializable
     @SerialName("match")
     data class Match(
-        val field: SpamRuleField,
+        @SerialName("field") val field: SpamRuleField,
         /** How [value] is held against the field, not what is compared. */
-        val match: SpamRuleMatch,
-        val value: String,
+        @SerialName("match") val match: SpamRuleMatch,
+        @SerialName("value") val value: String,
     ) : SpamRule
 }
 

@@ -26,4 +26,14 @@ interface SpamRepository {
      * [filterId] is the filter that caught the mail, null for a mail someone marked by hand.
      */
     suspend fun setSpam(emailId: Uuid, isSpam: Boolean, filterId: Uuid?): SpamEntry?
+
+    /**
+     * Says that the mail's spam is owed to [filterId] after all -- for a filter written for the
+     * mail that was flagged a moment before it existed.
+     *
+     * Changes what the newest entry of the mail is owed to rather than appending one: the state did
+     * not change, only the reason for it, and a second entry saying the same thing would be a
+     * change that never happened. Returns null when the mail is not flagged, or was never flagged.
+     */
+    suspend fun attributeToFilter(emailId: Uuid, filterId: Uuid): SpamEntry?
 }

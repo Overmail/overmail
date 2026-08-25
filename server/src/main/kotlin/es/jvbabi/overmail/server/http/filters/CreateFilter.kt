@@ -37,6 +37,9 @@ fun Route.createFilter() {
                 isActive = request.isActive,
             )
 
+            // The mail the rule was written for, if the caller named one.
+            call.attributeSpamTo(filter, request.mail)
+
             call.respond(HttpStatusCode.Created, filter.toResponse())
         }
     }

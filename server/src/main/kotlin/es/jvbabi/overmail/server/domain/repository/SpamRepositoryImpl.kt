@@ -105,6 +105,29 @@ class SpamRepositoryImpl(
         }
     }
 
+    override suspend fun attributeToFilter(emailId: Uuid, filterId: Uuid): SpamEntry? {
+        return database.query {
+            val newest = EmailSpam
+                .selectAll()
+                .where(EmailSpam.email eq emailId)
+                .orderBy(EmailSpam.createdAt to SortOrder.DESC, EmailSpam.id to SortOrder.DESC)
+                .limit(1)
+                .firstRowOrNull()
+                ?: return@query null
+
+            // Only what is flagged now: attributing the entry that took a mail back out of spam
+            // would read as "this filter unflagged it", which is not a thing a filter does.
+            if (!newest[EmailSpam.isSpam]) return@query null
+
+            val entryId = newest[EmailSpam.id].value
+            EmailSpam.update({ EmailSpam.id eq entryId }) {
+                it[EmailSpam.filter] = filterId
+            }
+
+            newest.toSpamEntry(filterOf(filterId))
+        }
+    }
+
     /** The filter an entry names, or null for one that names none. */
     private suspend fun R2dbcTransaction.filterOf(filterId: Uuid?): SpamFilter? {
         if (filterId == null) return null

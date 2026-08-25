@@ -2,7 +2,7 @@ import * as Blockly from 'blockly/core';
 import * as De from 'blockly/msg/de';
 import { base } from '$app/paths';
 import { SPAM_BLOCKS, readRule, workspaceStateFor, type RuleReadout, type SpamRule } from './rule';
-import { SPAM_THEME, SPAM_TOOLBOX, defineSpamBlocks } from './blocks';
+import { SPAM_THEME, SPAM_TOOLBOX, SpamConnectionChecker, defineSpamBlocks } from './blocks';
 
 /**
  * The Blockly half of the spam dialog. Everything in here touches the DOM the moment it is
@@ -159,7 +159,11 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 		theme: SPAM_THEME,
 		renderer: 'zelos',
 		rendererOverrides: RENDERER_OVERRIDES,
-		plugins: { flyoutsVerticalToolbox: SpamFlyout, blockDragger: SpamDragger },
+		plugins: {
+			flyoutsVerticalToolbox: SpamFlyout,
+			blockDragger: SpamDragger,
+			connectionChecker: SpamConnectionChecker
+		},
 		// Cursors, the zoom sprites and the dropdown arrow. A copy of node_modules/blockly/media
 		// under static/, rather than Blockly's CDN, so the installed app keeps its blocks when
 		// the network is gone -- re-copy it when Blockly is updated.

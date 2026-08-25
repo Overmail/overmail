@@ -15,9 +15,9 @@ export type SpamMatch = (typeof SPAM_MATCHES)[number];
  * spam when the tree comes out true. `op` is the tag on every node, so a rule can be walked --
  * and read by whoever ends up applying it -- without knowing which shape it is beforehand.
  *
- * `and` and `or` take a list, but a block only ever joins two things: what the editor builds as
- * `a und (b und c)` is read back as one flat list, and a list longer than two is seeded back into
- * nested blocks.
+ * `and` and `or` take as many operands as the block they came from had conditions in it, which is
+ * one for one what the editor shows: a wrapper with a column of conditions inside. `not` and the
+ * root take exactly one.
  */
 export type SpamRule =
 	| { op: 'and' | 'or'; operands: SpamRule[] }
@@ -39,11 +39,18 @@ export const SPAM_BLOCKS = {
 	match: 'spam_match'
 } as const;
 
-/**
- * What every well in the editor takes. Conditions carry it on the connection above them and
- * nowhere else: a block can be dropped into a well, and nothing can be hung under it.
- */
+/** What every well in the editor takes, and what conditions connect to each other with. */
 export const CONDITION_CHECK = 'SpamCondition';
+
+/**
+ * What the three operators are called. The blocks are labelled with them, and so is the one thing
+ * that can be wrong with an operator: an empty well.
+ */
+export const OPERATOR_LABELS = {
+	[SPAM_BLOCKS.and]: 'und',
+	[SPAM_BLOCKS.or]: 'oder',
+	[SPAM_BLOCKS.not]: 'nicht'
+} as const;
 
 /** What the mail parts are called on the blocks and in a rule spelled out as a sentence. */
 export const FIELD_LABELS: Record<SpamField, string> = {
@@ -98,13 +105,12 @@ export function readRule(workspace: Blockly.Workspace): RuleReadout {
 
 	// Said apart from the gaps inside the tree: an empty root is where every filter starts, so it
 	// is worth naming what goes in it rather than reporting a hole.
-	const condition = root.getInputTargetBlock('CONDITION');
-	if (!condition) {
+	if (!root.getInputTargetBlock('CONDITION')) {
 		return { rule: null, problem: 'Der Regel fehlt noch eine Bedingung.', warning };
 	}
 
 	try {
-		return { rule: readCondition(condition), problem: null, warning };
+		return { rule: only(root, 'CONDITION'), problem: null, warning };
 	} catch (error) {
 		if (error instanceof Unfinished) return { rule: null, problem: error.message, warning };
 		throw error;
@@ -125,11 +131,15 @@ function readCondition(block: Blockly.Block): SpamRule {
 		case SPAM_BLOCKS.and:
 		case SPAM_BLOCKS.or: {
 			const op = block.type === SPAM_BLOCKS.and ? 'and' : 'or';
-			return { op, operands: flatten([socket(block, 'A'), socket(block, 'B')], op) };
+			const operands = flatten(column(block, 'CONDITIONS'), op);
+
+			// An operator over one condition is that condition -- which is also how a group whose
+			// other conditions are switched off reads.
+			return operands.length === 1 ? operands[0] : { op, operands };
 		}
 
 		case SPAM_BLOCKS.not:
-			return { op: 'not', operand: socket(block, 'OPERAND') };
+			return { op: 'not', operand: only(block, 'OPERAND') };
 
 		case SPAM_BLOCKS.match:
 			return readMatch(block);
@@ -139,12 +149,44 @@ function readCondition(block: Blockly.Block): SpamRule {
 	}
 }
 
-/** What sits in one well. Every well takes exactly one condition, and needs one. */
-function socket(block: Blockly.Block, name: string): SpamRule {
+/**
+ * The column of conditions in an operator's well, top to bottom. This is what "as many as you like"
+ * means: the operator holds them all, and it is the one saying how they are joined.
+ */
+function column(block: Blockly.Block, name: string): SpamRule[] {
+	const conditions: SpamRule[] = [];
+
+	for (let child = block.getInputTargetBlock(name); child; child = child.getNextBlock()) {
+		// Neither is part of the rule: one is not placed yet, the other is placed and meant to sit
+		// this one out, which is what every Blockly editor takes a disabled block to mean.
+		if (child.isInsertionMarker() || !child.isEnabled()) continue;
+
+		conditions.push(readCondition(child));
+	}
+
+	if (conditions.length === 0) {
+		throw new Unfinished(`„${labelFor(block)}“ ist noch leer.`);
+	}
+
+	return conditions;
+}
+
+/** The one condition in a well that takes exactly one -- the root's and the one in "nicht". */
+function only(block: Blockly.Block, name: string): SpamRule {
 	const child = block.getInputTargetBlock(name);
 	if (!child) throw new Unfinished('Es ist noch eine Lücke offen.');
 
+	// The editor's connection checker is what keeps these wells down to one block. If one ever
+	// slips past it, saying so beats quietly dropping half the rule.
+	if (child.getNextBlock()) {
+		throw new Unfinished(`„${labelFor(block)}“ nimmt nur eine Bedingung.`);
+	}
+
 	return readCondition(child);
+}
+
+function labelFor(block: Blockly.Block): string {
+	return OPERATOR_LABELS[block.type as keyof typeof OPERATOR_LABELS] ?? 'Die Regel';
 }
 
 /** `a und (b und c)` and `a und b und c` say the same thing, and the flat one reads better. */
@@ -224,9 +266,9 @@ export function workspaceStateFor(rule: SpamRule | null): Record<string, unknown
 }
 
 /**
- * The same rule, in the shape blocks can hold it: two operands per `and`/`or`, since that is how
- * many wells a block has. Null for a group that turns out to hold nothing -- the editor then opens
- * with an empty well rather than with a block that says nothing.
+ * The same rule, in the shape blocks can hold it: an operator over one thing is that thing, and a
+ * group that turns out to hold nothing is dropped -- the editor then opens with an empty well
+ * rather than with a block that says nothing.
  */
 function asBlocks(rule: SpamRule): SpamRule | null {
 	if (rule.op === 'match') return rule;
@@ -241,14 +283,9 @@ function asBlocks(rule: SpamRule): SpamRule | null {
 		.filter((operand): operand is SpamRule => operand !== null);
 
 	if (operands.length === 0) return null;
-	// An operator over one thing is that thing.
 	if (operands.length === 1) return operands[0];
 
-	const [first, ...rest] = operands;
-	return {
-		op: rule.op,
-		operands: [first, rest.length === 1 ? rest[0] : { op: rule.op, operands: rest }]
-	};
+	return { op: rule.op, operands };
 }
 
 function blockStateFor(rule: SpamRule): Record<string, unknown> {
@@ -267,10 +304,17 @@ function blockStateFor(rule: SpamRule): Record<string, unknown> {
 		case 'or':
 			return {
 				type: rule.op === 'and' ? SPAM_BLOCKS.and : SPAM_BLOCKS.or,
-				inputs: {
-					A: { block: blockStateFor(rule.operands[0]) },
-					B: { block: blockStateFor(rule.operands[1]) }
-				}
+				inputs: { CONDITIONS: { block: columnStateFor(rule.operands) } }
 			};
 	}
+}
+
+/** One condition per block, each hanging off the one above it. */
+function columnStateFor(conditions: SpamRule[]): Record<string, unknown> {
+	const [first, ...rest] = conditions;
+	const state = blockStateFor(first);
+
+	if (rest.length > 0) state.next = { block: columnStateFor(rest) };
+
+	return state;
 }

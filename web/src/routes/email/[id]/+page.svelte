@@ -39,14 +39,27 @@
 
     const mail = $derived(store.mail);
     const spam = $derived(store.spam);
+    const sender = $derived(store.sender);
 
-    const sender = $derived(
+    const cardSender = $derived(
         mail && {
             ...toCardParticipant(mail.sender),
             // Absent for an address no picture was found for; the card falls back to initials.
             avatarUrl: avatarStore.urlFor(mail.sender.address) ?? undefined,
         },
     );
+
+    /**
+     * What the agent made of the sender, as the line under the heading. Null while it is still
+     * reading; a run that came back with neither name says so rather than showing an empty line.
+     */
+    const senderReading = $derived.by(() => {
+        if (!sender) return null;
+        if (sender.failure) return "Der Agent konnte die Mail nicht lesen.";
+
+        const named = [sender.person, sender.organisation].filter(Boolean);
+        return named.length ? named.join(" · ") : "Kein Name in der Mail.";
+    });
 
     function toCardParticipant(participant: MailParticipant) {
         return {name: participant.name ?? undefined, address: participant.address};
@@ -103,7 +116,7 @@
                 </Empty.Header>
             </Empty.Root>
         </div>
-    {:else if !mail || !sender}
+    {:else if !mail || !cardSender}
         <!-- The shape of the card rather than a spinner: what arrives fills it in. -->
         <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
             <Skeleton class="h-12 w-64" />
@@ -123,7 +136,7 @@
             {/if}
 
             <EmailCard
-                    sender={sender}
+                    sender={cardSender}
                     sent={SENT_FORMAT.format(new Date(mail.sent_at))}
                     to={mail.recipients.map(toCardParticipant)}
                     cc={mail.cc.map(toCardParticipant)}
@@ -157,6 +170,24 @@
                         {mail.tags.map((tag) => tag.name).join(", ")}
                     {:else}
                         <span class="text-muted-foreground">Keine</span>
+                    {/if}
+                </dd>
+
+                <!-- What the agent read out of the mail. Its own row rather than a note on the
+                     card: it is a reading of the mail, not something the mail says. -->
+                <dt class="text-muted-foreground">Absender</dt>
+                <dd>
+                    {#if senderReading}
+                        {#if sender?.person}{sender.person}{/if}
+                        {#if sender?.person && sender?.organisation}
+                            <span class="text-muted-foreground">·</span>
+                        {/if}
+                        {#if sender?.organisation}{sender.organisation}{/if}
+                        {#if !sender?.person && !sender?.organisation}
+                            <span class="text-muted-foreground">{senderReading}</span>
+                        {/if}
+                    {:else}
+                        <span class="text-muted-foreground">Der Agent liest die Mail …</span>
                     {/if}
                 </dd>
 

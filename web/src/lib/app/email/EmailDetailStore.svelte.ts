@@ -10,11 +10,21 @@ export type SpamState = {
 	filter?: { id: string; name: string } | null;
 };
 
-/** What the socket sends, on opening and on every change. */
-type DetailEvent = {
-	mail: Mail;
-	spam: SpamState;
+/** What the agent read out of the mail. A field it could not fill is absent, which is an answer. */
+export type SenderAnalysis = {
+	person?: string | null;
+	organisation?: string | null;
+	/** Why there is nothing, for the case where the model could not be asked at all. */
+	failure?: string | null;
 };
+
+/**
+ * What the socket sends, told apart by `type`: the mail and its state on opening and on every
+ * change, the agent's reading of it once, whenever it is done.
+ */
+type DetailEvent =
+	| { type: 'mail'; mail: Mail; spam: SpamState }
+	| ({ type: 'sender_analysis' } & SenderAnalysis);
 
 /**
  * How the screen is doing, which is not the same as how the mail is doing: `offline` still shows
@@ -29,8 +39,9 @@ const RECONNECT_DELAYS = [1_000, 2_000, 5_000, 10_000];
  * One mail, and everything known about it, kept current for as long as the screen is open.
  *
  * The headers and the state come over a socket: a mail is filed, archived or caught by a filter
- * while somebody is reading it, and every one of those is a row another screen may write. The body
- * comes over its own request and is asked for once -- it is big and it does not change.
+ * while somebody is reading it, and every one of those is a row another screen may write. What the
+ * agent reads out of the mail comes over the same socket, once, whenever the model is done. The
+ * body comes over its own request and is asked for once -- it is big and it does not change.
  */
 export class EmailDetailStore {
 	readonly #id: string;
@@ -51,6 +62,12 @@ export class EmailDetailStore {
 	body = $state<string | undefined>(undefined);
 
 	status = $state<DetailStatus>('connecting');
+
+	/**
+	 * What the agent read as the sender, null while it is still reading. One answer per open
+	 * screen: nothing about it changes while the mail is being read.
+	 */
+	sender = $state<SenderAnalysis | null>(null);
 
 	constructor(id: string) {
 		this.#id = id;
@@ -76,6 +93,10 @@ export class EmailDetailStore {
 	}
 
 	#connect(): void {
+		// A reconnect asks the agent again: its answer rides on the socket, and a socket that
+		// dropped before it arrived would otherwise leave the screen waiting forever.
+		this.sender = null;
+
 		const socket = new WebSocket(socketUrl(this.#id));
 		this.#socket = socket;
 
@@ -88,8 +109,14 @@ export class EmailDetailStore {
 			if (typeof event.data !== 'string') return;
 
 			const detail = JSON.parse(event.data) as DetailEvent;
-			this.mail = detail.mail;
-			this.spam = detail.spam;
+
+			if (detail.type === 'mail') {
+				this.mail = detail.mail;
+				this.spam = detail.spam;
+			} else {
+				this.sender = detail;
+			}
+
 			this.status = 'live';
 		});
 

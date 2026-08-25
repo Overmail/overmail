@@ -3,6 +3,9 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.http.avatars.avatars
+import es.jvbabi.overmail.server.http.filters.createFilter
+import es.jvbabi.overmail.server.http.filters.filters
+import es.jvbabi.overmail.server.http.filters.updateFilter
 import es.jvbabi.overmail.server.http.mails.mailContent
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.mails.validateRule
@@ -74,6 +77,13 @@ internal fun Application.configureRouting() {
                 mails()
                 mailContent()
                 validateRule()
+            }
+
+            // The spam filters a reader wrote, and what they say.
+            route("/filters") {
+                filters()
+                createFilter()
+                updateFilter()
             }
 
             // The threads themselves, as the skeleton a grouped list is laid out from.

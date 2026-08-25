@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.database
 
 import es.jvbabi.overmail.server.database.models.Archived
 import es.jvbabi.overmail.server.database.models.EmailAvatars
+import es.jvbabi.overmail.server.database.models.EmailSpam
 import es.jvbabi.overmail.server.database.models.Filters
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
@@ -44,6 +45,8 @@ class OvermailDatabase(
             SchemaUtils.create(EmailThreads)
             SchemaUtils.create(Archived)
             SchemaUtils.create(Filters)
+            // After the filters: `filter_id` points there.
+            SchemaUtils.create(EmailSpam)
         }
     }
 

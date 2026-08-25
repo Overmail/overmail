@@ -35,6 +35,13 @@ object Emails : UuidTable("emails") {
      */
     val isArchived = bool("is_archived").default(false)
 
+    /**
+     * Whether the mail counts as spam right now. Denormalised for the same reason as
+     * [isArchived]: the record of how it got there is [EmailSpam], and neither the stack nor a
+     * listing may join the newest row per mail out of it just to leave spam out.
+     */
+    val isSpam = bool("is_spam").default(false)
+
     init {
         /**
          * Narrows the dedup lookup (account + send second + subject) to a handful of rows. The

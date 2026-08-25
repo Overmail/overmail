@@ -35,6 +35,8 @@ export type Mail = {
 	/** ISO-8601, whole seconds. */
 	sent_at: string;
 	is_read: boolean;
+	/** Whether the mail sits in the archive. */
+	is_archived: boolean;
 	/** The matter the mail sits in, absent while nothing has filed it. */
 	thread?: MailThread | null;
 	tags: MailTag[];

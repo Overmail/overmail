@@ -3,6 +3,7 @@
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
     import {createVirtualizer} from "$lib/hooks/virtualizer.svelte";
+    import {goto} from "$app/navigation";
     import {cn} from "$lib/utils";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, spansRow} from "./columns";
     import {mailGrouping} from "./grouping.svelte";
@@ -68,6 +69,11 @@
     // Rows are looked up by id rather than by position: ungrouped, a mail's place in the row model
     // says nothing about its place in the mailbox, because the mailbox is filled from both ends.
     const rowsById = $derived(new Map(modelRows.map((row) => [row.id, row])));
+
+    /** Opens one mail on its own screen. */
+    function open(id: string): void {
+        void goto(`/email/${id}`);
+    }
 
     /**
      * How long the list is, not how much of it is loaded. Exact either way: ungrouped the server
@@ -246,9 +252,23 @@
 
                 {#each visible as {item, row} (row?.id ?? `pending-${item.index}`)}
                     {#if row}
+                        {@const openable = row.original.kind === 'mail' ? row.original.mail.id : null}
+                        <!-- The whole row opens the mail: a link in one cell would be a target the
+                             width of a subject, and the row is what a reader aims at. Rows that are
+                             a group heading open nothing. -->
                         <Table.Row
                                 aria-rowindex={item.index + 2}
-                                class={cn('h-8', rowClass(row.original))}
+                                class={cn('h-8', openable && 'cursor-pointer', rowClass(row.original))}
+                                role={openable ? 'link' : undefined}
+                                tabindex={openable ? 0 : undefined}
+                                onclick={openable ? () => open(openable) : undefined}
+                                onkeydown={openable
+                                    ? (event: KeyboardEvent) => {
+                                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                                          event.preventDefault();
+                                          open(openable);
+                                      }
+                                    : undefined}
                         >
                             {#if spansRow(row.original)}
                                 <Table.Cell colspan={columns.length} class="h-8 py-0">

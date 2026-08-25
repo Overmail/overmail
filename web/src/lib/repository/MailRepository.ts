@@ -1,3 +1,5 @@
+import type { SpamRule } from '$lib/app/spam_dialog/rule';
+
 const API = '/api/mails';
 
 /** Someone a mail names, as that mail spelled them out. */
@@ -84,6 +86,11 @@ export type MailPageQuery = {
 	filed?: boolean;
 };
 
+/** Whether a rule would catch one mail, as `POST /api/mails/{id}/validate-rule` reports it. */
+type RuleMatch = {
+	matches: boolean;
+};
+
 /** The most ids one request may name, as the server caps it. */
 export const MAX_IDS_PER_REQUEST = 200;
 
@@ -118,6 +125,26 @@ export class MailRepository {
 		if (!response.ok) throw new Error(`Could not load the body of ${id}: ${response.status}`);
 
 		return (await response.json()) as MailContent;
+	}
+
+	/**
+	 * Whether a spam rule would catch one mail. Nothing is stored and nothing is filed -- this is
+	 * the question the editor asks while a rule is being written.
+	 *
+	 * `signal` aborts a check that a later one has overtaken: the rule changes while it is typed,
+	 * and only the answer to the newest version is worth waiting for.
+	 */
+	async validateRule(id: string, rule: SpamRule, signal?: AbortSignal): Promise<boolean> {
+		const response = await fetch(`${API}/${id}/validate-rule`, {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(rule),
+			signal
+		});
+		if (!response.ok) throw new Error(`Could not check a rule against ${id}: ${response.status}`);
+
+		return ((await response.json()) as RuleMatch).matches;
 	}
 }
 

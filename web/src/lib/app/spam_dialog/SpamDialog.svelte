@@ -6,6 +6,8 @@
      * caller that already has one of those can pass it straight in.
      */
     export type SpamDialogMail = {
+        /** Which mail this is: what the rule is checked against, see `MailRepository`. */
+        id: string;
         sender: EmailCardParticipant & {avatarUrl?: string};
         /** Formatted for display already, see `EmailCard`. */
         sent: string;
@@ -16,6 +18,8 @@
         tags?: string[];
         /** Absent while the body's own request is still out; the card then shows its shape. */
         body?: string;
+        /** The mail's HTML part, see `EmailCard`. */
+        html?: string;
     };
 </script>
 
@@ -28,6 +32,7 @@
     import {Input} from "$lib/components/ui/input";
     import EmailCard from "$lib/app/my-stack/EmailCard.svelte";
     import SpamRuleEditor from "./SpamRuleEditor.svelte";
+    import {mailRepository} from "$lib/repository/MailRepository";
     import {cn} from "$lib/utils.js";
     import type {RuleReadout, SpamFilter, SpamRule} from "./rule";
 
@@ -65,6 +70,43 @@
 
     // Both halves have to be there: a rule that adds up, and a name to find the filter under.
     const ready = $derived(readout.rule !== null && name.trim().length > 0);
+
+    /**
+     * Whether the rule as it stands would catch the mail on screen. `unknown` while there is no
+     * rule to ask about, or no mail to ask against.
+     */
+    let hit = $state<"unknown" | "checking" | "match" | "miss" | "error">("unknown");
+
+    /** How long the rule has to stand still before it is checked. A field is typed into. */
+    const CHECK_DELAY = 300;
+
+    $effect(() => {
+        const rule = readout.rule;
+        const id = mail?.id;
+
+        if (!open || !rule || !id) {
+            hit = "unknown";
+            return;
+        }
+
+        const request = new AbortController();
+        const timer = setTimeout(async () => {
+            hit = "checking";
+
+            try {
+                hit = (await mailRepository.validateRule(id, rule, request.signal)) ? "match" : "miss";
+            } catch {
+                // A rule that was overtaken while its answer was on its way is not an error; the
+                // check that overtook it is already on screen.
+                if (!request.signal.aborted) hit = "error";
+            }
+        }, CHECK_DELAY);
+
+        return () => {
+            clearTimeout(timer);
+            request.abort();
+        };
+    });
 
     // A dialog that opens again starts over -- the editor is rebuilt from `initial` either way, so
     // leaving a half-typed name from last time behind would be the odd one out.
@@ -168,6 +210,23 @@
                     </div>
                 {/if}
             </div>
+
+            <!-- What the rule does to the mail beside it, asked of the server after every change.
+                 The height is held whether or not there is something to say, so the panels above
+                 do not jump every time the answer comes and goes. -->
+            {#if mail}
+                <p class="min-h-5 text-sm text-muted-foreground" aria-live="polite">
+                    {#if hit === "match"}
+                        <span class="text-foreground">Diese Regel würde diese E-Mail als Spam einsortieren.</span>
+                    {:else if hit === "miss"}
+                        Diese Regel greift bei dieser E-Mail nicht.
+                    {:else if hit === "checking"}
+                        Wird geprüft …
+                    {:else if hit === "error"}
+                        Die Regel konnte nicht geprüft werden.
+                    {/if}
+                </p>
+            {/if}
         </form>
 
         <Dialog.Footer>

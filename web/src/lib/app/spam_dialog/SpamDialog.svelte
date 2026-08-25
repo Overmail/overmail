@@ -26,7 +26,6 @@
 <script lang="ts">
     import * as Dialog from "$lib/components/ui/dialog";
     import * as Field from "$lib/components/ui/field";
-    import {Kbd} from "$lib/components/ui/kbd";
     import {Button} from "$lib/components/ui/button";
     import {ButtonGroup} from "$lib/components/ui/button-group";
     import {Input} from "$lib/components/ui/input";
@@ -236,7 +235,6 @@
 
         <Dialog.Footer>
             <Button variant="secondary" onclick={skip}>
-                <Kbd>Esc</Kbd>
                 Weiter ohne Spamfilter
             </Button>
 

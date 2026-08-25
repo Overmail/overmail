@@ -29,6 +29,7 @@ import es.jvbabi.overmail.server.domain.repository.UserRepository
 import es.jvbabi.overmail.server.domain.repository.UserRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepository
 import es.jvbabi.overmail.server.domain.repository.icon.EmailIconRepositoryImpl
+import es.jvbabi.overmail.server.domain.spam.SpamRuleMatcher
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
@@ -103,6 +104,9 @@ private fun Application.configureDependencies() {
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }
+        // Stateless, and the rules it reads come in per request; the coming automatic filing will
+        // hold mails against the same one.
+        provide<SpamRuleMatcher> { SpamRuleMatcher() }
 
         // Started from a route rather than on boot: filling the cache is a button, see
         // AvatarRefresher.

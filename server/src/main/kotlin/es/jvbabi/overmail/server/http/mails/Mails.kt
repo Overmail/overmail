@@ -6,15 +6,19 @@ import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.MailThreadRef
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
+import es.jvbabi.overmail.server.domain.spam.SpamRule
+import es.jvbabi.overmail.server.domain.spam.SpamRuleMatcher
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.plugins.di.resolve
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -152,6 +156,43 @@ fun Route.mails() {
                 )
             )
         }
+
+        /**
+         * Whether a spam rule holds for one mail, with the rule itself as the body.
+         *
+         * The editor sends the rule it currently shows after every change, so that whoever is
+         * writing it can see whether it would catch the mail in front of them. Nothing is stored
+         * and nothing is filed: this only answers the question.
+         *
+         * A rule the reader cannot make sense of -- an unknown operator, a regex that will not
+         * compile -- is the caller's mistake and answers 400. A mail of somebody else answers like
+         * one that does not exist, as everywhere else here.
+         */
+        post("/{id}/validate-rule") {
+            val user = call.principal<User>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+
+            val id = call.parameters["id"]?.let { runCatching { Uuid.parse(it) }.getOrNull() }
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+
+            val rule = runCatching { call.receive<SpamRule>() }.getOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+
+            val emailRepository = application.dependencies.resolve<EmailRepository>()
+            val email = emailRepository.getById(id).first()
+            if (email == null || email.imapAccount.user.id != user.id) {
+                return@post call.respond(HttpStatusCode.NotFound)
+            }
+
+            val matcher = application.dependencies.resolve<SpamRuleMatcher>()
+            val matches = try {
+                matcher.matches(rule, email)
+            } catch (_: IllegalArgumentException) {
+                // The only thing in a rule that can fail this late is a regex nothing compiles.
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+
+            call.respond(RuleMatchResponse(matches = matches))
+        }
     }
 }
 
@@ -248,4 +289,10 @@ data class MailContentResponse(
 data class TagResponse(
     @SerialName("id") val id: String,
     @SerialName("name") val name: String,
+)
+
+/** Whether a rule holds, as `POST /api/mails/{id}/validate-rule` reports it. */
+@Serializable
+data class RuleMatchResponse(
+    @SerialName("matches") val matches: Boolean,
 )

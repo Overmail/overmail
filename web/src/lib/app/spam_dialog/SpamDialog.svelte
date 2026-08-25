@@ -5,7 +5,7 @@
     import {Button} from "$lib/components/ui/button";
     import {Input} from "$lib/components/ui/input";
     import SpamRuleEditor from "./SpamRuleEditor.svelte";
-    import {describeRule, type RuleReadout, type SpamFilter, type SpamRule} from "./rule";
+    import type {RuleReadout, SpamFilter, SpamRule} from "./rule";
 
     let {
         open = $bindable(),
@@ -82,20 +82,6 @@
                             onchange={(next) => (readout = next)}
                             class="min-h-0 flex-1"
                     />
-
-                    <!-- One line for the whole rule: the blocks say the same thing, but they say
-                         it in two dimensions. What is missing is worded the same way, since a
-                         half-finished rule is the normal state of this dialog rather than a fault. -->
-                    <Field.Description>
-                        {#if readout.problem}
-                            {readout.problem}
-                        {:else if readout.rule}
-                            Spam, wenn {describeRule(readout.rule)}
-                        {/if}
-                        {#if readout.warning}
-                            {readout.warning}
-                        {/if}
-                    </Field.Description>
                 </Field.Set>
             </Field.Group>
         </form>

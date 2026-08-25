@@ -32,8 +32,10 @@
     import EmailCard from "$lib/app/my-stack/EmailCard.svelte";
     import SpamRuleEditor from "./SpamRuleEditor.svelte";
     import {mailRepository} from "$lib/repository/MailRepository";
+    import {filterRepository, type SpamFilterRecord} from "$lib/repository/FilterRepository";
+    import SaveFilterDialog from "./SaveFilterDialog.svelte";
     import {cn} from "$lib/utils.js";
-    import type {RuleReadout, SpamFilter, SpamRule} from "./rule";
+    import type {RuleReadout, SpamRule} from "./rule";
 
     let {
         open = $bindable(),
@@ -50,8 +52,8 @@
         initial?: SpamRule | null;
         /** The mail to write the filter against. Without one the rule has the dialog to itself. */
         mail?: SpamDialogMail;
-        /** The finished filter. Only ever called with a rule that adds up. */
-        onsubmit?: (filter: SpamFilter) => void;
+        /** The filter, once the server has it. Only ever called with a rule that adds up. */
+        onsubmit?: (filter: SpamFilterRecord) => void;
         /** The dialog was closed without a filter. */
         onskip?: () => void;
     } = $props();
@@ -113,19 +115,96 @@
     });
 
     // A dialog that opens again starts over -- the editor is rebuilt from `initial` either way, so
-    // leaving a half-typed name from last time behind would be the odd one out.
+    // a half-typed name, a question about the last rule or the trouble it ran into would all be
+    // left over from a filter nobody is writing any more.
     $effect(() => {
         if (open) {
             name = "";
             panel = "rule";
+            affected = null;
+            trouble = null;
         }
     });
 
-    function submit() {
-        if (!readout.rule || !ready) return;
+    /**
+     * Whether a request of the save is out. Holds both dialogs' buttons, so nothing is saved twice
+     * and the answer cannot arrive after the dialog is gone.
+     */
+    let busy = $state(false);
 
-        onsubmit?.({name: name.trim(), rule: readout.rule});
+    /** What went wrong while saving, in the words the status line shows. */
+    let trouble = $state<string | null>(null);
+
+    /**
+     * How many mails besides this one the rule catches, once that has been asked. Null while it has
+     * not been -- and what opens the second dialog when it turns out to be more than none.
+     */
+    let affected = $state<number | null>(null);
+
+    /**
+     * Saving asks the mailbox first: a rule written while reading one mail may well catch thirty
+     * others, and filing those is not something to do behind the reader's back. Nothing is written
+     * by the asking, so the dialog it opens can still be called off.
+     */
+    async function submit() {
+        if (!readout.rule || !ready || busy) return;
+
+        busy = true;
+        trouble = null;
+
+        try {
+            const others = await filterRepository.countAffectedMails(readout.rule, mail?.id);
+            if (others > 0) {
+                affected = others;
+                return;
+            }
+
+            await save(false);
+        } catch {
+            trouble = "Der Filter konnte nicht gespeichert werden.";
+        } finally {
+            busy = false;
+        }
+    }
+
+    /**
+     * Writes the filter, and holds it against the mails that are already there when asked to.
+     *
+     * The mail goes along: it was flagged as spam before this filter existed, so the server hands
+     * that flag over to the filter -- the filter is the reason for it, not the reader's own hand.
+     */
+    async function save(retroactively: boolean) {
+        const rule = readout.rule;
+        if (!rule) return;
+
+        const filter = await filterRepository.createFilter({
+            name: name.trim(),
+            rule,
+            mail: mail?.id,
+        });
+
+        if (retroactively) await filterRepository.applyFilter(filter.id);
+
+        onsubmit?.(filter);
+        affected = null;
         open = false;
+    }
+
+    /** The two answers of the second dialog, both of which save. */
+    async function saveFromDialog(retroactively: boolean) {
+        if (busy) return;
+
+        busy = true;
+        trouble = null;
+
+        try {
+            await save(retroactively);
+        } catch {
+            affected = null;
+            trouble = "Der Filter konnte nicht gespeichert werden.";
+        } finally {
+            busy = false;
+        }
     }
 
     function skip() {
@@ -224,6 +303,10 @@
                         <span class="text-foreground">Diese Regel würde diese E-Mail als Spam einsortieren.</span>
                     {:else if hit === "miss"}
                         Diese Regel greift bei dieser E-Mail nicht.
+                    {:else if trouble}
+                        {trouble}
+                    {:else if busy}
+                        Wird gespeichert …
                     {:else if hit === "error"}
                         Die Regel konnte nicht geprüft werden.
                     {:else if isChecking}
@@ -238,9 +321,20 @@
                 Weiter ohne Spamfilter
             </Button>
 
-            <Button variant="default" disabled={!ready} onclick={submit}>
+            <Button variant="default" disabled={!ready || busy} onclick={submit}>
                 Spamfilter erstellen
             </Button>
         </Dialog.Footer>
     </Dialog.Content>
 </Dialog.Root>
+
+<!-- Only ever up when the rule catches more than the mail it was written for. Cancelling it leaves
+     the editor as it was: nothing has been written at that point. The count is the state, and the
+     binding reads and clears it -- a boolean beside it would be a second thing to keep in step. -->
+<SaveFilterDialog
+        bind:open={() => affected !== null, (isOpen) => { if (!isOpen) affected = null; }}
+        count={affected ?? 0}
+        {busy}
+        onsave={() => saveFromDialog(false)}
+        onapply={() => saveFromDialog(true)}
+/>

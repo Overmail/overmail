@@ -50,7 +50,7 @@
 </script>
 
 <Dialog.Root bind:open={open}>
-    <!-- Room is what this dialog needs: the whole screen up to a desktop, and all of it but 64px
+    <!-- Room is what this dialog needs: the whole screen up to a desktop, and all of it but 32px
          from there on. The rows are spelled out so that the canvas takes everything the header and
          the buttons leave.
 
@@ -59,7 +59,7 @@
          dropdowns and field editors are positioned in page coordinates — see the editor. Pinned to
          all four sides, the dialog needs no transform to sit where it should. -->
     <Dialog.Content
-            class="inset-0 grid-rows-[auto_1fr_auto] h-auto w-auto max-w-none rounded-none sm:max-w-none xl:inset-16 xl:rounded-4xl"
+            class="inset-0 grid-rows-[auto_1fr_auto] h-auto w-auto max-w-none rounded-none sm:max-w-none xl:inset-8 xl:rounded-4xl"
             style="translate: none;"
     >
         <Dialog.Header>

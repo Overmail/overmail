@@ -75,10 +75,10 @@
      * Whether the rule as it stands would catch the mail on screen. `unknown` while there is no
      * rule to ask about, or no mail to ask against.
      */
-    let hit = $state<"unknown" | "checking" | "match" | "miss" | "error">("unknown");
+    let hit = $state<"unknown" | "match" | "miss" | "error">("unknown");
 
-    /** How long the rule has to stand still before it is checked. A field is typed into. */
-    const CHECK_DELAY = 300;
+    /** Whether an answer is on its way. The one before it stays on screen until it arrives. */
+    let isChecking = $state(false);
 
     $effect(() => {
         const rule = readout.rule;
@@ -86,26 +86,31 @@
 
         if (!open || !rule || !id) {
             hit = "unknown";
+            isChecking = false;
             return;
         }
 
+        // Every change, without waiting for a pause in the typing: the question costs one small
+        // request, and the answer is worth most while the rule is being written. Whatever the next
+        // change overtakes is dropped below.
         const request = new AbortController();
-        const timer = setTimeout(async () => {
-            hit = "checking";
+        isChecking = true;
 
-            try {
-                hit = (await mailRepository.validateRule(id, rule, request.signal)) ? "match" : "miss";
-            } catch {
+        mailRepository
+            .validateRule(id, rule, request.signal)
+            .then((matches) => {
+                hit = matches ? "match" : "miss";
+                isChecking = false;
+            })
+            .catch(() => {
                 // A rule that was overtaken while its answer was on its way is not an error; the
-                // check that overtook it is already on screen.
-                if (!request.signal.aborted) hit = "error";
-            }
-        }, CHECK_DELAY);
+                // check that overtook it is already on its way.
+                if (request.signal.aborted) return;
+                hit = "error";
+                isChecking = false;
+            });
 
-        return () => {
-            clearTimeout(timer);
-            request.abort();
-        };
+        return () => request.abort();
     });
 
     // A dialog that opens again starts over -- the editor is rebuilt from `initial` either way, so
@@ -220,10 +225,10 @@
                         <span class="text-foreground">Diese Regel würde diese E-Mail als Spam einsortieren.</span>
                     {:else if hit === "miss"}
                         Diese Regel greift bei dieser E-Mail nicht.
-                    {:else if hit === "checking"}
-                        Wird geprüft …
                     {:else if hit === "error"}
                         Die Regel konnte nicht geprüft werden.
+                    {:else if isChecking}
+                        Wird geprüft …
                     {/if}
                 </p>
             {/if}

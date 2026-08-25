@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.mails.mailContent
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.mails.validateRule
 import es.jvbabi.overmail.server.http.threads.threads
+import es.jvbabi.overmail.server.http.webapp.email.emailDetail
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import es.jvbabi.overmail.server.http.webapp.mystack.myStack
 import io.ktor.http.ContentType
@@ -101,6 +102,9 @@ internal fun Application.configureRouting() {
             route("/webapp/home") {
                 route("/email-graph") { emailGraph() }
             }
+
+            // One mail as its own screen shows it, live for as long as it is open.
+            route("/webapp/email") { emailDetail() }
 
             // The stack screen's socket, which is the whole channel that screen runs on.
             route("/webapp/my-stack") { myStack() }

@@ -26,6 +26,8 @@ data class MailResponse(
     /** ISO-8601, whole seconds, as mails are stored. */
     @SerialName("sent_at") val sentAt: String,
     @SerialName("is_read") val isRead: Boolean,
+    /** Whether the mail sits in the archive. */
+    @SerialName("is_archived") val isArchived: Boolean,
     /** The matter the mail sits in, absent while nothing has filed it. */
     @SerialName("thread") val thread: ThreadResponse? = null,
     @SerialName("tags") val tags: List<TagResponse>,
@@ -65,6 +67,7 @@ internal fun MailSummary.toResponse() = MailResponse(
     bcc = bcc.map { it.toResponse() },
     sentAt = sent.toString(),
     isRead = isRead,
+    isArchived = isArchived,
     thread = thread?.toResponse(),
     tags = tags.map { TagResponse(id = it.tag.id.toString(), name = it.tag.name) },
 )

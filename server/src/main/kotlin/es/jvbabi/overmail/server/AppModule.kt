@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server
 
+import es.jvbabi.overmail.server.ai.MailAnalyst
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.installSessionAuth
@@ -113,6 +114,8 @@ private fun Application.configureDependencies() {
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }
+        // Holds the connection to the model backend, so one per server rather than one per mail.
+        provide<MailAnalyst> { MailAnalyst(resolve()) }
         // Stateless, and the rules it reads come in per request; the coming automatic filing will
         // hold mails against the same one.
         provide<SpamRuleMatcher> { SpamRuleMatcher() }

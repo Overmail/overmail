@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.ArchiveRepository
+import es.jvbabi.overmail.server.domain.repository.SpamRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.http.mails.MailResponse
@@ -46,12 +47,13 @@ private const val MAX_TAGS = 50
 private const val LOAD_MAILS = "load_mails"
 private const val SET_TAGS = "set_tags"
 private const val SET_ARCHIVED = "set_archived"
+private const val SET_SPAM = "set_spam"
 
 /**
  * The stack screen's own channel.
  *
  * Everything the screen does with mails goes over this socket: asking for the next mails, filing
- * them under tags and putting them into the archive. Bodies are the one exception, they stay on
+ * them under tags, putting them into the archive and flagging them as spam. Bodies are the one exception, they stay on
  * `GET /api/mails/{id}/content` -- they are big, the browser caches them, and nothing about them is
  * live.
  *
@@ -86,6 +88,7 @@ fun Route.myStack() {
             val emailRepository = dependencies.resolve<EmailRepository>()
             val tagRepository = dependencies.resolve<TagRepository>()
             val archiveRepository = dependencies.resolve<ArchiveRepository>()
+            val spamRepository = dependencies.resolve<SpamRepository>()
 
             // The caller's tags, now and whenever they change. Its own coroutine, because it
             // outlives any one command; it ends with the session, which is what this scope is.
@@ -119,6 +122,7 @@ fun Route.myStack() {
                     is StackCommand.SetTags -> setTags(user, command, emailRepository, tagRepository)
                     is StackCommand.SetArchived ->
                         setArchived(user, command, emailRepository, archiveRepository)
+                    is StackCommand.SetSpam -> setSpam(user, command, emailRepository, spamRepository)
                 }
 
                 sendEvent(answer)
@@ -255,6 +259,37 @@ private suspend fun setArchived(
     )
 }
 
+/**
+ * Flags one mail as spam or takes it back out, and records the change.
+ *
+ * States what should be true rather than what to change, like [setArchived], and for the same
+ * reason: a client may resend it after a reconnect. Flagging is what takes the mail out of the
+ * stack for good -- until it is flagged, the next pack hands it back and the screen is left
+ * deciding on a mail it already decided on.
+ */
+private suspend fun setSpam(
+    user: User,
+    command: StackCommand.SetSpam,
+    emailRepository: EmailRepository,
+    spamRepository: SpamRepository,
+): StackEvent {
+    val mailId = runCatching { Uuid.parse(command.mail) }.getOrNull()
+        ?: return StackEvent.Failed(command.id, SET_SPAM, "mail is not an id")
+
+    val filterId = command.filter?.let {
+        runCatching { Uuid.parse(it) }.getOrNull()
+            ?: return StackEvent.Failed(command.id, SET_SPAM, "filter is not an id")
+    }
+
+    // Doubles as the check that the mail is the caller's, see setTags.
+    emailRepository.summaryOf(user, mailId)
+        ?: return StackEvent.Failed(command.id, SET_SPAM, "no such mail")
+
+    spamRepository.setSpam(mailId, command.spam, filterId)
+
+    return StackEvent.MailSpam(replyTo = command.id, mail = command.mail, spam = command.spam)
+}
+
 /** The caller's tags as the event that carries them. */
 private suspend fun tagsOf(user: User, tagRepository: TagRepository): StackEvent.Tags =
     StackEvent.Tags(
@@ -321,6 +356,21 @@ sealed interface StackCommand {
         @SerialName("mail") val mail: String,
         @SerialName("archived") val archived: Boolean,
     ) : StackCommand
+
+    /**
+     * Flags one mail as spam, or takes it back out with `spam` false.
+     *
+     * `filter` is the filter that caught it; the stack leaves it out, because a reader flagging a
+     * mail themselves is what this command is for -- a filter of theirs may well come afterwards.
+     */
+    @Serializable
+    @SerialName(SET_SPAM)
+    data class SetSpam(
+        @SerialName("id") override val id: Long? = null,
+        @SerialName("mail") val mail: String,
+        @SerialName("spam") val spam: Boolean,
+        @SerialName("filter") val filter: String? = null,
+    ) : StackCommand
 }
 
 /** What the server sends down the socket. */
@@ -361,6 +411,15 @@ sealed interface StackEvent {
         @SerialName("reply_to") override val replyTo: Long? = null,
         @SerialName("mail") val mail: String,
         @SerialName("archived") val archived: Boolean,
+    ) : StackEvent
+
+    /** Where one mail stands with spam, after a [StackCommand.SetSpam]. */
+    @Serializable
+    @SerialName("mail_spam")
+    data class MailSpam(
+        @SerialName("reply_to") override val replyTo: Long? = null,
+        @SerialName("mail") val mail: String,
+        @SerialName("spam") val spam: Boolean,
     ) : StackEvent
 
     /**

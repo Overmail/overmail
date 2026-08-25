@@ -180,6 +180,7 @@ export class StackStore {
 		this.topId = (this.#undecidedFrom(below) ?? this.waiting[0])?.mail.id;
 
 		if (to === 'archive') this.#archive(id, true);
+		if (to === 'spam') this.#spam(id, true);
 		this.ensureFilled();
 	}
 
@@ -210,6 +211,7 @@ export class StackStore {
 
 		// Undoing an archived mail takes it back out of the archive; the history keeps both changes.
 		if (undone?.to === 'archive') this.#archive(entry.mail.id, false);
+		if (undone?.to === 'spam') this.#spam(entry.mail.id, false);
 	}
 
 	/**
@@ -244,6 +246,21 @@ export class StackStore {
 			if (!entry) return;
 
 			entry.classification = archived ? undefined : { to: 'archive' };
+			this.ensureFilled();
+		});
+	}
+
+	/**
+	 * Flags a mail as spam or takes it back out. A write that could not be made drops the decision,
+	 * as archiving does -- and it has to be made, or the server hands the mail back on the next
+	 * pack and the stack asks about a mail that was already decided.
+	 */
+	#spam(id: string, spam: boolean): void {
+		void this.#socket.setSpam(id, spam).catch(() => {
+			const entry = this.entries[this.#indexOf(id)];
+			if (!entry) return;
+
+			entry.classification = spam ? undefined : { to: 'spam' };
 			this.ensureFilled();
 		});
 	}

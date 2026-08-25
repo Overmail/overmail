@@ -23,7 +23,8 @@ const RECONNECT_DELAYS = [250, 1_000, 3_000, 6_000];
 type StackCommand =
 	| { type: 'load_mails'; limit: number; before?: string }
 	| { type: 'set_tags'; mail: string; tags: string[] }
-	| { type: 'set_archived'; mail: string; archived: boolean };
+	| { type: 'set_archived'; mail: string; archived: boolean }
+	| { type: 'set_spam'; mail: string; spam: boolean; filter?: string };
 
 /**
  * What the server sends down the socket. `reply_to` names the command it answers; an event without
@@ -39,6 +40,7 @@ type StackEvent =
 	  }
 	| { type: 'mail_tags'; reply_to?: number | null; mail: string; tags: MailTag[] }
 	| { type: 'mail_archived'; reply_to?: number | null; mail: string; archived: boolean }
+	| { type: 'mail_spam'; reply_to?: number | null; mail: string; spam: boolean }
 	| { type: 'tags'; reply_to?: number | null; tags: MailTag[] }
 	| { type: 'error'; reply_to?: number | null; command?: string | null; message: string };
 
@@ -72,7 +74,8 @@ export type SocketFactory = (url: string) => WebSocket;
  * is the screen's retry button.
  *
  * Resending is safe because every command says what should be true rather than what to change --
- * `set_tags` carries the whole set of tags for a mail and `set_archived` the state it should be in,
+ * `set_tags` carries the whole set of tags for a mail, `set_archived` and `set_spam` the state it
+ * should be in,
  * so running either twice leaves the same thing behind.
  *
  * Reconnecting is driven by what is outstanding, not by a keepalive of its own: nothing here holds
@@ -132,6 +135,18 @@ export class StackSocket {
 	async setArchived(mail: string, archived: boolean): Promise<void> {
 		const event = await this.#request({ type: 'set_archived', mail, archived });
 		if (event.type !== 'mail_archived') throw new Error(`Archived a mail, got ${event.type}`);
+	}
+
+	/**
+	 * Flags a mail as spam, or takes it back out. Resolves once the change is stored.
+	 *
+	 * `filter` is the filter that caught it; the stack leaves it out, since a reader flagging a
+	 * mail themselves is what this is for. Until a mail is flagged the server keeps handing it
+	 * back, so this is what takes it out of the stack for good.
+	 */
+	async setSpam(mail: string, spam: boolean, filter?: string): Promise<void> {
+		const event = await this.#request({ type: 'set_spam', mail, spam, filter });
+		if (event.type !== 'mail_spam') throw new Error(`Flagged a mail, got ${event.type}`);
 	}
 
 	/** Hangs up for good and fails whatever was still on its way. Leaving the screen calls this. */

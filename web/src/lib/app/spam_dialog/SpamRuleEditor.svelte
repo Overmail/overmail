@@ -56,10 +56,23 @@
         const recalibrate = () => calibrate(anchorElement);
         hostElement.addEventListener('pointerdown', recalibrate, true);
 
+        // Escape closes the dialog, and a block hanging off the pointer is not what the user is
+        // giving up on when they press it. Capture phase, and stopped dead: the dialog listens for
+        // Escape on the document itself, and Blockly hides its own popovers on it.
+        const abortDrag = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || !editor?.abortDrag()) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        };
+        document.addEventListener('keydown', abortDrag, true);
+
         return () => {
             dropped = true;
             observer.disconnect();
             hostElement.removeEventListener('pointerdown', recalibrate, true);
+            document.removeEventListener('keydown', abortDrag, true);
             editor?.dispose();
         };
     });

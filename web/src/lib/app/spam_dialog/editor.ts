@@ -11,6 +11,56 @@ import { SPAM_THEME, SPAM_TOOLBOX, defineSpamBlocks } from './blocks';
  */
 
 /**
+ * The dragger of the drag that is running, so that Escape can reach it: Blockly makes one per drag
+ * and keeps it to itself.
+ */
+let dragging: SpamDragger | null = null;
+
+/** A drag that can be called off, which Blockly's own pointer drags cannot. */
+class SpamDragger extends Blockly.dragging.Dragger {
+	private aborted = false;
+	private fromFlyout = false;
+
+	override onDragStart(e?: PointerEvent | KeyboardEvent) {
+		// Read before `super`, which swaps a block dragged out of the palette for the copy that
+		// lands on the canvas.
+		this.fromFlyout = this.draggable.workspace.isFlyout;
+		dragging = this;
+
+		return super.onDragStart(e);
+	}
+
+	override onDragEnd(e?: PointerEvent | KeyboardEvent) {
+		dragging = null;
+
+		if (!this.aborted) {
+			super.onDragEnd(e);
+			return;
+		}
+
+		// A block on its way out of the palette was never anywhere, so calling that drag off
+		// leaves nothing behind.
+		if (this.fromFlyout && Blockly.isDeletable(this.draggable)) {
+			this.draggable.endDrag(e, Blockly.DragDisposition.DELETE);
+			this.draggable.dispose();
+		} else {
+			// The two steps Blockly takes for a drop it does not allow: the block goes back, and
+			// then the drag is closed off -- the revert on its own would leave the event group
+			// open, which is what makes a drag one step in the undo stack.
+			this.draggable.revertDrag();
+			this.draggable.endDrag(e, Blockly.DragDisposition.REVERT);
+		}
+
+		Blockly.Events.setGroup(false);
+	}
+
+	/** Marks the running drag to be undone rather than dropped once it ends. */
+	static abort() {
+		if (dragging) dragging.aborted = true;
+	}
+}
+
+/**
  * The palette, with one padding value instead of three. The flyout derives its inset from its own
  * corner radius and its gap from that inset again -- and both are readonly by the time a subclass
  * can see them, hence the assign.
@@ -79,6 +129,11 @@ export type SpamEditorOptions = {
 export type SpamEditor = {
 	/** Blockly only learns about a new container size from here. */
 	resize: () => void;
+	/**
+	 * Calls off the drag that is running, putting the block back where it was picked up. False if
+	 * nothing was being dragged, which is the caller's cue to let the key through.
+	 */
+	abortDrag: () => boolean;
 	dispose: () => void;
 };
 
@@ -98,7 +153,7 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 		theme: SPAM_THEME,
 		renderer: 'zelos',
 		rendererOverrides: RENDERER_OVERRIDES,
-		plugins: { flyoutsVerticalToolbox: SpamFlyout },
+		plugins: { flyoutsVerticalToolbox: SpamFlyout, blockDragger: SpamDragger },
 		// Cursors, the zoom sprites and the dropdown arrow. A copy of node_modules/blockly/media
 		// under static/, rather than Blockly's CDN, so the installed app keeps its blocks when
 		// the network is gone -- re-copy it when Blockly is updated.
@@ -127,6 +182,16 @@ export function createSpamEditor(options: SpamEditorOptions): SpamEditor {
 
 	return {
 		resize: () => Blockly.svgResize(workspace),
+		abortDrag: () => {
+			// Covers panning the canvas as well, where there is no block to put back -- ending
+			// that gesture is still the right answer to Escape.
+			if (!workspace.isDragging()) return false;
+
+			SpamDragger.abort();
+			workspace.cancelCurrentGesture();
+
+			return true;
+		},
 		dispose: () => {
 			workspace.dispose();
 

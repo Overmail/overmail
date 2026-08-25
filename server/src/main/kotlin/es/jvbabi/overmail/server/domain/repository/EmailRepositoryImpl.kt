@@ -29,6 +29,9 @@ import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.MailThreadRef
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.User
+import es.jvbabi.overmail.server.domain.spam.MailFacts
+import es.jvbabi.overmail.server.domain.spam.mailFactsOf
+import es.jvbabi.overmail.server.domain.spam.mailFactsOf
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
@@ -277,6 +280,33 @@ class EmailRepositoryImpl(
      * themselves, then their recipients and tags in one lookup each. Selected column by column
      * rather than through [loadEmails], which would pull both bodies of every mail along.
      */
+    override suspend fun forEachRuleFacts(user: User, onMail: suspend (Uuid, MailFacts) -> Unit) {
+        database.query {
+            (Emails innerJoin ImapAccounts innerJoin EmailUsers)
+                .select(
+                    Emails.id, Emails.subject, Emails.senderName, Emails.textContent,
+                    Emails.htmlContent, EmailUsers.address,
+                )
+                .where(ImapAccounts.user eq user.id)
+                // Oldest first, the id breaking ties as everywhere else here.
+                .orderBy(Emails.sent to SortOrder.ASC, Emails.id to SortOrder.ASC)
+                // Handed on as they arrive rather than gathered into a list first, so the bodies
+                // of a whole mailbox never pile up.
+                .collect { row ->
+                    onMail(
+                        row[Emails.id].value,
+                        mailFactsOf(
+                            subject = row[Emails.subject],
+                            senderName = row[Emails.senderName],
+                            senderAddress = row[EmailUsers.address],
+                            textContent = row[Emails.textContent],
+                            htmlContent = row[Emails.htmlContent],
+                        ),
+                    )
+                }
+        }
+    }
+
     private suspend fun loadSummaries(
         user: User,
         limit: Int,

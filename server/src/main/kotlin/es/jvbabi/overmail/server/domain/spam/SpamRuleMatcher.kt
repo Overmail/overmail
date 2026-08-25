@@ -71,10 +71,29 @@ class SpamRuleMatcher {
  * rule is held against what the reader sees rather than against markup nobody reads. Keep the two
  * in step, or "Inhalt enthält" will mean two different things.
  */
-fun Email.toRuleFacts() = MailFacts(
+fun Email.toRuleFacts() = mailFactsOf(
     subject = subject,
     senderName = senderName,
     senderAddress = sender.address,
+    textContent = textContent,
+    htmlContent = htmlContent,
+)
+
+/**
+ * The same, from the columns a mail is made of rather than from a loaded [Email] -- so that walking
+ * a whole mailbox does not have to build one object per mail, see
+ * [es.jvbabi.overmail.server.domain.repository.EmailRepository.forEachRuleFacts].
+ */
+fun mailFactsOf(
+    subject: String,
+    senderName: String?,
+    senderAddress: String,
+    textContent: String?,
+    htmlContent: String?,
+) = MailFacts(
+    subject = subject,
+    senderName = senderName,
+    senderAddress = senderAddress,
     body = textContent?.trim()?.takeIf { it.isNotEmpty() } ?: htmlContent?.flattenHtml() ?: "",
 )
 

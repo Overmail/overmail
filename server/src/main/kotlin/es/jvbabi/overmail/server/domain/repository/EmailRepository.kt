@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.MailPage
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.User
+import es.jvbabi.overmail.server.domain.spam.MailFacts
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
@@ -59,6 +60,16 @@ interface EmailRepository {
      * reader.
      */
     fun getDailyCountsForUser(user: User, year: Int): Flow<Map<LocalDate, Int>>
+
+    /**
+     * Hands every mail of [user] to [onMail] as the parts a spam rule reads, oldest first.
+     *
+     * Suspend and not a flow, unlike everything else that reads here: this is one pass over the
+     * mailbox as it stands, which is what holding a rule against it needs -- not something to
+     * watch. One row at a time rather than a list, because the bodies come along and a mailbox
+     * does not fit in memory twice.
+     */
+    suspend fun forEachRuleFacts(user: User, onMail: suspend (Uuid, MailFacts) -> Unit)
 
     /**
      * The years [user] has mail in at all, oldest first, so a caller can offer the years there is

@@ -3,6 +3,8 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.http.avatars.avatars
+import es.jvbabi.overmail.server.http.filters.affectedMails
+import es.jvbabi.overmail.server.http.filters.applyFilter
 import es.jvbabi.overmail.server.http.filters.createFilter
 import es.jvbabi.overmail.server.http.filters.filters
 import es.jvbabi.overmail.server.http.filters.updateFilter
@@ -84,6 +86,8 @@ internal fun Application.configureRouting() {
                 filters()
                 createFilter()
                 updateFilter()
+                affectedMails()
+                applyFilter()
             }
 
             // The threads themselves, as the skeleton a grouped list is laid out from.

@@ -13,7 +13,7 @@
 	bind:ref
 	data-slot="avatar-fallback"
 	class={cn(
-		"rounded-full bg-muted text-muted-foreground flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs",
+		"group-data-[variant=square]/avatar:rounded-md group-data-[variant=circle]/avatar:rounded-full bg-muted text-muted-foreground flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs",
 		className
 	)}
 	{...restProps}

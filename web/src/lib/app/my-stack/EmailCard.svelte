@@ -142,7 +142,7 @@ img { max-width: 100%; height: auto; }
 <div class={cn("relative flex flex-col w-3xl h-fit bg-background rounded-2xl shadow-2xl", className)}>
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
-            <Avatar.Root class="size-12">
+            <Avatar.Root class="size-12" variant="square">
                 <Avatar.Image src={sender.avatarUrl} alt="" />
                 <Avatar.Fallback class="text-base">{initials}</Avatar.Fallback>
             </Avatar.Root>

@@ -12,6 +12,6 @@
 <AvatarPrimitive.Image
 	bind:ref
 	data-slot="avatar-image"
-	class={cn("rounded-full aspect-square size-full object-cover", className)}
+	class={cn("group-data-[variant=square]/avatar:rounded-md group-data-[variant=circle]/avatar:rounded-full aspect-square size-full object-cover", className)}
 	{...restProps}
 />

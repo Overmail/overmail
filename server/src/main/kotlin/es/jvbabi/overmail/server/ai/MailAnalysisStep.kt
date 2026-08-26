@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.ai
 
+import ai.koog.prompt.structure.json.JsonStructure
 import kotlinx.serialization.KSerializer
 
 /**
@@ -57,6 +58,15 @@ class MailAnalysisStep<T>(
      * model is most likely to drift from, and `/no_think` only takes effect at the very top.
      */
     val systemPrompt: String get() = "$SHARED_RULES\n\n$instructions"
+
+    /**
+     * [serializer] as the JSON schema the model is held to, and as the parser for what comes back.
+     *
+     * Generated off the serializer rather than written out by hand, so a field added to an answer
+     * cannot drift from the shape the model was asked for. Built once per step: the steps are
+     * singletons and walking a serializer's descriptor is not per-request work.
+     */
+    val structure: JsonStructure<T> by lazy { JsonStructure.create(serializer = serializer) }
 }
 
 /**
@@ -76,6 +86,12 @@ private val SHARED_RULES = """
     rather than working it out from the addresses, and never take the owner for the other party.
 
     Rules for every answer:
+    - The owner's own address is never evidence about the mail. Whatever domain they receive their
+      mail at -- their school, their employer, their university, a mail provider -- is where this
+      mail was delivered. It is not who wrote it, not who it is about, and not the platform the
+      matter plays out on. A mail sent to someone at a school's address is not a mail from that
+      school. Read the other party off the other side, which the "Direction" line names for you,
+      and read the owner's side only to know which side to leave alone.
     - Use only what the mail itself shows: its text, its signature, its addresses.
     - Never invent, guess or complete information that is not in the mail. When something is not
       there, the answer is null -- an empty field is a correct answer, not a failure.

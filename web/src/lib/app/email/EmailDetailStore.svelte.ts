@@ -14,16 +14,48 @@ export type SpamState = {
 export type SenderAnalysis = {
 	person?: string | null;
 	organisation?: string | null;
+	/** The platform the mail came through -- "GitHub" and the like -- absent for ordinary mail. */
+	via?: string | null;
+	/**
+	 * Handles on what the mail belongs to: `gh:acme/widgets#412`, a newsletter's name, or a bare
+	 * kind word where the mail shows nothing more specific. Empty for mail that belongs to nothing.
+	 */
+	context?: string[] | null;
 	/** Why there is nothing, for the case where the model could not be asked at all. */
 	failure?: string | null;
 };
 
 /**
+ * Who said one line of an agent run. `error` is nobody: it is why there is no answer, and
+ * `thinking` is the channel a model reports its reasoning on -- which on some backends is where
+ * the answer itself turns up, see `answerText` on the server.
+ */
+export type AgentRole = 'system' | 'user' | 'assistant' | 'thinking' | 'error';
+
+/**
+ * One line of what the agent was asked and what it said. The prompts verbatim and the answer
+ * unparsed -- this is a log to read, and for now it is only here to be read.
+ */
+export type AgentMessage = {
+	step: string;
+	/** 1 for the first ask, 2 for the one carrying a complaint about the first answer. */
+	attempt: number;
+	role: AgentRole;
+	text: string;
+	/** What the request cost, on the answer that came back. */
+	input_tokens?: number | null;
+	output_tokens?: number | null;
+};
+
+/**
  * What the socket sends, told apart by `type`: the mail and its state on opening and on every
- * change, the agent's reading of it once, whenever it is done.
+ * change, and an agent run as it happens once one was asked for -- a start, a line per thing said,
+ * and the reading it ended with.
  */
 type DetailEvent =
 	| { type: 'mail'; mail: Mail; spam: SpamState }
+	| { type: 'agent_started' }
+	| ({ type: 'agent_message' } & AgentMessage)
 	| ({ type: 'sender_analysis' } & SenderAnalysis);
 
 /**
@@ -40,8 +72,9 @@ const RECONNECT_DELAYS = [1_000, 2_000, 5_000, 10_000];
  *
  * The headers and the state come over a socket: a mail is filed, archived or caught by a filter
  * while somebody is reading it, and every one of those is a row another screen may write. What the
- * agent reads out of the mail comes over the same socket, once, whenever the model is done. The
- * body comes over its own request and is asked for once -- it is big and it does not change.
+ * agent reads out of the mail comes over the same socket, but only once somebody asked for it with
+ * [analyse] -- opening a mail is not the same as wanting a model run over it. The body comes over
+ * its own request and is asked for once: it is big and it does not change.
  */
 export class EmailDetailStore {
 	readonly #id: string;
@@ -64,10 +97,19 @@ export class EmailDetailStore {
 	status = $state<DetailStatus>('connecting');
 
 	/**
-	 * What the agent read as the sender, null while it is still reading. One answer per open
-	 * screen: nothing about it changes while the mail is being read.
+	 * What the agent read as the sender, null until a run has finished one. One answer per run, and
+	 * a run happens when, and only when, [analyse] is called.
 	 */
 	sender = $state<SenderAnalysis | null>(null);
+
+	/**
+	 * Everything the agent was asked and everything it answered on the current run, oldest first.
+	 * Emptied when a run starts, so it is one run's log rather than a pile of them.
+	 */
+	log = $state<AgentMessage[]>([]);
+
+	/** Whether a run is in flight, which is what a rerun has to wait for. */
+	analysing = $state(false);
 
 	constructor(id: string) {
 		this.#id = id;
@@ -92,10 +134,25 @@ export class EmailDetailStore {
 		socket?.close();
 	}
 
+	/**
+	 * Asks the agent to read the mail, from the top, whether or not it has read it before.
+	 *
+	 * Does nothing while the socket is down: the ask is not queued, because a run is something
+	 * somebody pressed a button for and starting one minutes later off a reconnect is not what they
+	 * pressed it for. The button comes back with the socket.
+	 */
+	analyse(): void {
+		if (this.#socket?.readyState !== WebSocket.OPEN) return;
+
+		this.#socket.send(JSON.stringify({ type: 'analyse' }));
+	}
+
 	#connect(): void {
-		// A reconnect asks the agent again: its answer rides on the socket, and a socket that
-		// dropped before it arrived would otherwise leave the screen waiting forever.
-		this.sender = null;
+		// Whatever was running died with the socket, and nothing on the new one picks it up: a run
+		// is asked for, so a screen that thought one was in flight has to stop waiting for it. What
+		// a finished run said is kept -- it is still what the agent made of this mail, and a
+		// dropped connection is no reason to blank it.
+		this.analysing = false;
 
 		const socket = new WebSocket(socketUrl(this.#id));
 		this.#socket = socket;
@@ -113,8 +170,18 @@ export class EmailDetailStore {
 			if (detail.type === 'mail') {
 				this.mail = detail.mail;
 				this.spam = detail.spam;
+			} else if (detail.type === 'agent_started') {
+				// A run that starts replaces the one before it, log and reading both: what the
+				// last one made of the mail is not what this one is going to make of it.
+				this.log = [];
+				this.sender = null;
+				this.analysing = true;
+			} else if (detail.type === 'agent_message') {
+				this.log.push(detail);
 			} else {
+				// The reading is also what ends the run, see the socket.
 				this.sender = detail;
+				this.analysing = false;
 			}
 
 			this.status = 'live';

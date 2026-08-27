@@ -20,9 +20,11 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.lowerCase
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
 import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
+import org.jetbrains.exposed.v1.r2dbc.update
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -110,11 +112,12 @@ class ThreadRepositoryImpl(
 
     override suspend fun create(user: User, title: String, createdByAgent: Boolean): MailThread {
         val createdAt = Clock.System.now()
+        val name = title.trim().take(TITLE_LENGTH)
 
         return database.query {
             val id = Threads.insertAndGetId {
                 it[Threads.user] = user.id
-                it[Threads.title] = title.trim().take(255)
+                it[Threads.title] = name
                 it[Threads.createdAt] = createdAt
                 it[Threads.createdByAgent] = createdByAgent
             }.value
@@ -122,10 +125,84 @@ class ThreadRepositoryImpl(
             MailThread(
                 id = id,
                 user = user,
-                title = title.trim().take(255),
+                title = name,
+                identifier = null,
                 createdAt = createdAt,
                 createdByAgent = createdByAgent,
             )
+        }
+    }
+
+    override suspend fun findOrCreateByIdentifier(
+        user: User,
+        identifier: String,
+        title: String,
+        createdByAgent: Boolean,
+    ): MailThread {
+        val matter = identifier.trim().take(IDENTIFIER_LENGTH)
+        val name = title.trim().take(TITLE_LENGTH)
+
+        return database.query {
+            // Read and written in the one transaction, so two mails carrying the same number being
+            // read at the same moment cannot both decide the thread is missing. The unique index on
+            // (user, identifier) is what makes that a lost insert rather than two half threads
+            // either way; this is what keeps it from being an exception on the ordinary second mail.
+            val existing = Threads
+                .selectAll()
+                .where(
+                    (Threads.user eq user.id) and
+                        (Threads.identifier.lowerCase() eq matter.lowercase())
+                )
+                .firstRowOrNull()
+
+            if (existing != null) return@query existing.toMailThread(user)
+
+            val createdAt = Clock.System.now()
+            val id = Threads.insertAndGetId {
+                it[Threads.user] = user.id
+                it[Threads.title] = name
+                it[Threads.identifier] = matter
+                it[Threads.createdAt] = createdAt
+                it[Threads.createdByAgent] = createdByAgent
+            }.value
+
+            MailThread(
+                id = id,
+                user = user,
+                title = name,
+                identifier = matter,
+                createdAt = createdAt,
+                createdByAgent = createdByAgent,
+            )
+        }
+    }
+
+    override suspend fun findByIdentifier(user: User, identifier: String): MailThread? {
+        val matter = identifier.trim()
+        if (matter.isEmpty()) return null
+
+        return database.query {
+            Threads
+                .selectAll()
+                .where(
+                    (Threads.user eq user.id) and
+                        (Threads.identifier.lowerCase() eq matter.lowercase())
+                )
+                .firstRowOrNull()
+                ?.toMailThread(user)
+        }
+    }
+
+    override suspend fun rename(thread: MailThread, title: String): MailThread? {
+        val name = title.trim().take(TITLE_LENGTH)
+        if (name.isEmpty()) return null
+
+        return database.query {
+            val renamed = Threads.update({ Threads.id eq thread.id }) {
+                it[Threads.title] = name
+            }
+
+            if (renamed == 0) null else thread.copy(title = name)
         }
     }
 
@@ -162,3 +239,9 @@ class ThreadRepositoryImpl(
         }
     }
 }
+
+/** What the column takes, so a title cut here is cut the same way it is stored. */
+private const val TITLE_LENGTH = 255
+
+/** The same for an identifier: longer than this is not one, see `Threads.identifier`. */
+private const val IDENTIFIER_LENGTH = 128

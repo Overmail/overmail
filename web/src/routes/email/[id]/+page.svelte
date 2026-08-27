@@ -7,6 +7,32 @@
         hour: '2-digit',
         minute: '2-digit'
     });
+
+    /**
+     * What the agent's ways into an account are called on screen. Its own map rather than the wire
+     * word: the schema is written for a model and the screen is read by a person.
+     */
+    const MAGIC_KINDS: Record<string, string> = {
+        code: 'Code',
+        link: 'Anmeldelink'
+    };
+
+    /**
+     * The same for the kind of thing an identifier identifies -- what a matter is called on screen.
+     * Two of them land on the same word on purpose: a reader looking at "Ticket INC0043221" does not
+     * care whether the platform calls it an issue or a case.
+     */
+    const IDENTIFIER_KINDS: Record<string, string> = {
+        invoice: 'Rechnung',
+        order: 'Bestellung',
+        booking: 'Buchung',
+        shipment: 'Sendung',
+        ticket: 'Ticket',
+        transaction: 'Zahlung',
+        issue: 'Ticket',
+        conversation: 'Unterhaltung',
+        other: 'Vorgang'
+    };
 </script>
 
 <script lang="ts">
@@ -41,6 +67,89 @@
     const mail = $derived(store.mail);
     const spam = $derived(store.spam);
     const sender = $derived(store.sender);
+    const magic = $derived(store.magic);
+    const topic = $derived(store.topic);
+    const revision = $derived(store.revision);
+
+    /**
+     * What the last run changed about the mailbox, and a note where it changed nothing.
+     *
+     * The changes are shown even when the step was cut off: the tools change things as they are
+     * called, so what it got round to doing stands, and a reader who sees a tag move deserves to
+     * find it here rather than to wonder.
+     */
+    const revisionReading = $derived.by(() => {
+        if (!revision) return null;
+
+        const changes = revision.changes ?? [];
+
+        if (revision.failure) {
+            return {changes, note: "Abgebrochen — was schon geändert wurde, bleibt."};
+        }
+        if (revision.ran === false) {
+            return {changes, note: "Nichts zu vergleichen: keine Tags und keine Nummer."};
+        }
+        if (revision.proposals_filed_as_proposed) {
+            return {changes, note: "Vorschläge unverändert übernommen — nicht mit dem Postfach abgeglichen."};
+        }
+
+        return {changes, note: changes.length ? null : (revision.said ?? "Nichts geändert.")};
+    });
+
+    /**
+     * What the mail is filed under, with the reason it was filed for on hover.
+     *
+     * Read off the mail rather than off the run: the reason is stored with the filing, so it is
+     * still there tomorrow and it is the reason that actually applies -- the agent may well have
+     * filed a label the mailbox already had instead of the one it first thought of. A tag a reader
+     * attached themselves has no reason, and needs none.
+     */
+    const mailTags = $derived(
+        (mail?.tags ?? []).map((tag) => ({
+            name: tag.name,
+            byAgent: tag.by_agent ?? false,
+            why: tag.reason ?? undefined,
+        })),
+    );
+
+    /**
+     * What the last run proposed but has not filed, where any of it is still not on the mail.
+     *
+     * Normally empty: the revision step files what it agrees with, under the mailbox's own words. A
+     * proposal that shows up here is one it dropped or renamed, which is worth seeing -- it is the
+     * one place the two steps visibly disagree.
+     */
+    const droppedProposals = $derived(
+        (topic?.tags ?? []).filter(
+            (proposal) =>
+                !mailTags.some((tag) => tag.name.toLowerCase() === proposal.tag.toLowerCase()),
+        ),
+    );
+
+    /**
+     * The matter this mail belongs to as the agent read it: the identifier and what kind of thing it
+     * identifies. Null until a run has finished the step, and null for the mail that carries none --
+     * which is most of it.
+     */
+    const identifierReading = $derived.by(() => {
+        if (!topic) return null;
+
+        if (topic.failure) return {what: null, note: "Der Agent konnte die Mail nicht lesen."};
+        if (!topic.identifier) return {what: null, note: "Keine Nummer, die etwas eindeutig macht."};
+
+        const kind = topic.identifier_kind ? IDENTIFIER_KINDS[topic.identifier_kind] : undefined;
+
+        return {
+            what: kind ? `${kind} ${topic.identifier}` : topic.identifier,
+            // A matter gets its stack from the second mail about it, not from the first: a stack of
+            // one mail is a second listing of that mail. Said out loud, because "Vorgang: Rechnung
+            // R00123" next to "Thread: In keinem Thread" otherwise reads as something gone wrong.
+            note:
+                topic.matter === "noted"
+                    ? "Erste Mail dazu — ein Stapel entsteht ab der zweiten."
+                    : null,
+        };
+    });
 
     const cardSender = $derived(
         mail && {
@@ -82,6 +191,35 @@
             // A platform with nobody named in front of it is still a reading, so the note is only
             // for the case where there is neither.
             note: names || sender.via ? null : "Kein Name in der Mail."
+        };
+    });
+
+    /**
+     * What the mail lets the reader into, in the same three-slot shape as the sender reading: what
+     * it is and who it belongs to, until when, and a note for the runs that found nothing.
+     *
+     * Nothing to accept here, unlike the tags the agent used to offer: the row is written the
+     * moment the agent reads it, so this only says what landed in the table.
+     */
+    const magicReading = $derived.by(() => {
+        if (!magic) return null;
+
+        if (magic.failure) {
+            return {what: null, validUntil: null, note: "Der Agent konnte die Mail nicht lesen."};
+        }
+
+        const kinds = (magic.kinds ?? []).map((kind) => MAGIC_KINDS[kind] ?? kind);
+
+        // A provider with nothing to use it with is not a way in, and the server does not send one
+        // -- so the kinds alone decide whether there is anything to show.
+        if (!kinds.length) {
+            return {what: null, validUntil: null, note: "Kein Code und kein Anmeldelink."};
+        }
+
+        return {
+            what: magic.provider ? `${kinds.join(" · ")} für ${magic.provider}` : kinds.join(" · "),
+            validUntil: magic.valid_until ?? null,
+            note: null
         };
     });
 
@@ -169,7 +307,7 @@
                         cc={mail.cc.map(toCardParticipant)}
                         bcc={mail.bcc.map(toCardParticipant)}
                         subject={mail.subject}
-                        tags={mail.tags.map((tag) => tag.name)}
+                        tags={mail.tags.map((tag) => ({name: tag.name, byAgent: tag.by_agent}))}
                         body={store.body}
                         class="w-full shadow-none ring-1 ring-border"
                 />
@@ -191,12 +329,47 @@
                         {/if}
                     </dd>
 
+                    <!-- What the mail is filed under. Chips rather than a line of text, because
+                         each one carries the agent's reason on hover where the agent put it there --
+                         a tag a reader can check is a tag they can disagree with. -->
                     <dt class="text-muted-foreground">Tags</dt>
                     <dd>
-                        {#if mail.tags.length}
-                            {mail.tags.map((tag) => tag.name).join(", ")}
-                        {:else}
+                        {#if mailTags.length || droppedProposals.length}
+                            <div class="flex flex-row flex-wrap items-center gap-1">
+                                {#each mailTags as tag (tag.name)}
+                                    <Badge variant="secondary" title={tag.why}>{tag.name}</Badge>
+                                {/each}
+                                <!-- Outlined and struck through: proposed by the reading step and
+                                     not filed by the one that checked it against the mailbox. -->
+                                {#each droppedProposals as proposal (proposal.tag)}
+                                    <Badge
+                                            variant="outline"
+                                            class="text-muted-foreground line-through"
+                                            title={`Vorgeschlagen, nicht übernommen: ${proposal.reason}`}
+                                    >{proposal.tag}</Badge>
+                                {/each}
+                            </div>
+                        {:else if topic}
                             <span class="text-muted-foreground">Keine</span>
+                        {:else}
+                            <span class="text-muted-foreground">{agentNote}</span>
+                        {/if}
+                    </dd>
+
+                    <!-- The number the matter goes by, where the mail carries one. Its own row next
+                         to the thread above: the thread is where the mail landed, this is what put
+                         it there. -->
+                    <dt class="text-muted-foreground">Vorgang</dt>
+                    <dd>
+                        {#if identifierReading}
+                            {#if identifierReading.what}
+                                <span class="font-mono">{identifierReading.what}</span>
+                            {/if}
+                            {#if identifierReading.note}
+                                <span class="text-muted-foreground">{identifierReading.note}</span>
+                            {/if}
+                        {:else}
+                            <span class="text-muted-foreground">{agentNote}</span>
                         {/if}
                     </dd>
 
@@ -219,6 +392,29 @@
                         {/if}
                     </dd>
 
+                    <!-- What the mail is good for, where it is one of those mails that exist to
+                         let you in somewhere. Stated rather than offered: the server writes the row
+                         as it reads it, because a code in a mail is a fact about the mail and not
+                         an opinion about it. -->
+                    <dt class="text-muted-foreground">Zugang</dt>
+                    <dd>
+                        {#if magicReading}
+                            {#if magicReading.what}{magicReading.what}{/if}
+                            <!-- Only where the mail said so itself: most of these never do, and a
+                                 made-up deadline is worse than none. -->
+                            {#if magicReading.validUntil}
+                                <span class="text-muted-foreground">
+                                    bis {SENT_FORMAT.format(new Date(magicReading.validUntil))}
+                                </span>
+                            {/if}
+                            {#if magicReading.note}
+                                <span class="text-muted-foreground">{magicReading.note}</span>
+                            {/if}
+                        {:else}
+                            <span class="text-muted-foreground">{agentNote}</span>
+                        {/if}
+                    </dd>
+
                     <!-- What the mail belongs to, as the agent's own handles on it. Chips rather
                          than a sentence: each one is a thing to match on later, not prose. -->
                     <dt class="text-muted-foreground">Kontext</dt>
@@ -231,6 +427,27 @@
                             </div>
                         {:else if sender}
                             <span class="text-muted-foreground">Nichts Bestimmtes</span>
+                        {:else}
+                            <span class="text-muted-foreground">{agentNote}</span>
+                        {/if}
+                    </dd>
+
+                    <!-- What the agent changed after looking at the mail that came before this
+                         one. Its own row because it is the only thing here that is not about this
+                         mail alone: the lines can just as well be about a mail from March. -->
+                    <dt class="text-muted-foreground">Revision</dt>
+                    <dd>
+                        {#if revisionReading}
+                            {#if revisionReading.changes.length}
+                                <ul class="flex flex-col gap-1">
+                                    {#each revisionReading.changes as change (change)}
+                                        <li>{change}</li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                            {#if revisionReading.note}
+                                <span class="text-muted-foreground">{revisionReading.note}</span>
+                            {/if}
                         {:else}
                             <span class="text-muted-foreground">{agentNote}</span>
                         {/if}
@@ -264,7 +481,7 @@
                 <AgentLog
                         log={store.log}
                         analysing={store.analysing}
-                        onStart={() => store.analyse()}
+                        onStart={() => store.readMail()}
                 />
             </div>
         </div>

@@ -68,6 +68,20 @@ data class MailContext(
     val recipients: List<MailParticipant>,
     val subject: String,
     val body: String,
+    /**
+     * The links the mail carries, whole and numbered from 1 in the order they appear, see
+     * [mailLinks]. Empty for the mail that carries none, which is most of it.
+     *
+     * Beside the body rather than in it, because the body has had its links cut down to their hosts
+     * -- see [readableBody], where that is what makes a newsletter affordable at all. A step that
+     * only reads where a mail comes from wants the host and nothing more; a step that has to hand a
+     * sign-in link back needs the thing itself, and a link is only a way in while it is whole.
+     *
+     * Handed to every step like the rest of the context, and cheap for the mail that has one or two
+     * links. The step that has no use for them ignores them, as it ignores the To line of a mail
+     * about nothing.
+     */
+    val links: List<String> = emptyList(),
 ) {
     /** The mail as one user message: the envelope first, so the model reads it before the prose. */
     fun asMessage(): String = text {
@@ -82,11 +96,28 @@ data class MailContext(
         textWithNewLine("Subject: ${subject.ifBlank { NO_SUBJECT }}")
         textWithNewLine("")
         textWithNewLine(body.ifBlank { NO_BODY })
+
+        // After the body, not before it: this is an appendix to the mail rather than part of what
+        // it says, and a model that reads it first reads a page of URLs as the mail.
+        if (links.isNotEmpty()) {
+            textWithNewLine("")
+            textWithNewLine(LINKS_HEADING)
+            links.forEachIndexed { index, link -> textWithNewLine("[${index + 1}] $link") }
+        }
     }
 }
 
 /** What stands where the subject would: a mail without one is filed all the same. */
 const val NO_SUBJECT = "(none -- this mail carries no subject line)"
+
+/**
+ * What introduces the numbered links. It says where they came from and that they are the same ones,
+ * because in the body above they stand as bare hosts -- a model told nothing reads the list as a
+ * second set of links the mail did not have.
+ */
+private const val LINKS_HEADING =
+    "The links of this mail, whole and numbered, in the order they appear above (in the text above " +
+        "each of them stands as its host only):"
 
 /** What stands where the text would, for a mail that is only an envelope. */
 private const val NO_BODY = "(none -- this mail carries no text)"

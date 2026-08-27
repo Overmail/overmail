@@ -4,6 +4,23 @@
         name?: string;
         address: string;
     };
+
+    /** One tag the mail is filed under, and who filed it. */
+    export type EmailCardTag = {
+        name: string;
+        /** The agent hung it on the mail rather than the reader; those are marked, see below. */
+        byAgent?: boolean;
+    };
+
+    /**
+     * The colour an agent's tag carries.
+     *
+     * Same lightness and chroma as the badges in the mail list, see `tagColor`, so the two read as
+     * one palette -- but a fixed hue rather than one hashed from the name: what it says is who filed
+     * the tag, not which tag it is. Mixed into the surface rather than filled with, for the same
+     * reason as there: the theme is greyscale, and a flat fill would be unreadable in one of them.
+     */
+    const AGENT_TAG_COLOR = "oklch(0.68 0.14 250)";
 </script>
 
 <script lang="ts">
@@ -34,7 +51,7 @@
         cc?: EmailCardParticipant[];
         bcc?: EmailCardParticipant[];
         subject: string;
-        tags?: string[];
+        tags?: EmailCardTag[];
         /** The text part, or the HTML part flattened. Absent while the body's own request is still
             out; the card then shows its shape. */
         body?: string;
@@ -174,8 +191,17 @@ img { max-width: 100%; height: auto; }
 
     {#if tags.length}
         <div class="px-8 pt-3 flex flex-row flex-wrap items-center gap-1">
-            {#each tags as tag (tag)}
-                <span class="rounded-sm bg-muted px-2 py-0.5 text-sm text-muted-foreground">{tag}</span>
+            {#each tags as tag (tag.name)}
+                <span
+                        class={cn(
+                            "rounded-sm px-2 py-0.5 text-sm",
+                            tag.byAgent
+                                ? "bg-(--agent-tag)/10 text-(--agent-tag)"
+                                : "bg-muted text-muted-foreground",
+                        )}
+                        style={tag.byAgent ? `--agent-tag: ${AGENT_TAG_COLOR}` : undefined}
+                        title={tag.byAgent ? "Vom Agenten angehängt" : undefined}
+                >{tag.name}</span>
             {/each}
         </div>
     {/if}

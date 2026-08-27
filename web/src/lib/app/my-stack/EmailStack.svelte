@@ -1,5 +1,5 @@
 <script module lang="ts">
-    import type {EmailCardParticipant} from "$lib/app/my-stack/EmailCard.svelte";
+    import type {EmailCardParticipant, EmailCardTag} from "$lib/app/my-stack/EmailCard.svelte";
     import type {EmailClassification} from "$lib/app/my-stack/classification";
 
     /** One mail in the stack; `id` keys the `#each`, so it has to be stable across loads. */
@@ -15,7 +15,7 @@
         body?: string;
         /** The mail's HTML part, see `EmailCard`. */
         html?: string;
-        tags?: string[];
+        tags?: EmailCardTag[];
         /** Absent as long as the mail is still waiting for a decision. */
         classification?: EmailClassification;
     };

@@ -59,7 +59,7 @@
     function startTagging() {
         if (!stack.top) return;
 
-        draftTags = [...stack.top.tags];
+        draftTags = stack.top.tags.map((tag) => tag.name);
         isTagging = true;
     }
 

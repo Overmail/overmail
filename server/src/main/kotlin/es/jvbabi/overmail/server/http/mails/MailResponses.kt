@@ -55,6 +55,21 @@ data class ParticipantResponse(
 data class TagResponse(
     @SerialName("id") val id: String,
     @SerialName("name") val name: String,
+    /**
+     * Whether the agent is what filed the mail under it, as opposed to the reader. About this one
+     * filing and not about the tag: false where the shape carries a tag on its own rather than a
+     * tag on a mail, such as the list of tags a user has.
+     */
+    @SerialName("by_agent") val byAgent: Boolean = false,
+    /**
+     * Why this mail carries it, in the words of whoever filed it. Absent where a reader simply
+     * picked the tag, and absent on the shapes that carry a tag rather than a filing.
+     *
+     * On the wire because it is the answer to the only question a tag raises: a label a reader did
+     * not choose is one they will want to see the grounds for, and those grounds are stored with the
+     * filing rather than worked out again by whoever shows it.
+     */
+    @SerialName("reason") val reason: String? = null,
 )
 
 /** Internal, so a mail has one wire shape whichever channel it goes out on. */
@@ -69,7 +84,14 @@ internal fun MailSummary.toResponse() = MailResponse(
     isRead = isRead,
     isArchived = isArchived,
     thread = thread?.toResponse(),
-    tags = tags.map { TagResponse(id = it.tag.id.toString(), name = it.tag.name) },
+    tags = tags.map {
+        TagResponse(
+            id = it.tag.id.toString(),
+            name = it.tag.name,
+            byAgent = it.createdByAgent,
+            reason = it.reason,
+        )
+    },
 )
 
 private fun MailThreadRef.toResponse() = ThreadResponse(

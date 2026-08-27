@@ -31,6 +31,8 @@
         user: {label: "Mail", tone: "bg-muted/30"},
         thinking: {label: "Gedacht", tone: "bg-muted/30 text-muted-foreground italic"},
         assistant: {label: "Modell", tone: "bg-primary/5 ring-1 ring-primary/20"},
+        tool_call: {label: "Werkzeug", tone: "bg-primary/10 ring-1 ring-primary/20 font-mono"},
+        tool_result: {label: "Antwort", tone: "bg-muted/30 font-mono"},
         error: {label: "Fehler", tone: "bg-destructive/10 text-destructive"}
     };
 

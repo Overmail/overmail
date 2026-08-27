@@ -37,7 +37,14 @@ export type StackEntry = {
 	/** Absent as long as the mail is still waiting for a decision. */
 	classification?: EmailClassification;
 	/** The tags the mail carries, seeded from the listing and edited from here on. */
-	tags: string[];
+	tags: StackTag[];
+};
+
+/** One tag on a mail on the stack: its name, and who filed the mail under it. */
+export type StackTag = {
+	name: string;
+	/** The agent attached it rather than the reader; the card marks those. */
+	byAgent: boolean;
 };
 
 /**
@@ -230,11 +237,13 @@ export class StackStore {
 
 		const before = entry.tags;
 		const id = entry.mail.id;
-		entry.tags = [...tags];
+		// A tag the draft kept keeps who filed it: re-submitting the whole set is not the reader
+		// taking an agent's tag over, and the server leaves such a filing alone as well.
+		entry.tags = tags.map((name) => ({ name, byAgent: wasByAgent(before, name) }));
 
 		void this.#socket
 			.setTags(id, tags)
-			.then((filed) => this.#writeTags(id, filed.map((tag) => tag.name)))
+			.then((filed) => this.#writeTags(id, filed.map(toStackTag)))
 			.catch(() => this.#writeTags(id, before));
 	}
 
@@ -267,7 +276,7 @@ export class StackStore {
 		});
 	}
 
-	#writeTags(id: string, tags: string[]): void {
+	#writeTags(id: string, tags: StackTag[]): void {
 		const entry = this.entries[this.#indexOf(id)];
 		if (entry) entry.tags = tags;
 	}
@@ -319,7 +328,7 @@ export class StackStore {
 
 		// Seeded with the tags the mail already carries, so the card shows what is on it rather
 		// than an empty row that a tag edit would then look like it created.
-		const added = fresh.map((mail) => ({ mail, tags: mail.tags.map((tag) => tag.name) }));
+		const added = fresh.map((mail) => ({ mail, tags: mail.tags.map(toStackTag) }));
 		this.entries = [...this.entries, ...added];
 
 		// An answer the server could not fill means there is nothing older left. Said outright
@@ -384,4 +393,18 @@ export class StackStore {
 
 function shiftSecond(isoTimestamp: string, seconds: number): string {
 	return new Date(Date.parse(isoTimestamp) + seconds * 1000).toISOString();
+}
+
+function toStackTag(tag: MailTag): StackTag {
+	return { name: tag.name, byAgent: tag.by_agent ?? false };
+}
+
+/**
+ * Whether that name was on the mail as an agent's tag before the edit. Matched without regard to
+ * case, as the server matches tag names.
+ */
+function wasByAgent(before: StackTag[], name: string): boolean {
+	const lower = name.toLowerCase();
+
+	return before.some((tag) => tag.byAgent && tag.name.toLowerCase() === lower);
 }

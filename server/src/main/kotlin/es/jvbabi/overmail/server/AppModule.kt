@@ -26,6 +26,10 @@ import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamFilterRepository
 import es.jvbabi.overmail.server.domain.repository.SpamRepository
+import es.jvbabi.overmail.server.domain.repository.MagicEmailRepository
+import es.jvbabi.overmail.server.domain.repository.MagicEmailRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepository
+import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamFilterRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
@@ -111,6 +115,9 @@ private fun Application.configureDependencies() {
         provide<EmailAvatarRepository> { EmailAvatarRepositoryImpl(resolve(), resolve()) }
         provide<SpamFilterRepository> { SpamFilterRepositoryImpl(resolve(), resolve()) }
         provide<SpamRepository> { SpamRepositoryImpl(resolve(), resolve()) }
+        provide<MagicEmailRepository> { MagicEmailRepositoryImpl(resolve(), resolve()) }
+        // No change stream: nothing subscribes to these, they are asked for by identifier.
+        provide<MailIdentifierRepository> { MailIdentifierRepositoryImpl(resolve()) }
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }

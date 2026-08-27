@@ -10,6 +10,8 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.EmailTags
 import es.jvbabi.overmail.server.database.models.EmailThreads
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.MagicEmails
+import es.jvbabi.overmail.server.database.models.MailIdentifiers
 import es.jvbabi.overmail.server.database.models.Tags
 import es.jvbabi.overmail.server.database.models.Threads
 import es.jvbabi.overmail.server.database.models.Users
@@ -41,12 +43,18 @@ class OvermailDatabase(
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(Tags)
             SchemaUtils.create(EmailTags)
-            SchemaUtils.create(Threads)
+            // `identifier` was added to a table earlier runs already created, and `create` alone
+            // would skip it -- same reason as for the mails above.
+            SchemaUtils.createMissingTablesAndColumns(Threads)
             SchemaUtils.create(EmailThreads)
             SchemaUtils.create(Archived)
             SchemaUtils.create(Filters)
             // After the filters: `filter_id` points there.
             SchemaUtils.create(EmailSpam)
+            // Columns added to a table an earlier run already created come in here, `create` alone
+            // would skip them -- same reason as for the mails above. `payload` arrived this way.
+            SchemaUtils.createMissingTablesAndColumns(MagicEmails)
+            SchemaUtils.create(MailIdentifiers)
         }
     }
 

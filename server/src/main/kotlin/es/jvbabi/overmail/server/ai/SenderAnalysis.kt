@@ -55,10 +55,114 @@ data class SenderAnalysis(
 )
 
 /**
+ * A tag a reading proposes, together with why the mail carries it.
+ *
+ * The same pair the tagging step answers with, see [TopicTag], minus the quote: there is nothing to
+ * quote here. A tag off the sender reading is not read out of a sentence -- it is the name the
+ * reading already found, and the reason is what that field of the reading means.
+ */
+data class ProposedTag(val name: String, val reason: String)
+
+/**
+ * The sender reading as tags to file the mail under.
+ *
+ * Where the mail comes from is the one thing about it that a reader looks for by name -- "everything
+ * from the Sparkasse", "everything that came through GitHub" -- and it is exactly what the tagging
+ * step is told to leave alone, because it is read here and reading it twice would only produce two
+ * spellings of it. So it is filed from here.
+ *
+ * Three of the four fields become tags. The organisation and the platform are the ones that group:
+ * a hundred mails share them, which is what a tag is for. The person groups less but is what a
+ * reader asks for most directly, so they get one too.
+ *
+ * [SenderAnalysis.context] becomes a tag too, but cut down first. Its entries are handles, and a
+ * handle names two things at once: the thing mail keeps coming about, and the one instance this mail
+ * is about. `gh:acme/widgets#412` is the repository `acme/widgets` -- which will collect mail for
+ * years and is exactly what a reader wants to file under -- and pull request 412, which will not.
+ * So the instance is cut off and the thing is kept, see [asThingName]. What is left with a number
+ * still in it is not a thing but one occurrence of one, and that belongs to the identifier instead,
+ * see [TopicAnalysis.threadId].
+ */
+fun SenderAnalysis.asTags(): List<ProposedTag> {
+    val proposed = buildList {
+        organisation?.asTagName()?.let {
+            add(ProposedTag(it, "Die Mail kommt von $it."))
+        }
+        via?.asTagName()?.let {
+            add(ProposedTag(it, "Kam über $it."))
+        }
+        // After the two above, so that a person who shares their name with the company they write
+        // for is dropped as the duplicate rather than dropping the company.
+        person?.asTagName()?.let {
+            add(ProposedTag(it, "Geschrieben von $it."))
+        }
+        for (handle in context) {
+            handle.asThingName()?.let { add(ProposedTag(it, "Gehört zu $it.")) }
+        }
+    }
+
+    // Ignoring case, because "GitHub" as the platform and "Github" as the context are one tag and
+    // the tag store would make them one anyway -- with two rows on the mail pointing at it.
+    return proposed.distinctBy { it.name.lowercase() }
+}
+
+/** The field as a tag name, or null where it is nothing a reader would file under. */
+private fun String.asTagName(): String? = trim()
+    .takeIf { it.isNotEmpty() && it.length <= MAX_TAG_LENGTH && it.words() <= MAX_TAG_WORDS }
+
+/**
+ * A handle with the one instance cut off it, leaving the thing that keeps producing mail -- or null
+ * where there was never anything but the instance.
+ *
+ * `gh:acme/widgets#412` is a tag worth having as `acme/widgets`: a repository collects mail for
+ * years, and "everything about that repo" is a question a reader really asks. Pull request 412 is
+ * not that question, and neither is `INC0043221`.
+ *
+ * Four cuts, in this order: the platform prefix a handle carries (`gh:`), the fragment behind a `#`,
+ * a numbered tail (`PROJ-123` is project PROJ), and then whatever punctuation the cuts left hanging.
+ * What survives with a digit still in it is refused: a name with a number in it is an occurrence of
+ * something rather than the something, and there is a field for occurrences.
+ */
+private fun String.asThingName(): String? {
+    val thing = trim()
+        .replace(KIND_PREFIX, "")
+        .substringBefore('#')
+        .replace(NUMBERED_TAIL, "")
+        .trim()
+        .trim('/', '-', '.', ',')
+
+    if (thing.any { it.isDigit() } || thing.any { it in HANDLE_MARKERS }) return null
+
+    return thing.asTagName()
+}
+
+private const val MAX_TAG_LENGTH = 40
+
+/** As the tagging step is held to: past three words it is a description. */
+private const val MAX_TAG_WORDS = 3
+
+/**
+ * Markers that mean what is left is still a handle rather than a name. `/` is not among them: it is
+ * how a repository is written, and `acme/widgets` is one of the better tags a mail can get.
+ */
+private val HANDLE_MARKERS = charArrayOf(':', '#', '@')
+
+/** The platform a handle names itself by: `gh:`, `jira:`. Lowercase, short, and at the front. */
+private val KIND_PREFIX = Regex("""^[a-z][a-z0-9]{1,9}:""")
+
+/** A numbered tail: the `-123` of `PROJ-123`, the `/42` of a path that ends in an issue. */
+private val NUMBERED_TAIL = Regex("""[-/]\d+$""")
+
+private val WHITESPACE = Regex("""\s+""")
+
+private fun String.words(): Int = trim().split(WHITESPACE).count { it.isNotEmpty() }
+
+/**
  * The step that fills it in.
  *
  * First of the analysis steps, and the shape the ones after it follow: one question, one schema,
- * the fast model. What the mail is *about* is a different step's business.
+ * one model. What the mail is *about* belongs to [TOPIC_STEP], which is a judgement rather than a
+ * reading and is treated as one -- what is read here is filed, what is decided there is offered.
  */
 val SENDER_STEP = MailAnalysisStep(
     id = "sender",
@@ -158,7 +262,7 @@ val SENDER_STEP = MailAnalysisStep(
     serializer = SenderAnalysis.serializer(),
     tier = ModelTier.FAST,
     maxOutputTokens = 350,
-    validate = { analysis ->
+    validate = { analysis, _ ->
         // A schema can say "string or null"; it cannot say "not the empty string", how long a list
         // may get, or what shape the strings in it have. A model that misses one of those is worth
         // one more ask with the miss named.

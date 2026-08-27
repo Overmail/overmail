@@ -11,6 +11,7 @@ fun ResultRow.toMailThread(user: User): MailThread = MailThread(
     id = this[Threads.id].value,
     user = user,
     title = this[Threads.title],
+    identifier = this[Threads.identifier],
     createdAt = this[Threads.createdAt],
     createdByAgent = this[Threads.createdByAgent],
 )

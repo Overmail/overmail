@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.mails.mailContent
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.mails.validateRule
 import es.jvbabi.overmail.server.http.threads.threads
+import es.jvbabi.overmail.server.http.webapp.email.emailAgent
 import es.jvbabi.overmail.server.http.webapp.email.emailDetail
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
 import es.jvbabi.overmail.server.http.webapp.mystack.myStack
@@ -103,8 +104,12 @@ internal fun Application.configureRouting() {
                 route("/email-graph") { emailGraph() }
             }
 
-            // One mail as its own screen shows it, live for as long as it is open.
-            route("/webapp/email") { emailDetail() }
+            // One mail as its own screen shows it, live for as long as it is open -- and, on
+            // its own socket, the agent reading that mail when the screen asks it to.
+            route("/webapp/email") {
+                emailDetail()
+                emailAgent()
+            }
 
             // The stack screen's socket, which is the whole channel that screen runs on.
             route("/webapp/my-stack") { myStack() }

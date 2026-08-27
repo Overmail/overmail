@@ -13,6 +13,16 @@ export type MailParticipant = {
 export type MailTag = {
 	id: string;
 	name: string;
+	/**
+	 * Whether the agent filed the mail under it rather than the reader. Absent where the server sends
+	 * a tag on its own rather than a tag on a mail, as the stack's tag list does.
+	 */
+	by_agent?: boolean;
+	/**
+	 * Why this mail carries it, in the words of whoever filed it. Absent where a reader simply picked
+	 * the tag, and on the shapes that carry a tag rather than a filing.
+	 */
+	reason?: string | null;
 };
 
 /** The matter a mail sits in. */

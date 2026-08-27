@@ -50,8 +50,12 @@ class MailAnalysisStep<T>(
      *
      * For what a JSON schema cannot say: that a field is only needed once another one is filled,
      * that a required string must not arrive empty.
+     *
+     * Handed the mail as well as the answer, so a step can hold one against the other -- an
+     * identifier a step claims to have copied out of the mail is checkable, and a model that
+     * invents one is only caught here.
      */
-    val validate: (T) -> String? = { null },
+    val validate: (T, MailContext) -> String? = { _, _ -> null },
 ) {
     /**
      * What the step sends as its system prompt. The shared rules come first: they are the ones a

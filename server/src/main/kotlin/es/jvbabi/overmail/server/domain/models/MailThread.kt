@@ -11,6 +11,12 @@ data class MailThread(
     val id: Uuid,
     val user: User,
     val title: String,
+    /**
+     * The identifier the matter goes by, where it has one, see
+     * [es.jvbabi.overmail.server.database.models.Threads.identifier]. Null for a thread that is
+     * held together by having been picked rather than by a number.
+     */
+    val identifier: String?,
     val createdAt: Instant,
     val createdByAgent: Boolean,
 )

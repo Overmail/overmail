@@ -62,4 +62,43 @@ class ReadableBodyTest {
         assertTrue(head.endsWith("darin."), "head ends with: ${head.takeLast(40)}")
         assertTrue(tail.startsWith("Zeile "), "tail starts with: ${tail.take(40)}")
     }
+
+    @Test
+    fun `keeps the links whole beside the body`() {
+        val links = mailLinks("Anmelden: https://github.com/login/device?code=abc123&t=1")
+
+        assertEquals(listOf("https://github.com/login/device?code=abc123&t=1"), links)
+    }
+
+    @Test
+    fun `lists the same link once, in the order the mail has them`() {
+        val links = mailLinks(
+            """
+                Jetzt anmelden: https://acme.test/in?t=1
+                Falls das nicht geht: https://acme.test/in?t=1
+                Abmelden: https://acme.test/out
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("https://acme.test/in?t=1", "https://acme.test/out"), links)
+    }
+
+    @Test
+    fun `leaves the full stop of the sentence out of the link`() {
+        assertEquals(listOf("https://acme.test/in"), mailLinks("Hier: https://acme.test/in."))
+    }
+
+    @Test
+    fun `stops listing where a mail has stopped carrying links and started listing them`() {
+        val links = mailLinks((1..200).joinToString("\n") { "https://acme.test/$it" })
+
+        assertTrue(links.size <= 30, "listed ${links.size} links")
+        // The first ones, not a sample: the link a reader is let in by stands near the top.
+        assertEquals("https://acme.test/1", links.first())
+    }
+
+    @Test
+    fun `has no links for a mail that carries none`() {
+        assertEquals(emptyList(), mailLinks("Passt dir Mittwoch?"))
+    }
 }

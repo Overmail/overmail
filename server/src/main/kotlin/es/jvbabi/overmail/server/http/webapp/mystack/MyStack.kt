@@ -223,7 +223,9 @@ private suspend fun setTags(
     return StackEvent.MailTags(
         replyTo = command.id,
         mail = command.mail,
-        tags = after?.tags.orEmpty().map { TagResponse(it.tag.id.toString(), it.tag.name) },
+        tags = after?.tags.orEmpty().map {
+            TagResponse(it.tag.id.toString(), it.tag.name, byAgent = it.createdByAgent)
+        },
     )
 }
 

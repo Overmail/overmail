@@ -11,11 +11,21 @@ enum class AgentRole {
     /** The step's instructions, shared rules included -- what went out as the system prompt. */
     SYSTEM,
 
-    /** The mail, and on a second attempt what was wrong with the first answer. */
+    /** The mail, and on a repeat attempt what was wrong with the answer before it. */
     USER,
 
     /** What came back, as text, before anything tried to parse it. */
     ASSISTANT,
+
+    /**
+     * A tool the model asked for, with the arguments it wrote, see `MailToolStep`. Its own role
+     * rather than part of what the model said: it is the model acting rather than answering, and on
+     * a step that changes the mailbox that is the line a reader is looking for.
+     */
+    TOOL_CALL,
+
+    /** What that tool answered, or why it refused. */
+    TOOL_RESULT,
 
     /**
      * What the model thought, where it reports that apart from what it said.
@@ -40,7 +50,10 @@ data class AgentLine(
     /** Which step said it, so a log over several steps reads as several conversations. */
     val step: String,
 
-    /** 1 for the first ask, 2 for the one that carries a complaint about the first answer. */
+    /**
+     * 1 for the first ask, and one more for each ask that carries a complaint about the answer
+     * before it -- see `MAX_ATTEMPTS`, which is where the asking stops.
+     */
     val attempt: Int,
 
     val role: AgentRole,

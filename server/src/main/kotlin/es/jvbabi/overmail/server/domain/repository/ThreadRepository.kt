@@ -28,6 +28,43 @@ interface ThreadRepository {
     suspend fun create(user: User, title: String, createdByAgent: Boolean): MailThread
 
     /**
+     * The user's thread for [identifier], created with [title] where they have none yet.
+     *
+     * The one way a mail joins a matter it was never told about: the identifier is the string every
+     * mail about that matter carries, so the second mail to carry it finds the thread the first one
+     * opened instead of opening its own. Matched without regard to case, like a tag's name -- a
+     * sender writing "re-2024-00123" this time means the invoice it wrote as "RE-2024-00123" last
+     * time.
+     *
+     * The title of the existing thread stands: it may have been sharpened since, by a later mail or
+     * by the reader, and a second mail arriving is no reason to name the matter again.
+     */
+    suspend fun findOrCreateByIdentifier(
+        user: User,
+        identifier: String,
+        title: String,
+        createdByAgent: Boolean,
+    ): MailThread
+
+    /**
+     * The user's thread for [identifier], or null where they have none. Matched without regard to
+     * case, as [findOrCreateByIdentifier] does.
+     *
+     * The read half of that call, for a caller that wants to know whether the matter is already
+     * known without opening a thread for it if it is not.
+     */
+    suspend fun findByIdentifier(user: User, identifier: String): MailThread?
+
+    /**
+     * Renames [thread]. Returns it as it now reads, or null where it is gone.
+     *
+     * Nothing here asks who named it. A thread a reader named is theirs and renaming it is not the
+     * agent's to do -- see the revision desk, which is where that is decided, because it is a rule
+     * about who is acting rather than about what a thread is.
+     */
+    suspend fun rename(thread: MailThread, title: String): MailThread?
+
+    /**
      * Puts the mail into [thread]. Returns null and writes nothing when it already sits there, so a
      * second run cannot overwrite the reason a user gave with the agent's.
      */

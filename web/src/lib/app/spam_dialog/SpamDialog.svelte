@@ -1,5 +1,5 @@
 <script module lang="ts">
-    import type {EmailCardParticipant} from "$lib/app/my-stack/EmailCard.svelte";
+    import type {EmailCardParticipant, EmailCardTag} from "$lib/app/my-stack/EmailCard.svelte";
 
     /**
      * The mail the filter is being written for, in the shape the stack hands its cards -- so a
@@ -15,7 +15,7 @@
         cc?: EmailCardParticipant[];
         bcc?: EmailCardParticipant[];
         subject: string;
-        tags?: string[];
+        tags?: EmailCardTag[];
         /** Absent while the body's own request is still out; the card then shows its shape. */
         body?: string;
         /** The mail's HTML part, see `EmailCard`. */

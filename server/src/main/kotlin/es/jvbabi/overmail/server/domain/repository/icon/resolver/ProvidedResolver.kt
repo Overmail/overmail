@@ -57,13 +57,16 @@ class ProvidedResolver(client: HttpClient): EmailIconResolver(client) {
             "playpartners-noreply@google.com" to "https://svgl.app/library/googleplay.svg",
             "googleplay-noreply@google.com" to "https://svgl.app/library/googleplay.svg",
             "accounts.google.com" to "https://svgl.app/library/google.svg",
+            "noreply-accounts@google.com" to "https://svgl.app/library/google.svg",
             "cloudflare.com" to "https://svgl.app/library/cloudflare.svg",
             "*.cloudflare.com" to "https://svgl.app/library/cloudflare.svg",
             "account.netflix.com" to "https://svgl.app/library/netflix-icon.svg",
             "steampowered.com" to "https://svgl.app/library/steam.svg",
             "mail.instagram.com" to "https://svgl.app/library/instagram-icon.svg",
             "noreply@melious.ai" to "https://cdn.melious.ai/favicon/favicon-96x96.png",
-            "slothbytes@mail.beehiiv.com" to "https://media.beehiiv.com/cdn-cgi/image/fit=scale-down,format=auto,onerror=redirect,quality=80/uploads/publication/logo/785df2cf-6a8b-4daa-b929-7bf60c7f57cb/thumb_sloth_bytes_logo.png"
+            "slothbytes@mail.beehiiv.com" to "https://media.beehiiv.com/cdn-cgi/image/fit=scale-down,format=auto,onerror=redirect,quality=80/uploads/publication/logo/785df2cf-6a8b-4daa-b929-7bf60c7f57cb/thumb_sloth_bytes_logo.png",
+            "mail.baseten.co" to "https://www.baseten.co/brand/mark/svg/Baseten_Symbol-9.svg",
+            "apple.com" to "https://svgl.app/library/apple.svg",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

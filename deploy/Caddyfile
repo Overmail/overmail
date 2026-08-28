@@ -2,6 +2,6 @@
     log
     # Caddy runs as its own werkbank container, so the upstreams are on the host, not on
     # localhost. The path prefix is passed through: the Ktor routes live under /api.
-    reverse_proxy /api* host.docker.internal:8080
-    reverse_proxy * host.docker.internal:5174
+    reverse_proxy /api* host.docker.internal:30137
+    reverse_proxy * host.docker.internal:30138
 }

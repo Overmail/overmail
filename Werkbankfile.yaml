@@ -6,12 +6,12 @@ services:
   - name: api
     modes:
       local:
-        port: 8080
+        port: 30137
 
   - name: web
     modes:
       local:
-        port: 5173
+        port: 30138
 
   # The only http target: Caddy decides what goes to Ktor and what goes to SvelteKit,
   # so the split is the same locally and in a deployed image.

@@ -56,6 +56,19 @@
             : "Nichts zu tun.";
     });
 
+    /**
+     * The mails the agent gave up on, if any.
+     *
+     * Its own line rather than part of the one above, because it is a different kind of news: those
+     * are not waiting, nothing will take them again, and without this the panel would say "nichts zu
+     * tun" with ten mails stuck in the queue.
+     */
+    const failedNote = $derived(
+        agentQueue.failed > 0
+            ? `${agentQueue.failed} ${agentQueue.failed === 1 ? "Mail" : "Mails"} aufgegeben — siehe last_error in der Queue.`
+            : null,
+    );
+
     /** What the last press came to. Said out loud, because "0 neu" is a real and confusing answer. */
     const answerNote = $derived.by(() => {
         const answer = agentQueue.lastAnswer;
@@ -89,6 +102,10 @@
          is doing, and the two ways of giving it something to do. -->
     <div class="flex min-h-0 flex-1 flex-col gap-4 px-5 pb-5">
         <p class="text-muted-foreground text-sm">{queueNote}</p>
+
+        {#if failedNote}
+            <p class="text-destructive text-sm">{failedNote}</p>
+        {/if}
 
         <div class="flex flex-col gap-2">
             <Button variant="secondary" class="justify-start" onclick={() => agentQueue.processNewest()}>

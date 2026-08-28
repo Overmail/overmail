@@ -38,6 +38,15 @@ interface AiQueueRepository {
     suspend fun pendingFor(user: User): Int
 
     /**
+     * How many of [user]'s mails the agent has given up on -- [MAX_QUEUE_ATTEMPTS] failures each.
+     *
+     * Counted apart from [pendingFor] and reported on its own, because otherwise it is the quietest
+     * failure in the system: the rows sit in the queue, nothing will ever take them again, and a
+     * screen counting only what is owed says "nothing to do" while ten mails are stuck.
+     */
+    suspend fun failedFor(user: User): Int
+
+    /**
      * Fires whenever the queue changes, so a worker can wake up and a screen can be told.
      *
      * A signal and not the work list: what is owed is asked for with [next] afterwards, because

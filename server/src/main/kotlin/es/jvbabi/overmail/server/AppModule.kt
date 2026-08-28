@@ -64,6 +64,7 @@ import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -185,10 +186,14 @@ private fun Application.configureDependencies() {
         provide<AiProcessingState> { AiProcessingState() }
 
         provide<AiMailProcessor> {
+            val classifier = resolve<MailClassifier>()
+
             AiMailProcessor(
                 queue = resolve(),
                 emails = resolve(),
-                classifier = resolve(),
+                // The watcher is left off: a mail read off the queue has nobody watching it, and
+                // what the run came to is in the mailbox and in its own record either way.
+                classify = { email, owner, reason -> classifier.classify(email, owner, reason) },
                 state = resolve(),
                 coroutineScope = this@configureDependencies,
             )
@@ -211,6 +216,15 @@ private fun Application.startImporter() {
  */
 private fun Application.startAiProcessor() {
     launch {
-        dependencies.resolve<AiMailProcessor>().start()
+        // Said out loud rather than left to the default handler. A dependency that cannot be
+        // resolved here fails one detached coroutine, and everything else about the server carries
+        // on working -- mail still imports, the queue still fills, and the only symptom is that
+        // nothing ever reads it. That is not a failure anybody would find by looking.
+        try {
+            dependencies.resolve<AiMailProcessor>().start()
+        } catch (cause: Exception) {
+            LoggerFactory.getLogger("AiMailProcessor")
+                .error("AI mail processor could not be started; the queue will not be read", cause)
+        }
     }
 }

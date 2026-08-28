@@ -115,10 +115,11 @@ fun Route.agent() {
                 // which is what tells a screen where things stand rather than leaving it waiting for
                 // the next change -- and on an empty queue the next change is never.
                 queue.changes()
-                    .map { queue.pendingFor(user) }
-                    .combine(state.current) { pending, current ->
+                    .map { queue.pendingFor(user) to queue.failedFor(user) }
+                    .combine(state.current) { (pending, failed), current ->
                         AgentEvent.Queue(
                             pending = pending,
+                            failed = failed,
                             // Only ever this reader's own mail: which mail the agent has open in
                             // somebody else's mailbox is not their business, and "the agent is busy
                             // elsewhere" is not something worth putting on a screen either.
@@ -145,6 +146,12 @@ sealed interface AgentEvent {
     data class Queue(
         /** Mails of this reader still waiting, the one in progress included. */
         @SerialName("pending") val pending: Int,
+        /**
+         * Mails the agent has given up on after failing on them. They are not waiting -- nothing
+         * will take them again -- and they are reported because a queue that drops its failures
+         * quietly is one nobody can tell from a queue that is being read.
+         */
+        @SerialName("failed") val failed: Int = 0,
         /** The mail being read right now, absent while the agent is between mails. */
         @SerialName("current") val current: String? = null,
     ) : AgentEvent

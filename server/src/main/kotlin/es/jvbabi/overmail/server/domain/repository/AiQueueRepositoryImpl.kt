@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.map
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.r2dbc.deleteWhere
 import org.jetbrains.exposed.v1.r2dbc.insertAndGetId
@@ -94,6 +95,19 @@ class AiQueueRepositoryImpl(
                 .where(
                     (ImapAccounts.user eq user.id) and
                         (AiProcessingQueue.attempts less MAX_QUEUE_ATTEMPTS)
+                )
+                .count()
+                .toInt()
+        }
+    }
+
+    override suspend fun failedFor(user: User): Int {
+        return database.query {
+            (AiProcessingQueue innerJoin Emails innerJoin ImapAccounts)
+                .selectAll()
+                .where(
+                    (ImapAccounts.user eq user.id) and
+                        (AiProcessingQueue.attempts greaterEq MAX_QUEUE_ATTEMPTS)
                 )
                 .count()
                 .toInt()

@@ -23,7 +23,7 @@ export type QueuedAnswer = {
 };
 
 type AgentEvent =
-	| { type: 'queue'; pending: number; current?: string | null }
+	| { type: 'queue'; pending: number; failed?: number; current?: string | null }
 	| ({ type: 'queued' } & QueuedAnswer);
 
 /** How long before reopening a socket that dropped, per attempt; the last one repeats. */
@@ -43,6 +43,12 @@ class AgentQueueStore {
 
 	/** The mail the agent has open right now, null while it is between mails. */
 	currentMailId = $state<string | null>(null);
+
+	/**
+	 * Mails the agent gave up on. Not waiting for anything -- nothing will take them again -- and
+	 * shown because a queue that hides its failures reads exactly like one that is being worked off.
+	 */
+	failed = $state(0);
 
 	/** What the last press of a button came to, null until one has been pressed. */
 	lastAnswer = $state<QueuedAnswer | null>(null);
@@ -111,6 +117,7 @@ class AgentQueueStore {
 
 			if (message.type === 'queue') {
 				this.pending = message.pending;
+				this.failed = message.failed ?? 0;
 				this.currentMailId = message.current ?? null;
 			} else {
 				this.lastAnswer = message;

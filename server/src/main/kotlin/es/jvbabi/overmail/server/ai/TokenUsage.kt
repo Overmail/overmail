@@ -1,17 +1,25 @@
 package es.jvbabi.overmail.server.ai
 
-/** What one agent run cost, as the model reported it. Null where the backend does not say. */
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * What one agent run cost, as the model reported it. Null where the backend does not say.
+ *
+ * Serialisable for the same reason [AgentLine] is: it is stored with the run it belongs to.
+ */
+@Serializable
 data class TokenUsage(
-    val input: Int?,
+    @SerialName("input") val input: Int?,
 
     /** Everything the model wrote, thinking included: Ollama counts it in one number. */
-    val output: Int?,
+    @SerialName("output") val output: Int?,
 
     /**
      * Length of the thinking the model returned. In characters, not tokens -- Ollama reports no
      * separate count for it, only the text.
      */
-    val reasoningCharacters: Int?,
+    @SerialName("reasoning_characters") val reasoningCharacters: Int?,
 ) {
     /**
      * Two runs of one step, added up. A step that had to be asked again cost both requests, and

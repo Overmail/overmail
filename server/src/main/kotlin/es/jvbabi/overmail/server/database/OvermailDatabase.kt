@@ -1,6 +1,8 @@
 package es.jvbabi.overmail.server.database
 
+import es.jvbabi.overmail.server.database.models.AiProcessingQueue
 import es.jvbabi.overmail.server.database.models.Archived
+import es.jvbabi.overmail.server.database.models.EmailAiClassifications
 import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailSpam
 import es.jvbabi.overmail.server.database.models.Filters
@@ -12,6 +14,7 @@ import es.jvbabi.overmail.server.database.models.EmailThreads
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.MagicEmails
 import es.jvbabi.overmail.server.database.models.MailIdentifiers
+import es.jvbabi.overmail.server.database.models.Memories
 import es.jvbabi.overmail.server.database.models.Tags
 import es.jvbabi.overmail.server.database.models.Threads
 import es.jvbabi.overmail.server.database.models.Users
@@ -55,6 +58,10 @@ class OvermailDatabase(
             // would skip them -- same reason as for the mails above. `payload` arrived this way.
             SchemaUtils.createMissingTablesAndColumns(MagicEmails)
             SchemaUtils.create(MailIdentifiers)
+            SchemaUtils.create(EmailAiClassifications)
+            // After the mails: `learned_from_id` points there.
+            SchemaUtils.create(Memories)
+            SchemaUtils.create(AiProcessingQueue)
         }
     }
 

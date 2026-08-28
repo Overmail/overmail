@@ -7,6 +7,8 @@ import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
+import es.jvbabi.overmail.server.domain.models.ClassificationReason
+import es.jvbabi.overmail.server.domain.repository.AiQueueRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.io.ByteArrayOutputStream
@@ -16,6 +18,15 @@ class EmailImporter(
     val imapAccount: ImapAccount,
     val emailUserRepository: EmailUserRepository,
     val emailRepository: EmailRepository,
+    /**
+     * Where a freshly imported mail is put in front of the agent.
+     *
+     * The only thing that fills the queue on its own, and it fills it one mail at a time as they
+     * arrive -- see [AiProcessingQueue], where the reason there is no backfill behind it is written
+     * out. A mail that was already in the mailbox before any of this existed is never queued from
+     * here; somebody has to ask for it.
+     */
+    val aiQueueRepository: AiQueueRepository,
     val coroutineScope: CoroutineScope
 ) {
 
@@ -118,7 +129,7 @@ class EmailImporter(
                                 return@forEach
                             }
 
-                            emailRepository.insert(
+                            val imported = emailRepository.insert(
                                 imapAccount = imapAccount,
                                 sender = emailUsers.getValue(fromHeader.address),
                                 senderName = fromHeader.name,
@@ -130,6 +141,12 @@ class EmailImporter(
                                 isRead = Flag.Seen in mail.flags.await(),
                                 recipients = recipients,
                             )
+
+                            // Only what really arrived: `insert` answers null for a mail the mailbox
+                            // already had, and a duplicate must not cost a second run.
+                            if (imported != null) {
+                                aiQueueRepository.enqueue(imported.id, ClassificationReason.AUTOMATIC_INCOMING)
+                            }
 
                             println("Imported: $subject")
                         }

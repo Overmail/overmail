@@ -27,6 +27,7 @@
     import TagInput from "$lib/app/my-stack/TagInput.svelte";
     import type {MailParticipant} from "$lib/repository/MailRepository";
     import {createHotkeys, getIsKeyHeld} from "@tanstack/svelte-hotkeys";
+    import {goto} from "$app/navigation";
     import {cn} from "$lib/utils.js";
     import { ArchiveIcon, ArrowBendDownLeftIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, TrayIcon, WarningIcon } from "phosphor-svelte";
     import { fade } from "svelte/transition";
@@ -84,6 +85,15 @@
         isFiltering = true;
     }
 
+    /**
+     * The mail on top on its own screen. Nothing is decided on the way out, so coming back lands
+     * on the same card -- the stack is rebuilt from the server and the mail is still undecided.
+     */
+    function openTop() {
+        if (!stack.topId) return;
+        void goto(`/email/${stack.topId}`);
+    }
+
     // While a tag or a filter is being written, every stack key is off and only Escape is left:
     // both of them are typed into, and a name that contains an "a" must not archive a mail.
     const whileStackListens = () => ({enabled: !isTagging && !isFiltering});
@@ -93,6 +103,8 @@
         {hotkey: "S", callback: classifySpam, options: whileStackListens},
         {hotkey: "R", callback: () => stack.classify("respond_later"), options: whileStackListens},
         {hotkey: "Space", callback: () => stack.skip(), options: whileStackListens},
+        // Shift is compared strictly, see the '#' binding below, so this does not skip as well.
+        {hotkey: {key: "Space", shift: true}, callback: openTop, options: whileStackListens},
         {hotkey: "Backspace", callback: () => stack.back(), options: whileStackListens},
         // '#' sits on its own key on a German layout and on Shift+3 on a US one, and the matcher
         // compares Shift strictly, so both spellings are bound.

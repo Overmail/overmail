@@ -69,6 +69,22 @@ data class MailContext(
     val subject: String,
     val body: String,
     /**
+     * What the mailbox knows about its owner, as short lines with a handle each -- see
+     * [es.jvbabi.overmail.server.domain.agent.MemoryHandles].
+     *
+     * The summaries only, and only the ones that were true when this mail was sent. That is what
+     * makes them affordable: a mailbox that knows forty things about somebody cannot spend its
+     * context on all of them to read one mail about a parcel, and a degree finished in 2022 has no
+     * business explaining a mail from this week. Whatever is known beyond these lines is fetched by
+     * handle, by the one step that can ask for it.
+     *
+     * Background and not content. A step reads these to understand what the mail is talking about --
+     * that "TU" is the reader's university, that "BeLL" is a project of theirs -- and never as
+     * something the mail says: anything a step claims to have quoted is checked against the mail
+     * itself, which is what keeps that line from being crossed by accident.
+     */
+    val memories: List<String> = emptyList(),
+    /**
      * The links the mail carries, whole and numbered from 1 in the order they appear, see
      * [mailLinks]. Empty for the mail that carries none, which is most of it.
      *
@@ -94,6 +110,15 @@ data class MailContext(
         // rather than left as an empty line: a model handed a blank reads the line below as the
         // subject, or answers that it cannot tell anything about the mail.
         textWithNewLine("Subject: ${subject.ifBlank { NO_SUBJECT }}")
+
+        // Before the mail rather than after it: this is what the mail is read *against*, and a
+        // reader who is told afterwards that the sender is their landlord has already read it wrong.
+        if (memories.isNotEmpty()) {
+            textWithNewLine("")
+            textWithNewLine(MEMORIES_HEADING)
+            memories.forEach { textWithNewLine(it) }
+        }
+
         textWithNewLine("")
         textWithNewLine(body.ifBlank { NO_BODY })
 
@@ -118,6 +143,14 @@ const val NO_SUBJECT = "(none -- this mail carries no subject line)"
 private const val LINKS_HEADING =
     "The links of this mail, whole and numbered, in the order they appear above (in the text above " +
         "each of them stands as its host only):"
+
+/**
+ * What introduces the memories. It says whose they are and, more importantly, what they are not:
+ * background about the owner rather than anything this mail states.
+ */
+private const val MEMORIES_HEADING =
+    "What is known about the mailbox owner, as it stood when this mail was sent. Background only -- " +
+        "none of this is something the mail says, and nothing here may be quoted as if it were:"
 
 /** What stands where the text would, for a mail that is only an envelope. */
 private const val NO_BODY = "(none -- this mail carries no text)"

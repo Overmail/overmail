@@ -87,6 +87,8 @@ class RevisionDeskTest {
         tags: FakeTags,
         threads: FakeThreads,
         matters: FakeMatters = FakeMatters(),
+        memories: FakeMemories = FakeMemories(),
+        handles: MemoryHandles = MemoryHandles(),
     ) = RevisionDesk(
         owner = owner,
         mailId = currentId,
@@ -95,6 +97,8 @@ class RevisionDeskTest {
         tagging = tags,
         threading = threads,
         matters = matters,
+        remembering = memories,
+        memories = handles,
     )
 
     private fun mailbox(

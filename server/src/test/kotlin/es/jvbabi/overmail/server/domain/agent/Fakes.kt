@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.domain.models.MailPage
 import es.jvbabi.overmail.server.domain.models.MailSummary
 import es.jvbabi.overmail.server.domain.models.MailThread
 import es.jvbabi.overmail.server.domain.models.MailThreadEntry
+import es.jvbabi.overmail.server.domain.models.Memory
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
 import es.jvbabi.overmail.server.domain.models.Tag
 import es.jvbabi.overmail.server.domain.models.TagUsage
@@ -16,6 +17,7 @@ import es.jvbabi.overmail.server.domain.models.ThreadOverview
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepository
+import es.jvbabi.overmail.server.domain.repository.MemoryRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
 import es.jvbabi.overmail.server.domain.spam.MailFacts
@@ -199,6 +201,59 @@ internal class FakeMatters : MailIdentifierRepository {
         before: Instant?,
         limit: Int,
     ): List<Uuid> = of.filterValues { it.equals(identifier, ignoreCase = true) }.keys.toList()
+}
+
+/** What the mailbox knows about its reader, as a list that records what was written. */
+internal class FakeMemories : MemoryRepository {
+    val kept = mutableListOf<Memory>()
+
+    override suspend fun coreMemories(user: User, at: Instant?): List<Memory> = kept
+        .filter { it.isCore }
+        .filter { at == null || it.isRelevantAt(at) }
+
+    override suspend fun detailsOf(memoryId: Uuid, at: Instant?): List<Memory> = kept
+        .filter { it.parentId == memoryId }
+        .filter { at == null || it.isRelevantAt(at) }
+
+    override suspend fun remember(
+        user: User,
+        topic: String?,
+        content: String,
+        parentId: Uuid?,
+        relevantFrom: Instant?,
+        relevantTo: Instant?,
+        learnedFromEmailId: Uuid?,
+        createdByAgent: Boolean,
+    ): Memory {
+        val memory = Memory(
+            id = Uuid.random(),
+            userId = user.id,
+            parentId = parentId,
+            topic = topic,
+            content = content,
+            relevantFrom = relevantFrom,
+            relevantTo = relevantTo,
+            learnedFromEmailId = learnedFromEmailId,
+            createdAt = Clock.System.now(),
+            createdByAgent = createdByAgent,
+        )
+        kept += memory
+
+        return memory
+    }
+
+    override suspend fun close(memoryId: Uuid, on: Instant, onlyIfByAgent: Boolean): Memory? {
+        val at = kept.indexOfFirst { it.id == memoryId }
+        if (at < 0) return null
+        if (onlyIfByAgent && !kept[at].createdByAgent) return null
+
+        val closed = kept[at].copy(relevantTo = on)
+        kept[at] = closed
+
+        return closed
+    }
+
+    override suspend fun byId(memoryId: Uuid): Memory? = kept.firstOrNull { it.id == memoryId }
 }
 
 /** The mailbox as a listing. */

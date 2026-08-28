@@ -1,5 +1,8 @@
 package es.jvbabi.overmail.server.ai
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 /**
  * Who said one line of a run.
  *
@@ -7,14 +10,18 @@ package es.jvbabi.overmail.server.ai
  * or answered something unusable twice, is part of the log rather than something that quietly
  * ends it.
  */
+@Serializable
 enum class AgentRole {
     /** The step's instructions, shared rules included -- what went out as the system prompt. */
+    @SerialName("system")
     SYSTEM,
 
     /** The mail, and on a repeat attempt what was wrong with the answer before it. */
+    @SerialName("user")
     USER,
 
     /** What came back, as text, before anything tried to parse it. */
+    @SerialName("assistant")
     ASSISTANT,
 
     /**
@@ -22,9 +29,11 @@ enum class AgentRole {
      * rather than part of what the model said: it is the model acting rather than answering, and on
      * a step that changes the mailbox that is the line a reader is looking for.
      */
+    @SerialName("tool_call")
     TOOL_CALL,
 
     /** What that tool answered, or why it refused. */
+    @SerialName("tool_result")
     TOOL_RESULT,
 
     /**
@@ -34,9 +43,11 @@ enum class AgentRole {
      * hands a thinking model's whole completion back as reasoning and leaves the content empty,
      * and then this is the only place the answer ever appears. See `answerText`.
      */
+    @SerialName("thinking")
     THINKING,
 
     /** Why there is no answer. */
+    @SerialName("error")
     ERROR,
 }
 
@@ -45,23 +56,29 @@ enum class AgentRole {
  *
  * A record of what was actually sent and what actually came back, not a summary of it: a step that
  * answers nonsense is only debuggable if the prompt that produced it can be read back verbatim.
+ *
+ * Serialisable because a run is kept: the whole conversation is stored with the classification it
+ * produced, see [es.jvbabi.overmail.server.domain.models.EmailAiClassification]. The names are
+ * spelled out rather than left to the compiler, because these end up in a column and a field renamed
+ * in here would otherwise quietly stop matching what is already stored.
  */
+@Serializable
 data class AgentLine(
     /** Which step said it, so a log over several steps reads as several conversations. */
-    val step: String,
+    @SerialName("step") val step: String,
 
     /**
      * 1 for the first ask, and one more for each ask that carries a complaint about the answer
      * before it -- see `MAX_ATTEMPTS`, which is where the asking stops.
      */
-    val attempt: Int,
+    @SerialName("attempt") val attempt: Int,
 
-    val role: AgentRole,
+    @SerialName("role") val role: AgentRole,
 
-    val text: String,
+    @SerialName("text") val text: String,
 
     /** What the request cost, on the [AgentRole.ASSISTANT] line that answered it. */
-    val usage: TokenUsage? = null,
+    @SerialName("usage") val usage: TokenUsage? = null,
 )
 
 /**

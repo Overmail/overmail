@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.domain.repository.AiQueueRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
 import es.jvbabi.overmail.server.domain.repository.ImapAccountRepository
@@ -14,6 +15,8 @@ class ImporterManager(
     private val imapAccountRepository: ImapAccountRepository,
     private val emailUserRepository: EmailUserRepository,
     private val emailRepository: EmailRepository,
+    /** Handed on to every importer: what arrives goes in front of the agent. */
+    private val aiQueueRepository: AiQueueRepository,
     private val coroutineScope: CoroutineScope,
 ) {
 
@@ -41,6 +44,7 @@ class ImporterManager(
                         imapAccount = account,
                         emailUserRepository = emailUserRepository,
                         emailRepository = emailRepository,
+                        aiQueueRepository = aiQueueRepository,
                         coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
                     )
 

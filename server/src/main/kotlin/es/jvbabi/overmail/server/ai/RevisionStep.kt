@@ -13,6 +13,9 @@ object RevisionTool {
     const val CREATE_THREAD = "create_thread"
     const val ADD_TO_THREAD = "add_to_thread"
     const val RENAME_THREAD = "rename_thread"
+    const val RECALL = "recall"
+    const val REMEMBER = "remember"
+    const val CLOSE_MEMORY = "close_memory"
 }
 
 private val MAIL_HANDLE = ToolParameterDescriptor(
@@ -33,6 +36,12 @@ private val THREAD_HANDLE = ToolParameterDescriptor(
     type = ToolParameterType.String,
 )
 
+private val MEMORY_HANDLE = ToolParameterDescriptor(
+    name = "memory",
+    description = "One of the things known about the reader, by the handle it was listed under: \"K1\".",
+    type = ToolParameterType.String,
+)
+
 private val REASON = ToolParameterDescriptor(
     name = "reason",
     description = "Why, in one short German sentence. It is stored with the change and shown to " +
@@ -49,10 +58,15 @@ private val REASON = ToolParameterDescriptor(
  * why every one of them takes a reason, and why none of them can touch anything a reader made
  * themselves.
  *
- * Handles rather than ids. A mail is "M1", a thread is "T1", both handed out by whatever listed
- * them, and there are no UUIDs anywhere in this conversation: a model asked to copy thirty-six
- * characters of hexadecimal gets one wrong eventually, and a wrong handle is a tool error while a
- * wrong id could be somebody else's mail.
+ * Handles rather than ids. A mail is "M1", a thread is "T1", a thing known about the reader is "K1",
+ * all handed out by whatever listed them, and there are no UUIDs anywhere in this conversation: a
+ * model asked to copy thirty-six characters of hexadecimal gets one wrong eventually, and a wrong
+ * handle is a tool error while a wrong id could be somebody else's mail.
+ *
+ * The last three are about the reader rather than about the mailbox. They are here because they
+ * serve the same decisions: a mail is filed well or badly depending on whether whoever files it
+ * knows that "TU" is where the reader studies -- and the only moment anybody learns that is while
+ * reading a mail that says so.
  */
 val REVISION_TOOLS: List<ToolDescriptor> = listOf(
     ToolDescriptor(
@@ -138,6 +152,78 @@ val REVISION_TOOLS: List<ToolDescriptor> = listOf(
         description = "Put mails into a thread that already exists. Only into threads that were " +
             "opened by the agent -- a thread a reader made is theirs, and adding to it is refused.",
         requiredParameters = listOf(THREAD_HANDLE, MAIL_HANDLES, REASON),
+    ),
+    ToolDescriptor(
+        name = RevisionTool.RECALL,
+        description = "Ask what else is known about one of the things listed about the reader. The " +
+            "lines you were given are summaries; this answers with the detail behind one of them. " +
+            "Worth calling when the mail turns on something you only half know -- which course, " +
+            "which employer, what the project is -- and not worth calling otherwise. Nothing is " +
+            "changed by asking.",
+        requiredParameters = listOf(MEMORY_HANDLE),
+    ),
+    ToolDescriptor(
+        name = RevisionTool.REMEMBER,
+        description = "Write down something about the reader that this mail taught you and that " +
+            "will still matter for the mail after next: what they study, where they work, a " +
+            "project they are running, a club they are in, a move they are making. Not the " +
+            "contents of this mail -- a parcel arriving, an invoice being due and a newsletter " +
+            "going out teach nothing about anybody. Nothing that is already in the list, and " +
+            "nothing you inferred: only what the mail says.",
+        requiredParameters = listOf(
+            ToolParameterDescriptor(
+                name = "content",
+                description = "The one line, in German, as somebody would say it: \"Studiert " +
+                    "Informatik an der TU Dresden\". Short: it is shown for every mail it covers.",
+                type = ToolParameterType.String,
+            ),
+        ),
+        optionalParameters = listOf(
+            ToolParameterDescriptor(
+                name = "topic",
+                description = "What it is about, in a word or two: \"Studium\", \"Arbeit\", " +
+                    "\"Umzug\". Give it for a new thing; leave it out when adding a detail to one " +
+                    "that is already listed.",
+                type = ToolParameterType.String,
+            ),
+            ToolParameterDescriptor(
+                name = "of",
+                description = "The handle of the thing this is a detail of: \"K1\". Leave it out " +
+                    "for something new. A detail is only ever read when somebody asks about its " +
+                    "topic, so this is where everything belongs that is worth knowing but not " +
+                    "worth reading before every mail.",
+                type = ToolParameterType.String,
+            ),
+            ToolParameterDescriptor(
+                name = "from",
+                description = "The day it started, as YYYY-MM-DD, YYYY-MM or YYYY -- and only " +
+                    "where the mail says. Leave it out otherwise: an invented beginning makes the " +
+                    "memory go missing for exactly the mail it would have explained.",
+                type = ToolParameterType.String,
+            ),
+            ToolParameterDescriptor(
+                name = "to",
+                description = "The day it stopped, same format, for something already over when " +
+                    "you learned of it. Leave it out for anything still going on.",
+                type = ToolParameterType.String,
+            ),
+        ),
+    ),
+    ToolDescriptor(
+        name = RevisionTool.CLOSE_MEMORY,
+        description = "End something known about the reader as of a day, where this mail says it is " +
+            "over -- a degree finished, a job left, a flat given up. It is kept rather than " +
+            "deleted: the mail of its own years is still read against it, it just stops being " +
+            "shown for mail after that day. Only for what the agent wrote itself; what the reader " +
+            "wrote about their own life is theirs.",
+        requiredParameters = listOf(
+            MEMORY_HANDLE,
+            ToolParameterDescriptor(
+                name = "on",
+                description = "The day it ended, as YYYY-MM-DD, YYYY-MM or YYYY.",
+                type = ToolParameterType.String,
+            ),
+        ),
     ),
     ToolDescriptor(
         name = RevisionTool.RENAME_THREAD,
@@ -228,13 +314,27 @@ val REVISION_STEP = MailToolStep(
            conversation a platform numbers -- belong in one thread. Mails that are merely the same
            kind of thing do not: "Newsletter" is not a matter, and a thread of everything tagged
            "Rechnung" helps nobody.
-        5. Rename a thread whose name is too general for what is in it. A thread called "Bewerbung"
+        5. Learn about the reader, where this mail actually teaches something. You were given what
+           the mailbox knows about them -- one line each, only the things that were true when this
+           mail was sent. Two things to do with it:
+           - recall the detail behind a line when the mail turns on it and the summary is not
+             enough: which course, which employer, what the project is. Do not guess at those.
+           - remember what the mail teaches that will still matter for the mail after next: a
+             course started, a job taken, a project running, a move being made, a club joined. Give
+             it a beginning only where the mail says one. Something already in the list is not
+             remembered again, and something over is closed rather than left standing.
+           What is not a memory: what this one mail is about. A parcel arriving, an invoice falling
+           due, a newsletter going out -- those are the mail, not the reader. Nor is anything you
+           worked out rather than read.
+
+        6. Rename a thread whose name is too general for what is in it. A thread called "Bewerbung"
            that only ever holds the one application is better called "Bewerbung Musterfirma". Only
            threads the agent opened, and only where the name is genuinely wrong for the contents --
            not to make it prettier.
 
         What you may not do: touch anything the reader made themselves. Their tags stay on their
-        mails, their threads keep their names and their contents. The tools refuse it anyway, and
+        mails, their threads keep their names and their contents, and what they wrote about their own
+        life is not yours to end. The tools refuse it anyway, and
         every listing tells you which is which -- "(agent)" is yours, "(user)" is theirs.
 
         Rules for the whole job:

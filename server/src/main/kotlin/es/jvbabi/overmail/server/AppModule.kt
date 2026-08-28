@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server
 
 import es.jvbabi.overmail.server.ai.MailAnalyst
+import es.jvbabi.overmail.server.domain.agent.MailClassifier
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.installSessionAuth
@@ -26,10 +27,16 @@ import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamFilterRepository
 import es.jvbabi.overmail.server.domain.repository.SpamRepository
+import es.jvbabi.overmail.server.domain.repository.AiQueueRepository
+import es.jvbabi.overmail.server.domain.repository.AiQueueRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.EmailAiClassificationRepository
+import es.jvbabi.overmail.server.domain.repository.EmailAiClassificationRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.MagicEmailRepository
 import es.jvbabi.overmail.server.domain.repository.MagicEmailRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepository
 import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepositoryImpl
+import es.jvbabi.overmail.server.domain.repository.MemoryRepository
+import es.jvbabi.overmail.server.domain.repository.MemoryRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.SpamFilterRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
@@ -42,6 +49,8 @@ import es.jvbabi.overmail.server.domain.spam.SpamRuleMatcher
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.http.installStatusPages
 import es.jvbabi.overmail.server.jobs.avatar.AvatarRefresher
+import es.jvbabi.overmail.server.jobs.ai.AiMailProcessor
+import es.jvbabi.overmail.server.jobs.ai.AiProcessingState
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
@@ -73,6 +82,7 @@ fun Application.overmail() {
     installSessionAuth()
     configureRouting()
     startImporter()
+    startAiProcessor()
 }
 
 /**
@@ -118,11 +128,32 @@ private fun Application.configureDependencies() {
         provide<MagicEmailRepository> { MagicEmailRepositoryImpl(resolve(), resolve()) }
         // No change stream: nothing subscribes to these, they are asked for by identifier.
         provide<MailIdentifierRepository> { MailIdentifierRepositoryImpl(resolve()) }
+        // Nor here: a stored run is read by whoever opens the mail, not watched.
+        provide<EmailAiClassificationRepository> { EmailAiClassificationRepositoryImpl(resolve()) }
+        // Nor here: what the mailbox knows about its reader is read when a mail is read.
+        provide<MemoryRepository> { MemoryRepositoryImpl(resolve()) }
+        // This one does watch: the worker wakes on it and the agent panel counts what is left.
+        provide<AiQueueRepository> { AiQueueRepositoryImpl(resolve(), resolve()) }
         // No database of its own: this one only talks to third parties.
         provide<EmailIconRepository> { EmailIconRepositoryImpl() }
         provide<JwtService> { JwtService() }
         // Holds the connection to the model backend, so one per server rather than one per mail.
         provide<MailAnalyst> { MailAnalyst(resolve()) }
+        // One of these per server: it holds no state, it is what every caller that wants a mail read
+        // goes through -- the detail screen's socket, the queue, and whatever asks next.
+        provide<MailClassifier> {
+            MailClassifier(
+                analyst = resolve(),
+                emails = resolve(),
+                tagging = resolve(),
+                threading = resolve(),
+                magic = resolve(),
+                matters = resolve(),
+                remembering = resolve(),
+                classifications = resolve(),
+                config = resolve(),
+            )
+        }
         // Stateless, and the rules it reads come in per request; the coming automatic filing will
         // hold mails against the same one.
         provide<SpamRuleMatcher> { SpamRuleMatcher() }
@@ -144,6 +175,21 @@ private fun Application.configureDependencies() {
                 imapAccountRepository = resolve(),
                 emailUserRepository = resolve(),
                 emailRepository = resolve(),
+                aiQueueRepository = resolve(),
+                coroutineScope = this@configureDependencies,
+            )
+        }
+
+        // The mark on the mail the agent has open. Shared between the worker that moves it and the
+        // socket that reports it, which is why it is provided rather than owned by either.
+        provide<AiProcessingState> { AiProcessingState() }
+
+        provide<AiMailProcessor> {
+            AiMailProcessor(
+                queue = resolve(),
+                emails = resolve(),
+                classifier = resolve(),
+                state = resolve(),
                 coroutineScope = this@configureDependencies,
             )
         }
@@ -153,5 +199,18 @@ private fun Application.configureDependencies() {
 private fun Application.startImporter() {
     launch {
         dependencies.resolve<ImporterManager>().start()
+    }
+}
+
+/**
+ * Starts the walk over the queue.
+ *
+ * Its own start rather than part of the importer's, because the two are independent: the queue is
+ * worked off whether or not any mail is coming in, and mail comes in whether or not the agent is
+ * keeping up.
+ */
+private fun Application.startAiProcessor() {
+    launch {
+        dependencies.resolve<AiMailProcessor>().start()
     }
 }

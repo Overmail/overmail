@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.mails.mailContent
 import es.jvbabi.overmail.server.http.mails.mails
 import es.jvbabi.overmail.server.http.mails.validateRule
 import es.jvbabi.overmail.server.http.threads.threads
+import es.jvbabi.overmail.server.http.webapp.agent.agent
 import es.jvbabi.overmail.server.http.webapp.email.emailAgent
 import es.jvbabi.overmail.server.http.webapp.email.emailDetail
 import es.jvbabi.overmail.server.http.webapp.home.emailGraph
@@ -113,6 +114,10 @@ internal fun Application.configureRouting() {
 
             // The stack screen's socket, which is the whole channel that screen runs on.
             route("/webapp/my-stack") { myStack() }
+
+            // No path of its own beyond the one the socket declares: there is one agent, and what
+            // can be asked of it is what it is doing and what it should do next.
+            route("/webapp") { agent() }
         }
     }
 }

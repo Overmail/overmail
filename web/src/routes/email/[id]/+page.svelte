@@ -47,10 +47,14 @@
     import {EmailDetailStore} from "$lib/app/email/EmailDetailStore.svelte";
     import {avatarStore} from "$lib/app/avatars/AvatarStore.svelte";
     import type {MailParticipant} from "$lib/repository/MailRepository";
+    import {mailIdFromParam, mailPath} from "$lib/app/mails/mailUrl";
+    import {replaceState} from "$app/navigation";
     import {page} from "$app/state";
     import {ArrowLeftIcon, TrayIcon, WarningIcon} from "phosphor-svelte";
 
-    const id = $derived(page.params.id ?? "");
+    // The path may carry the subject in front of the id so a link says which mail it is; only the
+    // id here means anything, everything before it is dropped. See `mailPath`.
+    const id = $derived(mailIdFromParam(page.params.id ?? ""));
 
     // One store per mail: the id is what it watches, so a different id is a different store rather
     // than a store told to look elsewhere.
@@ -239,6 +243,29 @@
 
     /** What the screen is doing, for the one case worth saying out loud. */
     const isStale = $derived(store.status === "offline");
+
+    /**
+     * The mail whose subject the path already carries. Kept out of the effect's reading, so that
+     * writing the path does not have the effect run again on the change it made itself.
+     */
+    let titled: string | null = null;
+
+    /**
+     * Writes the subject in front of the id once the mail is here, so the address says which mail
+     * this is -- in a shared link, in the history, on a tab.
+     *
+     * Here rather than at the links that lead here: the subject is not on the link, it arrives with
+     * the mail. Replaced rather than pushed, and shallow: one mail is one history entry, and a
+     * navigation would tear this screen down and open the socket a second time.
+     */
+    $effect(() => {
+        const subject = mail?.subject;
+        if (!subject || titled === id) return;
+
+        titled = id;
+        const path = mailPath(id, subject);
+        if (path !== page.url.pathname) replaceState(path, page.state);
+    });
 </script>
 
 <header class="flex shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear h-12">

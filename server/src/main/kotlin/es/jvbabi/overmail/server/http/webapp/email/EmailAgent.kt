@@ -1,34 +1,23 @@
 package es.jvbabi.overmail.server.http.webapp.email
 
 import es.jvbabi.overmail.server.ai.AgentLine
+import es.jvbabi.overmail.server.ai.AgentRole
 import es.jvbabi.overmail.server.ai.MAGIC_STEP
-import es.jvbabi.overmail.server.ai.MailAnalyst
-import es.jvbabi.overmail.server.ai.MailContext
-import es.jvbabi.overmail.server.ai.MailDirection
-import es.jvbabi.overmail.server.ai.ProposedTag
 import es.jvbabi.overmail.server.ai.REVISION_STEP
 import es.jvbabi.overmail.server.ai.SENDER_STEP
 import es.jvbabi.overmail.server.ai.TOPIC_STEP
 import es.jvbabi.overmail.server.ai.ThreadKind
-import es.jvbabi.overmail.server.ai.TopicTag
-import es.jvbabi.overmail.server.ai.asTags
-import es.jvbabi.overmail.server.ai.mailLinks
-import es.jvbabi.overmail.server.ai.readableBody
-import es.jvbabi.overmail.server.ai.MailParticipant as AiParticipant
 import es.jvbabi.overmail.server.auth.SESSION_AUTH
+import es.jvbabi.overmail.server.domain.agent.ClassificationWatcher
+import es.jvbabi.overmail.server.domain.agent.MagicOutcome
+import es.jvbabi.overmail.server.domain.agent.MailClassifier
 import es.jvbabi.overmail.server.domain.agent.MatterFiled
-import es.jvbabi.overmail.server.domain.agent.MatterFiling
-import es.jvbabi.overmail.server.domain.agent.RevisionDesk
-import es.jvbabi.overmail.server.domain.agent.TagFiling
-import es.jvbabi.overmail.server.domain.models.Email
-import es.jvbabi.overmail.server.domain.models.MagicEmailKind
+import es.jvbabi.overmail.server.domain.agent.RevisionOutcome
+import es.jvbabi.overmail.server.domain.agent.SenderOutcome
+import es.jvbabi.overmail.server.domain.agent.TopicOutcome
+import es.jvbabi.overmail.server.domain.models.ClassificationReason
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
-import es.jvbabi.overmail.server.domain.repository.MagicEmailRepository
-import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepository
-import es.jvbabi.overmail.server.domain.repository.TagRepository
-import es.jvbabi.overmail.server.domain.repository.ThreadRepository
-import es.jvbabi.overmail.server.domain.spam.toRuleFacts
 import io.ktor.serialization.WebsocketDeserializeException
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
@@ -41,12 +30,12 @@ import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.close
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
-import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 /** `GET /api/webapp/email/{id}/agent` as a websocket. */
@@ -95,6 +84,18 @@ fun Route.emailAgent() {
          * sorted, and a proposal waiting to be accepted is a second inbox. What makes it bearable is
          * that each row says why it is there, in the mail's own words, and comes off in one click.
          *
+         * What the mailbox knows about its reader is read against the mail's own date rather than
+         * against today: a mail from 2022 is read against what was true in 2022, see [Memories].
+         * The summaries go into every step's context, the detail behind them only where the last
+         * step asks for it -- which is what keeps a mailbox that knows forty things about somebody
+         * affordable to read one mail with.
+         *
+         * The whole run is kept, whatever it came to, see [EmailAiClassificationRepository]: every
+         * prompt, every answer, every tool call, what it cost and which models it cost it at. A
+         * mailbox that files itself is only worth trusting if the filing can be read back, and this
+         * is the only thing that answers the question a wrong tag raises. It is written down as
+         * `MANUAL`, because this socket exists exactly when somebody pressed a button.
+         *
          * A mail of somebody else closes the socket like one that does not exist -- which ids are
          * taken is not the caller's business.
          */
@@ -108,11 +109,7 @@ fun Route.emailAgent() {
 
             val dependencies = call.application.dependencies
             val emailRepository = dependencies.resolve<EmailRepository>()
-            val magicEmailRepository = dependencies.resolve<MagicEmailRepository>()
-            val mailIdentifierRepository = dependencies.resolve<MailIdentifierRepository>()
-            val tagRepository = dependencies.resolve<TagRepository>()
-            val threadRepository = dependencies.resolve<ThreadRepository>()
-            val analyst = dependencies.resolve<MailAnalyst>()
+            val classifier = dependencies.resolve<MailClassifier>()
 
             // Read once, and with it the check that the mail is the caller's. A socket that is
             // going to hand a mail to a model reads it here, before anybody is let in, rather than
@@ -125,179 +122,33 @@ fun Route.emailAgent() {
             // Nobody asked, and nobody is going to: whoever would have is gone.
             if (!awaitReadMail()) return@webSocket
 
-            val context = email.asAnalysisContext(user)
-
             // The framing is the socket's own: a run that happens with nobody watching has no use
             // for a start and an end, it just returns.
             sendEvent(EmailAgentEvent.AgentStarted)
 
-            // The lines go out from inside the step rather than after it, which is the whole point
-            // of logging it: a step that hangs on a model that is not answering shows the prompt it
-            // is hanging on. The log is called on this coroutine, so a send that suspends holds the
-            // step up -- which is what keeps the lines in the order they happened.
-            val origin = analyst.run(SENDER_STEP, context) { line -> sendEvent(line.asEvent()) }
-
-            // Filed as well as reported. Where a mail comes from is what a reader looks for by
-            // name -- everything from the Sparkasse, everything that came through GitHub -- and it
-            // is the one thing the tagging step is told not to name, because it is read here. See
-            // `asTags`, which decides which of the fields is a label somebody would file under.
-            val tagFiling = TagFiling(owner = user, tagging = tagRepository)
-
-            // The names as the mailbox spells them rather than as this reading spelled them: filing
-            // goes through the one place that reuses a word the mailbox already has, see [TagFiling].
-            val fromTags = tagFiling.file(mailId, origin.value?.asTags().orEmpty()).map {
-                EmailAgentEvent.FiledTag(tag = it.name, reason = it.reason)
-            }
-
-            // A step that could not be answered is not an error: it comes back with nothing in it
-            // and a `failure` saying why, which goes out the same way an answer would.
-            sendEvent(
-                EmailAgentEvent.Sender(
-                    person = origin.value?.person,
-                    organisation = origin.value?.organisation,
-                    via = origin.value?.via,
-                    context = origin.value?.context.orEmpty(),
-                    tags = fromTags,
-                    failure = origin.failure,
-                )
-            )
-
-            val magic = analyst.run(MAGIC_STEP, context) { line -> sendEvent(line.asEvent()) }
-
-            val reading = magic.value
-
-            // Both flags can be true, and on these mails usually are: the code is written out and
-            // a link beside it carries the same code. That is two rows, one per kind, which is what
-            // the table is shaped for -- each with the thing itself beside it, because a row that
-            // cannot say how to get in sends the reader back into the mailbox it saved them from.
+            // Everything the run does is the classifier's; everything this socket does is turn what
+            // it reports into frames. Which is the point of the split: the queue runs exactly the
+            // same four steps with nobody watching, see [MailClassifier].
             //
-            // The link comes out of the mail rather than out of the answer: the model names which
-            // of the numbered links it is, see `MagicAnalysis.linkNumber`, and the link that number
-            // points at is the mail's own, character for character. A number pointing nowhere and a
-            // code that did not come back both mean no row for that kind -- `validate` has already
-            // refused the answers where these disagree, so this is what stands between a step that
-            // failed anyway and the table.
-            val ways = buildMap {
-                if (reading?.carriesCode == true && reading.code != null) {
-                    put(MagicEmailKind.CODE, reading.code)
-                }
-
-                val link = reading?.linkNumber?.let { context.links.getOrNull(it - 1) }
-                if (reading?.carriesLink == true && link != null) put(MagicEmailKind.LINK, link)
-            }
-
-            // Against when the mail was sent, not against now: a code good for ten minutes was good
-            // for ten minutes from the mail, and a mail read an hour after it arrived must not come
-            // out as one that expires in ten. Null stays null -- see `valid_until`, a stated end is
-            // the only kind worth writing down.
-            val validUntil = reading?.validForMinutes?.let { email.sent + it.minutes }
-
-            // Filed without asking: whether a mail carries a code is a reading and not a
-            // judgement, and a list of what still works is only worth having if it fills itself.
-            // Nothing comes back from this -- a row that was already there is the ordinary answer
-            // on a rerun, see `record`.
-            val provider = reading?.provider
-            if (provider != null) {
-                for ((kind, payload) in ways) {
-                    magicEmailRepository.record(mailId, provider, kind, payload, validUntil)
-                }
-            }
-
-            sendEvent(
-                EmailAgentEvent.Magic(
-                    provider = provider,
-                    kinds = ways.keys.map { it.name.lowercase() },
-                    validUntil = validUntil?.toString(),
-                    failure = magic.failure,
+            // The watcher is called on this coroutine, so a send that suspends holds the run up --
+            // which is what keeps the frames in the order the run happened in.
+            try {
+                classifier.classify(email, user, ClassificationReason.MANUAL, asWatcher())
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (cause: Exception) {
+                // The run is recorded before it gets here. The screen is told the same way it is
+                // told about a step that failed: a socket that dies without a word leaves a button
+                // spinning for good.
+                sendEvent(
+                    EmailAgentEvent.AgentMessage(
+                        step = "run",
+                        attempt = 1,
+                        role = AgentRole.ERROR.name.lowercase(),
+                        text = cause.message ?: cause::class.simpleName ?: "the run stopped",
+                    )
                 )
-            )
-
-            val topic = analyst.run(TOPIC_STEP, context) { line -> sendEvent(line.asEvent()) }
-            val about = topic.value
-
-            // Proposed and not filed. This step saw one mail, so what it thought of is a word for
-            // that mail -- and a mailbox filled straight from here collects "Rechnung" next to
-            // "Rechnungen" next to "Beleg" until nothing is findable under any of them. The step
-            // that looks at the mail which came before this one decides what actually goes on, with
-            // the mailbox's own vocabulary in front of it, see [REVISION_STEP]. What happens when
-            // that step cannot run is below: the proposals are filed as they stand.
-            val proposedTags = about?.tags.orEmpty().map {
-                ProposedTag(name = it.tag, reason = it.asReason())
             }
-
-            // The identifier is what lets a mail join a matter nobody has grouped yet, and it is
-            // filed in two steps that happen at two different times -- see [MatterFiling]: the tag
-            // and the record now, the thread once a second mail turns up. A kind without an
-            // identifier does not happen -- the step refuses that answer -- and is skipped here
-            // rather than trusted.
-            val identifier = about?.threadId?.takeIf { about.threadKind != ThreadKind.NONE }
-            val filed = identifier?.let {
-                MatterFiling(
-                    owner = user,
-                    matters = mailIdentifierRepository,
-                    threads = threadRepository,
-                    tagging = tagRepository,
-                ).file(mailId, it, about.threadKind.germanName)
-            }
-
-            sendEvent(
-                EmailAgentEvent.Topic(
-                    // The identifier's own tag among them, which is the sharpest one a mail gets:
-                    // every mail about that invoice writes that string and nothing else does.
-                    tags = about?.tags.orEmpty().map {
-                        EmailAgentEvent.FiledTag(tag = it.tag, reason = it.reason, quote = it.quote)
-                    },
-                    // The identifier's own tag is filed rather than proposed: it is the one label
-                    // with nothing to weigh about it. No other mail writes that string, so there is
-                    // no existing word for it to be reconciled with.
-                    filedTags = listOfNotNull(
-                        filed?.let { EmailAgentEvent.FiledTag(tag = it.tag, reason = it.reason) }
-                    ),
-                    identifier = identifier,
-                    identifierKind = identifier?.let { about.threadKind.name.lowercase() },
-                    matter = filed?.asWireWord(),
-                    failure = topic.failure,
-                )
-            )
-
-            // The last step is the only one that looks at more than this mail, and the only one
-            // that needed the ones before it to have run: it searches on what they wrote down. What
-            // it does is its own -- see the desk, which is what actually carries the tools out and
-            // what holds the line that the agent only ever changes what the agent made.
-            val desk = RevisionDesk(
-                owner = user,
-                mailId = mailId,
-                sentAt = email.sent,
-                emails = emailRepository,
-                tagging = tagRepository,
-                threading = threadRepository,
-                matters = mailIdentifierRepository,
-                proposals = proposedTags,
-            )
-
-            // Null where the mail carries neither a tag nor an identifier: nothing to search on, so
-            // nothing to revise, and no request spent finding that out.
-            val briefing = desk.briefing()
-            val revision = briefing?.let {
-                analyst.converse(REVISION_STEP, context, it, desk::run) { line -> sendEvent(line.asEvent()) }
-            }
-
-            // The safety net under the proposals: a conversation that never got to the tags -- a
-            // backend that is down, a model that talked its way past them -- must not cost the mail
-            // its tags altogether. Filed as they were proposed then, which is what the mailbox used
-            // to do with them anyway.
-            val fellBack = !desk.hasSetTagsOn(mailId) && proposedTags.isNotEmpty()
-            if (fellBack) tagFiling.file(mailId, proposedTags)
-
-            sendEvent(
-                EmailAgentEvent.Revision(
-                    changes = desk.changes,
-                    said = revision?.said,
-                    ran = briefing != null,
-                    proposalsFiledAsProposed = fellBack,
-                    failure = revision?.failure,
-                )
-            )
 
             sendEvent(EmailAgentEvent.AgentFinished)
         }
@@ -524,13 +375,72 @@ sealed interface EmailAgentCommand {
 }
 
 /**
- * Why the mail carries this tag, as one line for [TagRepository.attach].
+ * The socket as somebody watching the run: every step's outcome turned into the frame for it.
  *
- * The sentence and the words it was read off together, because they answer different questions: the
- * sentence says what the agent made of the mail, the quote says what it was looking at. A reader
- * who disagrees with a tag wants the second one -- it is the part they can check.
+ * Here and not in the classifier, because this is the only part of a run that is about a screen. What
+ * a step decided is the same whoever asked for it; what a screen is told about it is this socket's
+ * business, and the queue's runs are not told to anybody at all.
  */
-private fun TopicTag.asReason(): String = "${reason.trim().trimEnd('.')}. Zitat: „${quote.trim()}“"
+private fun DefaultWebSocketServerSession.asWatcher() = object : ClassificationWatcher {
+
+    override suspend fun line(line: AgentLine) = sendEvent(line.asEvent())
+
+    override suspend fun sender(outcome: SenderOutcome) {
+        sendEvent(
+            EmailAgentEvent.Sender(
+                person = outcome.reading?.person,
+                organisation = outcome.reading?.organisation,
+                via = outcome.reading?.via,
+                context = outcome.reading?.context.orEmpty(),
+                tags = outcome.filed.map { EmailAgentEvent.FiledTag(tag = it.name, reason = it.reason) },
+                failure = outcome.failure,
+            )
+        )
+    }
+
+    override suspend fun magic(outcome: MagicOutcome) {
+        sendEvent(
+            EmailAgentEvent.Magic(
+                provider = outcome.provider,
+                kinds = outcome.ways.keys.map { it.name.lowercase() },
+                validUntil = outcome.validUntil?.toString(),
+                failure = outcome.failure,
+            )
+        )
+    }
+
+    override suspend fun topic(outcome: TopicOutcome) {
+        sendEvent(
+            EmailAgentEvent.Topic(
+                tags = outcome.proposals.map {
+                    EmailAgentEvent.FiledTag(tag = it.tag, reason = it.reason, quote = it.quote)
+                },
+                // The identifier's own tag is filed rather than proposed: it is the one label with
+                // nothing to weigh about it. No other mail writes that string, so there is no
+                // existing word for it to be reconciled with.
+                filedTags = listOfNotNull(
+                    outcome.matter?.let { EmailAgentEvent.FiledTag(tag = it.tag, reason = it.reason) }
+                ),
+                identifier = outcome.identifier,
+                identifierKind = outcome.identifier?.let { outcome.kind.name.lowercase() },
+                matter = outcome.matter?.asWireWord(),
+                failure = outcome.failure,
+            )
+        )
+    }
+
+    override suspend fun revision(outcome: RevisionOutcome) {
+        sendEvent(
+            EmailAgentEvent.Revision(
+                changes = outcome.changes,
+                said = outcome.said,
+                ran = outcome.ran,
+                proposalsFiledAsProposed = outcome.fellBack,
+                failure = outcome.failure,
+            )
+        )
+    }
+}
 
 /** What became of a matter, in the word the wire uses for it. */
 private fun MatterFiled.asWireWord(): String = when (this) {
@@ -538,29 +448,6 @@ private fun MatterFiled.asWireWord(): String = when (this) {
     is MatterFiled.Opened -> "opened"
     is MatterFiled.Joined -> "joined"
 }
-
-/**
- * What a matter of this kind is called, for the title of a thread the agent opens.
- *
- * German, unlike everything else here, because it is not a wire format: it is stored as the thread's
- * name and shown to the reader as it stands. Plain words rather than the kind's own name, so a
- * thread reads as "Rechnung RE-2024-00123" and not as "INVOICE RE-2024-00123".
- *
- * [ThreadKind.NONE] cannot get here -- a thread is only opened where the mail carries an identifier
- * -- and is given the same word as anything unclear rather than an exception nobody would ever see.
- */
-private val ThreadKind.germanName: String
-    get() = when (this) {
-        ThreadKind.INVOICE -> "Rechnung"
-        ThreadKind.ORDER -> "Bestellung"
-        ThreadKind.BOOKING -> "Buchung"
-        ThreadKind.SHIPMENT -> "Sendung"
-        ThreadKind.TICKET -> "Ticket"
-        ThreadKind.TRANSACTION -> "Zahlung"
-        ThreadKind.ISSUE -> "Ticket"
-        ThreadKind.CONVERSATION -> "Unterhaltung"
-        ThreadKind.OTHER, ThreadKind.NONE -> "Vorgang"
-    }
 
 /** One log line on the wire. The role goes out lowercase, like every other `type` here. */
 private fun AgentLine.asEvent() = EmailAgentEvent.AgentMessage(
@@ -579,34 +466,4 @@ private fun AgentLine.asEvent() = EmailAgentEvent.AgentMessage(
  */
 private suspend fun DefaultWebSocketServerSession.sendEvent(event: EmailAgentEvent) {
     sendSerialized<EmailAgentEvent>(event)
-}
-
-/**
- * The mail as the analysis steps see it, see [MailContext].
- *
- * The body starts as the one a rule is held against: the text part, or the HTML flattened -- a
- * model handed raw markup spends its attention on tags, see `mailFactsOf`. What a step is handed
- * is cut down further from there, because a rule is matched for free and a model is not, see
- * [readableBody].
- */
-private fun Email.asAnalysisContext(owner: User): MailContext {
-    // Flattened once and read twice: the body a step is handed is cut down from it, and the whole
-    // links are picked out of it before that cut takes them down to their hosts.
-    val flattened = toRuleFacts().body
-
-    return MailContext(
-        owner = AiParticipant(name = owner.name, address = owner.email),
-        direction = MailDirection.of(
-            ownerAddress = owner.email,
-            senderAddress = sender.address,
-            recipientAddresses = recipients.map { it.emailUser.address },
-        ),
-        sender = AiParticipant(name = senderName, address = sender.address),
-        // Everyone the mail names, cc and bcc included: who else was written to is part of reading
-        // it.
-        recipients = recipients.map { AiParticipant(name = it.name, address = it.emailUser.address) },
-        subject = subject,
-        body = readableBody(flattened),
-        links = mailLinks(flattened),
-    )
 }

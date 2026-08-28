@@ -10,12 +10,16 @@ import es.jvbabi.overmail.server.domain.models.MailThread
 import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.MailIdentifierRepository
+import es.jvbabi.overmail.server.domain.repository.MemoryRepository
 import es.jvbabi.overmail.server.domain.repository.TagRepository
 import es.jvbabi.overmail.server.domain.repository.ThreadRepository
 import es.jvbabi.overmail.server.domain.spam.toRuleFacts
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -48,6 +52,15 @@ class RevisionDesk(
     private val tagging: TagRepository,
     private val threading: ThreadRepository,
     private val matters: MailIdentifierRepository,
+    private val remembering: MemoryRepository,
+    /**
+     * The core memories of this run under their handles, see [MemoryHandles].
+     *
+     * Handed in rather than loaded here, because the same lines went into the mail's own context for
+     * every step before this one: one list of handles, or the model would be told about a "K2" that
+     * the earlier prompt numbered differently.
+     */
+    private val memories: MemoryHandles = MemoryHandles(),
     /**
      * The tags the reading step proposed for this mail, not yet filed.
      *
@@ -153,6 +166,24 @@ class RevisionDesk(
                         "of them does, the proposal becomes a new tag, and that is fine."
                 )
             }
+            if (memories.lines().isNotEmpty()) {
+                appendLine()
+                appendLine(
+                    "What is known about the reader is listed with the mail above, one line each " +
+                        "under a handle (K1, K2). Those are summaries: ${RevisionTool.RECALL} " +
+                        "answers with what is behind one of them, and it is worth calling only " +
+                        "where this mail turns on something the summary does not settle."
+                )
+            }
+            appendLine()
+            appendLine(
+                "Where this mail teaches something about the reader that will still matter for the " +
+                    "mail after next -- a course started, a job taken, a project running, a move " +
+                    "being made -- write it down with ${RevisionTool.REMEMBER}. What this one mail " +
+                    "is about is not that: a parcel, an invoice, a newsletter teach nothing about " +
+                    "anybody. Most mail teaches nothing, and that is the ordinary case."
+            )
+            appendLine()
             appendLine(
                 "Start by looking for earlier mail: call ${RevisionTool.FIND_MAILS} with the tags " +
                     "above" + (identifier?.let { ", and with the identifier \"$it\"" } ?: "") + "."
@@ -169,6 +200,9 @@ class RevisionDesk(
         RevisionTool.CREATE_THREAD -> createThread(arguments)
         RevisionTool.ADD_TO_THREAD -> addToThread(arguments)
         RevisionTool.RENAME_THREAD -> renameThread(arguments)
+        RevisionTool.RECALL -> recall(arguments)
+        RevisionTool.REMEMBER -> remember(arguments)
+        RevisionTool.CLOSE_MEMORY -> closeMemory(arguments)
         else -> failed("There is no tool called \"$tool\".")
     }
 
@@ -425,6 +459,105 @@ class RevisionDesk(
         return ToolAnswer("$handle renamed from \"${thread.title}\" to \"${renamed.title}\".")
     }
 
+    private suspend fun recall(arguments: JsonObject): ToolAnswer {
+        val handle = arguments.string("memory")?.uppercase() ?: return failed("`memory` is missing.")
+        val memory = memories[handle] ?: return unknownMemory(handle)
+
+        // Against the mail's own moment, like the summaries were: a detail about a job that had
+        // ended before this mail arrived explains nothing about it.
+        val details = remembering.detailsOf(memory.id, at = sentAt)
+
+        return ToolAnswer(
+            buildString {
+                appendLine("$handle · ${memory.topic ?: "?"} · ${memory.content}")
+
+                if (details.isEmpty()) {
+                    append("Nothing further is known about it. What you were shown is all there is.")
+                } else {
+                    for (detail in details) {
+                        val period = detail.periodAsText().takeIf { it.isNotEmpty() }
+                            ?.let { " ($it)" } ?: ""
+
+                        appendLine("- ${detail.content}$period")
+                    }
+                }
+            }.trim()
+        )
+    }
+
+    private suspend fun remember(arguments: JsonObject): ToolAnswer {
+        val content = arguments.string("content")?.trim()
+        if (content.isNullOrEmpty()) return failed("`content` is missing.")
+        if (content.length > MAX_MEMORY) {
+            return failed(
+                "That is ${content.length} characters. A memory is one line -- what is longer " +
+                    "belongs under a topic as a detail, one line at a time."
+            )
+        }
+
+        val parentHandle = arguments.string("of")?.uppercase()
+        val parent = parentHandle?.let { memories[it] ?: return unknownMemory(it) }
+
+        // A core memory is shown for every mail it covers, so it has to say what it is about. A
+        // detail is only ever read through its parent, which is where its topic comes from.
+        val topic = arguments.string("topic")?.trim()
+        if (parent == null && topic.isNullOrEmpty()) {
+            return failed(
+                "`topic` is missing. Something new needs the word it is about -- \"Studium\", " +
+                    "\"Arbeit\" -- or give `of` to hang it under something already known."
+            )
+        }
+
+        // A date that is not one is refused rather than dropped: a memory with a beginning nobody
+        // wrote goes missing for exactly the mail it would have explained.
+        val from = arguments.dayOrNull("from") ?: return badDay("from")
+        val to = arguments.dayOrNull("to") ?: return badDay("to")
+
+        val written = remembering.remember(
+            user = owner,
+            topic = if (parent == null) topic else null,
+            content = content,
+            parentId = parent?.id,
+            relevantFrom = from.getOrNull(),
+            relevantTo = to.getOrNull(),
+            // Where it was learned, which is the provenance a reader wants before believing it.
+            learnedFromEmailId = mailId,
+            createdByAgent = true,
+        )
+
+        if (parent == null) {
+            val handle = memories.register(written)
+            this.written += "Gemerkt ($handle ${written.topic}): ${written.content}"
+
+            return ToolAnswer("$handle · ${written.topic} · ${written.content} -- written down.")
+        }
+
+        this.written += "Gemerkt zu ${parent.topic}: ${written.content}"
+
+        return ToolAnswer("Added to $parentHandle \"${parent.topic}\": ${written.content}")
+    }
+
+    private suspend fun closeMemory(arguments: JsonObject): ToolAnswer {
+        val handle = arguments.string("memory")?.uppercase() ?: return failed("`memory` is missing.")
+        val memory = memories[handle] ?: return unknownMemory(handle)
+        val on = arguments.dayOrNull("on")?.getOrNull() ?: return badDay("on")
+
+        if (!memory.createdByAgent) {
+            return failed(
+                "$handle was written by the reader about their own life, so it is not yours to end."
+            )
+        }
+
+        val closed = remembering.close(memory.id, on, onlyIfByAgent = true)
+            ?: return failed("$handle could not be ended.")
+
+        // The registry keeps it as it now reads, so a later line about it does not show it as open.
+        memories.register(closed)
+        written += "Beendet (${closed.topic}): ${closed.content}, ${closed.periodAsText()}"
+
+        return ToolAnswer("$handle ends on ${on.asDate()}: ${closed.content}")
+    }
+
     /** One mail as the model sees it: its handle, when it came, who from, and how it is filed. */
     private fun lineFor(summary: MailSummary, thread: MailThread?): String {
         val handle = handleFor(summary.id)
@@ -471,6 +604,16 @@ class RevisionDesk(
         "There is no mail \"$handle\". Use a handle from a listing -- \"M1\" is the mail being read."
     )
 
+    private fun unknownMemory(handle: String) = failed(
+        "There is nothing known about the reader under \"$handle\". Use a handle from the list you " +
+            "were given with the mail."
+    )
+
+    private fun badDay(name: String) = failed(
+        "`$name` is not a date. Write YYYY-MM-DD, YYYY-MM or YYYY, or leave it out where the mail " +
+            "does not say."
+    )
+
     private fun unknownThread(handle: String) = failed(
         "There is no thread \"$handle\". Use a handle from a listing."
     )
@@ -487,6 +630,12 @@ private const val MAX_FOUND = 12
 
 /** How much of one mail a read hands over. Every read stays in the conversation to the end. */
 private const val MAX_BODY = 3_000
+
+/**
+ * Where a memory stops being a line and becomes a note. Anything longer belongs under a topic as a
+ * detail, which is read on purpose rather than in front of every mail.
+ */
+private const val MAX_MEMORY = 200
 
 /**
  * The most tags a revision may leave on a mail.
@@ -530,3 +679,42 @@ private fun JsonObject.strings(name: String): List<String> = when (val value = t
 }
 
 private fun JsonPrimitive.contentOrNullIfBlank(): String? = content.takeIf { it.isNotBlank() }
+
+/**
+ * A day argument, as the moment that day begins in UTC.
+ *
+ * Three answers rather than two, which is what the outer null is for: a success holding null means
+ * the model left the argument out, and that is fine -- plenty of what a mail teaches has no date in
+ * it. The outer null means it wrote something that is not a day, and that has to be said back rather
+ * than quietly filed as "no date".
+ *
+ * Three forms, because a mail states a date in whatever precision it feels like and so does a model
+ * reading it: `2024-10-07`, `2024-10`, `2024`. The coarser two resolve to the first day of what they
+ * name, which is the honest reading of "seit Oktober 2024" -- and these days are only ever compared
+ * against the send times of mails, where a fortnight either way changes nothing.
+ *
+ * UTC and not the reader's zone: the other end of every one of those comparisons carries no zone of
+ * its own either.
+ */
+private fun JsonObject.dayOrNull(name: String): Result<Instant?>? {
+    val written = string(name)?.trim() ?: return Result.success(null)
+
+    val (year, month, dayOfMonth) = when {
+        FULL_DAY.matches(written) -> written.split('-').let {
+            Triple(it[0].toInt(), it[1].toInt(), it[2].toInt())
+        }
+        YEAR_MONTH.matches(written) -> written.split('-').let {
+            Triple(it[0].toInt(), it[1].toInt(), 1)
+        }
+        YEAR.matches(written) -> Triple(written.toInt(), 1, 1)
+        else -> return null
+    }
+
+    return runCatching {
+        LocalDate(year, month, dayOfMonth).atStartOfDayIn(TimeZone.UTC)
+    }.getOrNull()?.let { Result.success(it) }
+}
+
+private val FULL_DAY = Regex("""\d{4}-\d{2}-\d{2}""")
+private val YEAR_MONTH = Regex("""\d{4}-\d{2}""")
+private val YEAR = Regex("""\d{4}""")

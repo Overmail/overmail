@@ -67,6 +67,8 @@ class ProvidedResolver(client: HttpClient): EmailIconResolver(client) {
             "slothbytes@mail.beehiiv.com" to "https://media.beehiiv.com/cdn-cgi/image/fit=scale-down,format=auto,onerror=redirect,quality=80/uploads/publication/logo/785df2cf-6a8b-4daa-b929-7bf60c7f57cb/thumb_sloth_bytes_logo.png",
             "mail.baseten.co" to "https://www.baseten.co/brand/mark/svg/Baseten_Symbol-9.svg",
             "apple.com" to "https://svgl.app/library/apple.svg",
+            "sa.noreply@samsung-mail.com" to "https://v3.account.samsung.com/favicon.ico",
+            "noreply@t3.codes" to "https://raw.githubusercontent.com/pingdotgg/t3code/refs/heads/main/apps/marketing/public/icon.png",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

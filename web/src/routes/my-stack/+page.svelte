@@ -6,6 +6,7 @@
     import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
     import {onMount} from "svelte";
     import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import {createHotkey} from "@tanstack/svelte-hotkeys";
 
     let viewModel: EmailStackViewModel = new EmailStackViewModel();
 
@@ -14,6 +15,24 @@
             viewModel.dispose();
         }
     })
+
+    const stackHasEmails = $derived(viewModel.emails.length > 0);
+
+    createHotkey(
+        "Space",
+        () => {
+            viewModel.onKeepEmail()
+        },
+        () => ({enabled: stackHasEmails})
+    )
+
+    createHotkey(
+        "Backspace",
+        () => {
+            viewModel.onPreviousEmail()
+        },
+        () => ({enabled: stackHasEmails})
+    )
 </script>
 
 <header
@@ -39,7 +58,11 @@
                  cut off above it. Keeping the last lines reachable is the scroll box's job in
                  EmailStack, which pads its scroll range by the bar's height. -->
             <div class="absolute inset-0 flex justify-center pt-8">
-                <EmailStack emails={viewModel.remainingEmails ?? []} class="h-full" />
+                <EmailStack
+                        emails={viewModel.emails ?? []}
+                        currentEmailId={viewModel.currentEmailId}
+                        class="h-full"
+                />
             </div>
         </div>
 

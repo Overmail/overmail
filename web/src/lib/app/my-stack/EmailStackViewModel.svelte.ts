@@ -1,20 +1,19 @@
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 
+const MAX_EMAILS_BEFORE_REFETCH = 5;
+
 export class EmailStackViewModel {
     emails: StackEmail[] = $state([])
     currentEmailId = $state<string | null>(null);
-    remainingEmails = $derived.by(() => {
-        if (!this.currentEmailId) return this.emails;
-        const currentEmailIndex = this.emails.findIndex(e => e.id === this.currentEmailId);
-        if (currentEmailIndex === -1) return this.emails;
-        return this.emails.slice(currentEmailIndex + 1);
-    })
+    currentEmail = $derived(this.emails.find(e => e.id === this.currentEmailId));
+    currentEmailIndex = $derived(this.emails.findIndex(e => e.id === this.currentEmailId));
 
     private webSocketHandler: EmailStackWebSocketHandler;
 
     constructor() {
         this.webSocketHandler = new EmailStackWebSocketHandler({
             onEmails: (emails) => {
+                const isFirstBatchOfEmails = this.emails.length === 0;
                 emails.forEach(email => {
                     if (!this.emails.find(e => e.id === email.id)) {
                         this.emails.push(email);
@@ -23,6 +22,10 @@ export class EmailStackViewModel {
                         this.emails[index] = email;
                     }
                 })
+
+                if (isFirstBatchOfEmails && emails.length > 0) {
+                    this.currentEmailId = emails[0].id;
+                }
             }
         })
 
@@ -31,6 +34,30 @@ export class EmailStackViewModel {
 
     dispose() {
         this.webSocketHandler.stop();
+    }
+
+    onKeepEmail() {
+        if (!this.currentEmailId) return;
+        this.currentEmail!!.classification = {type: "keep"};
+
+        this.onNextEmail();
+    }
+
+    onNextEmail() {
+        if (this.currentEmailIndex === -1) return;
+        if (this.currentEmailIndex + 1 >= this.emails.length) return;
+        this.currentEmailId = this.emails[this.currentEmailIndex + 1].id;
+
+        const remainingEmails = this.emails.length - (this.currentEmailIndex + 1);
+        if (remainingEmails <= MAX_EMAILS_BEFORE_REFETCH) {
+            this.webSocketHandler.requestNextBatch();
+        }
+    }
+
+    onPreviousEmail() {
+        if (this.currentEmailIndex === -1) return;
+        if (this.currentEmailIndex - 1 < 0) return;
+        this.currentEmailId = this.emails[this.currentEmailIndex - 1].id;
     }
 }
 
@@ -45,10 +72,18 @@ class EmailStackWebSocketHandler {
         this.onEmails = config.onEmails;
     }
 
+    private requestQueue: StackWebsocketClientMessage[] = [];
+
     start() {
         this.webSocket = new WebSocket('/api/stack');
         this.webSocket.onclose = (e) => {
             if (!e.wasClean && !this.isStopped) setTimeout(() => this.start(), 1000);
+        }
+
+        this.webSocket.onopen = () => {
+            const q = [...this.requestQueue];
+            this.requestQueue = [];
+            q.forEach((message) => this.request(message));
         }
 
         this.webSocket.onmessage = async (event) => {
@@ -61,12 +96,25 @@ class EmailStackWebSocketHandler {
                             ...email,
                             body: await this.emailBodyRepository.getBody(email.id),
                             sent_at: new Date(email.sent_at * 1000),
+                            classification: null,
                         }))
                     );
                     this.onEmails(emails);
                     break;
             }
         }
+    }
+
+    private request(message: StackWebsocketClientMessage) {
+        if (this.webSocket?.readyState === WebSocket.OPEN) {
+            this.webSocket.send(JSON.stringify(message));
+        } else {
+            this.requestQueue.push(message);
+        }
+    }
+
+    requestNextBatch() {
+        this.request({type: "request.emails"});
     }
 
     stop() {
@@ -89,6 +137,10 @@ type StackWebsocketServerMessage = {
     }[]
 }
 
+type StackWebsocketClientMessage = {
+    type: "request.emails",
+}
+
 export type StackEmail = {
     id: string,
     subject: string,
@@ -100,7 +152,14 @@ export type StackEmail = {
     body: {
         text: string | null,
         html: string | null,
-    }
+    },
+    classification: Classification | null,
+}
+
+export type Classification = {
+    type: "keep"
+} | {
+    type: "archive"
 }
 
 export type EmailUser = {

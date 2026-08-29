@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.database
 
+import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvents
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
@@ -37,6 +38,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)
             SchemaUtils.create(EmailRecipients)
+            SchemaUtils.create(EmailAiClassificationEvents)
         }
     }
 

@@ -47,8 +47,9 @@ object Emails : UuidTable("emails") {
  * megabytes -- a listing that does not need the source should select its columns through the DSL
  * instead, see `http/stack/stackSocket.kt`.
  */
-class Email(id: EntityID<Uuid>) : UuidEntity(id) {
+class Email(id: EntityID<Id>) : UuidEntity(id) {
     companion object : UuidEntityClass<Email>(Emails)
+    typealias Id = Uuid
 
     var imapAccount by ImapAccount referencedOn Emails.imapAccount
     var sender by EmailUser referencedOn Emails.sender
@@ -61,6 +62,7 @@ class Email(id: EntityID<Uuid>) : UuidEntity(id) {
     var isRead by Emails.isRead
 
     val recipients by EmailRecipient referrersOn EmailRecipients.email
+    val aiClassificationEvents by EmailAiClassificationEvent referrersOn EmailAiClassificationEvents.email
 }
 
 /**

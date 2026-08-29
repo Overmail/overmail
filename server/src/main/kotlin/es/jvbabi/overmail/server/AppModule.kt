@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server
 
+import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
@@ -41,7 +42,7 @@ fun Application.overmail() {
     }
     installOvermailAuthentikt()
     configureRouting()
-    startImporter()
+    startJobs()
 }
 
 private fun Application.configureDependencies() {
@@ -56,17 +57,24 @@ private fun Application.configureDependencies() {
 
         provide<JwtService> { JwtService() }
 
+        provide<EmailClassificationQueue> { EmailClassificationQueue() }
+
         provide<ImporterManager> {
             ImporterManager(
                 database = resolve(),
                 coroutineScope = this@configureDependencies,
+                emailClassificationQueue = resolve()
             )
         }
     }
 }
 
-private fun Application.startImporter() {
+private fun Application.startJobs() {
     launch {
         dependencies.resolve<ImporterManager>().start()
+    }
+
+    launch {
+        dependencies.resolve<EmailClassificationQueue>().consume()
     }
 }

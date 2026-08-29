@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.core.Email.Flag
 import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
@@ -41,6 +42,7 @@ class EmailImporter(
     private val database: OvermailDatabase,
     val account: ImapConnection,
     private val coroutineScope: CoroutineScope,
+    private val emailClassificationQueue: EmailClassificationQueue,
 ) {
 
     private var importerJob: Job? = null
@@ -112,7 +114,7 @@ class EmailImporter(
                     // getContent parses through a piped stream and blocks the calling thread.
                     withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
 
-                    val stored = insert(
+                    val storedId = insert(
                         senderId = emailUsers.getValue(fromHeader.address),
                         senderName = fromHeader.name,
                         subject = subject,
@@ -124,7 +126,10 @@ class EmailImporter(
                         recipients = recipients,
                     )
 
-                    if (stored != null) println("Imported: $subject")
+                    if (storedId != null) {
+                        println("Imported: $subject")
+                        emailClassificationQueue.enqueue(storedId)
+                    }
                 }
                 delay(5.minutes)
             }

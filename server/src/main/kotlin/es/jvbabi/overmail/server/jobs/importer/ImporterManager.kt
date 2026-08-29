@@ -1,12 +1,9 @@
 package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.plus
+import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
@@ -16,6 +13,7 @@ private val RELOAD_INTERVAL = 1.minutes
 class ImporterManager(
     private val database: OvermailDatabase,
     private val coroutineScope: CoroutineScope,
+    private val emailClassificationQueue: EmailClassificationQueue,
 ) {
 
     private val importer = mutableMapOf<Uuid, EmailImporter>()
@@ -45,9 +43,10 @@ class ImporterManager(
             }
 
             val newImporter = EmailImporter(
-                database = database,
+                database = this.database,
                 account = account,
                 coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
+                emailClassificationQueue = this.emailClassificationQueue,
             )
 
             newImporter.start()

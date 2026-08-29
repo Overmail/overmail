@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.stack
 
+import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -25,6 +26,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private const val STACK_SIZE = 10
+private const val AI_PROCESSED_EMAIL_PUFFER = 50
 
 private val json = Json {
     ignoreUnknownKeys = true
@@ -35,6 +37,8 @@ fun Route.stackSocket() {
     authenticate {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
+            val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
+
             val user = call.user
             var latestMail = Clock.System.now()
 
@@ -90,6 +94,21 @@ fun Route.stackSocket() {
                                 tags = emptyList(),
                             )
                         }
+                }
+
+                // Make sure that the next 50 emails are being processed by AI
+
+                database.query {
+                    Emails
+                        .leftJoin(ImapAccounts)
+                        .selectAll()
+                        .where { ImapAccounts.user eq user.id }
+                        .andWhere { Emails.sent lessEq latestMail }
+                        .orderBy(Emails.sent, SortOrder.DESC)
+                        .limit(AI_PROCESSED_EMAIL_PUFFER)
+                        .let { Email.wrapRows(it) }
+                        .filter { email -> email.aiClassificationEvents.none { it.finishedAt == null } }
+                        .forEach { email -> classificationQueue.enqueue(emailId = email.id.value) }
                 }
 
                 sendSerialized<StackServerMessage>(StackServerMessage.Emails(mails))

@@ -1,33 +1,19 @@
-<script module lang="ts">
-    /** One address as it stood in a header field; `name` is absent for a bare address. */
-    export type EmailCardParticipant = {
-        name?: string;
-        address: string;
-    };
-</script>
-
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar";
+    import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
+    import type {EmailUser, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
 
     let {
-        sender,
-        sent,
+        sent_at,
+        from,
         to,
-        cc = [],
-        bcc = [],
+        cc,
+        bcc,
         subject,
         body,
         class: className,
-    }: {
-        sender: EmailCardParticipant & { avatarUrl?: string };
-        /** Formatted for display already: the card does no locale work of its own. */
-        sent: string;
-        to: EmailCardParticipant[];
-        cc?: EmailCardParticipant[];
-        bcc?: EmailCardParticipant[];
-        subject: string;
-        body: string;
+    }: StackEmail &{
         class?: string;
     } = $props();
 
@@ -37,13 +23,13 @@
         {label: "BCC:", participants: bcc},
     ].filter((field) => field.participants.length > 0));
 
-    function formatParticipant(participant: EmailCardParticipant): string {
-        return participant.name ? `${participant.name} (${participant.address})` : participant.address;
+    function formatParticipant(participant: EmailUser): string {
+        return participant.name ? `${participant.name} (${participant.email})` : participant.email;
     }
 
     /** Up to two initials, from the display name if there is one and the address otherwise. */
     const initials = $derived(
-        (sender.name ?? sender.address)
+        (from.name ?? from.email)
             .split(/[\s.@_-]+/)
             .filter(Boolean)
             .slice(0, 2)
@@ -57,19 +43,19 @@
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <Avatar.Root class="size-12">
-                <Avatar.Image src={sender.avatarUrl} alt="" />
+                <Avatar.Image src={from.avatarUrl} alt="" />
                 <Avatar.Fallback class="text-base">{initials}</Avatar.Fallback>
             </Avatar.Root>
             <div class="flex flex-col">
-                <span class="font-medium text-lg">{sender.name ?? sender.address}</span>
-                {#if sender.name}
-                    <span class="font-light text-base">{sender.address}</span>
+                <span class="font-medium text-lg">{from.name ?? from.email}</span>
+                {#if from.name}
+                    <span class="font-light text-base">{from.email}</span>
                 {/if}
             </div>
         </div>
 
         <div>
-            <span class="font-light text-accent-foreground">{sent}</span>
+            <span class="font-light text-accent-foreground">{sent_at}</span>
         </div>
     </div>
 
@@ -89,6 +75,12 @@
     <div class="mx-4 my-4 h-px bg-accent"></div>
 
     <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
-        {body}
+        {#if body.html}
+            <EmailHtmlBody html={body.html} />
+        {:else if body.text}
+            {body.text}
+        {:else}
+            <span class="text-muted-foreground">No content</span>
+        {/if}
     </div>
 </div>

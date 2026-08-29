@@ -3,8 +3,17 @@
     import {Separator} from "$lib/components/ui/separator";
     import KeyCap from "$lib/components/key/KeyCap.svelte";
     import EmailStack from "$lib/app/my-stack/EmailStack.svelte";
-    import emails from "$lib/assets/emails.json";
     import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+    import {onMount} from "svelte";
+    import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+
+    let viewModel: EmailStackViewModel = new EmailStackViewModel();
+
+    onMount(() => {
+        return () => {
+            viewModel.dispose();
+        }
+    })
 </script>
 
 <header
@@ -26,10 +35,11 @@
 <main class="flex flex-1 flex-col">
     <div class="relative flex flex-1">
         <div class="flex flex-1 overflow-hidden relative">
-            <!-- pb-32 keeps the cards clear of the shortcut bar, so a mail can be scrolled to its
-                 end without the last lines sitting under the keys. -->
-            <div class="absolute inset-0 flex justify-center pt-8 pb-32">
-                <EmailStack {emails} class="h-full" />
+            <!-- Down to the bottom edge, so a card runs under the shortcut bar instead of being
+                 cut off above it. Keeping the last lines reachable is the scroll box's job in
+                 EmailStack, which pads its scroll range by the bar's height. -->
+            <div class="absolute inset-0 flex justify-center pt-8">
+                <EmailStack emails={viewModel.remainingEmails ?? []} class="h-full" />
             </div>
         </div>
 

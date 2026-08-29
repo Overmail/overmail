@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http
 
+import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
@@ -33,6 +34,14 @@ internal fun Application.configureRouting() {
 
             route("/stack") {
                 stackSocket()
+            }
+
+            route("/emails") {
+                route("/{emailId}") {
+                    route("/body") {
+                        getEmailBody()
+                    }
+                }
             }
         }
     }

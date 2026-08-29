@@ -1,29 +1,14 @@
-<script module lang="ts">
-    import type {EmailCardParticipant} from "$lib/app/my-stack/EmailCard.svelte";
-
-    /** One mail in the stack; `id` keys the `#each`, so it has to be stable across loads. */
-    export type EmailStackEntry = {
-        id: string;
-        sender: EmailCardParticipant & { avatarUrl?: string };
-        sent: string;
-        to: EmailCardParticipant[];
-        cc?: EmailCardParticipant[];
-        bcc?: EmailCardParticipant[];
-        subject: string;
-        body: string;
-    };
-</script>
-
 <script lang="ts">
     import EmailCard from "$lib/app/my-stack/EmailCard.svelte";
     import {cn} from "$lib/utils.js";
+    import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
 
     let {
         emails,
         class: className,
     }: {
         /** Newest first: `emails[0]` is the card on top. */
-        emails: EmailStackEntry[];
+        emails: StackEmail[];
         class?: string;
     } = $props();
 
@@ -48,12 +33,12 @@
 
     const stack = $derived(
         emails.map((email, index) => {
-            const {id, ...card} = email;
             const depth = Math.min(index, MAX_DEPTH);
+            const id = email.id;
 
             return {
-                id,
-                card,
+                email: email,
+                id: id,
                 // The top card stays straight and centred; everything below drifts.
                 rotation: index === 0 ? 0 : jitter(id, 1, 2.5),
                 offsetX: index === 0 ? 0 : jitter(id, 2, 10),
@@ -74,17 +59,24 @@
      clips the cards themselves: the drop shadow has to stay visible, or the ones behind stop
      reading as separate cards. -->
 <div class={cn("relative isolate w-3xl", className)}>
-    {#each stack as { id, card, rotation, offsetX, offsetY, fade, z } (id)}
+    {#each stack as { email, id, rotation, offsetX, offsetY, fade, z } (id)}
         {#if fade === 0}
-            <!-- The scroll box goes around the card, not inside it: scrolling a long mail moves
-                 the whole card including its background, rather than sliding the body under a
-                 header that stays put. The padding is there because a scroll box clips, and the
-                 drop shadow would go with it. -->
+            <!-- The scroll box goes around the card, not inside it: the card keeps its natural
+                 height and the box slides it, so a long mail moves as one object — background,
+                 header and shadow together — instead of the body sliding under a header that
+                 stays put.
+
+                 inset-y-0 is what makes that work at all: only a box with a height of its own can
+                 overflow. w-fit + left-1/2 keeps it hugging the card, px-8 is there because a
+                 scroll box clips and the drop shadow would go with it, and pb-32 matches the
+                 shortcut bar: the box reaches the bottom of the page so the card disappears under
+                 the bar, and that padding is extra scroll range at the end, which brings the last
+                 lines back out from under it. -->
             <div
-                    class="absolute inset-y-0 left-1/2 w-fit -translate-x-1/2 overflow-y-auto px-8 pt-2 pb-8"
+                    class="card-scroll absolute inset-y-0 left-1/2 w-fit -translate-x-1/2 overflow-y-auto overscroll-contain px-8 pt-2 pb-32"
                     style="z-index: {z}"
             >
-                <EmailCard {...card} />
+                <EmailCard {...email} />
             </div>
         {:else}
             <!-- top-0 only: the wrapper hugs the card, so the tint overlay below lines up with the
@@ -98,7 +90,7 @@
             >
                 <!-- overflow-hidden instead of the card's own scrolling: the cards behind are
                      decoration and must not eat the wheel. -->
-                <EmailCard {...card} class="overflow-hidden" />
+                <EmailCard {...email} class="overflow-hidden" />
                 <div
                         class="pointer-events-none absolute inset-0 rounded-2xl bg-background"
                         style="opacity: {fade}"
@@ -107,3 +99,15 @@
         {/if}
     {/each}
 </div>
+
+<style>
+    /* No scrollbar: the card is supposed to read as a sheet of paper being pushed along, and a
+       track pinned to the edge gives away that it is a scroll box. */
+    .card-scroll {
+        scrollbar-width: none;
+    }
+
+    .card-scroll::-webkit-scrollbar {
+        display: none;
+    }
+</style>

@@ -56,7 +56,7 @@ fun Route.stackSocket() {
                                 id = email.id.value,
                                 subject = email.subject,
                                 isRead = email.isRead,
-                                sent = email.sent,
+                                sentAt = email.sent,
                                 from = email.sender.let { sender ->
                                     StackMail.User(
                                         name = email.senderName,
@@ -94,7 +94,7 @@ fun Route.stackSocket() {
 
                 sendSerialized<StackServerMessage>(StackServerMessage.Emails(mails))
 
-                if (mails.isNotEmpty()) latestMail = mails.minOf { it.sent }
+                if (mails.isNotEmpty()) latestMail = mails.minOf { it.sentAt }
 
             }
 
@@ -129,7 +129,7 @@ private sealed class StackClientMessage {
 private data class StackMail(
     @SerialName("id") val id: Uuid,
     @SerialName("subject") val subject: String,
-    @SerialName("sent") val sent: Instant,
+    @SerialName("sent_at") val sentAt: Instant,
     @SerialName("is_read") val isRead: Boolean,
     @SerialName("from") val from: User,
     @SerialName("to") val to: List<User>,

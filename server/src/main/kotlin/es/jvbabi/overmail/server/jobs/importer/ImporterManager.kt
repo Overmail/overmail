@@ -1,53 +1,68 @@
 package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.domain.repository.EmailRepository
-import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
-import es.jvbabi.overmail.server.domain.repository.ImapAccountRepository
+import es.jvbabi.overmail.server.database.models.ImapAccount
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.plus
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
+
+/** How long an added, removed or re-configured account takes to be picked up, see [start]. */
+private val RELOAD_INTERVAL = 1.minutes
 
 class ImporterManager(
     private val database: OvermailDatabase,
-    private val imapAccountRepository: ImapAccountRepository,
-    private val emailUserRepository: EmailUserRepository,
-    private val emailRepository: EmailRepository,
     private val coroutineScope: CoroutineScope,
 ) {
 
     private val importer = mutableMapOf<Uuid, EmailImporter>()
 
+    /**
+     * Keeps one importer per account running. Nothing pushes account changes any more, so the
+     * table is re-read every [RELOAD_INTERVAL] and the difference applied.
+     */
     suspend fun start() {
-        imapAccountRepository
-            .getAll()
-            .collect { accounts ->
-                val currentIds = accounts.map { it.id }.toSet()
-                importer.keys.filterNot { it in currentIds }.forEach { removedId ->
-                    importer.remove(removedId)?.stop()
-                }
+        while (coroutineScope.isActive) {
+            reconcile(database.query { ImapAccount.all().map { it.toConnection() } })
+            delay(RELOAD_INTERVAL)
+        }
+    }
 
-                accounts.forEach { account ->
-                    val existingImporter = importer[account.id]
-                    if (existingImporter != null) {
-                        val existingSignature = EmailImporter.buildImapConnectionSignature(existingImporter.imapAccount)
-                        val newSignature = EmailImporter.buildImapConnectionSignature(account)
-                        if (existingSignature == newSignature) return@forEach
-                        existingImporter.stop()
-                    }
+    private fun reconcile(accounts: List<ImapConnection>) {
+        val currentIds = accounts.map { it.id }.toSet()
+        importer.keys.filterNot { it in currentIds }.forEach { removedId ->
+            importer.remove(removedId)?.stop()
+        }
 
-                    val newImporter = EmailImporter(
-                        imapAccount = account,
-                        emailUserRepository = emailUserRepository,
-                        emailRepository = emailRepository,
-                        coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
-                    )
-
-                    newImporter.start()
-
-                    importer[account.id] = newImporter
-                }
+        accounts.forEach { account ->
+            val existingImporter = importer[account.id]
+            if (existingImporter != null) {
+                if (existingImporter.account.signature == account.signature) return@forEach
+                existingImporter.stop()
             }
+
+            val newImporter = EmailImporter(
+                database = database,
+                account = account,
+                coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
+            )
+
+            newImporter.start()
+
+            importer[account.id] = newImporter
+        }
     }
 }
+
+/** Reads the row into the snapshot the job runs on; only valid inside the transaction. */
+private fun ImapAccount.toConnection() = ImapConnection(
+    id = id.value,
+    userId = user.id.value,
+    host = host,
+    port = port,
+    username = username,
+    password = password,
+)

@@ -1,8 +1,13 @@
 package es.jvbabi.overmail.server.database.models
 
 import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
+import org.jetbrains.exposed.v1.dao.UuidEntity
+import org.jetbrains.exposed.v1.dao.UuidEntityClass
 import org.jetbrains.exposed.v1.datetime.timestamp
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 object Emails : UuidTable("emails") {
     /** The account the mail was imported through; also determines who owns it. */
@@ -36,3 +41,30 @@ object Emails : UuidTable("emails") {
         index(false, imapAccount, sent)
     }
 }
+
+/**
+ * A stored mail. Loading one through this entity reads [Emails.rawContent] with it, which can be
+ * megabytes -- a listing that does not need the source should select its columns through the DSL
+ * instead, see `http/stack/stackSocket.kt`.
+ */
+class Email(id: EntityID<Uuid>) : UuidEntity(id) {
+    companion object : UuidEntityClass<Email>(Emails)
+
+    var imapAccount by ImapAccount referencedOn Emails.imapAccount
+    var sender by EmailUser referencedOn Emails.sender
+    var senderName by Emails.senderName
+    var subject by Emails.subject
+    var sent by Emails.sent
+    var rawContent by Emails.rawContent
+    var textContent by Emails.textContent
+    var htmlContent by Emails.htmlContent
+    var isRead by Emails.isRead
+
+    val recipients by EmailRecipient referrersOn EmailRecipients.email
+}
+
+/**
+ * Mails are deduplicated by account, send second and subject, so send times are stored and looked
+ * up at second precision.
+ */
+fun Instant.truncatedToSecond(): Instant = Instant.fromEpochSeconds(epochSeconds)

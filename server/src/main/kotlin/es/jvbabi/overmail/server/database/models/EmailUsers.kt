@@ -1,7 +1,11 @@
 package es.jvbabi.overmail.server.database.models
 
 import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
+import org.jetbrains.exposed.v1.dao.UuidEntity
+import org.jetbrains.exposed.v1.dao.UuidEntityClass
+import kotlin.uuid.Uuid
 
 /**
  * A person appearing in a mail header (sender or recipient). Scoped per [Users] row: the same
@@ -19,4 +23,11 @@ object EmailUsers : UuidTable("email_users") {
     init {
         uniqueIndex(user, address)
     }
+}
+
+class EmailUser(id: EntityID<Uuid>) : UuidEntity(id) {
+    companion object : UuidEntityClass<EmailUser>(EmailUsers)
+
+    var user by User referencedOn EmailUsers.user
+    var address by EmailUsers.address
 }

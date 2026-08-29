@@ -15,5 +15,5 @@ data class DatabaseConfig(
     @SerialName("username") val user: String,
     @SerialName("password") val password: String,
 ) {
-    val r2dbcUrl: String get() = "r2dbc:postgresql://$host:$port/$database"
+    val jdbcUrl: String get() = "jdbc:postgresql://$host:$port/$database"
 }

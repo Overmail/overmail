@@ -5,19 +5,29 @@ import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
-import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
-import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
-import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
-import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
+import org.jetbrains.exposed.v1.jdbc.SchemaUtils
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 
-class OvermailDatabase(
-    config: DatabaseConfig,
-) {
-    val postgresqldb = R2dbcDatabase.connect(
-        url = config.r2dbcUrl,
-        driver = "postgresql",
-        user = config.user,
-        password = config.password
+private const val POSTGRES_DRIVER = "org.postgresql.Driver"
+
+/**
+ * The one way into the database. Everything that reads or writes runs inside [query]: the DAO
+ * entities in `database/models` only work while a transaction is open, and a reference read
+ * outside one throws.
+ */
+class OvermailDatabase(private val database: Database) {
+
+    constructor(config: DatabaseConfig) : this(
+        Database.connect(
+            url = config.jdbcUrl,
+            driver = POSTGRES_DRIVER,
+            user = config.user,
+            password = config.password,
+        )
     )
 
     suspend fun init() {
@@ -30,7 +40,10 @@ class OvermailDatabase(
         }
     }
 
-    suspend fun <T> query(block: suspend R2dbcTransaction.() -> T): T {
-        return suspendTransaction(this.postgresqldb) { block() }
-    }
+    /**
+     * Runs [block] in a transaction on [Dispatchers.IO]. The JDBC driver blocks the thread it is
+     * called on, so this must not happen on the Netty event loop.
+     */
+    suspend fun <T> query(block: suspend JdbcTransaction.() -> T): T =
+        withContext(Dispatchers.IO) { suspendTransaction(database) { block() } }
 }

@@ -1,8 +1,13 @@
 package es.jvbabi.overmail.server.database.models
 
-import es.jvbabi.overmail.server.domain.models.EmailRecipientType
 import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
+import org.jetbrains.exposed.v1.dao.UuidEntity
+import org.jetbrains.exposed.v1.dao.UuidEntityClass
+import kotlin.uuid.Uuid
+
+enum class EmailRecipientType { RECIPIENT, CC, BCC }
 
 /** Links an [Emails] row to the [EmailUsers] it was addressed to, per header field. */
 object EmailRecipients : UuidTable("email_recipients") {
@@ -16,4 +21,13 @@ object EmailRecipients : UuidTable("email_recipients") {
     init {
         uniqueIndex(email, emailUser, type)
     }
+}
+
+class EmailRecipient(id: EntityID<Uuid>) : UuidEntity(id) {
+    companion object : UuidEntityClass<EmailRecipient>(EmailRecipients)
+
+    var email by Email referencedOn EmailRecipients.email
+    var emailUser by EmailUser referencedOn EmailRecipients.emailUser
+    var name by EmailRecipients.name
+    var type by EmailRecipients.type
 }

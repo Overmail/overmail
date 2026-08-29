@@ -7,22 +7,32 @@ import es.jvbabi.authentikt.core.step.BaseState
 import es.jvbabi.authentikt.core.step.plugins.BasePlugin
 import es.jvbabi.authentikt.core.utils.buildGenericMap
 import es.jvbabi.authentikt.core.utils.respondGson
-import es.jvbabi.overmail.server.domain.models.MailAddress
-import es.jvbabi.overmail.server.domain.models.OutgoingMail
-import es.jvbabi.overmail.server.domain.models.User
-import es.jvbabi.overmail.server.domain.repository.OutgoingMailRepository
+import es.jvbabi.overmail.server.config.SmtpConfig
+import es.jvbabi.overmail.server.database.models.User
 import io.ktor.server.request.receive
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
+import jakarta.mail.Authenticator
+import jakarta.mail.Message
+import jakarta.mail.PasswordAuthentication
+import jakarta.mail.Transport
+import jakarta.mail.internet.InternetAddress
+import jakarta.mail.internet.MimeMessage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
+// Collides with authentikt's own Session, which this file is full of.
+import jakarta.mail.Session as MailSession
 
 const val EMAIL_VERIFICATION_NAMESPACE = "overmail/email-verification"
 
 private const val CODE_LENGTH = 6
+private const val UTF_8 = "UTF-8"
 
 /**
  * Mails a one-time code to the identified user and waits for it to come back.
@@ -31,11 +41,32 @@ private const val CODE_LENGTH = 6
  * pending sign-in is the safe direction to fail in.
  */
 class EmailVerificationPlugin(
-    private val outgoingMailRepository: OutgoingMailRepository,
+    private val smtpConfig: SmtpConfig,
 ) : BasePlugin<User, EmailVerificationState>(namespace = EMAIL_VERIFICATION_NAMESPACE) {
 
     private val codesBySession = ConcurrentHashMap<String, String>()
     private val random = SecureRandom()
+
+    /**
+     * Sessions are immutable and cheap to share; built lazily so a broken SMTP block only breaks
+     * the code mail, not application startup.
+     */
+    private val smtpSession: MailSession by lazy {
+        val properties = Properties().apply {
+            put("mail.smtp.host", smtpConfig.host)
+            put("mail.smtp.port", smtpConfig.port.toString())
+            put("mail.smtp.auth", "true")
+            put(if (smtpConfig.secure) "mail.smtp.ssl.enable" else "mail.smtp.starttls.enable", "true")
+        }
+
+        MailSession.getInstance(
+            properties,
+            object : Authenticator() {
+                override fun getPasswordAuthentication() =
+                    PasswordAuthentication(smtpConfig.auth.username, smtpConfig.auth.password)
+            },
+        )
+    }
 
     override suspend fun createState(session: Session<*>): EmailVerificationState {
         val email = session.identifiedUser!!.getEmail()!!
@@ -46,16 +77,27 @@ class EmailVerificationPlugin(
         logger.info("Sign-in code for $email: $code")
 
         runCatching {
-            outgoingMailRepository.send(
-                OutgoingMail(
-                    to = listOf(MailAddress(email)),
-                    subject = "Your Overmail sign-in code",
-                    textContent = "Your sign-in code is $code. It only works for this sign-in attempt.",
-                )
+            mail(
+                to = email,
+                subject = "Your Overmail sign-in code",
+                text = "Your sign-in code is $code. It only works for this sign-in attempt.",
             )
         }.onFailure { logger.warn("Could not mail the sign-in code, use the one logged above", it) }
 
         return EmailVerificationState(email)
+    }
+
+    /** Hands the mail to the configured SMTP server; delivery beyond that is not observable here. */
+    private suspend fun mail(to: String, subject: String, text: String) {
+        val message = MimeMessage(smtpSession).apply {
+            setFrom(InternetAddress(smtpConfig.auth.username))
+            addRecipient(Message.RecipientType.TO, InternetAddress(to))
+            setSubject(subject, UTF_8)
+            setText(text, UTF_8)
+        }
+
+        // Transport.send talks to the server on the calling thread.
+        withContext(Dispatchers.IO) { Transport.send(message) }
     }
 
     override fun installRoutes(inRoute: Route, authentiktInstance: AuthentiktInstance<User>) {

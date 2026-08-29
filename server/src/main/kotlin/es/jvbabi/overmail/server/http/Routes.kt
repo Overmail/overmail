@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http
 
+import es.jvbabi.overmail.server.http.stack.stackSocket
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
@@ -28,6 +29,10 @@ internal fun Application.configureRouting() {
              */
             get("/health") {
                 call.respondText("ok")
+            }
+
+            route("/stack") {
+                stackSocket()
             }
         }
     }

@@ -7,7 +7,9 @@ import kotlin.uuid.Uuid
  * [Email.senderName] and [EmailRecipient.name].
  */
 data class EmailUser(
-    val id: Uuid,
+    val id: Id,
     val user: User,
     val address: String,
-)
+) {
+    typealias Id = Uuid
+}

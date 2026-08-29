@@ -1,11 +1,12 @@
 package es.jvbabi.overmail.server.domain.repository
 
+import es.jvbabi.overmail.server.data.ChangeNotifiers
+import es.jvbabi.overmail.server.data.reloads
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.mappers.toImapAccount
 import es.jvbabi.overmail.server.database.mappers.toUser
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Users
-import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.User
 import kotlinx.coroutines.flow.Flow
@@ -20,11 +21,12 @@ import kotlin.uuid.Uuid
 
 class ImapAccountRepositoryImpl(
     private val database: OvermailDatabase,
-    private val changes: PostgresChangeStream,
+    private val changes: ChangeNotifiers,
 ): ImapAccountRepository {
 
     override fun getForUser(user: User): Flow<List<ImapAccount>> {
-        return changes.changesOf(ImapAccounts)
+        return changes.imapAccounts.changesOfOwner(user.id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -39,7 +41,8 @@ class ImapAccountRepositoryImpl(
     }
 
     override fun getById(id: Uuid): Flow<ImapAccount?> {
-        return changes.changesOf(ImapAccounts, Users)
+        return changes.imapAccounts.changesOfRow(id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -54,7 +57,8 @@ class ImapAccountRepositoryImpl(
     }
 
     override fun getAll(): Flow<List<ImapAccount>> {
-        return changes.changesOf(ImapAccounts, Users)
+        return changes.imapAccounts.changes()
+            .reloads()
             .conflate()
             .map {
                 database.query {

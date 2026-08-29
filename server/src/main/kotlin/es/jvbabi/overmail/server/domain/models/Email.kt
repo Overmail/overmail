@@ -5,11 +5,11 @@ import kotlin.uuid.Uuid
 
 /**
  * A stored mail without its raw source: that can be megabytes and would be re-read on every
- * replication tick, so load it separately via
+ * change of the mailbox, so load it separately via
  * [es.jvbabi.overmail.server.domain.repository.EmailRepository.getRawContent].
  */
 data class Email(
-    val id: Uuid,
+    val id: Id,
     val imapAccount: ImapAccount,
     val sender: EmailUser,
     /** Display name the sender used in this mail, null for a bare address. */
@@ -20,7 +20,9 @@ data class Email(
     val htmlContent: String?,
     val isRead: Boolean,
     val recipients: List<EmailRecipient>,
-)
+) {
+    typealias Id = Uuid
+}
 
 /**
  * Mails are deduplicated by account, send second and subject, so send times are stored and looked

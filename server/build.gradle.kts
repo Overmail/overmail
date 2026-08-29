@@ -49,6 +49,8 @@ dependencies {
     implementation("es.jvbabi.overmail:kamel:0.4.0")
 
     testImplementation(kotlin("test"))
+    // runTest with an unconfined dispatcher, so a flow chain can be asserted without waiting.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
 
 kotlin {

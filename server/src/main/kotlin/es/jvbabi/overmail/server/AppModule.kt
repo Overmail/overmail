@@ -5,8 +5,8 @@ import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.DatabaseConfig
+import es.jvbabi.overmail.server.data.ChangeNotifiers
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.domain.repository.EmailRepository
 import es.jvbabi.overmail.server.domain.repository.EmailRepositoryImpl
 import es.jvbabi.overmail.server.domain.repository.EmailUserRepository
@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The Ktor application is the composition root: it owns the object graph and the coroutine scope
- * that the change stream and the importers run in, so stopping the server tears both down.
+ * the importers run in, so stopping the server tears them down.
  */
 fun Application.overmail() {
     configureDependencies()
@@ -50,7 +50,9 @@ private fun Application.configureDependencies() {
         // the only way to reach the database, so nothing can query it before this ran.
         provide<OvermailDatabase> { OvermailDatabase(resolve()).also { it.init() } }
 
-        provide<PostgresChangeStream> { PostgresChangeStream(resolve(), this@configureDependencies) }
+        // Not tied to a connection or a scope: the notifiers only pass changes from the
+        // repository that wrote them to the flows that have to reload because of it.
+        provide<ChangeNotifiers> { ChangeNotifiers() }
 
         provide<UserRepository> { UserRepositoryImpl(resolve(), resolve()) }
         provide<ImapAccountRepository> { ImapAccountRepositoryImpl(resolve(), resolve()) }

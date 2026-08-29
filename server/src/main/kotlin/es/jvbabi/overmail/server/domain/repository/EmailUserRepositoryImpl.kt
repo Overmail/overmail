@@ -1,7 +1,8 @@
 package es.jvbabi.overmail.server.domain.repository
 
+import es.jvbabi.overmail.server.data.ChangeNotifiers
+import es.jvbabi.overmail.server.data.reloads
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.database.mappers.toEmailUser
 import es.jvbabi.overmail.server.database.mappers.toUser
 import es.jvbabi.overmail.server.database.models.EmailUsers
@@ -23,11 +24,12 @@ import kotlin.uuid.Uuid
 
 class EmailUserRepositoryImpl(
     private val database: OvermailDatabase,
-    private val changes: PostgresChangeStream,
+    private val changes: ChangeNotifiers,
 ): EmailUserRepository {
 
     override fun getForUser(user: User): Flow<List<EmailUser>> {
-        return changes.changesOf(EmailUsers)
+        return changes.emailUsers.changesOfOwner(user.id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -42,7 +44,8 @@ class EmailUserRepositoryImpl(
     }
 
     override fun getById(id: Uuid): Flow<EmailUser?> {
-        return changes.changesOf(EmailUsers, Users)
+        return changes.emailUsers.changesOfRow(id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -57,7 +60,8 @@ class EmailUserRepositoryImpl(
     }
 
     override fun findByAddress(user: User, address: String): Flow<EmailUser?> {
-        return changes.changesOf(EmailUsers)
+        return changes.emailUsers.changesOfOwner(user.id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -72,7 +76,7 @@ class EmailUserRepositoryImpl(
     }
 
     override suspend fun findOrCreate(user: User, address: String): EmailUser {
-        return database.query {
+        val (emailUser, wasCreated) = database.query {
             // No upsert: the row holds nothing but the key, so there would be nothing to update.
             // insertIgnore returns null once the address is known, and the lookup then finds it --
             // including the row a concurrent importer just committed.
@@ -81,13 +85,19 @@ class EmailUserRepositoryImpl(
                 it[EmailUsers.address] = address
             }?.value
 
-            if (id != null) return@query EmailUser(id = id, user = user, address = address)
+            if (id != null) return@query EmailUser(id = id, user = user, address = address) to true
 
             EmailUsers
                 .selectAll()
                 .where((EmailUsers.user eq user.id) and (EmailUsers.address eq address))
                 .map { it.toEmailUser(user) }
-                .first()
+                .first() to false
         }
+
+        // Only for a row this call actually wrote: the lookup returns rows whose insert was
+        // already reported, by the importer of another account or by an earlier call.
+        if (wasCreated) changes.emailUsers.created(user.id, emailUser.id)
+
+        return emailUser
     }
 }

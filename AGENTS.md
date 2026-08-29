@@ -11,7 +11,7 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   Main.kt              starts the server, nothing else
   database/models/     Exposed table objects (UuidTable)
   database/mappers/    ResultRow -> domain model extensions
-  database/changes/    PostgresChangeStream (logical replication)
+  data/                change notifiers: what a write tells the flows to reload
   domain/models/       plain data classes, no Exposed types
   domain/repository/   repository interface + Impl per aggregate
   http/                Ktor engine, config and routes
@@ -41,8 +41,8 @@ dependencies {
 ```
 
 - Register the interface, never the `Impl`, so consumers cannot depend on the concrete type.
-- The `Application` doubles as the coroutine scope for the change stream and the importers, so
-  stopping the server tears them down.
+- The `Application` doubles as the coroutine scope for the importers, so stopping the server
+  tears them down.
 - Routes get their dependencies from the same container (`by dependencies` or
   `dependencies.resolve<T>()`); do not construct repositories inside a route.
 
@@ -75,30 +75,64 @@ repository interface, never on the `Impl`.
 
 **Every reading repository function returns a `Flow`.** Also the ones that look
 like a one-shot lookup — callers use `.first()` if they only want the current
-value. Build the flow off `PostgresChangeStream.changesOf(...)` so it re-emits
-whenever a relevant table changes:
+value. Build the flow off the `EntityNotifier` of the table it selects from, so
+it re-emits whenever that table or one of its parents changed:
 
 ```kotlin
 override fun getById(id: Uuid): Flow<Thing?> {
-    return changes.changesOf(Things)
+    return changes.things.changesOfRow(id)
+        .reloads()
         .conflate()
         .map { database.query { /* query, map via database/mappers */ } }
         .distinctUntilChanged()
 }
 ```
 
-- List `changesOf(...)` with *every* table the query reads, joins included.
-- `conflate()` before the query, so a burst of WAL events collapses into one read.
+- Pick the subscription by what the query asks for: `changesOfOwner(user.id)` for
+  the rows of one user, `changesOfRow(id)` for one row, `changes()` for a query
+  that spans users, `eventsOfOwner` / `eventsOfRow` when the joined parents do
+  not matter (a blob column, a lookup on this table alone).
+- `reloads()` right after, so the collector starts with the current state.
+- `conflate()` before the query, so a burst of events collapses into one read.
 - `distinctUntilChanged()` after it, so subscribers only see real changes. This
   needs the domain model to have a working `equals` — keep `ByteArray` out of
   data classes, expose blobs through their own accessor instead.
 
-**Writing functions are `suspend` and return the affected model**, not a `Flow`.
-A cold flow would run the write again on every collection. Subscribers pick the
-change up through their own flow anyway, because it lands in the WAL.
+**Writing functions are `suspend`, return the affected model** (not a `Flow`: a
+cold flow would run the write again on every collection) **and report the change
+to the notifier of their table, after the transaction committed**:
+
+```kotlin
+changes.things.created(user.id, thing.id)   // also modified(...) and deleted(...)
+```
+
+That report is the only thing that makes any subscriber reload. Nothing watches
+the database itself, so a row inserted by anything but this server — psql, a
+second instance — stays invisible until something else triggers a read.
 
 Not every repository is backed by the database: `OutgoingMailRepository` talks to SMTP through
 Jakarta Mail (Eclipse Angus). The rule that consumers depend on the interface holds there too.
+
+## Change notifiers
+
+`data/ChangeNotifiers.kt` holds one `EntityNotifier` per table and, in its
+constructor arguments, the foreign keys they are chained along:
+
+```kotlin
+val emails = EntityNotifier<Email.Id>(imapAccounts, emailUsers)
+```
+
+A notifier subscribes to the notifiers of its parents, so a change travels down
+that chain by itself: renaming a user reaches the mails of their imap accounts
+without `EmailRepositoryImpl` knowing that a user table exists. Register a new
+table there, with the notifiers of its foreign keys — that file is the only
+place that has to know the shape of the schema.
+
+Every row belongs to exactly one user, and the owner travels along the chain
+unchanged, which is what lets a subscription narrow down to one user's data. A
+child table written only inside its parent's transaction (`email_recipients`)
+needs no events of its own; the parent's cover it.
+
 
 ## Domain models
 
@@ -117,6 +151,7 @@ other Exposed type.
 
 ```
 ./gradlew :server:compileKotlin
+./gradlew :server:test          # notifier chain, no database needed
 ./gradlew :server:runServer     # creates the schema, talks to the shared dev DB
 curl localhost:8080/api/health
 curl localhost:8080/api/swagger/documentation.json

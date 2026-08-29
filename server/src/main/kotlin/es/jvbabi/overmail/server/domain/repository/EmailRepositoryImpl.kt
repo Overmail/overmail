@@ -1,7 +1,8 @@
 package es.jvbabi.overmail.server.domain.repository
 
+import es.jvbabi.overmail.server.data.ChangeNotifiers
+import es.jvbabi.overmail.server.data.reloads
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.changes.PostgresChangeStream
 import es.jvbabi.overmail.server.database.mappers.toEmail
 import es.jvbabi.overmail.server.database.mappers.toEmailRecipient
 import es.jvbabi.overmail.server.database.mappers.toEmailUser
@@ -17,6 +18,7 @@ import es.jvbabi.overmail.server.domain.models.EmailRecipient
 import es.jvbabi.overmail.server.domain.models.EmailUser
 import es.jvbabi.overmail.server.domain.models.ImapAccount
 import es.jvbabi.overmail.server.domain.models.NewEmailRecipient
+import es.jvbabi.overmail.server.domain.models.User
 import es.jvbabi.overmail.server.domain.models.truncatedToSecond
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
@@ -37,18 +39,26 @@ import kotlinx.coroutines.flow.firstOrNull as firstRowOrNull
 
 class EmailRepositoryImpl(
     private val database: OvermailDatabase,
-    private val changes: PostgresChangeStream,
+    private val changes: ChangeNotifiers,
 ): EmailRepository {
 
+    /**
+     * A mail is read together with its recipients, so both notifiers are in play. The recipient
+     * one already carries the mails, senders, accounts and users along its chain.
+     */
+    private fun mailChangesOf(owner: User.Id) = changes.emailRecipients.changesOfOwner(owner)
+
     override fun getForImapAccount(imapAccount: ImapAccount): Flow<List<Email>> {
-        return changes.changesOf(Emails, EmailRecipients, EmailUsers, ImapAccounts, Users)
+        return mailChangesOf(imapAccount.user.id)
+            .reloads()
             .conflate()
             .map { database.query { loadEmails(Emails.imapAccount eq imapAccount.id) } }
             .distinctUntilChanged()
     }
 
     override fun getById(id: Uuid): Flow<Email?> {
-        return changes.changesOf(Emails, EmailRecipients, EmailUsers, ImapAccounts, Users)
+        return changes.emails.changesOfRow(id)
+            .reloads()
             .conflate()
             .map { database.query { loadEmails(Emails.id eq id).firstOrNull() } }
             .distinctUntilChanged()
@@ -56,7 +66,8 @@ class EmailRepositoryImpl(
 
     /** No `distinctUntilChanged` here: `ByteArray` compares by identity, so it would never drop. */
     override fun getRawContent(id: Uuid): Flow<ByteArray?> {
-        return changes.changesOf(Emails)
+        return changes.emails.eventsOfRow(id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -70,7 +81,8 @@ class EmailRepositoryImpl(
     }
 
     override fun findDuplicate(imapAccount: ImapAccount, sent: Instant, subject: String): Flow<Uuid?> {
-        return changes.changesOf(Emails)
+        return changes.emails.eventsOfOwner(imapAccount.user.id)
+            .reloads()
             .conflate()
             .map {
                 database.query {
@@ -161,6 +173,10 @@ class EmailRepositoryImpl(
                 isRead = isRead,
                 recipients = storedRecipients,
             )
+        }.also { email ->
+            // After the transaction, so nothing reloads onto the state from before the insert.
+            // The recipients went in with it and are covered by this event, see [mailChangesOf].
+            if (email != null) changes.emails.created(imapAccount.user.id, email.id)
         }
     }
 

@@ -25,4 +25,10 @@ object EmailLabels : UuidTable("email_labels") {
     val labeledAt = timestamp("labeled_at").defaultExpression(CurrentTimestamp)
     val labeledByAgent = bool("labeled_by_agent")
     val reason = varchar("reason", 512).nullable()
+
+    init {
+        // One row per (email, label): the database enforces what the check-then-insert in the
+        // classification assumes, so concurrent runs cannot attach the same label twice.
+        uniqueIndex(email, label)
+    }
 }

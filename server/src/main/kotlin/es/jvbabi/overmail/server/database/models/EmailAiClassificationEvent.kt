@@ -19,6 +19,7 @@ class EmailAiClassificationEvent(id: EntityID<Uuid>) : UuidEntity(id) {
     var finishedAt by EmailAiClassificationEvents.finishedAt
     var tokensIn by EmailAiClassificationEvents.tokensIn
     var tokensOut by EmailAiClassificationEvents.tokensOut
+    var log by EmailAiClassificationEvents.log
 }
 
 object EmailAiClassificationEvents : UuidTable("email_ai_classification_events") {
@@ -29,4 +30,7 @@ object EmailAiClassificationEvents : UuidTable("email_ai_classification_events")
     val finishedAt = timestamp("finished_at").nullable()
     val tokensIn = integer("tokens_in").nullable()
     val tokensOut = integer("tokens_out").nullable()
+
+    /** Complete log of the classification run: prompts, raw model responses, decisions, errors. */
+    val log = text("log").nullable()
 }

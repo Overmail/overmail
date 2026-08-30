@@ -1,8 +1,9 @@
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar";
+    import * as Tooltip from "$lib/components/ui/tooltip";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
-    import type {EmailUser, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
 
     let {
         sent_at,
@@ -12,8 +13,9 @@
         bcc,
         subject,
         body,
+        labels,
         class: className,
-    }: StackEmail &{
+    }: StackEmail & {
         class?: string;
     } = $props();
 
@@ -43,7 +45,7 @@
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <Avatar.Root class="size-12">
-                <Avatar.Image src={from.avatarUrl} alt="" />
+                <Avatar.Image src={from.avatarUrl} alt=""/>
                 <Avatar.Fallback class="text-base">{initials}</Avatar.Fallback>
             </Avatar.Root>
             <div class="flex flex-col">
@@ -55,7 +57,7 @@
         </div>
 
         <div>
-            <span class="font-light text-accent-foreground">{sent_at}</span>
+            <span class="font-light text-accent-foreground">{sent_at.toLocaleString()}</span>
         </div>
     </div>
 
@@ -72,11 +74,48 @@
         {subject}
     </div>
 
+    <!-- Chips carry the label color as a dot and a subtle tint; the text keeps the theme's
+         foreground color so any label color stays readable in light and dark mode. -->
+    {#snippet chip(label: Label, props: Record<string, unknown> = {})}
+        <span
+                {...props}
+                class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                style={`background-color: color-mix(in srgb, ${label.color} 12%, transparent); border-color: color-mix(in srgb, ${label.color} 35%, transparent);`}
+        >
+            <span class="size-1.5 shrink-0 rounded-full" style={`background-color: ${label.color};`}></span>
+            {label.name}
+        </span>
+    {/snippet}
+
+    <div class="px-8 pt-3 flex flex-row flex-wrap items-center gap-1.5">
+        {#each labels as label (label.id)}
+            {#if label.label_description || label.assignment_reason}
+                <Tooltip.Root>
+                    <Tooltip.Trigger>
+                        {#snippet child({props})}
+                            {@render chip(label, props)}
+                        {/snippet}
+                    </Tooltip.Trigger>
+                    <Tooltip.Content side="bottom" class="flex-col items-start gap-0.5">
+                        {#if label.label_description}
+                            <p>{label.label_description}</p>
+                        {/if}
+                        {#if label.assignment_reason}
+                            <p class="text-background/70">{label.assignment_reason}</p>
+                        {/if}
+                    </Tooltip.Content>
+                </Tooltip.Root>
+            {:else}
+                {@render chip(label)}
+            {/if}
+        {/each}
+    </div>
+
     <div class="mx-4 my-4 h-px bg-accent"></div>
 
     <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
         {#if body.html}
-            <EmailHtmlBody html={body.html} />
+            <EmailHtmlBody html={body.html}/>
         {:else if body.text}
             {body.text}
         {:else}

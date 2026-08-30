@@ -134,6 +134,7 @@ type StackWebsocketServerMessage = {
         cc: EmailUser[],
         bcc: EmailUser[],
         sent_at: number,
+        labels: Label[]
     }[]
 }
 
@@ -154,6 +155,15 @@ export type StackEmail = {
         html: string | null,
     },
     classification: Classification | null,
+    labels: Label[],
+}
+
+export type Label = {
+    id: string;
+    name: string;
+    color: string;
+    assignment_reason: string | null;
+    label_description: string | null;
 }
 
 export type Classification = {

@@ -36,6 +36,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailAiClassificationEvents)
             SchemaUtils.create(Labels, EmailLabels)
             SchemaUtils.create(Stacks, EmailStacks)
+            SchemaUtils.create(EmailArchives)
         }
     }
 

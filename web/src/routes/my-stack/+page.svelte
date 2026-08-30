@@ -33,6 +33,14 @@
         },
         () => ({enabled: stackHasEmails})
     )
+
+    createHotkey(
+        "A",
+        () => {
+            viewModel.onArchiveOrUnarchiveEmail()
+        },
+        () => ({enabled: stackHasEmails})
+    )
 </script>
 
 <header
@@ -60,6 +68,7 @@
             <div class="absolute inset-0 flex justify-center pt-8">
                 <EmailStack
                         emails={viewModel.emails ?? []}
+                        onRequestReclassify={(email) => viewModel.onRequestEmailClassification(email.id)}
                         currentEmailId={viewModel.currentEmailId}
                         class="h-full"
                 />
@@ -80,7 +89,14 @@
             <div class="relative flex h-full flex-row items-center justify-center gap-6">
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="A" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArchiveIcon /> Archivieren</span>
+                    <span class="flex flex-row items-center gap-1">
+                        <ArchiveIcon />
+                        {#if viewModel.currentEmail?.classification?.type === "archive"}
+                            Entarchivieren
+                        {:else}
+                            Archivieren
+                        {/if}
+                    </span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">

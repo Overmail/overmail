@@ -5,11 +5,7 @@ import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.models.Email
-import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvents
-import es.jvbabi.overmail.server.database.models.EmailRecipientType
-import es.jvbabi.overmail.server.database.models.Emails
-import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
@@ -19,15 +15,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.v1.core.SortOrder
-import org.jetbrains.exposed.v1.core.and
-import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.greater
-import org.jetbrains.exposed.v1.core.isNotNull
-import org.jetbrains.exposed.v1.core.lessEq
-import org.jetbrains.exposed.v1.core.notExists
-import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.andWhere
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -35,6 +25,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private const val STACK_SIZE = 10
+
+/** How far ahead of the stack mails are classified, counted in stack order from the current batch. */
 private const val AI_PROCESSED_EMAIL_PUFFER = 50
 
 /** Unfinished classification runs older than this are treated as crashed and retried. */
@@ -43,6 +35,29 @@ private val CLASSIFICATION_RETRY_UNFINISHED_AFTER = 10.minutes
 private val json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
+}
+
+/**
+ * True for mails that belong in the stack. The archive table is an event log, so only the latest
+ * event decides: a mail is hidden when it has an Archive/Spam event with no Unarchive event at or
+ * after it. Filtering the joined rows instead would resurface re-archived mails, because their
+ * old Unarchive row still matches.
+ */
+private fun emailIsNotArchived(): Op<Boolean> {
+    val laterUnarchive = EmailArchives.alias("later_unarchive")
+    return notExists(
+        EmailArchives.selectAll().where {
+            (EmailArchives.email eq Emails.id) and
+                    (EmailArchives.action neq EmailArchiveAction.Unarchive) and
+                    notExists(
+                        laterUnarchive.selectAll().where {
+                            (laterUnarchive[EmailArchives.email] eq EmailArchives.email) and
+                                    (laterUnarchive[EmailArchives.action] eq EmailArchiveAction.Unarchive) and
+                                    (laterUnarchive[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
+                        }
+                    )
+        }
+    )
 }
 
 fun Route.stackSocket() {
@@ -60,18 +75,20 @@ fun Route.stackSocket() {
                 // raw_content with every row, which is the whole mail source.
                 var latestMailForThisBatch: Instant? = null
                 val mails = database.query {
-                    Emails
+                    val batch = Emails
                         .leftJoin(ImapAccounts)
-                        .selectAll()
+                        .select(Emails.columns)
                         .where { ImapAccounts.user eq user.id }
                         .andWhere { Emails.sent lessEq latestMail }
+                        .andWhere { emailIsNotArchived() }
                         .orderBy(Emails.sent, SortOrder.DESC)
                         .limit(STACK_SIZE)
                         .let { Email.wrapRows(it) }
-                        .also { mails ->
-                            if (!mails.empty()) latestMailForThisBatch = mails.minOf { it.sent }
-                        }
-                        .map { email ->
+                        .toList()
+
+                    if (batch.isNotEmpty()) latestMailForThisBatch = batch.minOf { it.sent }
+
+                    batch.map { email ->
                             val recipients = email.recipients.toList()
                             StackMail(
                                 id = email.id.value,
@@ -122,18 +139,30 @@ fun Route.stackSocket() {
                         }
                 }
 
-                // Make sure that the next 50 emails are being processed by AI. A mail needs
-                // classification unless it already has a finished run or one that started
-                // recently (= still running); unfinished runs older than the threshold are
-                // considered crashed and get retried. The NOT EXISTS subquery keeps this a
-                // single statement instead of one events query per mail.
+                // Classify ahead of the stack: the window is the next AI_PROCESSED_EMAIL_PUFFER
+                // mails the stack is going to serve (this batch included), in stack order. The
+                // window is cut BEFORE looking at the classification status — filtering first
+                // would make it "the first 50 unclassified mails" and reach arbitrarily far past
+                // the stack into old mail. Within the window, a mail is enqueued unless it has a
+                // finished run or one that started recently (= still running); unfinished runs
+                // older than the threshold count as crashed and get retried.
                 val runningThreshold = Clock.System.now() - CLASSIFICATION_RETRY_UNFINISHED_AFTER
                 database.query {
-                    Emails
+                    val upcomingEmailIds = Emails
                         .leftJoin(ImapAccounts)
-                        .selectAll()
+                        .select(Emails.id)
                         .where { ImapAccounts.user eq user.id }
                         .andWhere { Emails.sent lessEq latestMail }
+                        .andWhere { emailIsNotArchived() }
+                        .orderBy(Emails.sent, SortOrder.DESC)
+                        .limit(AI_PROCESSED_EMAIL_PUFFER)
+                        .map { it[Emails.id] }
+
+                    if (upcomingEmailIds.isEmpty()) return@query
+
+                    Emails
+                        .select(Emails.id)
+                        .where { Emails.id inList upcomingEmailIds }
                         .andWhere {
                             notExists(
                                 EmailAiClassificationEvents.selectAll().where {
@@ -143,8 +172,6 @@ fun Route.stackSocket() {
                                 }
                             )
                         }
-                        .orderBy(Emails.sent, SortOrder.DESC)
-                        .limit(AI_PROCESSED_EMAIL_PUFFER)
                         .forEach { row -> classificationQueue.enqueue(emailId = row[Emails.id].value) }
                 }
 
@@ -195,6 +222,30 @@ fun Route.stackSocket() {
                 val message = frame as? Frame.Text ?: continue
                 when (val clientMessage = json.decodeFromString<StackClientMessage>(message.readText())) {
                     is StackClientMessage.RequestEmails -> sendNewBatch()
+                    is StackClientMessage.ArchiveEmail -> {
+                        database.query {
+                            val email = Email.findById(clientMessage.emailId) ?: return@query
+                            // The id comes from the client; without this check any signed-in
+                            // user could archive mails of other users.
+                            if (email.imapAccount.user.id != user.id) return@query
+                            if (email.archiveState == EmailArchiveAction.Archive) return@query
+                            EmailArchive.new {
+                                this.email = email
+                                this.action = EmailArchiveAction.Archive
+                            }
+                        }
+                    }
+                    is StackClientMessage.UnarchiveEmail -> {
+                        database.query {
+                            val email = Email.findById(clientMessage.emailId) ?: return@query
+                            if (email.imapAccount.user.id != user.id) return@query
+                            if (email.archiveState == EmailArchiveAction.Unarchive) return@query
+                            EmailArchive.new {
+                                this.email = email
+                                this.action = EmailArchiveAction.Unarchive
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -227,6 +278,18 @@ private sealed class StackClientMessage {
     @Serializable
     @SerialName("request.emails")
     object RequestEmails : StackClientMessage()
+
+    @Serializable
+    @SerialName("update.email.archive")
+    data class ArchiveEmail(
+        @SerialName("email_id") val emailId: Uuid,
+    ) : StackClientMessage()
+
+    @Serializable
+    @SerialName("update.email.unarchive")
+    data class UnarchiveEmail(
+        @SerialName("email_id") val emailId: Uuid,
+    ) : StackClientMessage()
 }
 
 @Serializable

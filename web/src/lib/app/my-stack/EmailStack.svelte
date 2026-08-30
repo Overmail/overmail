@@ -6,11 +6,13 @@
     let {
         emails,
         currentEmailId,
+        onRequestReclassify,
         class: className,
     }: {
         /** Newest first: `emails[0]` is the card on top. */
         emails: StackEmail[];
         currentEmailId: string | null;
+        onRequestReclassify: (email: StackEmail) => Promise<boolean>;
         class?: string;
     } = $props();
 
@@ -138,7 +140,10 @@
             <!-- Hugs the card, so the tint below lines up with it instead of with the full-height
                  scroll box. -->
             <div class="relative w-fit">
-                <EmailCard {...email} />
+                <EmailCard
+                        {...email}
+                        onRequestReclassify={() => onRequestReclassify(email)}
+                />
                 <div
                         class="pointer-events-none absolute inset-0 rounded-2xl bg-background transition-opacity duration-500 motion-reduce:transition-none"
                         style="opacity: {fade}"

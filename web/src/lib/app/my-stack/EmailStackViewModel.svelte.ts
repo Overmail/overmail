@@ -61,6 +61,19 @@ export class EmailStackViewModel {
         this.onNextEmail();
     }
 
+    onArchiveOrUnarchiveEmail() {
+        if (!this.currentEmailId) return;
+        if (this.currentEmail!!.classification?.type === "archive") {
+            this.currentEmail!!.classification = null;
+            this.webSocketHandler.unarchiveEmail(this.currentEmailId);
+        } else {
+            this.currentEmail!!.classification = {type: "archive"};
+            this.webSocketHandler.archiveEmail(this.currentEmailId);
+        }
+
+        this.onNextEmail();
+    }
+
     onNextEmail() {
         if (this.currentEmailIndex === -1) return;
         if (this.currentEmailIndex + 1 >= this.emails.length) return;
@@ -76,6 +89,13 @@ export class EmailStackViewModel {
         if (this.currentEmailIndex === -1) return;
         if (this.currentEmailIndex - 1 < 0) return;
         this.currentEmailId = this.emails[this.currentEmailIndex - 1].id;
+    }
+
+    async onRequestEmailClassification(emailId: string) {
+        const result = await fetch(`/api/emails/${emailId}/classify`, {
+            method: "POST",
+        });
+        return result.ok;
     }
 }
 
@@ -149,6 +169,20 @@ class EmailStackWebSocketHandler {
         this.request({type: "request.emails"});
     }
 
+    archiveEmail(emailId: string) {
+        this.request({
+            type: "update.email.archive",
+            email_id: emailId
+        });
+    }
+
+    unarchiveEmail(emailId: string) {
+        this.request({
+            type: "update.email.unarchive",
+            email_id: emailId
+        });
+    }
+
     stop() {
         this.isStopped = true;
         this.webSocket?.close();
@@ -180,6 +214,12 @@ type StackWebsocketServerMessage = {
 
 type StackWebsocketClientMessage = {
     type: "request.emails",
+} | {
+    type: "update.email.archive",
+    email_id: string,
+} | {
+    type: "update.email.unarchive",
+    email_id: string,
 }
 
 export type StackEmail = {

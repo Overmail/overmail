@@ -1,11 +1,14 @@
 package es.jvbabi.overmail.server.database.models
 
 import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 import org.jetbrains.exposed.v1.dao.UuidEntity
 import org.jetbrains.exposed.v1.dao.UuidEntityClass
 import org.jetbrains.exposed.v1.datetime.timestamp
+import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -64,6 +67,15 @@ class Email(id: EntityID<Id>) : UuidEntity(id) {
     val recipients by EmailRecipient referrersOn EmailRecipients.email
     val aiClassificationEvents by EmailAiClassificationEvent referrersOn EmailAiClassificationEvents.email
     val labels by EmailLabel referrersOn EmailLabels.email
+    val archiveHistory by EmailArchive referrersOn EmailArchives.email
+
+    val archiveState get() =
+        EmailArchives
+            .select(EmailArchives.action)
+            .where { EmailArchives.email eq this@Email.id }
+            .orderBy(EmailArchives.createdAt, SortOrder.DESC)
+            .limit(1)
+            .singleOrNull()?.get(EmailArchives.action) ?: EmailArchiveAction.Unarchive
 }
 
 /**

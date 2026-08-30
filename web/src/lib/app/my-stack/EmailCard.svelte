@@ -1,9 +1,12 @@
 <script lang="ts">
     import * as Avatar from "$lib/components/ui/avatar";
     import * as Tooltip from "$lib/components/ui/tooltip";
+    import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
     import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import {Button} from "$lib/components/ui/button";
+    import { DotsThreeVerticalIcon } from "phosphor-svelte";
 
     let {
         sent_at,
@@ -15,8 +18,10 @@
         body,
         labels,
         class: className,
+        onRequestReclassify,
     }: StackEmail & {
         class?: string;
+        onRequestReclassify: () => Promise<boolean>;
     } = $props();
 
     const fields = $derived([
@@ -56,8 +61,28 @@
             </div>
         </div>
 
-        <div>
+        <div class="flex flex-row items-center gap-1">
             <span class="font-light text-accent-foreground">{sent_at.toLocaleString()}</span>
+
+            <DropdownMenu.Root>
+                <DropdownMenu.Trigger>
+                    <Button
+                            variant="ghost"
+                            size="icon"
+                    >
+                        <DotsThreeVerticalIcon />
+                    </Button>
+                </DropdownMenu.Trigger>
+
+                <DropdownMenu.Content class="w-56" align="start">
+                    <DropdownMenu.Label>Overmail AI</DropdownMenu.Label>
+                    <DropdownMenu.Group>
+                        <DropdownMenu.Item onclick={onRequestReclassify}>
+                            Erneut klassifizieren
+                        </DropdownMenu.Item>
+                    </DropdownMenu.Group>
+                </DropdownMenu.Content>
+            </DropdownMenu.Root>
         </div>
     </div>
 

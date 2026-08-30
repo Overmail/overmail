@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.ai.classification
 
+import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
@@ -10,7 +11,10 @@ import java.util.concurrent.ConcurrentHashMap
  * [enqueue] is safe to call from any thread or coroutine; [consume] is meant to be run by a single
  * consumer coroutine (see `startJobs` in `AppModule`).
  */
-class EmailClassificationQueue {
+class EmailClassificationQueue(
+    private val emailClassification: EmailClassification,
+    private val database: OvermailDatabase,
+) {
 
     /** IDs currently waiting in [channel]. Used to skip emails that are already queued. */
     private val pending = ConcurrentHashMap.newKeySet<Email.Id>()
@@ -33,7 +37,9 @@ class EmailClassificationQueue {
         for (emailId in channel) {
             // Released before processing, so an email changing mid-classification can be re-queued.
             pending.remove(emailId)
-            println(emailId)
+            val email = database.query { Email.findById(emailId) } ?: continue
+
+            emailClassification.run(email = email)
         }
     }
 }

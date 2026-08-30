@@ -1,11 +1,6 @@
 package es.jvbabi.overmail.server.database
 
-import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvents
-import es.jvbabi.overmail.server.database.models.EmailRecipients
-import es.jvbabi.overmail.server.database.models.EmailUsers
-import es.jvbabi.overmail.server.database.models.Emails
-import es.jvbabi.overmail.server.database.models.ImapAccounts
-import es.jvbabi.overmail.server.database.models.Users
+import es.jvbabi.overmail.server.database.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -39,6 +34,8 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(Emails)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)
+            SchemaUtils.create(Labels, EmailLabels)
+            SchemaUtils.create(Stacks, EmailStacks)
         }
     }
 

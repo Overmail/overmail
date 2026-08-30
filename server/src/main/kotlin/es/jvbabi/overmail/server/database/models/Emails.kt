@@ -63,6 +63,7 @@ class Email(id: EntityID<Id>) : UuidEntity(id) {
 
     val recipients by EmailRecipient referrersOn EmailRecipients.email
     val aiClassificationEvents by EmailAiClassificationEvent referrersOn EmailAiClassificationEvents.email
+    val labels by EmailLabel referrersOn EmailLabels.email
 }
 
 /**

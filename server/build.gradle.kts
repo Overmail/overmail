@@ -56,6 +56,8 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:3.5.2")
     // In-memory database for tests that need real rows; the schema is created per test class.
     testImplementation("com.h2database:h2:2.4.240")
+
+    implementation("ai.koog:koog-agents:1.2.0")
 }
 
 kotlin {

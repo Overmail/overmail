@@ -1,5 +1,9 @@
 package es.jvbabi.overmail.server
 
+import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.llm.LLMProvider
+import ai.koog.prompt.llm.LLModel
+import es.jvbabi.overmail.server.ai.classification.EmailClassification
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
@@ -57,7 +61,42 @@ private fun Application.configureDependencies() {
 
         provide<JwtService> { JwtService() }
 
-        provide<EmailClassificationQueue> { EmailClassificationQueue() }
+        provide {
+            val config = resolve<ApplicationConfig>()
+            // The provider must be LLMProvider.OpenAI: MultiLLMPromptExecutor routes requests by
+            // comparing the model's provider with the one the registered client reports, and
+            // OpenAILLMClient reports LLMProvider.OpenAI regardless of its base URL.
+            // OpenAIEndpoint.Completions is required: without it the client cannot decide
+            // between the Chat-Completions and the Responses API and refuses the request.
+            // Baseten only offers the Chat-Completions endpoint. No Schema capability, so
+            // executeStructured embeds the JSON schema and examples into the prompt (manual
+            // mode), which works regardless of what the served model supports.
+            LLModel(
+                provider = LLMProvider.OpenAI,
+                id = config.ai.model,
+                capabilities = listOf(
+                    LLMCapability.OpenAIEndpoint.Completions,
+                    LLMCapability.Completion,
+                    LLMCapability.Temperature,
+                    LLMCapability.Tools,
+                ),
+            )
+        }
+
+        provide {
+            EmailClassification(
+                config = resolve<ApplicationConfig>(),
+                model = resolve(),
+                overmailDatabase = resolve()
+            )
+        }
+
+        provide<EmailClassificationQueue> {
+            EmailClassificationQueue(
+                emailClassification = resolve(),
+                database = resolve()
+            )
+        }
 
         provide<ImporterManager> {
             ImporterManager(

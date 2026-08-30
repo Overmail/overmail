@@ -2,6 +2,8 @@ package es.jvbabi.overmail.server.http.stack
 
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.user
+import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
+import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvents
@@ -13,6 +15,7 @@ import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -47,6 +50,7 @@ fun Route.stackSocket() {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
+            val emailLabelNotifier = application.dependencies.resolve<EmailLabelNotifier>()
 
             val user = call.user
             var latestMail = Clock.System.now()
@@ -145,6 +149,41 @@ fun Route.stackSocket() {
                 }
 
                 sendSerialized<StackServerMessage>(StackServerMessage.Emails(mails))
+
+                mails.forEach { mail ->
+                    launch {
+                        emailLabelNotifier.subscribe(mail.id).collect { event ->
+                            when (event) {
+                                is EmailLabelEvent.Upsert -> {
+                                    sendSerialized<StackServerMessage>(
+                                        StackServerMessage.EmailTagsAdded(
+                                            emailId = mail.id,
+                                            tags = listOf(
+                                                StackMail.Label(
+                                                    id = event.label.id.value,
+                                                    name = event.label.name,
+                                                    color = event.label.color,
+                                                    description = event.label.description,
+                                                    assignmentReason = null,
+                                                    createdByAgent = event.label.createdByAgent
+                                                )
+                                            )
+                                        )
+                                    )
+                                }
+                                is EmailLabelEvent.Delete -> {
+                                    sendSerialized<StackServerMessage>(
+                                        StackServerMessage.EmailTagsDeleted(
+                                            emailId = mail.id,
+                                            tagIds = listOf(event.label.id.value)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (latestMailForThisBatch != null) {
                     latestMail = latestMailForThisBatch
                 }
@@ -173,6 +212,13 @@ private sealed class StackServerMessage {
     data class EmailTagsAdded(
         @SerialName("email_id") val emailId: Uuid,
         @SerialName("tags") val tags: List<StackMail.Label>
+    ) : StackServerMessage()
+
+    @Serializable
+    @SerialName("update.email.tags.delete")
+    data class EmailTagsDeleted(
+        @SerialName("email_id") val emailId: Uuid,
+        @SerialName("tag_ids") val tagIds: List<Uuid>
     ) : StackServerMessage()
 }
 

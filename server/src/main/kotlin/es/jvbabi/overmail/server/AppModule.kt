@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
+import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.configureRouting
@@ -55,6 +56,8 @@ private fun Application.configureDependencies() {
         provide<DatabaseConfig> { resolve<ApplicationConfig>().database }
         provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
 
+        provide<EmailLabelNotifier> { EmailLabelNotifier() }
+
         // Creating the schema on first resolution keeps it in one place: every caller reaches
         // the database through this provider, so nothing can query it before this ran.
         provide<OvermailDatabase> { OvermailDatabase(resolve<DatabaseConfig>()).also { it.init() } }
@@ -87,7 +90,8 @@ private fun Application.configureDependencies() {
             EmailClassification(
                 config = resolve<ApplicationConfig>(),
                 model = resolve(),
-                overmailDatabase = resolve()
+                overmailDatabase = resolve(),
+                emailLabelNotifier = resolve(),
             )
         }
 

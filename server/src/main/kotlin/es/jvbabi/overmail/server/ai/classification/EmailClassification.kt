@@ -9,6 +9,7 @@ import ai.koog.prompt.executor.model.executeStructured
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.structure.StructuredResponse
 import es.jvbabi.overmail.server.config.ApplicationConfig
+import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvent
@@ -29,6 +30,7 @@ class EmailClassification(
     config: ApplicationConfig,
     private val model: LLModel,
     private val overmailDatabase: OvermailDatabase,
+    private val emailLabelNotifier: EmailLabelNotifier,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -226,6 +228,7 @@ class EmailClassification(
                 return@forEach
             }
 
+            var attachedLabel: Label? = null
             val (resolvedName, existing, alreadyAttached) = overmailDatabase.query {
                 // Case-insensitive lookup as the last line of defense against duplicate labels
                 // that differ only in casing (e.g. "newsletter" vs "Newsletter"). When a label is
@@ -251,10 +254,14 @@ class EmailClassification(
                         this.labeledByAgent = true
                         this.reason = label.reason
                     }
+                    attachedLabel = labelElement
                 }
 
                 Triple(labelElement.name, existing != null, alreadyAttached)
             }
+            // Notified after the transaction committed, so subscribers never see a label that
+            // could still be rolled back.
+            attachedLabel?.let { emailLabelNotifier.notifyLabelUpsert(email.id.value, it) }
             log(
                 "Label '$requestedName': " +
                         (if (existing) "reused existing label '$resolvedName'" else "created new label") +

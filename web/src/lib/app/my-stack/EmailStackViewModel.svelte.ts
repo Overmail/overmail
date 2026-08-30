@@ -26,7 +26,25 @@ export class EmailStackViewModel {
                 if (isFirstBatchOfEmails && emails.length > 0) {
                     this.currentEmailId = emails[0].id;
                 }
-            }
+            },
+            onLabelsUpserted: (emailId, labels) => {
+                console.log(labels);
+                const email = this.emails.find(e => e.id === emailId);
+                if (!email) return;
+                labels.forEach(label => {
+                    const index = email.labels.findIndex(l => l.id === label.id);
+                    if (index === -1) {
+                        email.labels.push(label);
+                    } else {
+                        email.labels[index] = label;
+                    }
+                });
+            },
+            onLabelsDeleted: (emailId, labelIds) => {
+                const email = this.emails.find(e => e.id === emailId);
+                if (!email) return;
+                email.labels = email.labels.filter(l => !labelIds.includes(l.id));
+            },
         })
 
         this.webSocketHandler.start();
@@ -67,9 +85,17 @@ class EmailStackWebSocketHandler {
 
     private readonly emailBodyRepository = new EmailBodyRepository();
     private readonly onEmails: (emails: StackEmail[]) => void
+    private readonly onLabelsUpserted: (emailId: string, labels: Label[]) => void
+    private readonly onLabelsDeleted: (emailId: string, labelIds: string[]) => void
 
-    constructor(config: {onEmails: (emails: StackEmail[]) => void}) {
+    constructor(config: {
+        onEmails: (emails: StackEmail[]) => void,
+        onLabelsUpserted: (emailId: string, labels: Label[]) => void,
+        onLabelsDeleted: (emailId: string, labelIds: string[]) => void,
+    }) {
         this.onEmails = config.onEmails;
+        this.onLabelsUpserted = config.onLabelsUpserted;
+        this.onLabelsDeleted = config.onLabelsDeleted;
     }
 
     private requestQueue: StackWebsocketClientMessage[] = [];
@@ -100,6 +126,12 @@ class EmailStackWebSocketHandler {
                         }))
                     );
                     this.onEmails(emails);
+                    break;
+                case "update.email.tags.upsert":
+                    this.onLabelsUpserted(message.email_id, message.tags);
+                    break;
+                case "update.email.tags.delete":
+                    this.onLabelsDeleted(message.email_id, message.tag_ids);
                     break;
             }
         }
@@ -136,6 +168,14 @@ type StackWebsocketServerMessage = {
         sent_at: number,
         labels: Label[]
     }[]
+} | {
+    type: "update.email.tags.upsert",
+    email_id: string,
+    tags: Label[],
+} | {
+    type: "update.email.tags.delete",
+    email_id: string,
+    tag_ids: string[],
 }
 
 type StackWebsocketClientMessage = {

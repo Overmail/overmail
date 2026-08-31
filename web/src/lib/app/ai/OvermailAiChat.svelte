@@ -1,12 +1,12 @@
 <script lang="ts">
     import {Separator} from "$lib/components/ui/separator";
-    import {ArrowUpIcon} from "phosphor-svelte";
+    import {ArrowUpIcon, LightbulbIcon} from "phosphor-svelte";
     import * as InputGroup from "$lib/components/ui/input-group";
     import * as Select from "$lib/components/ui/select";
     import {onMount} from "svelte";
     import {fade} from "svelte/transition";
-    import type {Prompt} from "$lib/app/ai/popover/prompt";
     import PromptInput from "$lib/app/ai/popover/PromptInput.svelte";
+    import {OvermailPromptViewModel} from "$lib/app/ai/popover/OvermailPromptViewModel.svelte";
 
     const placeholders = [
         "Frage etwas oder gib eine Aufgabe",
@@ -28,31 +28,20 @@
         return () => clearInterval(interval);
     })
 
-    let prompt: Prompt = $state({
-        segments: [
-            {type: "text", content: "Fasse "},
-            {type: "email", emailId: "email-123"},
-            {type: "text", content: " zusammen und versehe sie mit dem Label "},
-            {type: "label", labelId: "label-uni"},
-            {type: "text", content: "."},
-        ],
-    });
-
-    let promptEmpty = $derived(
-        prompt.segments.every((s) => s.type === "text" && s.content.trim() === "")
-    );
+    const promptViewModel = new OvermailPromptViewModel();
+    let promptEmpty = $derived(promptViewModel.isEmpty);
 
     let promptType: "normal" | "read-only" = $state("normal");
 </script>
 
 <h1 class="text-xl">Overmail AI</h1>
-<div class="flex flex-col h-128 pb-4">
+<div class="flex flex-col h-192">
     <div class="w-full flex-1 overflow-y-auto">
         history
     </div>
 
-    <div class="h-24">
-        <InputGroup.Root>
+    <div class="flex flex-col min-h-24 max-h-56">
+        <InputGroup.Root class="flex-1 min-h-0">
             {#if promptEmpty}
                 {#key placeholder}
                     <span
@@ -64,7 +53,7 @@
                     </span>
                 {/key}
             {/if}
-            <PromptInput bind:prompt/>
+            <PromptInput viewModel={promptViewModel}/>
 
             <InputGroup.Addon align="block-end">
                 <Select.Root type="single" bind:value={promptType}>
@@ -96,5 +85,9 @@
                 </InputGroup.Button>
             </InputGroup.Addon>
         </InputGroup.Root>
+        <span class="block text-muted-foreground text-sm pt-1 pl-4 font-medium tracking-tight">
+            <LightbulbIcon class="inline-block size-3.5 align-[-0.2em]" />
+            Markiere #labels, @emails oder :personen
+        </span>
     </div>
 </div>

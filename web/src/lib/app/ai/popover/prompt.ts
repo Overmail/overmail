@@ -1,3 +1,6 @@
+import type {Component} from "svelte";
+import type {OvermailPromptViewModel} from "./OvermailPromptViewModel.svelte";
+
 export type Prompt = {
     segments: PromptSegment[];
 }
@@ -10,5 +13,34 @@ export type PromptSegment = {
     emailId: string;
 } | {
     type: "label",
-    labelId: string;
+    label: PromptLabel;
 }
+
+export type PromptLabel = {
+    id: string;
+    name: string;
+    color: string;
+}
+
+// Props, die jedes Trigger-Fenster vom PromptInput bekommt. Ein Fenster kann zusätzlich
+// eine Instanz-Funktion `handleKey(event): boolean` exportieren, an die der Editor
+// Tastatur-Events (Pfeile, Enter) weiterreicht, solange das Fenster offen ist.
+export type PromptTriggerWindowProps = {
+    query: string;
+    left: number;
+    bottom: number;
+    viewModel: OvermailPromptViewModel;
+    // Ersetzt den Trigger-Text (Zeichen + Query) durch das Segment.
+    onReplace: (segment: PromptSegment) => void;
+    onDismiss: () => void;
+};
+
+export type PromptTriggerWindowExports = {
+    handleKey?: (event: KeyboardEvent) => boolean;
+};
+
+// Ein Zeichen, das im Prompt-Editor ein Query-Fenster öffnet (z.B. "#" für Labels).
+export type PromptTriggerDefinition = {
+    char: string;
+    window: Component<PromptTriggerWindowProps, PromptTriggerWindowExports>;
+};

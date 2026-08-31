@@ -1,5 +1,6 @@
 <script lang="ts">
     import {onMount, type Snippet} from "svelte";
+    import {cubicOut} from "svelte/easing";
     import {cn} from "$lib/utils.js";
     import * as Kbd from "$lib/components/ui/kbd";
     import {_} from "svelte-i18n";
@@ -17,6 +18,19 @@
     } = $props();
 
     let element: HTMLDivElement;
+
+    /**
+     * Ein- und Ausblenden wie ein Popover: Opacity plus ein leichtes Aufsteigen aus der
+     * Ankerkante. Animiert werden die eigenständigen Properties `translate` und `scale` —
+     * `transform` gehört clampToViewport und würde sich sonst mit der Transition überschreiben.
+     */
+    function float(_node: Element, {duration}: {duration: number}) {
+        return {
+            duration,
+            easing: cubicOut,
+            css: (t: number, u: number) => `opacity: ${t}; scale: ${0.96 + 0.04 * t}; translate: 0 ${u * 8}px;`,
+        };
+    }
 
     // Mindestabstand zur Viewport-Kante (p-4).
     const MARGIN = 16;
@@ -64,8 +78,10 @@
 
 <div
         bind:this={element}
+        in:float={{duration: 150}}
+        out:float={{duration: 100}}
         class={cn(
-            "absolute z-50 max-w-[calc(100vw-2rem)] max-h-64 overflow-y-auto rounded-md border bg-popover text-sm text-popover-foreground shadow-md",
+            "absolute z-50 max-w-[calc(100vw-2rem)] max-h-64 origin-bottom-left overflow-y-auto rounded-md border bg-popover text-sm text-popover-foreground shadow-md",
             className,
         )}
         style:left="{left}px"

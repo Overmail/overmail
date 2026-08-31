@@ -87,8 +87,7 @@
                 continue;
             }
 
-            // Zero-Width-Spaces sind nur Cursor-Anker im DOM, nie Teil des Prompts.
-            const text = (node instanceof HTMLBRElement ? "\n" : node.textContent ?? "").replaceAll("\u200B", "");
+            const text = node instanceof HTMLBRElement ? "\n" : node.textContent ?? "";
             if (!text) continue;
 
             const last = segments[segments.length - 1];
@@ -122,9 +121,8 @@
         element.remove();
 
         if (prev instanceof Text && next instanceof Text) {
-            // Beim Join gleich die Zero-Width-Space-Anker aufräumen.
-            const prevText = (prev.textContent ?? "").replaceAll("\u200B", "");
-            prev.textContent = prevText + (next.textContent ?? "").replaceAll("\u200B", "");
+            const prevText = prev.textContent ?? "";
+            prev.textContent = prevText + (next.textContent ?? "");
             next.remove();
             setCaret(prev, prevText.length);
         } else if (prev instanceof Text) {
@@ -144,10 +142,7 @@
 
         let candidate: Node | null = null;
         if (selection.anchorNode instanceof Text) {
-            // Steht vor dem Cursor höchstens ein Zero-Width-Space, zählt das wie Offset 0 —
-            // sonst müsste man den unsichtbaren Anker erst "leer" wegtippen.
-            const before = (selection.anchorNode.textContent ?? "").slice(0, selection.anchorOffset);
-            if (/^\u200B*$/.test(before)) candidate = selection.anchorNode.previousSibling;
+            if (selection.anchorOffset === 0) candidate = selection.anchorNode.previousSibling;
         } else if (selection.anchorNode === editor && selection.anchorOffset > 0) {
             candidate = editor.childNodes[selection.anchorOffset - 1];
         }
@@ -185,6 +180,17 @@
         caretBeside(host, event.clientX >= rect.left + rect.width / 2);
     }
 
+    // Ein Zeichen zählt nur dann als Trigger, wenn es am Anfang eines Textabschnitts steht
+    // oder direkt hinter einem Whitespace — sonst öffnete jedes "foo:bar", "12:30" oder
+    // "a@b.tld" ein Fenster.
+    function isTriggerPosition(node: Text, index: number, char: string): boolean {
+        const content = node.textContent ?? "";
+        if (content[index] !== char) return false;
+
+        const before = content.slice(0, index);
+        return before === "" || /\s$/.test(before);
+    }
+
     // Startet eine Session, wenn der eben eingefügte Text genau ein Trigger-Zeichen ist.
     function maybeStartSession(event: InputEvent) {
         if (event.inputType !== "insertText") return;
@@ -197,13 +203,14 @@
         if (!(node instanceof Text) || node.parentNode !== editor) return;
 
         const index = selection.anchorOffset - 1;
-        if (index < 0 || (node.textContent ?? "")[index] !== definition.char) return;
+        if (index < 0 || !isTriggerPosition(node, index, definition.char)) return;
 
         session = {definition, node, index};
     }
 
-    // Validiert die laufende Session gegen die aktuelle Cursor-Position: der Cursor
-    // muss im selben Textknoten hinter dem (noch vorhandenen) Trigger-Zeichen stehen.
+    // Validiert die laufende Session gegen die aktuelle Cursor-Position: der Cursor muss im
+    // selben Textknoten hinter dem Trigger-Zeichen stehen, und das Zeichen muss dort noch an
+    // einer Trigger-Position sitzen — schreibt jemand davor, endet die Session.
     function updateTrigger() {
         if (!session) {
             activeTrigger = null;
@@ -216,7 +223,7 @@
             && selection.anchorNode === node
             && node.parentNode === editor
             && selection.anchorOffset > session.index
-            && (node.textContent ?? "")[session.index] === session.definition.char;
+            && isTriggerPosition(node, session.index, session.definition.char);
         if (!valid) {
             session = null;
             activeTrigger = null;
@@ -269,21 +276,18 @@
         const host = createSegmentHost(segment);
         trigger.node.after(host);
 
-        // In einem komplett leeren Textknoten zeichnet Chrome den Cursor optisch noch
-        // im Label davor. Ein Zero-Width-Space gibt ihm eine echte Position dahinter;
-        // syncFromDom filtert ihn aus dem Modell wieder heraus.
-        let after = host.nextSibling;
-        let caretOffset = 0;
-        if (remainder !== "" || !(after instanceof Text)) {
-            after = document.createTextNode(remainder === "" ? "\u200B" : remainder);
-            caretOffset = remainder === "" ? 1 : 0;
-            host.after(after);
-        }
+        // Hinter dem Chip steht immer ein Leerzeichen: es trennt ihn vom nächsten Wort, macht
+        // das folgende Zeichen zu einer gültigen Trigger-Position und gibt dem Cursor eine
+        // echte Position hinter dem Chip — in einem leeren Textknoten zeichnet Chrome ihn
+        // sonst optisch noch im Chip davor. Stand hinter dem Cursor schon ein Whitespace,
+        // bleibt es bei dem einen.
+        const after = document.createTextNode(/^\s/.test(remainder) ? remainder : ` ${remainder}`);
+        host.after(after);
 
         session = null;
         activeTrigger = null;
         editor.focus();
-        setCaret(after, caretOffset);
+        setCaret(after, 1);
         syncFromDom();
     }
 

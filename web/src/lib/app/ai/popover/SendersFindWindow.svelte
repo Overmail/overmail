@@ -78,7 +78,7 @@
         <div class="px-2 py-1.5 text-muted-foreground">{$_('ai.senders.empty')}</div>
     {/if}
 
-    <div bind:this={listElement} class="max-h-64 overflow-y-auto">
+    <div bind:this={listElement} class="max-h-64 overflow-y-auto pb-12">
         {#each senders as sender, index}
             <button
                     bind:this={itemElements[index]}

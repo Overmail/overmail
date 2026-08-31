@@ -90,7 +90,7 @@
                         variant="default"
                         class="rounded-full"
                         size="icon-xs"
-                        disabled
+                        disabled={promptEmpty || promptViewModel.currentModel.type === "loading"}
                 >
                     <ArrowUpIcon/>
                     <span class="sr-only">{$_('ai.chat.send')}</span>

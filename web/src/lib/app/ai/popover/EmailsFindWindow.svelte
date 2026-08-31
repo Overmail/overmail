@@ -41,7 +41,7 @@
     /** Breite, auf der HTML-Mails typischerweise designt sind; darauf wird gerendert. */
     const PREVIEW_DESIGN_WIDTH = 640;
     /** Innenabstand (p-2) der Vorschau-Ebene, geht von der nutzbaren Breite ab. */
-    const PREVIEW_PADDING = 8;
+    const PREVIEW_PADDING = 0;
     /** Obergrenze gleichzeitig gemounteter Vorschau-Iframes. */
     const MAX_MOUNTED_PREVIEWS = 20;
     /** Vergrößerungsfaktor der Hover-Lupe, relativ zur angezeigten Vorschau. */
@@ -163,7 +163,7 @@
     }
 </script>
 
-<TriggerWindow {left} {bottom} class="w-max min-w-80 max-w-[min(28rem,calc(100vw-2rem))] max-h-[38rem] p-1">
+<TriggerWindow {left} {bottom} class="w-max min-w-80 max-w-[min(28rem,calc(100vw-2rem))] max-h-152 p-1">
     {#if currentEmailId !== null}
         <!-- Vorschau des präferierten Inhalts (HTML vor Text) der markierten Mail. Alle schon
              geladenen Vorschauen bleiben als unsichtbare Ebenen gemountet (invisible statt
@@ -178,8 +178,9 @@
             {#each mountedPreviews as entry (entry.id)}
                 <div
                         class={cn(
-                            "absolute inset-0 cursor-none overflow-y-auto overflow-x-hidden p-2",
+                            "absolute inset-0 cursor-none overflow-y-auto overflow-x-hidden",
                             entry.id !== currentEmailId && "invisible",
+                            entry.body.text && !entry.body.html && "p-2",
                         )}
                         onmousemove={onPreviewMousemove}
                         onmouseleave={() => lens = null}
@@ -246,7 +247,7 @@
         <div class="px-2 py-1.5 text-muted-foreground">{$_('ai.emails.empty')}</div>
     {/if}
 
-    <div bind:this={listElement} class="max-h-56 overflow-y-auto">
+    <div bind:this={listElement} class="max-h-56 overflow-y-auto pb-12">
         {#each emails as email, index}
             <button
                     bind:this={itemElements[index]}

@@ -1,6 +1,8 @@
 <script lang="ts">
     import {onMount, type Snippet} from "svelte";
     import {cn} from "$lib/utils.js";
+    import * as Kbd from "$lib/components/ui/kbd";
+    import {_} from "svelte-i18n";
 
     let {
         left,
@@ -70,4 +72,35 @@
         style:bottom="{bottom}px"
 >
     {@render children()}
+
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-linear-to-b from-transparent to-popover">
+        <div class="absolute inset-0 backdrop-blur-[2px] mask-[linear-gradient(to_bottom,transparent_0%,black_25%)]"></div>
+        <div class="absolute inset-0 backdrop-blur-xs mask-[linear-gradient(to_bottom,transparent_25%,black_50%)]"></div>
+        <div class="absolute inset-0 backdrop-blur-sm mask-[linear-gradient(to_bottom,transparent_50%,black_75%)]"></div>
+        <div class="absolute inset-0 backdrop-blur-lg mask-[linear-gradient(to_bottom,transparent_75%,black_100%)]"></div>
+
+        <div class="relative flex h-full flex-row items-end gap-3 px-2 pb-1.5 text-xs text-muted-foreground">
+            <div class="flex flex-row items-center gap-1">
+                <span>{$_('ai.shortcuts.navigate')}</span>
+                <Kbd.Group>
+                    <Kbd.Root>&uparrow;</Kbd.Root>
+                    <Kbd.Root>&downarrow;</Kbd.Root>
+                </Kbd.Group>
+            </div>
+
+            <div class="flex flex-row items-center gap-1">
+                <span>{$_('ai.shortcuts.select')}</span>
+                <Kbd.Group>
+                    <Kbd.Root>&crarr;</Kbd.Root>
+                </Kbd.Group>
+            </div>
+
+            <div class="flex flex-row items-center gap-1">
+                <span>{$_('ai.shortcuts.dismiss')}</span>
+                <Kbd.Group>
+                    <Kbd.Root>Esc</Kbd.Root>
+                </Kbd.Group>
+            </div>
+        </div>
+    </div>
 </div>

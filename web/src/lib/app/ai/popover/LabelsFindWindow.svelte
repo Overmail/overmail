@@ -84,7 +84,7 @@
         <div class="px-2 py-1.5 text-muted-foreground">{$_('ai.labels.empty')}</div>
     {/if}
 
-    <div bind:this={listElement} class="max-h-64 overflow-y-auto">
+    <div bind:this={listElement} class="max-h-64 overflow-y-auto pb-12">
         {#each options as option, index}
             <button
                     bind:this={itemElements[index]}

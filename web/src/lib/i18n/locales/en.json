@@ -79,6 +79,11 @@
 			"emailCount": "{count, plural, one {# mail} other {# mails}}",
 			"create": "New label “{name}”"
 		},
+		"shortcuts": {
+			"navigate": "Navigate",
+			"select": "Select",
+			"dismiss": "Dismiss"
+		},
 		"senders": {
 			"empty": "No senders found",
 			"emailCount": "{count, plural, one {# mail} other {# mails}}"

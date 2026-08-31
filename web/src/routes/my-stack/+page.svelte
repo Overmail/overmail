@@ -7,6 +7,7 @@
     import {onMount} from "svelte";
     import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
+    import OvermailAiPopover from "$lib/app/ai/popover/OvermailAiPopover.svelte";
 
     let viewModel: EmailStackViewModel = new EmailStackViewModel();
 
@@ -41,6 +42,8 @@
         },
         () => ({enabled: stackHasEmails})
     )
+
+    let showOvermailAI = $state(true);
 </script>
 
 <header
@@ -51,7 +54,7 @@
         <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
         <h1 class="text-base font-medium">Stack</h1>
         <div class="ms-auto flex items-center gap-2">
-            <!-- End of header -->
+            <OvermailAiPopover bind:open={showOvermailAI} />
         </div>
     </div>
 </header>

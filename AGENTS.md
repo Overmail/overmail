@@ -139,11 +139,20 @@ Mixing the DSL into DAO code is fine and sometimes the point: the importer uses
 importer, because `EmailUser.new` would throw on the unique index instead.
 
 ## Conventions
-
-- Table names are plural snake_case (`imap_accounts`, `email_recipients`).
+### General
 - Comments and identifiers in English, KDoc only where the *why* is non-obvious.
+
+### Backend
+- Table names are plural snake_case (`imap_accounts`, `email_recipients`).
 - Register new tables in `OvermailDatabase.init()`, parents before children, and put the entity
   in the same file as the table.
+
+### Frontend
+- Always use Bun instead of npm, yarn etc.
+- Use svelte-i18n for all user-facing text in the ui. Use the correct plurals. Add english (fallback) and german. Nest objects by route, e.g. `auth.signin.title`, `auth.signin.button`.
+- Catalogs are `web/src/lib/i18n/locales/{en,de}.json`; the locale is decided in `+layout.server.ts`
+  (cookie, else `Accept-Language`) and applied in `+layout.ts` before anything renders, so ssr and
+  hydration agree. Plurals are ICU: `{count, plural, one {# mail} other {# mails}}`.
 
 ## Verify
 

@@ -3,6 +3,7 @@
     import bot from "$lib/components/icons/bot.svg";
     import * as Popover from "$lib/components/ui/popover";
     import OvermailAiChat from "$lib/app/ai/OvermailAiChat.svelte";
+    import {_} from "svelte-i18n";
 
     let {
         open = $bindable(false),
@@ -16,8 +17,8 @@
         <Button
                 variant="outline"
         >
-            <img src={bot} alt="Overmail AI" class="w-4 h-4"/>
-            Overmail AI
+            <img src={bot} alt="" class="w-4 h-4"/>
+            {$_('ai.title')}
         </Button>
     </Popover.Trigger>
 

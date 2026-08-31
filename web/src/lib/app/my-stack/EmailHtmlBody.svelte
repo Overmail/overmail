@@ -1,4 +1,6 @@
 <script lang="ts">
+    import {_} from "svelte-i18n";
+
     let {html}: { html: string } = $props();
 
     let iframe = $state<HTMLIFrameElement | null>(null);
@@ -81,7 +83,7 @@
 
 <iframe
         bind:this={iframe}
-        title="E-Mail-Inhalt"
+        title={$_('myStack.email.bodyTitle')}
         {srcdoc}
         sandbox={SANDBOX}
         referrerpolicy="no-referrer"

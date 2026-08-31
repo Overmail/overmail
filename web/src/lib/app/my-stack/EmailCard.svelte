@@ -3,10 +3,11 @@
     import * as Tooltip from "$lib/components/ui/tooltip";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
-    import {cn} from "$lib/utils.js";
+    import {cn, initials} from "$lib/utils.js";
     import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
+    import {_} from "svelte-i18n";
 
     let {
         sent_at,
@@ -25,24 +26,15 @@
     } = $props();
 
     const fields = $derived([
-        {label: "To:", participants: to},
-        {label: "CC:", participants: cc},
-        {label: "BCC:", participants: bcc},
+        {key: "myStack.email.to", participants: to},
+        {key: "myStack.email.cc", participants: cc},
+        {key: "myStack.email.bcc", participants: bcc},
     ].filter((field) => field.participants.length > 0));
 
     function formatParticipant(participant: EmailUser): string {
         return participant.name ? `${participant.name} (${participant.email})` : participant.email;
     }
 
-    /** Up to two initials, from the display name if there is one and the address otherwise. */
-    const initials = $derived(
-        (from.name ?? from.email)
-            .split(/[\s.@_-]+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]!.toUpperCase())
-            .join(""),
-    );
 </script>
 
 <!-- `class` goes last, so the caller can place and rotate the card in the stack. -->
@@ -50,13 +42,10 @@
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <Avatar.Root class="size-12">
-                <!-- Most addresses have no picture, and rendering the image without a src would
-                     fire a request that can only come back 404. -->
                 {#if from.avatar_url}
                     <Avatar.Image src={from.avatar_url} alt=""/>
                 {/if}
-                <!-- Also what shows while the picture is still loading, and if it fails to. -->
-                <Avatar.Fallback class="text-base">{initials}</Avatar.Fallback>
+                <Avatar.Fallback class="text-base">{initials(from.name ?? from.email)}</Avatar.Fallback>
             </Avatar.Root>
             <div class="flex flex-col">
                 <span class="font-medium text-lg">{from.name ?? from.email}</span>
@@ -80,10 +69,10 @@
                 </DropdownMenu.Trigger>
 
                 <DropdownMenu.Content class="w-56" align="start">
-                    <DropdownMenu.Label>Overmail AI</DropdownMenu.Label>
+                    <DropdownMenu.Label>{$_('myStack.email.menu.ai')}</DropdownMenu.Label>
                     <DropdownMenu.Group>
                         <DropdownMenu.Item onclick={onRequestReclassify}>
-                            Erneut klassifizieren
+                            {$_('myStack.email.menu.reclassify')}
                         </DropdownMenu.Item>
                     </DropdownMenu.Group>
                 </DropdownMenu.Content>
@@ -92,9 +81,9 @@
     </div>
 
     <div class="px-8 pt-4 flex flex-row flex-wrap items-center gap-x-10">
-        {#each fields as field (field.label)}
+        {#each fields as field (field.key)}
             <div class="flex flex-row items-center gap-1">
-                <span class="font-bold text-muted-foreground px-1 py-0.5 rounded-sm w-16">{field.label}</span>
+                <span class="font-bold text-muted-foreground px-1 py-0.5 rounded-sm w-16">{$_(field.key)}</span>
                 <span>{field.participants.map(formatParticipant).join(", ")}</span>
             </div>
         {/each}
@@ -149,7 +138,7 @@
         {:else if body.text}
             {body.text}
         {:else}
-            <span class="text-muted-foreground">No content</span>
+            <span class="text-muted-foreground">{$_('myStack.email.noContent')}</span>
         {/if}
     </div>
 </div>

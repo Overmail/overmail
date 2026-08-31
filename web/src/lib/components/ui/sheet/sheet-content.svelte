@@ -11,6 +11,7 @@
 	import SheetPortal from "./sheet-portal.svelte";
 	import type { Snippet } from "svelte";
 	import type { ComponentProps } from "svelte";
+	import { _ } from "svelte-i18n";
 
 	let {
 		ref = $bindable(null),
@@ -46,7 +47,7 @@
 				{#snippet child({ props })}
 					<Button variant="ghost" class="absolute top-4 right-4 bg-secondary" size="icon-sm" {...props}>
 						<XIcon  />
-						<span class="sr-only">Close</span>
+						<span class="sr-only">{$_("ui.sheet.close")}</span>
 					</Button>
 				{/snippet}
 			</SheetPrimitive.Close>

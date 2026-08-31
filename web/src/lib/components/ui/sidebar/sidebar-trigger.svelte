@@ -4,6 +4,7 @@
 	import { cn } from "$lib/utils.js";
 	import { useSidebar } from "./context.svelte.js";
 	import type { ComponentProps } from "svelte";
+	import { _ } from "svelte-i18n";
 
 	let {
 		ref = $bindable(null),
@@ -32,5 +33,5 @@
 	{...restProps}
 >
 	<SidebarIcon  />
-	<span class="sr-only">Toggle Sidebar</span>
+	<span class="sr-only">{$_("ui.sidebar.toggle")}</span>
 </Button>

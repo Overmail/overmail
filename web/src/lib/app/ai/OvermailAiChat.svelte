@@ -7,22 +7,29 @@
     import {fade} from "svelte/transition";
     import PromptInput from "$lib/app/ai/popover/PromptInput.svelte";
     import {OvermailPromptViewModel} from "$lib/app/ai/popover/OvermailPromptViewModel.svelte";
+    import {Spinner} from "$lib/components/ui/spinner";
+    import {_} from "svelte-i18n";
 
-    const placeholders = [
-        "Frage etwas oder gib eine Aufgabe",
-        "\"Fasse diese E-Mail in drei Sätzen zusammen.\"",
-        "\"Versehe alle E-Mails zu meinem Studium mit dem Label Uni.\"",
-        "\"Welche E-Mails warten noch auf eine Antwort von mir?\"",
-        "\"Archiviere alle Newsletter, die älter als eine Woche sind.\"",
-        "\"Gibt es Fristen oder Termine in dieser E-Mail?\"",
-    ]
+    // Keys, not strings: the rotation has to follow the ui language.
+    const placeholderKeys = [
+        "ask",
+        "summarize",
+        "label",
+        "waiting",
+        "archive",
+        "deadlines",
+    ].map((name) => `ai.chat.placeholders.${name}`);
 
-    let placeholderIndex = $state(Math.round(Math.random() * placeholders.length));
-    let placeholder = $derived(placeholders[placeholderIndex % placeholders.length]);
+    let placeholderIndex = $state(Math.round(Math.random() * placeholderKeys.length));
+    let placeholderKey = $derived(placeholderKeys[placeholderIndex % placeholderKeys.length]);
 
     onMount(() => {
         const interval = setInterval(() => {
-            placeholderIndex = Math.round(Math.random() * placeholders.length);
+            let next = Math.round(Math.random() * placeholderKeys.length);
+            while (next === placeholderIndex) {
+                next = Math.round(Math.random() * placeholderKeys.length);
+            }
+            placeholderIndex = next;
         }, 5000);
 
         return () => clearInterval(interval);
@@ -34,22 +41,22 @@
     let promptType: "normal" | "read-only" = $state("normal");
 </script>
 
-<h1 class="text-xl">Overmail AI</h1>
+<h1 class="text-xl">{$_('ai.title')}</h1>
 <div class="flex flex-col h-192">
     <div class="w-full flex-1 overflow-y-auto">
-        history
+        {$_('ai.chat.history')}
     </div>
 
     <div class="flex flex-col min-h-24 max-h-56">
         <InputGroup.Root class="flex-1 min-h-0">
             {#if promptEmpty}
-                {#key placeholder}
+                {#key placeholderKey}
                     <span
                             class="absolute top-2.5 left-3 text-muted-foreground pointer-events-none"
                             in:fade={{delay: 300, duration: 300}}
                             out:fade={{duration: 300}}
                     >
-                        {placeholder}
+                        {$_(placeholderKey)}
                     </span>
                 {/key}
             {/if}
@@ -58,20 +65,25 @@
             <InputGroup.Addon align="block-end">
                 <Select.Root type="single" bind:value={promptType}>
                     <Select.Trigger>
-                        {promptType === "normal" ? "Normal" : "Nur lesen"}
+                        {promptType === "normal" ? $_('ai.chat.mode.normal') : $_('ai.chat.mode.readOnly')}
                     </Select.Trigger>
                     <Select.Content
                             side="top"
                             align="start"
                     >
                         <Select.Group>
-                            <Select.Item value="normal">Normal</Select.Item>
-                            <Select.Item value="read-only">Nur lesen</Select.Item>
+                            <Select.Item value="normal">{$_('ai.chat.mode.normal')}</Select.Item>
+                            <Select.Item value="read-only">{$_('ai.chat.mode.readOnly')}</Select.Item>
                         </Select.Group>
                     </Select.Content>
                 </Select.Root>
 
-                <InputGroup.Text class="ms-auto">AI Features are experimental and can edit your inbox.
+                <InputGroup.Text class="ms-auto">
+                    {#if promptViewModel.currentModel.type === "loading"}
+                        <Spinner />
+                    {:else}
+                        {promptViewModel.currentModel.model}
+                    {/if}
                 </InputGroup.Text>
                 <Separator orientation="vertical" class="h-4!"/>
                 <InputGroup.Button
@@ -81,13 +93,13 @@
                         disabled
                 >
                     <ArrowUpIcon/>
-                    <span class="sr-only">Send</span>
+                    <span class="sr-only">{$_('ai.chat.send')}</span>
                 </InputGroup.Button>
             </InputGroup.Addon>
         </InputGroup.Root>
         <span class="block text-muted-foreground text-sm pt-1 pl-4 font-medium tracking-tight">
             <LightbulbIcon class="inline-block size-3.5 align-[-0.2em]" />
-            Markiere #labels, @emails oder :personen
+            {$_('ai.chat.hint')}
         </span>
     </div>
 </div>

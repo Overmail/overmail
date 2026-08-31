@@ -5,10 +5,14 @@
     import EmailSegment from "./EmailSegment.svelte";
     import LabelSegment from "./LabelSegment.svelte";
     import LabelsFindWindow from "./LabelsFindWindow.svelte";
+    import EmailsFindWindow from "./EmailsFindWindow.svelte";
 
     let {
         viewModel,
-        triggers = [{char: "#", window: LabelsFindWindow}],
+        triggers = [
+            {char: "#", window: LabelsFindWindow},
+            {char: "@", window: EmailsFindWindow},
+        ],
     }: {
         viewModel: OvermailPromptViewModel;
         triggers?: PromptTriggerDefinition[];
@@ -29,9 +33,12 @@
 
     let activeTrigger: ActiveTrigger | null = $state(null);
     let triggerWindow: PromptTriggerWindowExports | undefined = $state();
-    // Per Enter/Escape weggeklickte Trigger bleiben zu, bis sich die Query ändert
-    // oder der Match verschwindet.
-    let dismissed: {node: Text; index: number; query: string} | null = null;
+
+    // Eine Trigger-Session startet nur in dem Moment, in dem das Trigger-Zeichen
+    // getippt wird — nicht, wenn der Cursor hinter einem alten Zeichen landet. Sie
+    // endet bei Escape, Auswahl, oder sobald der Cursor den Query-Bereich verlässt.
+    // Dadurch dürfen Leerzeichen in der Query vorkommen.
+    let session: {definition: PromptTriggerDefinition; node: Text; index: number} | null = null;
 
     // Mounted segment component + model segment per host element.
     const hosts = new Map<HTMLElement, {instance: Record<string, unknown>; segment: PromptSegment}>();
@@ -48,7 +55,7 @@
         host.dataset.segmentType = segment.type;
 
         const instance = segment.type === "email"
-            ? mount(EmailSegment, {target: host, props: {emailId: segment.emailId}})
+            ? mount(EmailSegment, {target: host, props: {email: segment.email}})
             : mount(LabelSegment, {target: host, props: {label: segment.label}});
         hosts.set(host, {instance, segment});
 
@@ -173,59 +180,58 @@
         caretBeside(host, event.clientX >= rect.left + rect.width / 2);
     }
 
-    // Sucht rückwärts vom Cursor nach einem Trigger-Zeichen im selben Textknoten,
-    // ohne Whitespace/Zeilenumbruch dazwischen.
-    function findTriggerMatch(): {definition: PromptTriggerDefinition; query: string; node: Text; index: number; caretOffset: number} | null {
+    // Startet eine Session, wenn der eben eingefügte Text genau ein Trigger-Zeichen ist.
+    function maybeStartSession(event: InputEvent) {
+        if (event.inputType !== "insertText") return;
+        const definition = triggers.find((trigger) => event.data === trigger.char);
+        if (!definition) return;
+
         const selection = window.getSelection();
-        if (!selection?.isCollapsed) return null;
-
+        if (!selection?.isCollapsed) return;
         const node = selection.anchorNode;
-        if (!(node instanceof Text) || node.parentNode !== editor) return null;
+        if (!(node instanceof Text) || node.parentNode !== editor) return;
 
-        const upToCaret = (node.textContent ?? "").slice(0, selection.anchorOffset);
+        const index = selection.anchorOffset - 1;
+        if (index < 0 || (node.textContent ?? "")[index] !== definition.char) return;
 
-        let best: {definition: PromptTriggerDefinition; index: number} | null = null;
-        for (const definition of triggers) {
-            const index = upToCaret.lastIndexOf(definition.char);
-            if (index === -1) continue;
-            if (/\s/.test(upToCaret.slice(index + 1))) continue;
-            if (!best || index > best.index) best = {definition, index};
-        }
-        if (!best) return null;
-
-        return {
-            definition: best.definition,
-            query: upToCaret.slice(best.index + 1),
-            node,
-            index: best.index,
-            caretOffset: selection.anchorOffset,
-        };
+        session = {definition, node, index};
     }
 
+    // Validiert die laufende Session gegen die aktuelle Cursor-Position: der Cursor
+    // muss im selben Textknoten hinter dem (noch vorhandenen) Trigger-Zeichen stehen.
     function updateTrigger() {
-        const match = findTriggerMatch();
-        if (!match) {
+        if (!session) {
             activeTrigger = null;
-            dismissed = null;
             return;
         }
 
-        if (dismissed && dismissed.node === match.node && dismissed.index === match.index) {
-            if (dismissed.query === match.query) {
-                activeTrigger = null;
-                return;
-            }
-            dismissed = null;
+        const selection = window.getSelection();
+        const node = session.node;
+        const valid = selection?.isCollapsed
+            && selection.anchorNode === node
+            && node.parentNode === editor
+            && selection.anchorOffset > session.index
+            && (node.textContent ?? "")[session.index] === session.definition.char;
+        if (!valid) {
+            session = null;
+            activeTrigger = null;
+            return;
         }
 
+        const caretOffset = selection.anchorOffset;
+
         const range = document.createRange();
-        range.setStart(match.node, match.index);
-        range.setEnd(match.node, match.caretOffset);
+        range.setStart(node, session.index);
+        range.setEnd(node, caretOffset);
         const rect = range.getBoundingClientRect();
         const wrapperRect = wrapper.getBoundingClientRect();
 
         activeTrigger = {
-            ...match,
+            definition: session.definition,
+            query: (node.textContent ?? "").slice(session.index + 1, caretOffset),
+            node,
+            index: session.index,
+            caretOffset,
             left: Math.max(0, rect.left - wrapperRect.left),
             // Über dem gesamten Eingabefeld statt über der Cursor-Zeile,
             // damit das Fenster den Prompt nie überdeckt.
@@ -234,8 +240,7 @@
     }
 
     function dismissTrigger() {
-        if (!activeTrigger) return;
-        dismissed = {node: activeTrigger.node, index: activeTrigger.index, query: activeTrigger.query};
+        session = null;
         activeTrigger = null;
     }
 
@@ -270,8 +275,8 @@
             host.after(after);
         }
 
+        session = null;
         activeTrigger = null;
-        dismissed = null;
         editor.focus();
         setCaret(after, caretOffset);
         syncFromDom();
@@ -314,8 +319,9 @@
     });
     onDestroy(unmountAll);
 
-    function onInput() {
+    function onInput(event: Event) {
         syncFromDom();
+        if (event instanceof InputEvent) maybeStartSession(event);
         updateTrigger();
     }
 </script>

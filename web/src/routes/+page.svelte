@@ -2,6 +2,7 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import {Separator} from "$lib/components/ui/separator";
     import {Button} from "$lib/components/ui/button";
+    import {_} from "svelte-i18n";
 </script>
 
 <header
@@ -10,7 +11,7 @@
     <div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <Sidebar.Trigger class="-ms-1" />
         <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
-        <h1 class="text-base font-medium">Home</h1>
+        <h1 class="text-base font-medium">{$_('home.title')}</h1>
         <div class="ms-auto flex items-center gap-2">
             <Button
                     href="https://github.com/overmail"
@@ -20,7 +21,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
             >
-                GitHub
+                {$_('home.github')}
             </Button>
         </div>
     </div>

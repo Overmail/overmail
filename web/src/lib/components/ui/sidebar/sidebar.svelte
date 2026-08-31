@@ -4,6 +4,7 @@
 	import { SIDEBAR_WIDTH_MOBILE } from "./constants.js";
 	import { useSidebar } from "./context.svelte.js";
 	import type { HTMLAttributes } from "svelte/elements";
+	import { _ } from "svelte-i18n";
 
 	let {
 		ref = $bindable(null),
@@ -48,8 +49,8 @@
 			{side}
 		>
 			<Sheet.Header class="sr-only">
-				<Sheet.Title>Sidebar</Sheet.Title>
-				<Sheet.Description>Displays the mobile sidebar.</Sheet.Description>
+				<Sheet.Title>{$_("ui.sidebar.title")}</Sheet.Title>
+				<Sheet.Description>{$_("ui.sidebar.description")}</Sheet.Description>
 			</Sheet.Header>
 			<div class="flex h-full w-full flex-col">
 				{@render children?.()}

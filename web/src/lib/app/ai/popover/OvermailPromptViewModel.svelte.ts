@@ -2,20 +2,42 @@ import type {Prompt, PromptLabel, PromptSegment} from "./prompt";
 
 export type LabelSearchResult = PromptLabel & {emailCount: number};
 
+// end ist exklusiv, passend für String.slice.
+export type MatchableText = {
+    text: string;
+    matches: {start: number; end: number}[];
+};
+
+export type EmailSearchResult = {
+    id: string;
+    subject: MatchableText;
+    from: {
+        name: MatchableText | null;
+        address: MatchableText;
+    };
+    avatarUrl: string | null;
+    to: string[];
+    date: string;
+};
+
 export class OvermailPromptViewModel {
     prompt: Prompt = $state({
-        segments: [
-            {type: "text", content: "Fasse "},
-            {type: "email", emailId: "email-123"},
-            {type: "text", content: " zusammen und versehe sie mit dem Label "},
-            {type: "label", label: {id: "label-uni", name: "Uni", color: "#4f46e5"}},
-            {type: "text", content: "."},
-        ],
+        segments: [],
     });
 
     isEmpty = $derived(
         this.prompt.segments.every((s) => s.type === "text" && s.content.trim() === "")
     );
+
+    currentModel: {type: "result", model: string} | {type: "loading"} = $state({type: "loading"});
+
+    constructor() {
+        fetch("/api/webapp/ai/current-config")
+            .then((response) => response.json())
+            .then((data) => {
+                this.currentModel = {type: "result", model: data.model_id};
+            });
+    }
 
     setSegments(segments: PromptSegment[]) {
         this.prompt.segments = segments;
@@ -34,6 +56,31 @@ export class OvermailPromptViewModel {
             name: label.name,
             color: label.color,
             emailCount: label.email_count,
+        }));
+    }
+
+    async findEmails(query: string): Promise<EmailSearchResult[]> {
+        const response = await fetch(`/api/emails/search?query=${encodeURIComponent(query)}`);
+        if (!response.ok) return [];
+
+        const data: {
+            emails: {
+                id: string;
+                subject: MatchableText;
+                from: {name: MatchableText | null; address: MatchableText};
+                avatar_url: string | null;
+                to: string[];
+                date: string;
+            }[];
+        } = await response.json();
+
+        return data.emails.map((email) => ({
+            id: email.id,
+            subject: email.subject,
+            from: email.from,
+            avatarUrl: email.avatar_url,
+            to: email.to,
+            date: email.date,
         }));
     }
 }

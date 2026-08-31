@@ -10,7 +10,7 @@ export type PromptSegment = {
     content: string;
 } | {
     type: "email",
-    emailId: string;
+    email: PromptEmail;
 } | {
     type: "label",
     label: PromptLabel;
@@ -20,6 +20,12 @@ export type PromptLabel = {
     id: string;
     name: string;
     color: string;
+}
+
+export type PromptEmail = {
+    id: string;
+    subject: string;
+    avatarUrl: string | null;
 }
 
 // Props, die jedes Trigger-Fenster vom PromptInput bekommt. Ein Fenster kann zusätzlich

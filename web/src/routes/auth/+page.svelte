@@ -6,6 +6,7 @@
 		STEP_EMAIL_VERIFICATION,
 		STEP_IDENTIFIER
 	} from '$lib/repository/AuthRepository';
+	import { _ } from 'svelte-i18n';
 
 	let sessionId = $state<string | null>(null);
 	let namespace = $state<string | null>(null);
@@ -49,7 +50,7 @@
 		try {
 			const result = await authRepository.submitIdentifier(sessionId!, identifier);
 			if (result.type !== 'success') {
-				error = 'No account for that username or email.';
+				error = $_('auth.signin.identifier.error');
 				return;
 			}
 			await refresh();
@@ -64,7 +65,7 @@
 		try {
 			const result = await authRepository.submitCode(sessionId!, code);
 			if (result.type !== 'success') {
-				error = 'That code is not right.';
+				error = $_('auth.signin.code.error');
 				return;
 			}
 			await refresh();
@@ -74,7 +75,7 @@
 	}
 </script>
 
-<h1>Sign in</h1>
+<h1>{$_('auth.signin.title')}</h1>
 
 {#if error}
 	<p style="color: red">{error}</p>
@@ -83,21 +84,25 @@
 {#if namespace === STEP_IDENTIFIER}
 	<form onsubmit={(event) => (event.preventDefault(), submitIdentifier())}>
 		<label>
-			Username or email
+			{$_('auth.signin.identifier.label')}
 			<input bind:value={identifier} autocomplete="username" />
 		</label>
-		<button type="submit" disabled={busy || !identifier}>Continue</button>
+		<button type="submit" disabled={busy || !identifier}>
+			{$_('auth.signin.identifier.submit')}
+		</button>
 	</form>
 {:else if namespace === STEP_EMAIL_VERIFICATION}
 	<form onsubmit={(event) => (event.preventDefault(), submitCode())}>
-		<p>We sent a code to {maskedEmail}.</p>
+		<p>{$_('auth.signin.code.sent', { values: { email: maskedEmail } })}</p>
 		<label>
-			Code
+			{$_('auth.signin.code.label')}
 			<input bind:value={code} inputmode="numeric" autocomplete="one-time-code" />
 		</label>
-		<button type="submit" disabled={busy || !code}>Sign in</button>
-		<button type="button" onclick={start} disabled={busy}>Start over</button>
+		<button type="submit" disabled={busy || !code}>{$_('auth.signin.code.submit')}</button>
+		<button type="button" onclick={start} disabled={busy}>
+			{$_('auth.signin.code.restart')}
+		</button>
 	</form>
 {:else}
-	<p>Loading…</p>
+	<p>{$_('auth.signin.loading')}</p>
 {/if}

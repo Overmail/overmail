@@ -8,6 +8,7 @@
     import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
     import OvermailAiPopover from "$lib/app/ai/popover/OvermailAiPopover.svelte";
+    import {_} from "svelte-i18n";
 
     let viewModel: EmailStackViewModel = new EmailStackViewModel();
 
@@ -52,7 +53,7 @@
     <div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <Sidebar.Trigger class="-ms-1" />
         <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
-        <h1 class="text-base font-medium">Stack</h1>
+        <h1 class="text-base font-medium">{$_('myStack.title')}</h1>
         <div class="ms-auto flex items-center gap-2">
             <OvermailAiPopover bind:open={showOvermailAI} />
         </div>
@@ -95,36 +96,36 @@
                     <span class="flex flex-row items-center gap-1">
                         <ArchiveIcon />
                         {#if viewModel.currentEmail?.classification?.type === "archive"}
-                            Entarchivieren
+                            {$_('myStack.shortcuts.unarchive')}
                         {:else}
-                            Archivieren
+                            {$_('myStack.shortcuts.archive')}
                         {/if}
                     </span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="S" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><WarningIcon /> Spam</span>
+                    <span class="flex flex-row items-center gap-1"><WarningIcon /> {$_('myStack.shortcuts.spam')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="R" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> Später antworten</span>
+                    <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> {$_('myStack.shortcuts.replyLater')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="#" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><TagIcon /> Taggen</span>
+                    <span class="flex flex-row items-center gap-1"><TagIcon /> {$_('myStack.shortcuts.tag')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="␣" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> Weiter</span>
+                    <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> {$_('myStack.shortcuts.next')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="⌫" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> Vorige Mail</span>
+                    <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> {$_('myStack.shortcuts.previous')}</span>
                 </div>
             </div>
         </div>

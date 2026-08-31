@@ -6,6 +6,7 @@
 	import { authRepository, type Session } from '$lib/repository/AuthRepository';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import AppSidebar from "$lib/app/shell/AppSidebar.svelte";
+	import { _ } from 'svelte-i18n';
 
 	let { children } = $props();
 
@@ -33,7 +34,7 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if !checked}
-	<p>Checking session…</p>
+	<p>{$_('app.checkingSession')}</p>
 {:else if isAuthRoute || session}
 	{#if session}
 

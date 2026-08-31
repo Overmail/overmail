@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.core.Email
 import es.jvbabi.overmail.core.Email.Flag
 import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
@@ -17,9 +18,12 @@ import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.insertIgnoreAndGetId
 import org.jetbrains.exposed.v1.jdbc.select
 import java.io.ByteArrayOutputStream
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+
+private val POLL_INTERVAL = 5.minutes
 
 /**
  * Everything an importer needs about its account, read once while a transaction was open. The job
@@ -49,90 +53,116 @@ class EmailImporter(
 
     fun start() {
         importerJob = coroutineScope.launch {
+            while (isActive) {
+                // One failed cycle must not end the job: nothing restarts it (ImporterManager only
+                // reacts to config changes), so an uncaught error would stop the import for good.
+                try {
+                    importOnce()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    println("Import cycle failed for ${account.username}, retrying in $POLL_INTERVAL:")
+                    println(e.stackTraceToString())
+                }
+                delay(POLL_INTERVAL)
+            }
+        }
+    }
 
-            val client = ImapClient(
-                host = account.host,
-                port = account.port,
-                username = account.username,
-                password = account.password,
-                debug = false,
-            )
-
-            client.testConnection()
-
-            val folders = client.getFolders()
-            val inbox = folders.firstOrNull { it.name == "INBOX" }
-
+    /**
+     * One poll cycle on a connection of its own. Not reused across cycles: the pool inside
+     * [ImapClient] never evicts sockets the server has dropped in the meantime and hands them out
+     * again -- a dead socket can even yield an empty mail list instead of an error, which would
+     * look like an empty inbox forever.
+     */
+    private suspend fun importOnce() {
+        ImapClient(
+            host = account.host,
+            port = account.port,
+            username = account.username,
+            password = account.password,
+            debug = false,
+        ).use { client ->
+            val inbox = client.getFolders().firstOrNull { it.name == "INBOX" }
             if (inbox == null) {
                 println("No INBOX folder found for account ${account.username}")
-                return@launch
+                return
             }
 
-            while (isActive) {
-                val mails = inbox.getMails {
-                    getAll()
-                    envelope = true
-                    flags = true
-                    uid = true
-                }
-                mails.forEach { mail ->
-                    // A missing subject stores as "", never null: the dedup below compares it with
-                    // `=`, and NULL never equals NULL, so such mails would import over and over.
-                    val subject = mail.subject.await().orEmpty()
-                    val sentAt = mail.sentAt.await()
-
-                    // Before the body, not after: downloading it pulls the attachments too.
-                    if (database.query { isKnown(sentAt, subject) }) return@forEach
-
-                    val from = mail.from.await()
-                    val to = mail.to.await()
-                    val cc = mail.cc.await()
-                    val bcc = mail.bcc.await()
-
-                    // Only the address identifies a stored email user. The display names stay on
-                    // this mail: notifications@github.com carries the acting username as its name,
-                    // so a name learned here says nothing about the next mail from that address.
-                    val emailUsers = findOrCreateEmailUsers((from + to + cc + bcc).map { it.address }.distinct())
-
-                    val fromHeader = from.firstOrNull()
-                    if (fromHeader == null) {
-                        println("Skipping mail without a From header: $subject")
-                        return@forEach
-                    }
-
-                    val recipients = listOf(
-                        to to EmailRecipientType.RECIPIENT,
-                        cc to EmailRecipientType.CC,
-                        bcc to EmailRecipientType.BCC,
-                    ).flatMap { (users, type) ->
-                        users.map { NewRecipient(emailUsers.getValue(it.address), it.name, type) }
-                    }
-
-                    val raw = ByteArrayOutputStream()
-                    val text = ByteArrayOutputStream()
-                    val html = ByteArrayOutputStream()
-                    // getContent parses through a piped stream and blocks the calling thread.
-                    withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
-
-                    val storedId = insert(
-                        senderId = emailUsers.getValue(fromHeader.address),
-                        senderName = fromHeader.name,
-                        subject = subject,
-                        sent = sentAt,
-                        rawContent = raw.toByteArray(),
-                        textContent = text.toByteArray().decodeToString().takeIf { it.isNotBlank() },
-                        htmlContent = html.toByteArray().decodeToString().takeIf { it.isNotBlank() },
-                        isRead = Flag.Seen in mail.flags.await(),
-                        recipients = recipients,
-                    )
-
-                    if (storedId != null) {
-                        println("Imported: $subject")
-                        emailClassificationQueue.enqueue(storedId)
-                    }
-                }
-                delay(5.minutes)
+            val mails = inbox.getMails {
+                getAll()
+                envelope = true
+                flags = true
+                uid = true
             }
+            mails.forEach { mail ->
+                try {
+                    import(mail)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Skip only this mail; unknown ones are retried next cycle anyway.
+                    println("Failed to import a mail for ${account.username}:")
+                    println(e.stackTraceToString())
+                }
+            }
+        }
+    }
+
+    private suspend fun import(mail: Email) {
+        // A missing subject stores as "", never null: the dedup below compares it with
+        // `=`, and NULL never equals NULL, so such mails would import over and over.
+        val subject = mail.subject.await().orEmpty()
+        val sentAt = mail.sentAt.await()
+
+        // Before the body, not after: downloading it pulls the attachments too.
+        if (database.query { isKnown(sentAt, subject) }) return
+
+        val from = mail.from.await()
+        val to = mail.to.await()
+        val cc = mail.cc.await()
+        val bcc = mail.bcc.await()
+
+        // Only the address identifies a stored email user. The display names stay on
+        // this mail: notifications@github.com carries the acting username as its name,
+        // so a name learned here says nothing about the next mail from that address.
+        val emailUsers = findOrCreateEmailUsers((from + to + cc + bcc).map { it.address }.distinct())
+
+        val fromHeader = from.firstOrNull()
+        if (fromHeader == null) {
+            println("Skipping mail without a From header: $subject")
+            return
+        }
+
+        val recipients = listOf(
+            to to EmailRecipientType.RECIPIENT,
+            cc to EmailRecipientType.CC,
+            bcc to EmailRecipientType.BCC,
+        ).flatMap { (users, type) ->
+            users.map { NewRecipient(emailUsers.getValue(it.address), it.name, type) }
+        }
+
+        val raw = ByteArrayOutputStream()
+        val text = ByteArrayOutputStream()
+        val html = ByteArrayOutputStream()
+        // getContent parses through a piped stream and blocks the calling thread.
+        withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
+
+        val storedId = insert(
+            senderId = emailUsers.getValue(fromHeader.address),
+            senderName = fromHeader.name,
+            subject = subject,
+            sent = sentAt,
+            rawContent = raw.toByteArray(),
+            textContent = text.toByteArray().decodeToString().takeIf { it.isNotBlank() },
+            htmlContent = html.toByteArray().decodeToString().takeIf { it.isNotBlank() },
+            isRead = Flag.Seen in mail.flags.await(),
+            recipients = recipients,
+        )
+
+        if (storedId != null) {
+            println("Imported: $subject")
+            emailClassificationQueue.enqueue(storedId)
         }
     }
 

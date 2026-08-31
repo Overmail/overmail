@@ -51,6 +51,9 @@ dependencies {
 
     implementation("es.jvbabi.overmail:kamel:0.4.0")
 
+    // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
+    implementation("org.jsoup:jsoup:1.21.1")
+
     testImplementation(kotlin("test"))
     // Drives routes through the real plugin pipeline without binding a port.
     testImplementation("io.ktor:ktor-server-test-host:3.5.2")

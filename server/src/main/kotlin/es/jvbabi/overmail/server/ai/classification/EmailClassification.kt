@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.database.models.EmailLabels
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.util.HtmlToText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
@@ -96,6 +97,9 @@ class EmailClassification(
         log: (String) -> Unit,
     ) {
         val basePrompt = overmailDatabase.query {
+            // Some mails ship no text/plain part (or only a "view this mail in your browser"
+            // stub); without the fallback the model would classify the literal string "null".
+            val textContent = email.textContent ?: email.htmlContent?.let { HtmlToText.convert(it) }
             prompt("base") {
                 system("You are an AI used to help the user organize their emails. You will be given the content of an email and some context about the user. Your task will be to answer the questions about the email and the user. You will answer in JSON format, details are provided in the questions.")
                 system("The users name is ${email.imapAccount.user.username} and their email address is ${email.imapAccount.user.email}.")
@@ -105,7 +109,7 @@ class EmailClassification(
                     Subject: ${email.subject}
                     Sent: ${email.sent}
                     
-                    Text content: ${email.textContent}
+                    Text content: $textContent
                 """.trimIndent()
                 )
             }
@@ -172,7 +176,7 @@ class EmailClassification(
 
             No additional context is available. Please polish and finalize the classification. The proposed classification may be incorrect or incomplete. Feel free to change it as you see fit.
 
-            Whenever an existing label covers the email, reuse its exact name. Creating a new label is the exception, not the rule: before creating one, check it against the user's existing labels AND against the other labels in your answer. Names that differ only by abbreviation, legal suffix ("e.V.", "GmbH"), spelling, or plural are the SAME label — output it once, with one canonical name. Drop proposed labels that are too specific to ever match another email.
+            Whenever an existing label covers the email, reuse its exact name. Creating a new label is the exception, not the rule: before creating one, check it against the user's existing labels AND against the other labels in your answer. Names that differ only by abbreviation, legal suffix ("e.V.", "GmbH"), spelling, or plural are the SAME label — output it once, with one canonical name. Drop proposed labels that are too specific to ever match another email — EXCEPT identifier labels (e.g. "MediaMarkt Bestellung 34529176", "nextcloud/android#882"): they are deliberately specific so follow-up emails about the same order, booking, or issue group under them. Keep those as long as they pair the identifier with its context; drop only bare identifiers without context.
         """.trimIndent()
         log("Finalize request:\n$finalizeRequest")
 
@@ -314,10 +318,11 @@ data class EmailFirstLook(
         """
             A list of labels for this email, used to find it again later.
 
-            Labels are the words the user would use when thinking about or searching for this email. Propose labels along these three dimensions:
+            Labels are the words the user would use when thinking about or searching for this email. Propose labels along these four dimensions:
             1. Sender: the organization or community the email is from, for every recognizable organization. Use the official name without legal form suffixes, and do not abbreviate: "Young Founders Network", not "YFN" and not "Young Founders Network e.V.".
             2. Type of email: what the email is, e.g. "Newsletter", "Rechnung", "Versandbestätigung", "Veranstaltung", "Login", "Anmeldung".
-            3. Ongoing matter: when the email belongs to a matter that spans several emails (a job application, a move, a trip, a support case), label the matter by the name the user would call it (e.g. "Wohnungssuche", "Bewerbung"). Never use raw identifiers like order or ticket numbers for this — threads are already grouped via the thread identifier.
+            3. Ongoing matter: when the email belongs to a matter that spans several emails (a job application, a move, a trip, a support case), label the matter by the name the user would call it (e.g. "Wohnungssuche", "Bewerbung"). Keep this label free of identifiers — those get their own label, see 4.
+            4. Identifier: when the email revolves around a specific identifier — an order number, booking code, ticket or issue reference — propose one label that combines the matter with the identifier, e.g. "MediaMarkt Bestellung 34529176" or "nextcloud/android#882". Never the bare identifier alone: without its context a number is meaningless. Only identifiers that follow-up emails about the same matter would repeat (order confirmation, shipping notice, invoice all share the order number) — not one-off values like message IDs or tracking checksums.
 
             Rules:
             - There is no fixed maximum, but every label must earn its place: propose a label only if it genuinely helps the user find or organize this email, never labels for labels' sake.
@@ -426,10 +431,11 @@ data class EmailClassificationFinalized(
         """
             The final list of labels for this email, used to find it again later.
 
-            Labels are the words the user would use when thinking about or searching for this email. Assign labels along these three dimensions:
+            Labels are the words the user would use when thinking about or searching for this email. Assign labels along these four dimensions:
             1. Sender: the organization or community the email is from, for every recognizable organization. Use the official name without legal form suffixes, and do not abbreviate: "Young Founders Network", not "YFN" and not "Young Founders Network e.V.".
             2. Type of email: what the email is, e.g. "Newsletter", "Rechnung", "Versandbestätigung", "Veranstaltung", "Login", "Anmeldung".
-            3. Ongoing matter: when the email belongs to a matter that spans several emails (a job application, a move, a trip, a support case), label the matter by the name the user would call it (e.g. "Wohnungssuche", "Bewerbung"). Never use raw identifiers like order or ticket numbers for this — threads are already grouped via the thread identifier.
+            3. Ongoing matter: when the email belongs to a matter that spans several emails (a job application, a move, a trip, a support case), label the matter by the name the user would call it (e.g. "Wohnungssuche", "Bewerbung"). Keep this label free of identifiers — those get their own label, see 4.
+            4. Identifier: when the email revolves around a specific identifier — an order number, booking code, ticket or issue reference — assign one label that combines the matter with the identifier, e.g. "MediaMarkt Bestellung 34529176" or "nextcloud/android#882". Never the bare identifier alone: without its context a number is meaningless. Only identifiers that follow-up emails about the same matter would repeat (order confirmation, shipping notice, invoice all share the order number) — not one-off values like message IDs or tracking checksums. If the user already has a label for this identifier, reuse it character by character.
 
             Rules:
             - There is no fixed maximum, but every label must earn its place: assign a label only if it genuinely helps the user find or organize this email, never labels for labels' sake.

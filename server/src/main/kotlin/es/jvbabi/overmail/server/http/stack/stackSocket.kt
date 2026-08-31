@@ -232,6 +232,7 @@ fun Route.stackSocket() {
                             EmailArchive.new {
                                 this.email = email
                                 this.action = EmailArchiveAction.Archive
+                                this.createdByAgent = false
                             }
                         }
                     }
@@ -243,6 +244,7 @@ fun Route.stackSocket() {
                             EmailArchive.new {
                                 this.email = email
                                 this.action = EmailArchiveAction.Unarchive
+                                this.createdByAgent = false
                             }
                         }
                     }

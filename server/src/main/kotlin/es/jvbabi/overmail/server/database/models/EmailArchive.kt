@@ -15,12 +15,14 @@ class EmailArchive(id: EntityID<Uuid>) : UuidEntity(id) {
     var email by Email referencedOn EmailArchives.email
     var action by EmailArchives.action
     var createdAt by EmailArchives.createdAt
+    var createdByAgent by EmailArchives.createdByAgent
 }
 
 object EmailArchives : UuidTable("email_archives") {
     val email = reference("email_id", Emails, onDelete = ReferenceOption.CASCADE)
     val action = enumerationByName<EmailArchiveAction>("action", 12)
     val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+    val createdByAgent = bool("created_by_agent")
 }
 
 enum class EmailArchiveAction {

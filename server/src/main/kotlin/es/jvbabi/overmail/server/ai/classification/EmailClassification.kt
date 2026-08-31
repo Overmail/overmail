@@ -13,6 +13,8 @@ import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvent
+import es.jvbabi.overmail.server.database.models.EmailArchive
+import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailLabel
 import es.jvbabi.overmail.server.database.models.EmailLabels
 import es.jvbabi.overmail.server.database.models.Label
@@ -139,6 +141,14 @@ class EmailClassification(
         // no matter what the model answers.
         if (!emailFirstLook.data.trustworthy) {
             log("Email ID ${email.id} classified as untrustworthy, skipping label assignment.")
+            overmailDatabase.query {
+                EmailArchive.new {
+                    this.email = email
+                    this.action = EmailArchiveAction.Spam
+                    this.createdAt = Clock.System.now()
+                    this.createdByAgent = true
+                }
+            }
             return
         }
 

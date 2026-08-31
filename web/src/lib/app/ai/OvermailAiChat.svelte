@@ -7,6 +7,7 @@
     import {fade} from "svelte/transition";
     import PromptInput from "$lib/app/ai/popover/PromptInput.svelte";
     import {OvermailPromptViewModel} from "$lib/app/ai/popover/OvermailPromptViewModel.svelte";
+    import type {PromptInputExports} from "$lib/app/ai/popover/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
     import {_} from "svelte-i18n";
 
@@ -39,6 +40,19 @@
     let promptEmpty = $derived(promptViewModel.isEmpty);
 
     let promptType: "normal" | "read-only" = $state("normal");
+
+    let promptInput: PromptInputExports | undefined = $state();
+
+    // Die Leiste unter dem Editor zeigt den Text-Cursor, ist aber selbst nicht editierbar —
+    // ein Klick darauf soll deshalb im Prompt landen statt ins Leere zu gehen. Bedienelemente
+    // sind ausgenommen, und preventDefault hält den Fokus im Editor, statt ihn erst zu
+    // verlieren und per Klick zurückzuholen.
+    function focusPromptFromAddon(event: MouseEvent) {
+        if (!(event.target instanceof Element) || event.target.closest("button")) return;
+
+        event.preventDefault();
+        promptInput?.focusEnd();
+    }
 </script>
 
 <h1 class="text-xl">{$_('ai.title')}</h1>
@@ -60,9 +74,9 @@
                     </span>
                 {/key}
             {/if}
-            <PromptInput viewModel={promptViewModel}/>
+            <PromptInput bind:this={promptInput} viewModel={promptViewModel}/>
 
-            <InputGroup.Addon align="block-end">
+            <InputGroup.Addon align="block-end" onmousedown={focusPromptFromAddon}>
                 <Select.Root type="single" bind:value={promptType}>
                     <Select.Trigger>
                         {promptType === "normal" ? $_('ai.chat.mode.normal') : $_('ai.chat.mode.readOnly')}

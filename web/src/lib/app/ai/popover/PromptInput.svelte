@@ -169,6 +169,21 @@
         selection?.addRange(range);
     }
 
+    // Setzt den Cursor ans Ende des Prompts. Für Klicks auf Flächen, die zwar den Text-Cursor
+    // zeigen, aber selbst nicht editierbar sind — etwa die Leiste unter dem Editor.
+    export function focusEnd() {
+        editor.focus();
+
+        // Über eine Range statt setCaret: die deckt auch den Fall ab, dass am Ende ein
+        // Chip statt eines Textknotens steht.
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+    }
+
     function onMousedown(event: MouseEvent) {
         if (!(event.target instanceof Element)) return;
         const host = event.target.closest("[data-segment-type]");

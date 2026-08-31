@@ -52,6 +52,11 @@ export type PromptTriggerWindowProps = {
     onDismiss: () => void;
 };
 
+// Was PromptInput per bind:this nach aussen gibt.
+export type PromptInputExports = {
+    focusEnd: () => void;
+};
+
 export type PromptTriggerWindowExports = {
     handleKey?: (event: KeyboardEvent) => boolean;
 };

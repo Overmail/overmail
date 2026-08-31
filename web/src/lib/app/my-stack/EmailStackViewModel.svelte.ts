@@ -45,6 +45,15 @@ export class EmailStackViewModel {
                 if (!email) return;
                 email.labels = email.labels.filter(l => !labelIds.includes(l.id));
             },
+            onAvatarResolved: (address, avatarUrl) => {
+                // By address, not by mail: one sender fills a whole stack, and the picture found
+                // for it is the same in every mail it appears in.
+                this.emails.forEach(email => {
+                    [email.from, ...email.to, ...email.cc, ...email.bcc]
+                        .filter(participant => participant.email === address)
+                        .forEach(participant => participant.avatar_url = avatarUrl);
+                });
+            },
         })
 
         this.webSocketHandler.start();
@@ -107,15 +116,18 @@ class EmailStackWebSocketHandler {
     private readonly onEmails: (emails: StackEmail[]) => void
     private readonly onLabelsUpserted: (emailId: string, labels: Label[]) => void
     private readonly onLabelsDeleted: (emailId: string, labelIds: string[]) => void
+    private readonly onAvatarResolved: (address: string, avatarUrl: string) => void
 
     constructor(config: {
         onEmails: (emails: StackEmail[]) => void,
         onLabelsUpserted: (emailId: string, labels: Label[]) => void,
         onLabelsDeleted: (emailId: string, labelIds: string[]) => void,
+        onAvatarResolved: (address: string, avatarUrl: string) => void,
     }) {
         this.onEmails = config.onEmails;
         this.onLabelsUpserted = config.onLabelsUpserted;
         this.onLabelsDeleted = config.onLabelsDeleted;
+        this.onAvatarResolved = config.onAvatarResolved;
     }
 
     private requestQueue: StackWebsocketClientMessage[] = [];
@@ -152,6 +164,9 @@ class EmailStackWebSocketHandler {
                     break;
                 case "update.email.tags.delete":
                     this.onLabelsDeleted(message.email_id, message.tag_ids);
+                    break;
+                case "update.avatar":
+                    this.onAvatarResolved(message.address, message.avatar_url);
                     break;
             }
         }
@@ -210,6 +225,11 @@ type StackWebsocketServerMessage = {
     type: "update.email.tags.delete",
     email_id: string,
     tag_ids: string[],
+} | {
+    // A picture the server looked up after the batch went out; see AvatarQueue on the server.
+    type: "update.avatar",
+    address: string,
+    avatar_url: string,
 }
 
 type StackWebsocketClientMessage = {
@@ -255,4 +275,6 @@ export type Classification = {
 export type EmailUser = {
     name: string,
     email: string,
+    /** Null while no picture has been found for the address -- the card shows initials then. */
+    avatar_url: string | null,
 }

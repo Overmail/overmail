@@ -50,7 +50,12 @@
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <Avatar.Root class="size-12">
-                <Avatar.Image src={from.avatarUrl} alt=""/>
+                <!-- Most addresses have no picture, and rendering the image without a src would
+                     fire a request that can only come back 404. -->
+                {#if from.avatar_url}
+                    <Avatar.Image src={from.avatar_url} alt=""/>
+                {/if}
+                <!-- Also what shows while the picture is still loading, and if it fails to. -->
                 <Avatar.Fallback class="text-base">{initials}</Avatar.Fallback>
             </Avatar.Root>
             <div class="flex flex-col">

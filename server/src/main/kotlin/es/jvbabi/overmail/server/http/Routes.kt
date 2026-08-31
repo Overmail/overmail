@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http
 
+import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.stack.stackSocket
@@ -31,6 +32,12 @@ internal fun Application.configureRouting() {
              */
             get("/health") {
                 call.respondText("ok")
+            }
+
+            route("/avatars") {
+                route("/{avatarId}") {
+                    getAvatar()
+                }
             }
 
             route("/stack") {

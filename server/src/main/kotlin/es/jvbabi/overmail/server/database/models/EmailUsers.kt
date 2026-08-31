@@ -20,14 +20,31 @@ object EmailUsers : UuidTable("email_users") {
 
     val address = varchar("address", 320)
 
+    /**
+     * The picture we found for [address], null while none was resolved (yet). `SET NULL` on
+     * delete: dropping the cache is what puts an address back in front of the resolvers, so the
+     * link has to come off with the row rather than block its deletion.
+     */
+    val avatar = optReference("avatar_id", EmailAvatars, onDelete = ReferenceOption.SET_NULL)
+
     init {
         uniqueIndex(user, address)
     }
 }
 
-class EmailUser(id: EntityID<Uuid>) : UuidEntity(id) {
+class EmailUser(id: EntityID<Id>) : UuidEntity(id) {
     companion object : UuidEntityClass<EmailUser>(EmailUsers)
+    typealias Id = Uuid
 
     var user by User referencedOn EmailUsers.user
     var address by EmailUsers.address
+
+    /**
+     * Reading this loads the picture bytes with it, see [EmailAvatar]. Everything that only wants
+     * the url goes through [avatarId] instead.
+     */
+    var avatar by EmailAvatar optionalReferencedOn EmailUsers.avatar
+
+    /** The id of the linked picture without loading its bytes, null while none was resolved. */
+    val avatarId: EmailAvatar.Id? get() = readValues[EmailUsers.avatar]?.value
 }

@@ -30,7 +30,11 @@ class OvermailDatabase(private val database: Database) {
         query {
             SchemaUtils.create(Users)
             SchemaUtils.create(ImapAccounts)
-            SchemaUtils.create(EmailUsers)
+            // Before the email users: their `avatar_id` points here.
+            SchemaUtils.create(EmailAvatars)
+            // `avatar_id` was added to a table earlier runs already created, and `create` alone
+            // skips columns of a table that exists.
+            SchemaUtils.createMissingTablesAndColumns(EmailUsers)
             SchemaUtils.create(Emails)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)

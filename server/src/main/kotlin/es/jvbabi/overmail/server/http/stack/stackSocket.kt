@@ -2,10 +2,14 @@ package es.jvbabi.overmail.server.http.stack
 
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.user
+import es.jvbabi.overmail.server.data.notifier.AvatarEvent
+import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
+import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
@@ -66,14 +70,26 @@ fun Route.stackSocket() {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
             val emailLabelNotifier = application.dependencies.resolve<EmailLabelNotifier>()
+            val avatarQueue = application.dependencies.resolve<AvatarQueue>()
+            val avatarNotifier = application.dependencies.resolve<AvatarNotifier>()
 
             val user = call.user
             var latestMail = Clock.System.now()
+
+            /**
+             * Senders this socket is already waiting on a picture for. A sender fills batch after
+             * batch, and subscribing to it twice would send its avatar down here twice.
+             */
+            val watchedSenders = mutableSetOf<EmailUser.Id>()
 
             suspend fun sendNewBatch() {
                 // Selected column by column instead of through the Email entity: that one reads
                 // raw_content with every row, which is the whole mail source.
                 var latestMailForThisBatch: Instant? = null
+                // The senders of this batch that have no picture yet, so they can be looked up
+                // once the mails are out. Collected inside the transaction: reading it off the
+                // sender entities afterwards would query a closed one.
+                var sendersWithoutAvatar: List<EmailUser.Id> = emptyList()
                 val mails = database.query {
                     val batch = Emails
                         .leftJoin(ImapAccounts)
@@ -88,6 +104,12 @@ fun Route.stackSocket() {
 
                     if (batch.isNotEmpty()) latestMailForThisBatch = batch.minOf { it.sent }
 
+                    sendersWithoutAvatar = batch
+                        .map { it.sender }
+                        .filter { sender -> sender.avatarId == null }
+                        .map { sender -> sender.id.value }
+                        .distinct()
+
                     batch.map { email ->
                             val recipients = email.recipients.toList()
                             StackMail(
@@ -99,6 +121,7 @@ fun Route.stackSocket() {
                                     StackMail.User(
                                         name = email.senderName,
                                         email = sender.address,
+                                        avatarUrl = sender.avatarId?.let(::avatarUrl),
                                     )
                                 },
                                 to = recipients
@@ -107,6 +130,7 @@ fun Route.stackSocket() {
                                         StackMail.User(
                                             name = recipient.name,
                                             email = recipient.emailUser.address,
+                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
                                         )
                                     },
                                 cc = recipients
@@ -115,6 +139,7 @@ fun Route.stackSocket() {
                                         StackMail.User(
                                             name = recipient.name,
                                             email = recipient.emailUser.address,
+                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
                                         )
                                     },
                                 bcc = recipients
@@ -123,6 +148,7 @@ fun Route.stackSocket() {
                                         StackMail.User(
                                             name = recipient.name,
                                             email = recipient.emailUser.address,
+                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
                                         )
                                     },
                                 labels = email.labels.map { labelAssignment ->
@@ -176,6 +202,26 @@ fun Route.stackSocket() {
                 }
 
                 sendSerialized<StackServerMessage>(StackServerMessage.Emails(mails))
+
+                // After the mails went out, never before: a lookup is a request to a third party
+                // and would hold up the batch. What is cached already travelled with the mails
+                // above, the rest arrives through the subscription below.
+                sendersWithoutAvatar.forEach { senderId ->
+                    if (watchedSenders.add(senderId)) launch {
+                        avatarNotifier.subscribe(senderId).collect { event ->
+                            when (event) {
+                                is AvatarEvent.Resolved -> sendSerialized<StackServerMessage>(
+                                    StackServerMessage.AvatarResolved(
+                                        address = event.address,
+                                        avatarUrl = avatarUrl(event.avatarId),
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    avatarQueue.enqueue(senderId)
+                }
 
                 mails.forEach { mail ->
                     launch {
@@ -273,6 +319,17 @@ private sealed class StackServerMessage {
         @SerialName("email_id") val emailId: Uuid,
         @SerialName("tag_ids") val tagIds: List<Uuid>
     ) : StackServerMessage()
+
+    /**
+     * A picture that was found after the mails went out. By address rather than by mail: one
+     * sender appears in many of them, and the picture is the same in each.
+     */
+    @Serializable
+    @SerialName("update.avatar")
+    data class AvatarResolved(
+        @SerialName("address") val address: String,
+        @SerialName("avatar_url") val avatarUrl: String,
+    ) : StackServerMessage()
 }
 
 @Serializable
@@ -310,6 +367,8 @@ private data class StackMail(
     data class User(
         @SerialName("name") val name: String?,
         @SerialName("email") val email: String,
+        /** Null while no picture has been found for the address; the client shows initials then. */
+        @SerialName("avatar_url") val avatarUrl: String?,
     )
 
     @Serializable

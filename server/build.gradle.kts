@@ -29,6 +29,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("org.postgresql:postgresql:42.7.13")
 
+    // BIMI records are DNS TXT lookups, which the JDK offers no supported API for.
+    implementation("dnsjava:dnsjava:3.6.5")
+
     implementation("io.ktor:ktor-server-core:3.5.2")
     implementation("io.ktor:ktor-server-netty:3.5.2")
     implementation("io.ktor:ktor-server-websockets:3.5.2")
@@ -39,6 +42,11 @@ dependencies {
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
     implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
+
+    // Downloading avatars. CIO is the engine authentikt already pulls in, so no second one ends
+    // up on the classpath.
+    implementation("io.ktor:ktor-client-core:3.5.2")
+    implementation("io.ktor:ktor-client-cio:3.5.2")
 
     implementation("es.jvbabi.authentikt:core:0.4.5")
     implementation("com.auth0:java-jwt:4.6.0")

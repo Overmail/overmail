@@ -14,12 +14,23 @@ export type PromptSegment = {
 } | {
     type: "label",
     label: PromptLabel;
+} | {
+    type: "sender",
+    sender: PromptSender;
 }
 
 export type PromptLabel = {
     id: string;
     name: string;
     color: string;
+}
+
+export type PromptSender = {
+    id: string;
+    // Anzeigename, falls der Absender je einen benutzt hat -- sonst nur die Adresse.
+    name: string | null;
+    address: string;
+    avatarUrl: string | null;
 }
 
 export type PromptEmail = {

@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
+import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import io.ktor.http.ContentType
@@ -66,6 +67,12 @@ internal fun Application.configureRouting() {
             route("/labels") {
                 route("/search") {
                     labelSearch()
+                }
+            }
+
+            route("/senders") {
+                route("/search") {
+                    senderSearch()
                 }
             }
 

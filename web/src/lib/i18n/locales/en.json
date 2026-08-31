@@ -79,6 +79,10 @@
 			"emailCount": "{count, plural, one {# mail} other {# mails}}",
 			"create": "New label “{name}”"
 		},
+		"senders": {
+			"empty": "No senders found",
+			"emailCount": "{count, plural, one {# mail} other {# mails}}"
+		},
 		"emails": {
 			"empty": "No emails found",
 			"noPreview": "No content available"

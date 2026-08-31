@@ -1,6 +1,8 @@
-import type {Prompt, PromptLabel, PromptSegment} from "./prompt";
+import type {Prompt, PromptLabel, PromptSegment, PromptSender} from "./prompt";
 
 export type LabelSearchResult = PromptLabel & {emailCount: number};
+
+export type SenderSearchResult = PromptSender & {emailCount: number};
 
 // end ist exklusiv, passend für String.slice.
 export type MatchableText = {
@@ -56,6 +58,29 @@ export class OvermailPromptViewModel {
             name: label.name,
             color: label.color,
             emailCount: label.email_count,
+        }));
+    }
+
+    async findSenders(query: string): Promise<SenderSearchResult[]> {
+        const response = await fetch(`/api/senders/search?query=${encodeURIComponent(query)}`);
+        if (!response.ok) return [];
+
+        const data: {
+            senders: {
+                id: string;
+                name: string | null;
+                address: string;
+                avatar_url: string | null;
+                email_count: number;
+            }[];
+        } = await response.json();
+
+        return data.senders.map((sender) => ({
+            id: sender.id,
+            name: sender.name,
+            address: sender.address,
+            avatarUrl: sender.avatar_url,
+            emailCount: sender.email_count,
         }));
     }
 

@@ -4,14 +4,17 @@
     import type {OvermailPromptViewModel} from "./OvermailPromptViewModel.svelte";
     import EmailSegment from "./EmailSegment.svelte";
     import LabelSegment from "./LabelSegment.svelte";
+    import SenderSegment from "./SenderSegment.svelte";
     import LabelsFindWindow from "./LabelsFindWindow.svelte";
     import EmailsFindWindow from "./EmailsFindWindow.svelte";
+    import SendersFindWindow from "./SendersFindWindow.svelte";
 
     let {
         viewModel,
         triggers = [
             {char: "#", window: LabelsFindWindow},
             {char: "@", window: EmailsFindWindow},
+            {char: ":", window: SendersFindWindow},
         ],
     }: {
         viewModel: OvermailPromptViewModel;
@@ -56,7 +59,9 @@
 
         const instance = segment.type === "email"
             ? mount(EmailSegment, {target: host, props: {email: segment.email}})
-            : mount(LabelSegment, {target: host, props: {label: segment.label}});
+            : segment.type === "label"
+                ? mount(LabelSegment, {target: host, props: {label: segment.label}})
+                : mount(SenderSegment, {target: host, props: {sender: segment.sender}});
         hosts.set(host, {instance, segment});
 
         return host;

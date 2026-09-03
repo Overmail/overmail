@@ -31,7 +31,26 @@ class AiChatMessage(id: EntityID<Id>): UuidEntity(id) {
             @SerialName("content") val text: String,
             @SerialName("model") val model: String,
             @SerialName("tokens_output") val tokensOutput: Int,
-        ) : MessageContent()
+            /**
+             * What the agent looked up while writing this answer, in the order it did. Stored
+             * with the message so a later turn of the same chat sees the results again instead
+             * of calling the same tool a second time. Defaulted, so rows written before this
+             * existed still read.
+             */
+            @SerialName("tool_calls") val toolCalls: List<ToolCall> = emptyList(),
+        ) : MessageContent() {
+
+            @Serializable
+            data class ToolCall(
+                /** The provider's id for the call; a result is matched to its call by it. */
+                @SerialName("id") val id: String?,
+                @SerialName("tool") val tool: String,
+                /** Arguments as the model sent them, json. */
+                @SerialName("arguments") val arguments: String,
+                @SerialName("result") val result: String,
+                @SerialName("is_error") val isError: Boolean = false,
+            )
+        }
 
         @Serializable
         @SerialName("user")

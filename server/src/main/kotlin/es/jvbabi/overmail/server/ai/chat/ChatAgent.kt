@@ -6,12 +6,17 @@ import ai.koog.agents.core.agent.session.AIAgentLLMWriteSession
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.dsl.extension.ReceivedToolResults
+import ai.koog.agents.core.environment.ReceivedToolResult
+import ai.koog.agents.core.environment.ToolResultKind
+import ai.koog.serialization.kotlinx.toKotlinxJsonObject
 import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.prompt.Prompt
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponse
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
@@ -68,7 +73,10 @@ class ChatAgent(
      * The graph, built per run: its nodes write the answer into [stream] while the model produces
      * it, and that stream belongs to one message.
      */
-    private fun strategy(stream: AiChatMessageStream) = strategy<String, String>("overmail-chat") {
+    private fun strategy(
+        stream: AiChatMessageStream,
+        recorder: ChatToolCallRecorder,
+    ) = strategy<String, String>("overmail-chat") {
         val respond by node<String, Message.Assistant>(ChatAgentGraph.RESPOND) { request ->
             llm.writeSession {
                 appendPrompt { user(request) }
@@ -79,6 +87,10 @@ class ChatAgent(
         val executeTools by nodeExecuteTools(ChatAgentGraph.EXECUTE_TOOLS)
 
         val sendToolResults by node<ReceivedToolResults, Message.Assistant>(ChatAgentGraph.SEND_TOOL_RESULTS) { results ->
+            // Kept with the message: the next turn of this chat gets the same results back
+            // instead of the model calling the tool again for what it already knows.
+            results.toolResults.forEach { result -> recorder.record(result) }
+
             llm.writeSession {
                 appendPrompt { user { results.toolResults.forEach { result -> toolResult(result.toMessagePart()) } } }
                 streamAssistantMessage(stream)
@@ -112,18 +124,30 @@ class ChatAgent(
         try {
             val turn = loadTurn(messageId) ?: return
 
+            val recorder = ChatToolCallRecorder()
+
             try {
-                answer(turn, stream)
+                answer(turn, stream, recorder)
             } catch (exception: Exception) {
                 // Whatever the model managed to write is kept and the message is marked finished:
                 // the client stops waiting for an answer that is not coming. The queue logs it.
                 val partial = stream.snapshot()
-                finish(messageId, content = partial.content, tokensOutput = partial.tokensOutput)
+                finish(
+                    messageId,
+                    content = partial.content,
+                    tokensOutput = partial.tokensOutput,
+                    toolCalls = recorder.recorded(),
+                )
                 throw exception
             }
 
             val answer = stream.snapshot()
-            finish(messageId, content = answer.content, tokensOutput = answer.tokensOutput)
+            finish(
+                messageId,
+                content = answer.content,
+                tokensOutput = answer.tokensOutput,
+                toolCalls = recorder.recorded(),
+            )
             nameChat(turn, answer.content)
         } finally {
             // After the row is written, so a client that reloads on `done` sees the same text it
@@ -133,17 +157,9 @@ class ChatAgent(
         }
     }
 
-    private suspend fun answer(turn: ChatTurn, stream: AiChatMessageStream) {
+    private suspend fun answer(turn: ChatTurn, stream: AiChatMessageStream, recorder: ChatToolCallRecorder) {
         val agentConfig = AIAgentConfig(
-            prompt = prompt("overmail-chat") {
-                system(SYSTEM_PROMPT)
-                turn.history.forEach { message ->
-                    when (message) {
-                        is ChatTurn.Message.User -> user(message.text)
-                        is ChatTurn.Message.Agent -> assistant(message.text)
-                    }
-                }
-            },
+            prompt = chatPrompt(turn),
             model = model,
             maxAgentIterations = MAX_AGENT_ITERATIONS,
         )
@@ -151,7 +167,7 @@ class ChatAgent(
         val agent = GraphAIAgent(
             promptExecutor = promptExecutor,
             agentConfig = agentConfig,
-            strategy = strategy(stream),
+            strategy = strategy(stream, recorder),
             // Built per run and bound to the owner of this chat: the tools take no user argument,
             // so there is nothing the model could say to reach another user's data.
             toolRegistry = chatToolRegistry(userId = turn.userId, database = database, stream = stream),
@@ -272,6 +288,7 @@ class ChatAgent(
         messageId: AiChatMessage.Id,
         content: String,
         tokensOutput: Int,
+        toolCalls: List<AiChatMessage.MessageContent.AgentMessageContent.ToolCall>,
     ) = database.query {
         val message = AiChatMessage.findById(messageId) ?: return@query
         // The model is written with the answer, not taken from the placeholder row: the config
@@ -282,11 +299,12 @@ class ChatAgent(
             // Only what the answer cost: naming the chat is a call of its own and not part of
             // what the user asked for.
             tokensOutput = tokensOutput,
+            toolCalls = toolCalls,
         )
         message.finishedAt = Clock.System.now()
     }
 
-    private companion object {
+    internal companion object {
         /**
          * Grows with the tools: what the agent can do is the tool registry, and the list of what
          * it cannot do has to be kept next to it -- a model that is not told will happily promise
@@ -334,6 +352,60 @@ class ChatAgent(
 }
 
 /**
+ * The conversation as the model sees it: the system prompt, then every earlier turn.
+ *
+ * An answer that used tools is replayed as the call and its result before the text, each call
+ * directly followed by its own result -- that is the shape providers expect, and it is what lets
+ * a follow-up question be answered from what was already looked up.
+ */
+internal fun chatPrompt(turn: ChatTurn): Prompt = prompt("overmail-chat") {
+    system(ChatAgent.SYSTEM_PROMPT)
+
+    turn.history.forEach { message ->
+        when (message) {
+            is ChatTurn.Message.User -> user(message.text)
+            is ChatTurn.Message.Agent -> {
+                message.toolCalls.forEach { call ->
+                    toolCall(MessagePart.Tool.Call(id = call.id, tool = call.tool, args = call.arguments))
+                    toolResult(
+                        MessagePart.Tool.Result(
+                            id = call.id,
+                            tool = call.tool,
+                            output = call.result,
+                            isError = call.isError,
+                        )
+                    )
+                }
+                if (message.text.isNotBlank()) assistant(message.text)
+            }
+        }
+    }
+}
+
+/**
+ * Collects what the tools of one run answered, in the order they ran.
+ *
+ * Synchronized: tools may run in parallel, and the list is read once the run is over.
+ */
+internal class ChatToolCallRecorder {
+    private val calls = mutableListOf<AiChatMessage.MessageContent.AgentMessageContent.ToolCall>()
+
+    @Synchronized
+    fun record(result: ReceivedToolResult) {
+        calls += AiChatMessage.MessageContent.AgentMessageContent.ToolCall(
+            id = result.id,
+            tool = result.tool,
+            arguments = result.toolArgs.toKotlinxJsonObject().toString(),
+            result = result.output,
+            isError = result.resultKind !is ToolResultKind.Success,
+        )
+    }
+
+    @Synchronized
+    fun recorded(): List<AiChatMessage.MessageContent.AgentMessageContent.ToolCall> = calls.toList()
+}
+
+/**
  * The tools of one run, bound to the user whose chat it is and to the stream its answer goes into:
  * the tools take no user argument, so there is nothing the model could say to reach another user's
  * data, and what they looked at shows up in the answer.
@@ -365,7 +437,7 @@ object ChatAgentGraph {
     const val SEND_TOOL_RESULTS = "sendToolResults"
 }
 
-private data class ChatTurn(
+internal data class ChatTurn(
     val chatId: AiChat.Id,
     /** Owner of the chat. Everything the tools may touch is scoped to them. */
     val userId: User.Id,
@@ -378,7 +450,12 @@ private data class ChatTurn(
         abstract val text: String
 
         data class User(override val text: String) : Message()
-        data class Agent(override val text: String) : Message()
+
+        data class Agent(
+            override val text: String,
+            /** What the agent looked up for this answer, so the next turn does not repeat it. */
+            val toolCalls: List<AiChatMessage.MessageContent.AgentMessageContent.ToolCall> = emptyList(),
+        ) : Message()
     }
 }
 
@@ -389,7 +466,10 @@ private data class ChatTurn(
 private fun AiChatMessage.asTurnMessage(): ChatTurn.Message? = when (val content = content) {
     is AiChatMessage.MessageContent.UserMessageContent -> ChatTurn.Message.User(content.render())
     is AiChatMessage.MessageContent.AgentMessageContent ->
-        content.text.takeIf { it.isNotBlank() }?.let { ChatTurn.Message.Agent(it) }
+        // An answer that is only tool calls still belongs in the history: what it looked up is
+        // the part the next turn needs.
+        if (content.text.isBlank() && content.toolCalls.isEmpty()) null
+        else ChatTurn.Message.Agent(text = content.text, toolCalls = content.toolCalls)
 }
 
 /**

@@ -7,6 +7,7 @@
     import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
+    import {getStackFocus} from "$lib/app/my-stack/stackFocus";
     import {_} from "svelte-i18n";
 
     let {
@@ -24,6 +25,8 @@
         class?: string;
         onRequestReclassify: () => Promise<boolean>;
     } = $props();
+
+    const stackFocus = getStackFocus();
 
     const fields = $derived([
         {key: "myStack.email.to", participants: to},
@@ -60,15 +63,32 @@
 
             <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
-                    <Button
-                            variant="ghost"
-                            size="icon"
-                    >
-                        <DotsThreeVerticalIcon />
-                    </Button>
+                    <!-- child, so the trigger *is* the button: rendering one inside the other
+                         nests two <button> elements, which is invalid and makes the key handling
+                         of both fire. -->
+                    {#snippet child({props})}
+                        <Button
+                                {...props}
+                                variant="ghost"
+                                size="icon"
+                        >
+                            <DotsThreeVerticalIcon />
+                        </Button>
+                    {/snippet}
                 </DropdownMenu.Trigger>
 
-                <DropdownMenu.Content class="w-56" align="start">
+                <!-- The keyboard goes back to the stack rather than to this button, which would
+                     answer to the next Space itself instead of letting the mail move on. -->
+                <DropdownMenu.Content
+                        class="w-56"
+                        align="start"
+                        onCloseAutoFocus={(event) => {
+                            if (!stackFocus) return;
+
+                            event.preventDefault();
+                            stackFocus.restore();
+                        }}
+                >
                     <DropdownMenu.Label>{$_('myStack.email.menu.ai')}</DropdownMenu.Label>
                     <DropdownMenu.Group>
                         <DropdownMenu.Item onclick={onRequestReclassify}>

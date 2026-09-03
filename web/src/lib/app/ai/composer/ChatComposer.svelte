@@ -54,6 +54,11 @@
         viewModel.onPromptSubmitted(prompt);
     }
 
+    /** The caret starts at the end of whatever is already in the prompt, as when clicking in. */
+    export function focusPrompt() {
+        promptInput?.focusEnd();
+    }
+
     // The bar below the editor shows the text cursor but is not editable itself, so a click on
     // it should land in the prompt instead of going nowhere. Controls are exempt, and
     // preventDefault keeps the focus in the editor rather than losing it and clicking it back.

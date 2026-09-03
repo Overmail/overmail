@@ -9,14 +9,21 @@
     const chatViewModel = new AiChatViewModel();
 
     onMount(() => () => chatViewModel.dispose());
+
+    let composer: ReturnType<typeof ChatComposer> | undefined = $state();
+
+    /** Called by whoever opens the assistant: it is there to be typed into. */
+    export function focusPrompt() {
+        composer?.focusPrompt();
+    }
 </script>
 
-<AiChatSwitcher viewModel={chatViewModel}/>
+<AiChatSwitcher viewModel={chatViewModel} onCloseFocus={focusPrompt}/>
 
 <div class="flex flex-col h-192">
     <div class="w-full flex-1 overflow-y-auto">
         <ChatMessageList viewModel={chatViewModel}/>
     </div>
 
-    <ChatComposer viewModel={chatViewModel}/>
+    <ChatComposer bind:this={composer} viewModel={chatViewModel}/>
 </div>

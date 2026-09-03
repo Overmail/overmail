@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
+import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
@@ -25,6 +26,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.di.*
+import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -39,6 +41,7 @@ fun Application.overmail() {
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
     install(Authentication) { overmailSession() }
+    install(SSE)
     install(WebSockets) {
         pingPeriod = 15.seconds
         timeout = 15.seconds
@@ -62,6 +65,7 @@ private fun Application.configureDependencies() {
 
         provide<EmailLabelNotifier> { EmailLabelNotifier() }
         provide<AiChatNotifier> { AiChatNotifier() }
+        provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
         provide<AvatarNotifier> { AvatarNotifier() }
 
         // Creating the schema on first resolution keeps it in one place: every caller reaches

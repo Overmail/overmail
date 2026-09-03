@@ -9,6 +9,8 @@ import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
+import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
+import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
 import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
@@ -90,6 +92,16 @@ internal fun Application.configureRouting() {
 
                     route("/chat") {
                         message()
+
+                        route("/{chatId}") {
+                            route("/history") {
+                                chatHistory()
+                            }
+
+                            route("/message/{messageId}/stream") {
+                                chatMessageStream()
+                            }
+                        }
                     }
                 }
             }

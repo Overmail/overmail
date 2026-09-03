@@ -36,6 +36,8 @@ dependencies {
     implementation("io.ktor:ktor-server-core:3.5.2")
     implementation("io.ktor:ktor-server-netty:3.5.2")
     implementation("io.ktor:ktor-server-websockets:3.5.2")
+    // Chat answers stream to the browser over EventSource, not over the chat socket.
+    implementation("io.ktor:ktor-server-sse:3.5.2")
     implementation("io.ktor:ktor-server-auth:3.5.2")
     implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
     implementation("io.ktor:ktor-server-swagger:3.5.2")

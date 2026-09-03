@@ -12,18 +12,18 @@
 </script>
 
 <div class="flex flex-col">
-    <div class="flex flex-col px-16 pt-16 gap-2">
-        <HomeGreeting/>
-        {#if home.mailboxCount !== null}
-            <h2 class="text-muted-foreground">
-                {$_("home.mailbox.count", {values: {count: home.mailboxCount}})}
-            </h2>
-        {:else}
-            <Skeleton class="h-5 w-56"/>
-        {/if}
-    </div>
+    <div class="flex flex-row flex-wrap px-16 pt-16 gap-16">
+        <div class="flex flex-col gap-2">
+            <HomeGreeting/>
+            {#if home.mailboxCount !== null}
+                <h2 class="text-muted-foreground">
+                    {$_("home.mailbox.count", {values: {count: home.mailboxCount}})}
+                </h2>
+            {:else}
+                <Skeleton class="h-5 w-56"/>
+            {/if}
+        </div>
 
-    <div class="px-16 pt-10">
         <EmailGraph/>
     </div>
 </div>

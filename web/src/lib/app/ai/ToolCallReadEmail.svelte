@@ -5,6 +5,7 @@
 <script lang="ts">
     import {EyeglassesIcon} from "phosphor-svelte";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
+    import {shortSubject} from "$lib/app/ai/emailSubject";
     import {_} from "svelte-i18n";
 
     let {attributes}: {attributes?: Record<string, string>} = $props();
@@ -25,6 +26,6 @@
         {#if email.avatarUrl}
             <img src={email.avatarUrl} alt="" class="size-4 shrink-0 rounded-full object-cover"/>
         {/if}
-        <span class="truncate text-foreground">{email.subject}</span>
+        <span class="truncate text-foreground" title={email.subject}>{shortSubject(email.subject)}</span>
     </span>
 {/if}

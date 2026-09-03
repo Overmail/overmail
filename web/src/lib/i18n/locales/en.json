@@ -88,7 +88,8 @@
       "send": "Send",
       "hint": "Mention #labels, @emails or :people",
       "messages": {
-        "deletedReference": "Deleted"
+        "deletedReference": "Deleted",
+        "retry": "Try again"
       }
     },
     "labels": {

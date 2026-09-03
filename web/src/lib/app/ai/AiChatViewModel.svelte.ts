@@ -105,6 +105,31 @@ export class AiChatViewModel {
         await this.chatHistoryRepository.loadChat(chatId, true, true);
     }
 
+    /**
+     * Asks the same question again. The old answer is replaced rather than kept: the server
+     * empties the message and queues it, and the reload picks it up as pending again.
+     */
+    async retryMessage(messageId: string) {
+        const chatId = this.currentChatId;
+        if (chatId === null || this.isAnswering) return;
+
+        this.isSending = true;
+        try {
+            const response = await fetch(
+                `/api/webapp/ai/chat/${chatId}/message/${messageId}/retry`,
+                {method: "POST"},
+            );
+            if (!response.ok) {
+                console.error(`Failed to retry message ${messageId}: ${response.status} ${response.statusText}`);
+                return;
+            }
+
+            await this.chatHistoryRepository.loadChat(chatId, true, true);
+        } finally {
+            this.isSending = false;
+        }
+    }
+
     async onPromptSubmitted(
         prompt: Prompt
     ) {

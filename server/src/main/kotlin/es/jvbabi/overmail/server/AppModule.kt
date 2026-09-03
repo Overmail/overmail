@@ -5,6 +5,8 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.classification.EmailClassification
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
+import es.jvbabi.overmail.server.ai.chat.ChatAgent
+import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
@@ -62,6 +64,7 @@ private fun Application.configureDependencies() {
         provide<ApplicationConfig> { ApplicationConfig.load() }
         provide<DatabaseConfig> { resolve<ApplicationConfig>().database }
         provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
+        provide<ApplicationConfig.AiConfig> { resolve<ApplicationConfig>().ai }
 
         provide<EmailLabelNotifier> { EmailLabelNotifier() }
         provide<AiChatNotifier> { AiChatNotifier() }
@@ -112,6 +115,17 @@ private fun Application.configureDependencies() {
             )
         }
 
+        provide {
+            ChatAgent(
+                config = resolve<ApplicationConfig.AiConfig>(),
+                model = resolve(),
+                database = resolve(),
+                streamNotifier = resolve(),
+            )
+        }
+
+        provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve()) }
+
         // Owns an http client, so one instance rather than one per lookup.
         provide<AvatarLookup> { AvatarLookup() }
 
@@ -144,5 +158,9 @@ private fun Application.startJobs() {
 
     launch {
         dependencies.resolve<AvatarQueue>().consume()
+    }
+
+    launch {
+        dependencies.resolve<ChatAgentQueue>().consume()
     }
 }

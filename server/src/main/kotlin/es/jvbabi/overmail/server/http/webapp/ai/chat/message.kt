@@ -1,8 +1,12 @@
 package es.jvbabi.overmail.server.http.webapp.ai.chat
 
+import ai.koog.prompt.llm.LLModel
+import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
+import es.jvbabi.overmail.server.database.models.AiChatMessage
+import es.jvbabi.overmail.server.database.models.AiChatMessageSender
 import es.jvbabi.overmail.server.database.models.User
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
@@ -22,6 +26,8 @@ fun Route.message() {
         post {
             val db = application.dependencies.resolve<OvermailDatabase>()
             val aiChatNotifier = application.dependencies.resolve<AiChatNotifier>()
+            val chatAgentQueue = application.dependencies.resolve<ChatAgentQueue>()
+            val model = application.dependencies.resolve<LLModel>()
 
             val user = call.principal<User>()!!
             val request = call.receive<Message>()
@@ -53,8 +59,53 @@ fun Route.message() {
                 chat
             }
 
+            val message = db.query {
+                AiChatMessage.new {
+                    this.chat = chat
+                    this.sender = AiChatMessageSender.USER
+                    this.sentAt = Clock.System.now()
+                    this.finishedAt = Clock.System.now()
+                    this.content = AiChatMessage.MessageContent.UserMessageContent(
+                        segments = request.prompt.segments.map { segment ->
+                            when (segment) {
+                                is Message.Prompt.Segment.Text -> AiChatMessage.MessageContent.UserMessageContent.Segment.Text(
+                                    content = segment.content
+                                )
+                                is Message.Prompt.Segment.Email -> AiChatMessage.MessageContent.UserMessageContent.Segment.Email(
+                                    id = segment.id
+                                )
+                                is Message.Prompt.Segment.Label -> AiChatMessage.MessageContent.UserMessageContent.Segment.Label(
+                                    id = segment.id
+                                )
+                                is Message.Prompt.Segment.Sender -> AiChatMessage.MessageContent.UserMessageContent.Segment.Sender(
+                                    id = segment.id
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
+            // The answer is written into a row that already exists, so the client can render it
+            // as pending and follow it over the message stream instead of polling for it to show
+            // up. No finishedAt: that is what marks it as still being written.
+            val answer = db.query {
+                AiChatMessage.new {
+                    this.chat = chat
+                    this.sender = AiChatMessageSender.AGENT
+                    this.sentAt = Clock.System.now()
+                    this.finishedAt = null
+                    this.content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = model.id)
+                }
+            }
+
+            // After the response is built, so the run cannot finish before the client knows the id.
+            chatAgentQueue.enqueue(answer.id.value)
+
             call.respond(MessageResponse(
-                chatId = chat.id.value
+                chatId = chat.id.value,
+                messageId = message.id.value,
+                answerMessageId = answer.id.value,
             ))
         }
     }
@@ -109,4 +160,7 @@ private data class Message(
 @Serializable
 private data class MessageResponse(
     @SerialName("chat_id") val chatId: Uuid,
+    @SerialName("message_id") val messageId: Uuid,
+    /** The still-empty agent message the answer is written into. */
+    @SerialName("answer_message_id") val answerMessageId: Uuid,
 )

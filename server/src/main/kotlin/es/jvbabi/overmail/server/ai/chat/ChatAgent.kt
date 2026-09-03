@@ -83,13 +83,14 @@ class ChatAgent(
 
         edge(nodeStart forwardTo respond)
 
-        // Text ends the run, tool calls loop back through the tools. Both nodes that can produce
-        // either need both edges, otherwise a run stalls on the shape it has no way out for.
-        edge(respond forwardTo nodeFinish onTextMessage { true })
+        // Tool calls before text, and not the other way round: a model that says something on its
+        // way to a tool call ("let me look") produces both, and the first matching edge wins --
+        // with text first, that answer would end the run before the tool ever ran.
         edge(respond forwardTo executeTools onToolCalls { true })
+        edge(respond forwardTo nodeFinish onTextMessage { true })
         edge(executeTools forwardTo sendToolResults)
-        edge(sendToolResults forwardTo nodeFinish onTextMessage { true })
         edge(sendToolResults forwardTo executeTools onToolCalls { true })
+        edge(sendToolResults forwardTo nodeFinish onTextMessage { true })
     }
 
     /**
@@ -175,7 +176,7 @@ class ChatAgent(
                 // otherwise run into it without a break.
                 if (firstTextOfTurn) {
                     firstTextOfTurn = false
-                    if (stream.snapshot().content.isNotEmpty()) stream.append("\n\n")
+                    if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
                 }
                 stream.append(frame.text)
             }

@@ -65,6 +65,8 @@ class AiChatMessageStream {
     @Synchronized
     fun append(text: String) {
         if (completed || text.isEmpty()) return
+        // Models like to open with a blank line or two; an answer must not start with them.
+        if (content.isBlank() && text.isBlank()) return
         content.append(text)
         mutableEvents.tryEmit(AiChatStreamEvent.Chunk(index = nextChunk++, text = text))
     }

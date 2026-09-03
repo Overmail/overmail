@@ -2,9 +2,9 @@
 <script lang="ts">
     import {onMount} from "svelte";
     import {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
-    import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
-    import ChatMessageList from "$lib/app/ai/ChatMessageList.svelte";
-    import ChatComposer from "$lib/app/ai/ChatComposer.svelte";
+    import AiChatSwitcher from "$lib/app/ai/chats/AiChatSwitcher.svelte";
+    import ChatMessageList from "$lib/app/ai/messages/ChatMessageList.svelte";
+    import ChatComposer from "$lib/app/ai/composer/ChatComposer.svelte";
 
     const chatViewModel = new AiChatViewModel();
 

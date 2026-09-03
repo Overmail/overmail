@@ -4,11 +4,11 @@
 -->
 <script lang="ts">
     import SvelteMarkdown from "@humanspeak/svelte-markdown";
-    import ToolCallGroup from "$lib/app/ai/ToolCallGroup.svelte";
+    import ToolCallGroup from "$lib/app/ai/messages/tool-calls/ToolCallGroup.svelte";
     import EntityEmail from "$lib/app/entities/EntityEmail.svelte";
     import EntityLabel from "$lib/app/entities/EntityLabel.svelte";
     import EntityPerson from "$lib/app/entities/EntityPerson.svelte";
-    import {agentBlocks} from "$lib/app/ai/agentBlocks";
+    import {agentBlocks} from "$lib/app/ai/messages/agentBlocks";
 
     let {
         content,

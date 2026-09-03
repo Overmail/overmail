@@ -6,9 +6,9 @@
     import * as Select from "$lib/components/ui/select";
     import {onMount} from "svelte";
     import {fade} from "svelte/transition";
-    import PromptInput from "$lib/app/ai/PromptInput.svelte";
-    import {OvermailPromptViewModel} from "$lib/app/ai/OvermailPromptViewModel.svelte";
-    import type {PromptInputExports} from "$lib/app/ai/prompt";
+    import PromptInput from "$lib/app/ai/composer/PromptInput.svelte";
+    import {OvermailPromptViewModel} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
+    import type {PromptInputExports} from "$lib/app/ai/composer/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
     import type {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
     import {_} from "svelte-i18n";

@@ -1,13 +1,13 @@
 <script lang="ts">
     import {mount, onDestroy, onMount, unmount} from "svelte";
-    import type {PromptSegment, PromptTriggerDefinition, PromptTriggerWindowExports} from "./prompt";
-    import type {OvermailPromptViewModel} from "./OvermailPromptViewModel.svelte";
-    import EmailSegment from "./EmailSegment.svelte";
-    import LabelSegment from "./LabelSegment.svelte";
-    import SenderSegment from "./SenderSegment.svelte";
-    import LabelsFindWindow from "./LabelsFindWindow.svelte";
-    import EmailsFindWindow from "./EmailsFindWindow.svelte";
-    import SendersFindWindow from "./SendersFindWindow.svelte";
+    import type {PromptSegment, PromptTriggerDefinition, PromptTriggerWindowExports} from "$lib/app/ai/composer/prompt";
+    import type {OvermailPromptViewModel} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
+    import EmailSegment from "$lib/app/ai/segments/EmailSegment.svelte";
+    import LabelSegment from "$lib/app/ai/segments/LabelSegment.svelte";
+    import SenderSegment from "$lib/app/ai/segments/SenderSegment.svelte";
+    import LabelsFindWindow from "$lib/app/ai/composer/windows/LabelsFindWindow.svelte";
+    import EmailsFindWindow from "$lib/app/ai/composer/windows/EmailsFindWindow.svelte";
+    import SendersFindWindow from "$lib/app/ai/composer/windows/SendersFindWindow.svelte";
 
     let {
         viewModel,

@@ -1,6 +1,6 @@
 <script lang="ts">
     import {TagIcon} from "phosphor-svelte";
-    import type {PromptLabel} from "./prompt";
+    import type {PromptLabel} from "$lib/app/ai/composer/prompt";
 
     let {
         label,

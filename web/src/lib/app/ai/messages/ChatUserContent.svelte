@@ -1,10 +1,10 @@
 <!-- A sent prompt, rendered the way it looked in the editor. -->
 <script lang="ts">
-    import EmailSegment from "$lib/app/ai/EmailSegment.svelte";
-    import LabelSegment from "$lib/app/ai/LabelSegment.svelte";
-    import SenderSegment from "$lib/app/ai/SenderSegment.svelte";
+    import EmailSegment from "$lib/app/ai/segments/EmailSegment.svelte";
+    import LabelSegment from "$lib/app/ai/segments/LabelSegment.svelte";
+    import SenderSegment from "$lib/app/ai/segments/SenderSegment.svelte";
     import type {ChatMessageSegment} from "$lib/app/ai/ChatHistoryRepository";
-    import type {PromptEmail, PromptLabel, PromptSender} from "$lib/app/ai/prompt";
+    import type {PromptEmail, PromptLabel, PromptSender} from "$lib/app/ai/composer/prompt";
     import {_} from "svelte-i18n";
 
     let {segments}: {segments: ChatMessageSegment[]} = $props();

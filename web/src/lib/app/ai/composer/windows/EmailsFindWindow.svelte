@@ -2,11 +2,11 @@
     import {OvermailAvatar} from "$lib/components/avatar";
     import {Spinner} from "$lib/components/ui/spinner";
     import {cn, scrollIntoViewWithin} from "$lib/utils.js";
-    import TriggerWindow from "./TriggerWindow.svelte";
+    import TriggerWindow from "$lib/app/ai/composer/windows/TriggerWindow.svelte";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
-    import type {PromptTriggerWindowProps} from "./prompt";
-    import type {EmailSearchResult, MatchableText} from "./OvermailPromptViewModel.svelte";
+    import type {PromptTriggerWindowProps} from "$lib/app/ai/composer/prompt";
+    import type {EmailSearchResult, MatchableText} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
     import {_} from "svelte-i18n";
 
     let {

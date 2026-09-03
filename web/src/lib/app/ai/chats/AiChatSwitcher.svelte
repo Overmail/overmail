@@ -3,7 +3,7 @@
     import {Button} from "$lib/components/ui/button";
     import {CaretDownIcon, PlusIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
-    import AiChatList from "$lib/app/ai/AiChatList.svelte";
+    import AiChatList from "$lib/app/ai/chats/AiChatList.svelte";
     import type {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
 
     let {viewModel}: {viewModel: AiChatViewModel} = $props();

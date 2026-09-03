@@ -1,4 +1,4 @@
-import type {Prompt} from "$lib/app/ai/prompt";
+import type {Prompt} from "$lib/app/ai/composer/prompt";
 import {ChatHistoryRepository, type AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";
 
 export class AiChatViewModel {

@@ -1,9 +1,9 @@
 <script lang="ts">
     import {OvermailAvatar} from "$lib/components/avatar";
     import {cn, scrollIntoViewWithin} from "$lib/utils.js";
-    import TriggerWindow from "./TriggerWindow.svelte";
-    import type {PromptTriggerWindowProps} from "./prompt";
-    import type {SenderSearchResult} from "./OvermailPromptViewModel.svelte";
+    import TriggerWindow from "$lib/app/ai/composer/windows/TriggerWindow.svelte";
+    import type {PromptTriggerWindowProps} from "$lib/app/ai/composer/prompt";
+    import type {SenderSearchResult} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
     import {_} from "svelte-i18n";
 
     let {

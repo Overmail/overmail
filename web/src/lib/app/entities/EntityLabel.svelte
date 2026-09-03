@@ -3,7 +3,7 @@
     the agent writes into its answer, and usable on its own with an `id` prop.
 -->
 <script lang="ts">
-    import LabelSegment from "$lib/app/ai/LabelSegment.svelte";
+    import LabelSegment from "$lib/app/ai/segments/LabelSegment.svelte";
     import {labelRepository} from "$lib/app/entities/EntityRepository.svelte";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
     import {Skeleton} from "$lib/components/ui/skeleton";

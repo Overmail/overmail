@@ -1,7 +1,7 @@
 <script lang="ts">
     import {UserIcon} from "phosphor-svelte";
     import {OvermailAvatar} from "$lib/components/avatar";
-    import type {PromptSender} from "./prompt";
+    import type {PromptSender} from "$lib/app/ai/composer/prompt";
 
     let {
         sender,

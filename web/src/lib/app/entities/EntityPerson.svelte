@@ -3,7 +3,7 @@
     the agent writes into its answer, and usable on its own with an `id` prop.
 -->
 <script lang="ts">
-    import SenderSegment from "$lib/app/ai/SenderSegment.svelte";
+    import SenderSegment from "$lib/app/ai/segments/SenderSegment.svelte";
     import {senderRepository} from "$lib/app/entities/EntityRepository.svelte";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
     import {Skeleton} from "$lib/components/ui/skeleton";

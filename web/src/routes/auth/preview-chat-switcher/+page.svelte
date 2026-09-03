@@ -5,7 +5,7 @@
     It lives under /auth because the root layout locks everything else behind the session.
 -->
 <script lang="ts">
-    import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
+    import AiChatSwitcher from "$lib/app/ai/chats/AiChatSwitcher.svelte";
     import type {AiChat, AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
 
     const PAGE_SIZE = 30;

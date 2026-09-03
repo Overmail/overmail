@@ -1,6 +1,6 @@
 <!-- The open chat, oldest message first. -->
 <script lang="ts">
-    import ChatMessage from "$lib/app/ai/ChatMessage.svelte";
+    import ChatMessage from "$lib/app/ai/messages/ChatMessage.svelte";
     import type {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
     import {_} from "svelte-i18n";
 

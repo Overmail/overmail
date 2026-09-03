@@ -8,10 +8,10 @@
     import {CaretRightIcon, WrenchIcon} from "phosphor-svelte";
     import {fly, slide} from "svelte/transition";
     import ThinkingOrb from "$lib/components/orb/ThinkingOrb.svelte";
-    import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
-    import ToolCallSearchEmails from "$lib/app/ai/ToolCallSearchEmails.svelte";
-    import ToolCallThinking from "$lib/app/ai/ToolCallThinking.svelte";
-    import type {ToolCall} from "$lib/app/ai/agentBlocks";
+    import ToolCallReadEmail from "$lib/app/ai/messages/tool-calls/ToolCallReadEmail.svelte";
+    import ToolCallSearchEmails from "$lib/app/ai/messages/tool-calls/ToolCallSearchEmails.svelte";
+    import ToolCallThinking from "$lib/app/ai/messages/tool-calls/ToolCallThinking.svelte";
+    import type {ToolCall} from "$lib/app/ai/messages/agentBlocks";
     import type {OrbState} from "thinking-orbs/engine";
     import {_} from "svelte-i18n";
 

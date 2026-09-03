@@ -1,4 +1,4 @@
-import type {Prompt, PromptLabel, PromptSegment, PromptSender} from "./prompt";
+import type {Prompt, PromptLabel, PromptSegment, PromptSender} from "$lib/app/ai/composer/prompt";
 
 export type LabelSearchResult = PromptLabel & {emailCount: number};
 

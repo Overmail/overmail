@@ -1,5 +1,5 @@
 import type {Component} from "svelte";
-import type {OvermailPromptViewModel} from "./OvermailPromptViewModel.svelte";
+import type {OvermailPromptViewModel} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
 
 export type Prompt = {
     segments: PromptSegment[];

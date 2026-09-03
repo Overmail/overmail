@@ -1,8 +1,8 @@
 <!-- One message: the bubble, when it was sent, and what can be done with it. -->
 <script lang="ts">
-    import ChatUserContent from "$lib/app/ai/ChatUserContent.svelte";
-    import ChatAgentContent from "$lib/app/ai/ChatAgentContent.svelte";
-    import ChatMessageActions from "$lib/app/ai/ChatMessageActions.svelte";
+    import ChatUserContent from "$lib/app/ai/messages/ChatUserContent.svelte";
+    import ChatAgentContent from "$lib/app/ai/messages/ChatAgentContent.svelte";
+    import ChatMessageActions from "$lib/app/ai/messages/ChatMessageActions.svelte";
     import RelativeTime from "$lib/components/time/RelativeTime.svelte";
     import {Spinner} from "$lib/components/ui/spinner";
     import type {AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";

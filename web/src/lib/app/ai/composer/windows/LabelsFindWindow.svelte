@@ -1,9 +1,9 @@
 <script lang="ts">
     import {PlusIcon, TagIcon} from "phosphor-svelte";
     import {cn, scrollIntoViewWithin} from "$lib/utils.js";
-    import TriggerWindow from "./TriggerWindow.svelte";
-    import type {PromptTriggerWindowProps} from "./prompt";
-    import type {LabelSearchResult} from "./OvermailPromptViewModel.svelte";
+    import TriggerWindow from "$lib/app/ai/composer/windows/TriggerWindow.svelte";
+    import type {PromptTriggerWindowProps} from "$lib/app/ai/composer/prompt";
+    import type {LabelSearchResult} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
     import {_} from "svelte-i18n";
 
     let {

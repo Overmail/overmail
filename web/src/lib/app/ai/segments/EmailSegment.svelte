@@ -1,8 +1,8 @@
 <script lang="ts">
     import {EnvelopeSimpleIcon} from "phosphor-svelte";
     import {OvermailAvatar} from "$lib/components/avatar";
-    import type {PromptEmail} from "./prompt";
-    import {shortSubject} from "./emailSubject";
+    import type {PromptEmail} from "$lib/app/ai/composer/prompt";
+    import {shortSubject} from "$lib/app/ai/emailSubject";
 
     let {
         email,

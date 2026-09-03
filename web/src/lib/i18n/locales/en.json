@@ -91,7 +91,10 @@
         "deletedReference": "Deleted",
         "retry": "Try again",
         "readEmail": "Reading email",
-        "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}"
+        "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}",
+        "searchEmails": "Searching emails",
+        "searchSubject": "Subject: {query}",
+        "searchSender": "From: {query}"
       }
     },
     "labels": {

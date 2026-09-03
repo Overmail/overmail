@@ -2,6 +2,7 @@
 <script lang="ts">
     import SvelteMarkdown from "@humanspeak/svelte-markdown";
     import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
+    import ToolCallSearchEmails from "$lib/app/ai/ToolCallSearchEmails.svelte";
 
     let {
         content,
@@ -14,7 +15,12 @@
 
     // Only the tool call elements are ours; everything else keeps the library's renderers, which
     // sanitize urls and leave unknown html alone.
-    const renderers = {html: {"toolcall-read-email": ToolCallReadEmail}};
+    const renderers = {
+        html: {
+            "toolcall-read-email": ToolCallReadEmail,
+            "toolcall-search-emails": ToolCallSearchEmails,
+        },
+    };
 </script>
 
 <!-- The markdown blocks bring no margins of their own here, so the spacing is set once. -->

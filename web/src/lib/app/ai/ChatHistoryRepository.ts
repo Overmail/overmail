@@ -1,4 +1,3 @@
-import type {PromptSegment} from "$lib/app/ai/prompt";
 import {SvelteMap} from "svelte/reactivity";
 
 export class ChatHistoryRepository {
@@ -31,28 +30,38 @@ export class ChatHistoryRepository {
                     return {
                         ...baseMessage,
                         type: "user",
-                        content: message.content.map((segment: any) => {
+                        content: message.content.map((segment: any): ChatMessageSegment => {
                             switch (segment.type) {
-                                case "text":
-                                    return {
-                                        type: "text",
-                                        content: segment.content,
-                                    };
                                 case "email":
                                     return {
                                         type: "email",
-                                        email: {id: segment.id},
+                                        email: {
+                                            id: segment.id,
+                                            subject: segment.subject,
+                                            avatarUrl: segment.avatar_url,
+                                        },
                                     };
                                 case "label":
                                     return {
                                         type: "label",
-                                        label: {id: segment.id},
+                                        label: {
+                                            id: segment.id,
+                                            name: segment.name,
+                                            color: segment.color,
+                                        },
                                     };
                                 case "sender":
                                     return {
                                         type: "sender",
-                                        sender: {id: segment.id},
+                                        sender: {
+                                            id: segment.id,
+                                            address: segment.address,
+                                            name: segment.name,
+                                            avatarUrl: segment.avatar_url,
+                                        },
                                     };
+                                default:
+                                    return {type: "text", content: segment.content};
                             }
                         }),
                     };
@@ -165,13 +174,31 @@ export type AiChat = {
     messages: AiChatMessage[],
 }
 
+/**
+ * A segment of a sent prompt. Same shapes as the editor's, except that a reference the server
+ * could not resolve anymore -- deleted since -- arrives without its name.
+ */
+export type ChatMessageSegment = {
+    type: "text",
+    content: string,
+} | {
+    type: "email",
+    email: {id: string, subject: string | null, avatarUrl: string | null},
+} | {
+    type: "label",
+    label: {id: string, name: string | null, color: string | null},
+} | {
+    type: "sender",
+    sender: {id: string, address: string | null, name: string | null, avatarUrl: string | null},
+}
+
 export type AiChatMessage = {
     id: string,
     created_at: Date,
 } & (
     {
         type: "user",
-        content: PromptSegment[]
+        content: ChatMessageSegment[]
     } | {
         type: "assistant",
         pending: boolean,

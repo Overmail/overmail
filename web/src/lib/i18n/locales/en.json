@@ -1,123 +1,126 @@
 {
-	"app": {
-		"name": "Overmail",
-		"checkingSession": "Checking session…",
-		"nav": {
-			"home": "Home",
-			"stack": "Stack"
-		},
-		"language": {
-			"label": "Language"
-		}
-	},
-	"auth": {
-		"signin": {
-			"title": "Sign in",
-			"loading": "Loading…",
-			"identifier": {
-				"label": "Username or email",
-				"submit": "Continue",
-				"error": "No account for that username or email."
-			},
-			"code": {
-				"sent": "We sent a code to {email}.",
-				"label": "Code",
-				"submit": "Sign in",
-				"restart": "Start over",
-				"error": "That code is not right."
-			}
-		}
-	},
-	"home": {
-		"title": "Home",
-		"github": "GitHub"
-	},
-	"myStack": {
-		"title": "Stack",
-		"shortcuts": {
-			"archive": "Archive",
-			"unarchive": "Unarchive",
-			"spam": "Spam",
-			"replyLater": "Reply later",
-			"tag": "Tag",
-			"next": "Next",
-			"previous": "Previous mail"
-		},
-		"email": {
-			"to": "To:",
-			"cc": "CC:",
-			"bcc": "BCC:",
-			"bodyTitle": "Email content",
-			"noContent": "No content",
-			"menu": {
-				"ai": "Overmail AI",
-				"reclassify": "Reclassify"
-			}
-		}
-	},
-	"ai": {
-		"title": "Overmail AI",
-		"chat": {
-			"history": "History",
-			"chats": {
-				"new": "New chat",
-				"untitled": "Untitled chat",
-				"empty": "No chats yet",
-				"loading": "Loading chats…",
-				"groups": {
-					"today": "Today",
-					"yesterday": "Yesterday",
-					"lastWeek": "Last 7 days",
-					"lastMonth": "Last 30 days",
-					"older": "Older"
-				}
-			},
-			"placeholders": {
-				"ask": "Ask something or give a task",
-				"summarize": "“Summarise this email in three sentences.”",
-				"label": "“Label every email about my studies with Uni.”",
-				"waiting": "“Which emails are still waiting for a reply from me?”",
-				"archive": "“Archive every newsletter older than a week.”",
-				"deadlines": "“Are there any deadlines or dates in this email?”"
-			},
-			"mode": {
-				"normal": "Normal",
-				"readOnly": "Read only",
-				"askBeforeChanges": "Ask before changes"
-			},
-			"send": "Send",
-			"hint": "Mention #labels, @emails or :people"
-		},
-		"labels": {
-			"empty": "No labels found",
-			"emailCount": "{count, plural, one {# mail} other {# mails}}",
-			"create": "New label “{name}”"
-		},
-		"shortcuts": {
-			"navigate": "Navigate",
-			"select": "Select",
-			"dismiss": "Dismiss"
-		},
-		"senders": {
-			"empty": "No senders found",
-			"emailCount": "{count, plural, one {# mail} other {# mails}}"
-		},
-		"emails": {
-			"empty": "No emails found",
-			"noPreview": "No content available"
-		}
-	},
-	"ui": {
-		"sidebar": {
-			"toggle": "Toggle sidebar",
-			"title": "Sidebar",
-			"description": "Displays the mobile sidebar."
-		},
-		"sheet": {
-			"close": "Close"
-		},
-		"spinner": {
-			"loading": "Loading"
-		}
-	}
+  "app": {
+    "name": "Overmail",
+    "checkingSession": "Checking session…",
+    "nav": {
+      "home": "Home",
+      "stack": "Stack"
+    },
+    "language": {
+      "label": "Language"
+    }
+  },
+  "auth": {
+    "signin": {
+      "title": "Sign in",
+      "loading": "Loading…",
+      "identifier": {
+        "label": "Username or email",
+        "submit": "Continue",
+        "error": "No account for that username or email."
+      },
+      "code": {
+        "sent": "We sent a code to {email}.",
+        "label": "Code",
+        "submit": "Sign in",
+        "restart": "Start over",
+        "error": "That code is not right."
+      }
+    }
+  },
+  "home": {
+    "title": "Home",
+    "github": "GitHub"
+  },
+  "myStack": {
+    "title": "Stack",
+    "shortcuts": {
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "spam": "Spam",
+      "replyLater": "Reply later",
+      "tag": "Tag",
+      "next": "Next",
+      "previous": "Previous mail"
+    },
+    "email": {
+      "to": "To:",
+      "cc": "CC:",
+      "bcc": "BCC:",
+      "bodyTitle": "Email content",
+      "noContent": "No content",
+      "menu": {
+        "ai": "Overmail AI",
+        "reclassify": "Reclassify"
+      }
+    }
+  },
+  "ai": {
+    "title": "Overmail AI",
+    "chat": {
+      "history": "History",
+      "chats": {
+        "new": "New chat",
+        "untitled": "Untitled chat",
+        "empty": "No chats yet",
+        "loading": "Loading chats…",
+        "groups": {
+          "today": "Today",
+          "yesterday": "Yesterday",
+          "lastWeek": "Last 7 days",
+          "lastMonth": "Last 30 days",
+          "older": "Older"
+        }
+      },
+      "placeholders": {
+        "ask": "Ask something or give a task",
+        "summarize": "“Summarise this email in three sentences.”",
+        "label": "“Label every email about my studies with Uni.”",
+        "waiting": "“Which emails are still waiting for a reply from me?”",
+        "archive": "“Archive every newsletter older than a week.”",
+        "deadlines": "“Are there any deadlines or dates in this email?”"
+      },
+      "mode": {
+        "normal": "Normal",
+        "readOnly": "Read only",
+        "askBeforeChanges": "Ask before changes"
+      },
+      "send": "Send",
+      "hint": "Mention #labels, @emails or :people",
+      "messages": {
+        "deletedReference": "Deleted"
+      }
+    },
+    "labels": {
+      "empty": "No labels found",
+      "emailCount": "{count, plural, one {# mail} other {# mails}}",
+      "create": "New label “{name}”"
+    },
+    "shortcuts": {
+      "navigate": "Navigate",
+      "select": "Select",
+      "dismiss": "Dismiss"
+    },
+    "senders": {
+      "empty": "No senders found",
+      "emailCount": "{count, plural, one {# mail} other {# mails}}"
+    },
+    "emails": {
+      "empty": "No emails found",
+      "noPreview": "No content available"
+    }
+  },
+  "ui": {
+    "sidebar": {
+      "toggle": "Toggle sidebar",
+      "title": "Sidebar",
+      "description": "Displays the mobile sidebar."
+    },
+    "sheet": {
+      "close": "Close"
+    },
+    "spinner": {
+      "loading": "Loading"
+    }
+  }
 }

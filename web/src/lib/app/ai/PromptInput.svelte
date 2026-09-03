@@ -185,6 +185,15 @@
         selection?.addRange(range);
     }
 
+    // Empties the prompt after it was sent. The editor is the source of truth while typing, so
+    // the view model alone is not enough -- the DOM has to be cleared with it.
+    export function clear() {
+        unmountAll();
+        editor.replaceChildren();
+        dismissTrigger();
+        viewModel.setSegments([]);
+    }
+
     function onMousedown(event: MouseEvent) {
         if (!(event.target instanceof Element)) return;
         const host = event.target.closest("[data-segment-type]");

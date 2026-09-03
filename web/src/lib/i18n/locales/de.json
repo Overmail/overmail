@@ -1,123 +1,126 @@
 {
-	"app": {
-		"name": "Overmail",
-		"checkingSession": "Sitzung wird geprüft…",
-		"nav": {
-			"home": "Start",
-			"stack": "Stack"
-		},
-		"language": {
-			"label": "Sprache"
-		}
-	},
-	"auth": {
-		"signin": {
-			"title": "Anmelden",
-			"loading": "Wird geladen…",
-			"identifier": {
-				"label": "Benutzername oder E-Mail",
-				"submit": "Weiter",
-				"error": "Zu diesem Benutzernamen oder dieser E-Mail-Adresse gibt es kein Konto."
-			},
-			"code": {
-				"sent": "Wir haben einen Code an {email} geschickt.",
-				"label": "Code",
-				"submit": "Anmelden",
-				"restart": "Neu beginnen",
-				"error": "Dieser Code stimmt nicht."
-			}
-		}
-	},
-	"home": {
-		"title": "Start",
-		"github": "GitHub"
-	},
-	"myStack": {
-		"title": "Stack",
-		"shortcuts": {
-			"archive": "Archivieren",
-			"unarchive": "Entarchivieren",
-			"spam": "Spam",
-			"replyLater": "Später antworten",
-			"tag": "Taggen",
-			"next": "Weiter",
-			"previous": "Vorige Mail"
-		},
-		"email": {
-			"to": "An:",
-			"cc": "CC:",
-			"bcc": "BCC:",
-			"bodyTitle": "E-Mail-Inhalt",
-			"noContent": "Kein Inhalt",
-			"menu": {
-				"ai": "Overmail AI",
-				"reclassify": "Erneut klassifizieren"
-			}
-		}
-	},
-	"ai": {
-		"title": "Overmail AI",
-		"chat": {
-			"history": "Verlauf",
-			"chats": {
-				"new": "Neuer Chat",
-				"untitled": "Unbenannter Chat",
-				"empty": "Noch keine Chats",
-				"loading": "Chats werden geladen…",
-				"groups": {
-					"today": "Heute",
-					"yesterday": "Gestern",
-					"lastWeek": "Letzte 7 Tage",
-					"lastMonth": "Letzte 30 Tage",
-					"older": "Älter"
-				}
-			},
-			"placeholders": {
-				"ask": "Frage etwas oder gib eine Aufgabe",
-				"summarize": "„Fasse diese E-Mail in drei Sätzen zusammen.“",
-				"label": "„Versehe alle E-Mails zu meinem Studium mit dem Label Uni.“",
-				"waiting": "„Welche E-Mails warten noch auf eine Antwort von mir?“",
-				"archive": "„Archiviere alle Newsletter, die älter als eine Woche sind.“",
-				"deadlines": "„Gibt es Fristen oder Termine in dieser E-Mail?“"
-			},
-			"mode": {
-				"normal": "Normal",
-				"readOnly": "Nur lesen",
-				"askBeforeChanges": "Vor Änderungen fragen"
-			},
-			"send": "Senden",
-			"hint": "Markiere #labels, @emails oder :personen"
-		},
-		"labels": {
-			"empty": "Keine Labels gefunden",
-			"emailCount": "{count, plural, one {# Mail} other {# Mails}}",
-			"create": "Neues Label „{name}“"
-		},
-		"shortcuts": {
-			"navigate": "Navigation",
-			"select": "Auswahl",
-			"dismiss": "Schließen"
-		},
-		"senders": {
-			"empty": "Keine Absender gefunden",
-			"emailCount": "{count, plural, one {# Mail} other {# Mails}}"
-		},
-		"emails": {
-			"empty": "Keine E-Mails gefunden",
-			"noPreview": "Kein Inhalt verfügbar"
-		}
-	},
-	"ui": {
-		"sidebar": {
-			"toggle": "Seitenleiste umschalten",
-			"title": "Seitenleiste",
-			"description": "Zeigt die mobile Seitenleiste."
-		},
-		"sheet": {
-			"close": "Schließen"
-		},
-		"spinner": {
-			"loading": "Wird geladen"
-		}
-	}
+  "app": {
+    "name": "Overmail",
+    "checkingSession": "Sitzung wird geprüft…",
+    "nav": {
+      "home": "Start",
+      "stack": "Stack"
+    },
+    "language": {
+      "label": "Sprache"
+    }
+  },
+  "auth": {
+    "signin": {
+      "title": "Anmelden",
+      "loading": "Wird geladen…",
+      "identifier": {
+        "label": "Benutzername oder E-Mail",
+        "submit": "Weiter",
+        "error": "Zu diesem Benutzernamen oder dieser E-Mail-Adresse gibt es kein Konto."
+      },
+      "code": {
+        "sent": "Wir haben einen Code an {email} geschickt.",
+        "label": "Code",
+        "submit": "Anmelden",
+        "restart": "Neu beginnen",
+        "error": "Dieser Code stimmt nicht."
+      }
+    }
+  },
+  "home": {
+    "title": "Start",
+    "github": "GitHub"
+  },
+  "myStack": {
+    "title": "Stack",
+    "shortcuts": {
+      "archive": "Archivieren",
+      "unarchive": "Entarchivieren",
+      "spam": "Spam",
+      "replyLater": "Später antworten",
+      "tag": "Taggen",
+      "next": "Weiter",
+      "previous": "Vorige Mail"
+    },
+    "email": {
+      "to": "An:",
+      "cc": "CC:",
+      "bcc": "BCC:",
+      "bodyTitle": "E-Mail-Inhalt",
+      "noContent": "Kein Inhalt",
+      "menu": {
+        "ai": "Overmail AI",
+        "reclassify": "Erneut klassifizieren"
+      }
+    }
+  },
+  "ai": {
+    "title": "Overmail AI",
+    "chat": {
+      "history": "Verlauf",
+      "chats": {
+        "new": "Neuer Chat",
+        "untitled": "Unbenannter Chat",
+        "empty": "Noch keine Chats",
+        "loading": "Chats werden geladen…",
+        "groups": {
+          "today": "Heute",
+          "yesterday": "Gestern",
+          "lastWeek": "Letzte 7 Tage",
+          "lastMonth": "Letzte 30 Tage",
+          "older": "Älter"
+        }
+      },
+      "placeholders": {
+        "ask": "Frage etwas oder gib eine Aufgabe",
+        "summarize": "„Fasse diese E-Mail in drei Sätzen zusammen.“",
+        "label": "„Versehe alle E-Mails zu meinem Studium mit dem Label Uni.“",
+        "waiting": "„Welche E-Mails warten noch auf eine Antwort von mir?“",
+        "archive": "„Archiviere alle Newsletter, die älter als eine Woche sind.“",
+        "deadlines": "„Gibt es Fristen oder Termine in dieser E-Mail?“"
+      },
+      "mode": {
+        "normal": "Normal",
+        "readOnly": "Nur lesen",
+        "askBeforeChanges": "Vor Änderungen fragen"
+      },
+      "send": "Senden",
+      "hint": "Markiere #labels, @emails oder :personen",
+      "messages": {
+        "deletedReference": "Gelöscht"
+      }
+    },
+    "labels": {
+      "empty": "Keine Labels gefunden",
+      "emailCount": "{count, plural, one {# Mail} other {# Mails}}",
+      "create": "Neues Label „{name}“"
+    },
+    "shortcuts": {
+      "navigate": "Navigation",
+      "select": "Auswahl",
+      "dismiss": "Schließen"
+    },
+    "senders": {
+      "empty": "Keine Absender gefunden",
+      "emailCount": "{count, plural, one {# Mail} other {# Mails}}"
+    },
+    "emails": {
+      "empty": "Keine E-Mails gefunden",
+      "noPreview": "Kein Inhalt verfügbar"
+    }
+  },
+  "ui": {
+    "sidebar": {
+      "toggle": "Seitenleiste umschalten",
+      "title": "Seitenleiste",
+      "description": "Zeigt die mobile Seitenleiste."
+    },
+    "sheet": {
+      "close": "Schließen"
+    },
+    "spinner": {
+      "loading": "Wird geladen"
+    }
+  }
 }

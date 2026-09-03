@@ -27,6 +27,18 @@ export class AiChatViewModel {
      */
     oldestCreatedAt: Date | null = $state(null);
 
+    /** The prompt is on its way to the server; the answer message does not exist yet. */
+    private isSending: boolean = $state(false);
+
+    /**
+     * An answer is being written -- from the moment the prompt is sent until the stream of the
+     * agent message ends. The prompt stays blocked for as long.
+     */
+    isAnswering: boolean = $derived(
+        this.isSending
+        || this.currentChatMessages.some((message) => message.type === "assistant" && message.pending)
+    );
+
     /** A page is on its way; the scroll handler must not ask for the same one again. */
     isLoadingChats: boolean = $state(true);
 
@@ -96,47 +108,54 @@ export class AiChatViewModel {
     async onPromptSubmitted(
         prompt: Prompt
     ) {
-        const response = await fetch('/api/webapp/ai/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                chat_id: this.currentChatId,
-                prompt: {
-                    type: prompt.type,
-                    segments: prompt.segments.map((segment) => {
-                        switch (segment.type) {
-                            case "text":
-                                return {
-                                    type: "text",
-                                    content: segment.content,
-                                };
-                            case "email":
-                                return {
-                                    type: "email",
-                                    id: segment.email.id,
-                                };
-                            case "label":
-                                return {
-                                    type: "label",
-                                    id: segment.label.id,
-                                };
-                            case "sender":
-                                return {
-                                    type: "sender",
-                                    id: segment.sender.id,
-                                };
-                        }
-                    })
-                }
-            }),
-        });
+        this.isSending = true;
+        try {
+            const response = await fetch('/api/webapp/ai/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chat_id: this.currentChatId,
+                    prompt: {
+                        type: prompt.type,
+                        segments: prompt.segments.map((segment) => {
+                            switch (segment.type) {
+                                case "text":
+                                    return {
+                                        type: "text",
+                                        content: segment.content,
+                                    };
+                                case "email":
+                                    return {
+                                        type: "email",
+                                        id: segment.email.id,
+                                    };
+                                case "label":
+                                    return {
+                                        type: "label",
+                                        id: segment.label.id,
+                                    };
+                                case "sender":
+                                    return {
+                                        type: "sender",
+                                        id: segment.sender.id,
+                                    };
+                            }
+                        })
+                    }
+                }),
+            });
 
-        const data = await response.json();
-        this.currentChatId = data.chat_id;
+            const data = await response.json();
+            this.currentChatId = data.chat_id;
 
-        await this.chatHistoryRepository.loadChat(data.chat_id, true, true);
+            await this.chatHistoryRepository.loadChat(data.chat_id, true, true);
+        } finally {
+            // Released once the history holds the pending answer, which is what carries the
+            // waiting state from here on.
+            this.isSending = false;
+        }
     }
 }
 

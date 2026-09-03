@@ -58,6 +58,7 @@ export type PromptTriggerWindowProps = {
 // What PromptInput exposes through bind:this.
 export type PromptInputExports = {
     focusEnd: () => void;
+    clear: () => void;
 };
 
 export type PromptTriggerWindowExports = {

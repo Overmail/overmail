@@ -7,11 +7,16 @@
     import {fade} from "svelte/transition";
     import PromptInput from "$lib/app/ai/PromptInput.svelte";
     import {OvermailPromptViewModel} from "$lib/app/ai/OvermailPromptViewModel.svelte";
-    import type {PromptInputExports, PromptSegment} from "$lib/app/ai/prompt";
+    import type {PromptEmail, PromptInputExports, PromptLabel, PromptSender} from "$lib/app/ai/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
     import {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
     import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
-    import {_} from "svelte-i18n";
+    import EmailSegment from "$lib/app/ai/EmailSegment.svelte";
+    import LabelSegment from "$lib/app/ai/LabelSegment.svelte";
+    import SenderSegment from "$lib/app/ai/SenderSegment.svelte";
+    import {_, locale} from "svelte-i18n";
+    import {formatDistance} from "date-fns";
+    import {de, enUS} from "date-fns/locale";
 
     // Keys, not strings: the rotation has to follow the ui language.
     const placeholderKeys = [
@@ -46,26 +51,48 @@
 
     let promptInput: PromptInputExports | undefined = $state();
 
+    // date-fns has catalogs of its own, so the relative dates have to be pointed at the ui
+    // language separately. `$locale` can be a regional tag such as `de-DE`.
+    const dateLocale = $derived($locale?.slice(0, 2) === "de" ? de : enUS);
+
+    // "5 minutes ago" goes stale while the chat is open, so every label is computed against this
+    // value rather than Date.now().
+    let now = $state(new Date());
+    onMount(() => {
+        const interval = setInterval(() => now = new Date(), 60_000);
+        return () => clearInterval(interval);
+    });
+
     /**
-     * A sent prompt as plain text. The history only carries the ids of the referenced mails,
-     * labels and senders, so they show up as the sigil they were typed with plus a short id --
-     * resolving them into names is a job for the rich rendering that replaces this.
+     * The chips of a sent prompt. A reference the server could no longer resolve -- deleted since
+     * -- keeps its shape and says so instead of showing a blank chip.
      */
-    function promptSegmentsAsText(segments: PromptSegment[]): string {
-        return segments
-            .map((segment) => {
-                switch (segment.type) {
-                    case "text":
-                        return segment.content;
-                    case "email":
-                        return `@${segment.email.id.slice(0, 8)}`;
-                    case "label":
-                        return `#${segment.label.id.slice(0, 8)}`;
-                    case "sender":
-                        return `:${segment.sender.id.slice(0, 8)}`;
-                }
-            })
-            .join("");
+    function emailChip(email: {id: string, subject: string | null, avatarUrl: string | null}): PromptEmail {
+        return {...email, subject: email.subject ?? $_("ai.chat.messages.deletedReference")};
+    }
+
+    function labelChip(label: {id: string, name: string | null, color: string | null}): PromptLabel {
+        return {
+            id: label.id,
+            name: label.name ?? $_("ai.chat.messages.deletedReference"),
+            color: label.color ?? "currentColor",
+        };
+    }
+
+    function senderChip(
+        sender: {id: string, address: string | null, name: string | null, avatarUrl: string | null},
+    ): PromptSender {
+        return {...sender, address: sender.address ?? $_("ai.chat.messages.deletedReference")};
+    }
+
+    function submitPrompt() {
+        if (promptViewModel.isEmpty || chatViewModel.isAnswering) return;
+
+        // A snapshot, because the editor is emptied in the same breath -- the request must not
+        // read the prompt after that.
+        const prompt = $state.snapshot(promptViewModel.prompt);
+        promptInput?.clear();
+        chatViewModel.onPromptSubmitted(prompt);
     }
 
     // The bar below the editor shows the text cursor but is not editable itself, so a click on
@@ -89,23 +116,20 @@
 
         <ul class="flex flex-col gap-3 py-3">
             {#each chatViewModel.currentChatMessages as message (message.id)}
-                <li class="flex" class:justify-end={message.type === "user"}>
+                <li class="flex flex-col gap-0.5" class:items-end={message.type === "user"}>
                     <!-- 80% keeps the two sides apart even when a message is one long line. -->
                     <div
-                            class="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words"
-                            class:bg-primary={message.type === "user"}
-                            class:text-primary-foreground={message.type === "user"}
-                            class:bg-muted={message.type === "assistant"}
+                            class="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap wrap-break-word"
+                            class:bg-muted={message.type === "user"}
                     >
-                        {#if message.type === "user"}
-                            {promptSegmentsAsText(message.content)}
-                        {:else if message.content !== ""}
-                            {message.content}
-                        {:else}
-                            <!-- Nothing streamed yet: the answer is queued or just starting. -->
-                            <Spinner class="size-4"/>
-                        {/if}
+                        <!-- No line breaks inside: the bubble keeps whitespace, so every newline
+                             in this template would show up in the message. -->
+                        {#if message.type === "user"}{#each message.content as segment, index (index)}{#if segment.type === "text"}{segment.content}{:else if segment.type === "email"}<EmailSegment email={emailChip(segment.email)}/>{:else if segment.type === "label"}<LabelSegment label={labelChip(segment.label)}/>{:else if segment.type === "sender"}<SenderSegment sender={senderChip(segment.sender)}/>{/if}{/each}{:else if message.content !== ""}{message.content}{:else}<Spinner class="size-4"/>{/if}
                     </div>
+
+                    <span class="text-muted-foreground text-xs">
+                        {formatDistance(message.created_at, now, {addSuffix: true, locale: dateLocale})}
+                    </span>
                 </li>
             {/each}
         </ul>
@@ -127,7 +151,7 @@
             <PromptInput
                     bind:this={promptInput}
                     viewModel={promptViewModel}
-                    onPromptSubmit={() => chatViewModel.onPromptSubmitted(promptViewModel.prompt)}
+                    onPromptSubmit={submitPrompt}
             />
 
             <InputGroup.Addon align="block-end" onmousedown={focusPromptFromAddon}>
@@ -165,9 +189,16 @@
                         variant="default"
                         class="rounded-full"
                         size="icon-xs"
-                        disabled={promptViewModel.isEmpty || promptViewModel.currentModel.type === "loading"}
+                        onclick={submitPrompt}
+                        disabled={promptViewModel.isEmpty
+                            || promptViewModel.currentModel.type === "loading"
+                            || chatViewModel.isAnswering}
                 >
-                    <ArrowUpIcon/>
+                    {#if chatViewModel.isAnswering}
+                        <Spinner/>
+                    {:else}
+                        <ArrowUpIcon/>
+                    {/if}
                     <span class="sr-only">{$_('ai.chat.send')}</span>
                 </InputGroup.Button>
             </InputGroup.Addon>

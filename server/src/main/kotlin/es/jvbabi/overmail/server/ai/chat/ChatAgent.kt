@@ -152,7 +152,7 @@ class ChatAgent(
             strategy = strategy(stream),
             // Built per run and bound to the owner of this chat: the tools take no user argument,
             // so there is nothing the model could say to reach another user's data.
-            toolRegistry = toolRegistry(turn.userId),
+            toolRegistry = chatToolRegistry(userId = turn.userId, database = database, stream = stream),
         )
 
         // The return value is the last message only; what the client saw -- and what is stored --
@@ -229,10 +229,6 @@ class ChatAgent(
         chatNotifier.notifyChatUpsert(userId = turn.userId, chat = chat)
     }
 
-    private fun toolRegistry(userId: User.Id): ToolRegistry = ToolRegistry.builder()
-        .tool(ReadEmailTool(userId = userId, database = database))
-        .build()
-
     /**
      * Everything the run needs, read out of the database in one go: the entities are bound to
      * their transaction, and the model call happens long after it closed.
@@ -305,6 +301,32 @@ class ChatAgent(
             ?.takeIf { it.isNotBlank() }
     }
 }
+
+/**
+ * The tools of one run, bound to the user whose chat it is and to the stream its answer goes into:
+ * the tools take no user argument, so there is nothing the model could say to reach another user's
+ * data, and what they looked at shows up in the answer.
+ *
+ * Top-level rather than a method, so a test can build the same registry the agent runs with.
+ */
+internal fun chatToolRegistry(
+    userId: User.Id,
+    database: OvermailDatabase,
+    stream: AiChatMessageStream,
+): ToolRegistry = ToolRegistry.builder()
+    .tool(
+        ReadEmailTool(
+            userId = userId,
+            database = database,
+            // Its own block in the answer: the client renders the element, and markdown only
+            // treats it as one when it stands alone.
+            onEmailRead = { markup ->
+                if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
+                stream.append(markup)
+            },
+        )
+    )
+    .build()
 
 /** Node names, so a run can be traced back to the graph without matching on property names. */
 object ChatAgentGraph {

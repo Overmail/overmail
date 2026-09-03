@@ -116,13 +116,14 @@ class ChatAgent(
             } catch (exception: Exception) {
                 // Whatever the model managed to write is kept and the message is marked finished:
                 // the client stops waiting for an answer that is not coming. The queue logs it.
-                finish(messageId, content = stream.snapshot().content)
+                val partial = stream.snapshot()
+                finish(messageId, content = partial.content, tokensOutput = partial.tokensOutput)
                 throw exception
             }
 
-            val answer = stream.snapshot().content
-            finish(messageId, content = answer)
-            nameChat(turn, answer)
+            val answer = stream.snapshot()
+            finish(messageId, content = answer.content, tokensOutput = answer.tokensOutput)
+            nameChat(turn, answer.content)
         } finally {
             // After the row is written, so a client that reloads on `done` sees the same text it
             // was just streamed.
@@ -188,7 +189,12 @@ class ChatAgent(
             }
             .toList()
 
-        return frames.toMessageResponse().also { response -> appendPrompt { message(response) } }
+        return frames.toMessageResponse().also { response ->
+            appendPrompt { message(response) }
+            // Reported by the provider in the last frame of the stream; null when it does not
+            // send usage at all, and then the answer simply stays at what the other turns cost.
+            response.metaInfo.outputTokensCount?.let { tokens -> stream.addOutputTokens(tokens) }
+        }
     }
 
     /**
@@ -261,11 +267,21 @@ class ChatAgent(
         )
     }
 
-    private suspend fun finish(messageId: AiChatMessage.Id, content: String) = database.query {
+    private suspend fun finish(
+        messageId: AiChatMessage.Id,
+        content: String,
+        tokensOutput: Int,
+    ) = database.query {
         val message = AiChatMessage.findById(messageId) ?: return@query
         // The model is written with the answer, not taken from the placeholder row: the config
         // can change between the message being created and it being answered.
-        message.content = AiChatMessage.MessageContent.AgentMessageContent(text = content, model = model.id)
+        message.content = AiChatMessage.MessageContent.AgentMessageContent(
+            text = content,
+            model = model.id,
+            // Only what the answer cost: naming the chat is a call of its own and not part of
+            // what the user asked for.
+            tokensOutput = tokensOutput,
+        )
         message.finishedAt = Clock.System.now()
     }
 

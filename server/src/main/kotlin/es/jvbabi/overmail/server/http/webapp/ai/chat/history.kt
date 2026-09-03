@@ -66,6 +66,7 @@ fun Route.chatHistory() {
                             // the client opens the stream for it.
                             pending = message.finishedAt == null,
                             content = content.text,
+                            tokensOutput = content.tokensOutput,
                         )
                     }
                 }
@@ -184,6 +185,8 @@ private sealed class ChatHistoryMessage {
         @SerialName("created_at") val createdAt: Long,
         @SerialName("pending") val pending: Boolean,
         @SerialName("content") val content: String,
+        /** Tokens the model reported for this answer; still growing while it is pending. */
+        @SerialName("tokens_output") val tokensOutput: Int,
     ) : ChatHistoryMessage()
 }
 

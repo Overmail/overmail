@@ -39,7 +39,7 @@ fun Route.retryMessage() {
                 // Still running: a second run would write into the same row as the first.
                 if (message.finishedAt == null) return@query RetryOutcome.AlreadyRunning
 
-                message.content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = model.id)
+                message.content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = model.id, tokensOutput = 0)
                 message.finishedAt = null
                 message.sentAt = Clock.System.now()
                 RetryOutcome.Enqueued

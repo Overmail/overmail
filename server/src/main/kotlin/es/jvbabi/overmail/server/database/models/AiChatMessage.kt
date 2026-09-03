@@ -30,6 +30,7 @@ class AiChatMessage(id: EntityID<Id>): UuidEntity(id) {
         data class AgentMessageContent(
             @SerialName("content") val text: String,
             @SerialName("model") val model: String,
+            @SerialName("tokens_output") val tokensOutput: Int,
         ) : MessageContent()
 
         @Serializable

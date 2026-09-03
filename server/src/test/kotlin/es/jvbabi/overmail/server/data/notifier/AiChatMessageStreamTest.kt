@@ -29,7 +29,7 @@ class AiChatMessageStreamTest {
         val stream = AiChatMessageStream()
         stream.append("before ")
 
-        var snapshot = AiChatMessageStream.Snapshot("", 0, false)
+        var snapshot = AiChatMessageStream.Snapshot("", 0, false, 0)
         val reader = async {
             stream.events
                 .onSubscription { snapshot = stream.snapshot() }
@@ -46,6 +46,21 @@ class AiChatMessageStreamTest {
         val events = reader.await().filterIsInstance<AiChatStreamEvent.Chunk>()
         assertEquals("before ", snapshot.content)
         assertEquals(listOf("after"), events.filter { it.index >= snapshot.nextChunk }.map { it.text })
+    }
+
+    @Test
+    fun `output tokens add up across turns`() {
+        val stream = AiChatMessageStream()
+        stream.addOutputTokens(12)
+        stream.addOutputTokens(30)
+        // Nothing to count, and nothing after the answer is done.
+        stream.addOutputTokens(0)
+
+        assertEquals(42, stream.snapshot().tokensOutput)
+
+        stream.complete()
+        stream.addOutputTokens(5)
+        assertEquals(42, stream.snapshot().tokensOutput)
     }
 
     @Test

@@ -149,7 +149,7 @@ class ChatHistoryTest {
                 this.sender = AiChatMessageSender.AGENT
                 sentAt = Clock.System.now()
                 finishedAt = null
-                content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = "test-model")
+                content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = "test-model", tokensOutput = 0)
             }
 
             Fixture(chatId = chat.id.value)

@@ -53,6 +53,7 @@ class AiChatMessageStream {
     private val content = StringBuilder()
     private var nextChunk = 0
     private var completed = false
+    private var tokensOutput = 0
 
     /** The text so far, plus where in the chunk sequence it ends. */
     @Synchronized
@@ -60,6 +61,7 @@ class AiChatMessageStream {
         content = content.toString(),
         nextChunk = nextChunk,
         completed = completed,
+        tokensOutput = tokensOutput,
     )
 
     @Synchronized
@@ -69,6 +71,18 @@ class AiChatMessageStream {
         if (content.isBlank() && text.isBlank()) return
         content.append(text)
         mutableEvents.tryEmit(AiChatStreamEvent.Chunk(index = nextChunk++, text = text))
+    }
+
+    /**
+     * Adds what one model turn reported as its output. Counted per turn and summed, because a run
+     * that calls tools answers in several of them.
+     */
+    @Synchronized
+    fun addOutputTokens(count: Int) {
+        if (completed || count <= 0) return
+        tokensOutput += count
+        // The total, not the delta: a reader that missed one is still right after the next.
+        mutableEvents.tryEmit(AiChatStreamEvent.Usage(tokensOutput))
     }
 
     @Synchronized
@@ -83,6 +97,8 @@ class AiChatMessageStream {
         /** Index the next chunk will carry; a reader ignores everything below it. */
         val nextChunk: Int,
         val completed: Boolean,
+        /** Tokens the model has reported for this answer so far. */
+        val tokensOutput: Int,
     )
 }
 
@@ -95,6 +111,9 @@ sealed class AiChatStreamEvent {
 
     /** A piece of the answer, to be appended to the text the reader already has. */
     data class Chunk(val index: Int, val text: String) : AiChatStreamEvent()
+
+    /** Tokens the answer has cost so far, as a running total. */
+    data class Usage(val tokensOutput: Int) : AiChatStreamEvent()
 
     /** The answer is complete and persisted. */
     data object Completed : AiChatStreamEvent()

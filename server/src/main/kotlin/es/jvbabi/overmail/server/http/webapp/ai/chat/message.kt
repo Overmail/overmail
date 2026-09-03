@@ -95,7 +95,7 @@ fun Route.message() {
                     this.sender = AiChatMessageSender.AGENT
                     this.sentAt = Clock.System.now()
                     this.finishedAt = null
-                    this.content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = model.id)
+                    this.content = AiChatMessage.MessageContent.AgentMessageContent(text = "", model = model.id, tokensOutput = 0)
                 }
             }
 

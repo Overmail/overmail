@@ -56,10 +56,10 @@ class RetryMessageTest {
         database.query {
             val message = AiChatMessage.findById(fixture.answerId)!!
             assertNull(message.finishedAt)
-            assertEquals(
-                "",
-                (message.content as AiChatMessage.MessageContent.AgentMessageContent).text,
-            )
+            val content = message.content as AiChatMessage.MessageContent.AgentMessageContent
+            assertEquals("", content.text)
+            // The old answer's tokens belong to the old answer.
+            assertEquals(0, content.tokensOutput)
         }
     }
 
@@ -153,7 +153,7 @@ class RetryMessageTest {
                 sender = AiChatMessageSender.AGENT
                 sentAt = Clock.System.now()
                 finishedAt = Clock.System.now()
-                content = AiChatMessage.MessageContent.AgentMessageContent(text = "old answer", model = model.id)
+                content = AiChatMessage.MessageContent.AgentMessageContent(text = "old answer", model = model.id, tokensOutput = 12)
             }
 
             Fixture(chatId = chat.id.value, questionId = question.id.value, answerId = answer.id.value)

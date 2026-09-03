@@ -43,7 +43,7 @@ fun Route.chatMessageStream() {
                 .of(message.id)
 
             if (stream == null) {
-                send(StreamEvent.Snapshot(message.content))
+                send(StreamEvent.Snapshot(content = message.content, tokensOutput = message.tokensOutput))
                 send(StreamEvent.Done)
                 return@sse
             }
@@ -71,7 +71,7 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
             when (event) {
                 is AiChatStreamEvent.Resynchronize -> {
                     val snapshot = stream.snapshot()
-                    emit(StreamEvent.Snapshot(snapshot.content))
+                    emit(StreamEvent.Snapshot(snapshot.content, snapshot.tokensOutput))
                     nextChunk = snapshot.nextChunk
                     if (snapshot.completed) emit(StreamEvent.Done)
                     !snapshot.completed
@@ -82,7 +82,7 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
                         event.index < nextChunk -> Unit
                         event.index > nextChunk -> {
                             val snapshot = stream.snapshot()
-                            emit(StreamEvent.Snapshot(snapshot.content))
+                            emit(StreamEvent.Snapshot(snapshot.content, snapshot.tokensOutput))
                             nextChunk = snapshot.nextChunk
                         }
 
@@ -94,10 +94,16 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
                     true
                 }
 
+                is AiChatStreamEvent.Usage -> {
+                    emit(StreamEvent.Usage(event.tokensOutput))
+                    true
+                }
+
                 AiChatStreamEvent.Completed -> {
                     // The whole text once more: a chunk dropped while this client was slow would
                     // otherwise stay missing in what it renders.
-                    emit(StreamEvent.Snapshot(stream.snapshot().content))
+                    val snapshot = stream.snapshot()
+                    emit(StreamEvent.Snapshot(snapshot.content, snapshot.tokensOutput))
                     emit(StreamEvent.Done)
                     false
                 }
@@ -116,15 +122,21 @@ private suspend fun ServerSSESession.resolveMessage(): StreamedMessage? {
 
     return call.overmailDatabase().query {
         val message = AiChatMessage.findById(messageId)?.takeIf { it.chat.id == chat.id } ?: return@query null
+        // Only an agent message has text to stream; a user message has nothing to follow.
+        val content = message.content as? AiChatMessage.MessageContent.AgentMessageContent
         StreamedMessage(
             id = message.id.value,
-            // Only an agent message has text to stream; a user message has nothing to follow.
-            content = (message.content as? AiChatMessage.MessageContent.AgentMessageContent)?.text.orEmpty(),
+            content = content?.text.orEmpty(),
+            tokensOutput = content?.tokensOutput ?: 0,
         )
     }
 }
 
-private data class StreamedMessage(val id: AiChatMessage.Id, val content: String)
+private data class StreamedMessage(
+    val id: AiChatMessage.Id,
+    val content: String,
+    val tokensOutput: Int,
+)
 
 private suspend fun ServerSSESession.send(event: StreamEvent) =
     send(ServerSentEvent(data = json.encodeToString<StreamEvent>(event)))
@@ -135,7 +147,15 @@ private sealed class StreamEvent {
     /** The whole answer so far, replacing what the client has. */
     @Serializable
     @SerialName("snapshot")
-    data class Snapshot(@SerialName("content") val content: String) : StreamEvent()
+    data class Snapshot(
+        @SerialName("content") val content: String,
+        @SerialName("tokens_output") val tokensOutput: Int,
+    ) : StreamEvent()
+
+    /** What the answer has cost so far, as a running total. */
+    @Serializable
+    @SerialName("usage")
+    data class Usage(@SerialName("tokens_output") val tokensOutput: Int) : StreamEvent()
 
     /** A piece of the answer, to be appended to what the client already has. */
     @Serializable

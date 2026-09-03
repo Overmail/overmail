@@ -18,9 +18,9 @@
     }
 </script>
 
-<AiChatSwitcher viewModel={chatViewModel} onCloseFocus={focusPrompt}/>
+<div class="flex flex-col p-4 flex-1">
+    <AiChatSwitcher viewModel={chatViewModel} onCloseFocus={focusPrompt}/>
 
-<div class="flex flex-col h-192">
     <div class="w-full flex-1 overflow-y-auto">
         <ChatMessageList viewModel={chatViewModel}/>
     </div>

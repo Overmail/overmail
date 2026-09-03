@@ -1,22 +1,23 @@
-<!--
-    The bar above every page behind the sidebar: which page is open on the left, what can be done
-    from anywhere on the right. A page adds controls of its own through setPageHeader.
--->
 <script lang="ts">
     import * as Sidebar from "$lib/components/ui/sidebar";
     import {Separator} from "$lib/components/ui/separator";
-    import OvermailAiPopover from "$lib/app/ai/popover/OvermailAiPopover.svelte";
     import {currentNavItem} from "$lib/app/shell/nav";
     import type {PageHeader} from "$lib/app/shell/pageHeader.svelte";
     import {page} from "$app/state";
     import {_} from "svelte-i18n";
+    import {Button} from "$lib/components/ui/button";
+    import {SidebarSimpleIcon} from "phosphor-svelte";
 
-    let {header}: {header: PageHeader} = $props();
+    let {
+        header,
+        sidebarOpen = $bindable(false),
+    }: {
+        header: PageHeader,
+        sidebarOpen: boolean,
+    } = $props();
 
     // Routes outside the menu -- none so far -- fall back to the product name over an empty bar.
     const item = $derived(currentNavItem(page.url.pathname));
-
-    let assistantOpen = $state(false);
 </script>
 
 <header
@@ -28,10 +29,14 @@
         <h1 class="text-base font-medium">{item ? $_(item.key) : $_('app.name')}</h1>
         <div class="ms-auto flex items-center gap-2">
             {@render header.actions?.()}
-            <OvermailAiPopover
-                    bind:open={assistantOpen}
-                    onCloseFocus={header.restoreFocus ?? undefined}
-            />
+
+            <Button
+                    size="icon-sm"
+                    variant={sidebarOpen ? "secondary" : "ghost"}
+                    onclick={() => sidebarOpen = !sidebarOpen}
+            >
+                <SidebarSimpleIcon class="rotate-180" />
+            </Button>
         </div>
     </div>
 </header>

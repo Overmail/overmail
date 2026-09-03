@@ -47,10 +47,10 @@
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-3xl border border-transparent
                                bg-transparent py-1.5 pl-4.5 pr-3 text-start outline-none
                                transition-[color,box-shadow,background-color]
-                               hover:bg-input/50 focus-visible:border-ring focus-visible:ring-3
+                               hover:bg-input/50 focus-visible:ring-3
                                focus-visible:ring-ring/30"
                 >
-                    <h1 class="min-w-0 flex-1 truncate text-xl">
+                    <h1 class="min-w-0 flex-1 truncate text-lg">
                         {viewModel.currentChat
                             ? (viewModel.currentChat.name ?? $_('ai.chat.chats.untitled'))
                             : $_('ai.chat.chats.new')}

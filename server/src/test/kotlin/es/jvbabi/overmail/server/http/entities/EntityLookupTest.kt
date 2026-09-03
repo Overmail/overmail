@@ -74,6 +74,8 @@ class EntityLookupTest {
             User.new {
                 username = "stranger-${Uuid.random()}"
                 email = "stranger-${Uuid.random()}@example.com"
+                firstname = "Test"
+                lastname = "User"
             }
         }
 
@@ -103,6 +105,8 @@ class EntityLookupTest {
             val user = User.new {
                 username = "owner-${Uuid.random()}"
                 email = "owner-${Uuid.random()}@example.com"
+                firstname = "Test"
+                lastname = "User"
             }
             signedIn = user
 

@@ -45,6 +45,8 @@ class ChatAgentTest {
             val user = User.new {
                 username = "tester"
                 email = "tester@example.com"
+                firstname = "Test"
+                lastname = "User"
             }
             val chat = AiChat.new {
                 this.user = user

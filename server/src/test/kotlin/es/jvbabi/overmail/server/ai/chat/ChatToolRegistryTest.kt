@@ -81,6 +81,8 @@ class ChatToolRegistryTest {
             val user = User.new {
                 username = "owner-${Uuid.random()}"
                 email = "owner-${Uuid.random()}@example.com"
+                firstname = "Test"
+                lastname = "User"
             }
             val account = ImapAccount.new {
                 this.user = user

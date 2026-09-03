@@ -92,6 +92,8 @@ class ChatHistoryTest {
             val user = User.new {
                 username = "owner-${Uuid.random()}"
                 email = "owner-${Uuid.random()}@example.com"
+                firstname = "Test"
+                lastname = "User"
             }
             signedIn = user
 

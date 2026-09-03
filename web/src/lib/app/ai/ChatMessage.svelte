@@ -6,6 +6,7 @@
     import RelativeTime from "$lib/components/time/RelativeTime.svelte";
     import {Spinner} from "$lib/components/ui/spinner";
     import type {AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";
+    import {_} from "svelte-i18n";
 
     let {
         message,
@@ -36,20 +37,28 @@
         {#if message.type === "user"}
             <ChatUserContent segments={message.content}/>
         {:else if message.content !== ""}
-            <ChatAgentContent content={message.content}/>
+            <ChatAgentContent content={message.content} streaming={message.pending}/>
         {:else}
             <!-- Nothing streamed yet: the answer is queued or just starting. -->
             <Spinner class="size-4"/>
         {/if}
     </div>
 
-    <div class="flex flex-col items-start gap-1 text-muted-foreground text-xs">
-        {#if hasActions}
-            <div class="mb-2">
-                <ChatMessageActions disabled={isBusy} onRetry={() => onRetry(message.id)}/>
-            </div>
-        {/if}
+    {#if !isUser}
+        <div class="flex flex-col items-start gap-1 text-muted-foreground text-xs">
+            {#if hasActions}
+                <div class="mb-2">
+                    <ChatMessageActions disabled={isBusy} onRetry={() => onRetry(message.id)}/>
+                </div>
+            {/if}
 
-        <RelativeTime date={message.created_at}/>
-    </div>
+            <div class="flex items-center gap-1.5">
+                <RelativeTime date={message.created_at}/>
+                {#if message.type === "assistant" && message.tokensOutput > 0}
+                    <span aria-hidden="true">·</span>
+                    <span>{$_("ai.chat.messages.tokensOutput", {values: {count: message.tokensOutput}})}</span>
+                {/if}
+            </div>
+        </div>
+    {/if}
 </li>

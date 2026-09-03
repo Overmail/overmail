@@ -70,10 +70,15 @@ export class ChatHistoryRepository {
                         this.streamingHandler.subscribeTo({
                             chatId: chatId,
                             messageId: message.id,
-                            onSnapshot: (content) => this.updateAssistantMessage(
+                            onSnapshot: (content, tokensOutput) => this.updateAssistantMessage(
                                 chatId,
                                 message.id,
-                                (assistant) => ({...assistant, content: content}),
+                                (assistant) => ({...assistant, content, tokensOutput}),
+                            ),
+                            onUsage: (tokensOutput) => this.updateAssistantMessage(
+                                chatId,
+                                message.id,
+                                (assistant) => ({...assistant, tokensOutput}),
                             ),
                             onNewContent: (content) => this.updateAssistantMessage(
                                 chatId,
@@ -92,6 +97,7 @@ export class ChatHistoryRepository {
                         type: "assistant",
                         pending: message.pending,
                         content: message.content,
+                        tokensOutput: message.tokens_output,
                     };
                 }
                 return [];
@@ -132,8 +138,10 @@ class ChatResponseStreamingHandler {
         chatId: string,
         messageId: string,
         /** The whole answer so far; replaces what is rendered instead of being appended to it. */
-        onSnapshot: (content: string) => void,
+        onSnapshot: (content: string, tokensOutput: number) => void,
         onNewContent: (content: string) => void,
+        /** Running total, not a delta: a missed update is corrected by the next one. */
+        onUsage: (tokensOutput: number) => void,
         onComplete: () => void,
     }) {
         const existingSource = this.sources.get(config.messageId);
@@ -153,7 +161,9 @@ class ChatResponseStreamingHandler {
             } else if (data.type === "snapshot") {
                 // Every stream opens with one, and a reconnect gets a fresh one: it is what makes
                 // the retry below safe, no matter how much was missed while the stream was down.
-                config.onSnapshot(data.content);
+                config.onSnapshot(data.content, data.tokens_output);
+            } else if (data.type === "usage") {
+                config.onUsage(data.tokens_output);
             }
         };
         eventSource.onerror = (error) => {
@@ -202,7 +212,9 @@ export type AiChatMessage = {
     } | {
         type: "assistant",
         pending: boolean,
-        content: string
+        content: string,
+        /** Tokens the model reported for this answer; still growing while it is pending. */
+        tokensOutput: number
     }
 )
 

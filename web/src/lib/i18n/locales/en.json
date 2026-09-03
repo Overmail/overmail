@@ -89,7 +89,9 @@
       "hint": "Mention #labels, @emails or :people",
       "messages": {
         "deletedReference": "Deleted",
-        "retry": "Try again"
+        "retry": "Try again",
+        "readEmail": "Reading email",
+        "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}"
       }
     },
     "labels": {

@@ -82,7 +82,8 @@
 			},
 			"mode": {
 				"normal": "Normal",
-				"readOnly": "Read only"
+				"readOnly": "Read only",
+				"askBeforeChanges": "Ask before changes"
 			},
 			"send": "Send",
 			"hint": "Mention #labels, @emails or :people"

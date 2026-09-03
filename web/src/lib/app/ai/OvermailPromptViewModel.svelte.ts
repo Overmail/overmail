@@ -25,6 +25,7 @@ export type EmailSearchResult = {
 export class OvermailPromptViewModel {
     prompt: Prompt = $state({
         segments: [],
+        type: "normal",
     });
 
     isEmpty = $derived(

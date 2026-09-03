@@ -16,9 +16,11 @@
             {char: "@", window: EmailsFindWindow},
             {char: ":", window: SendersFindWindow},
         ],
+        onPromptSubmit,
     }: {
         viewModel: OvermailPromptViewModel;
         triggers?: PromptTriggerDefinition[];
+        onPromptSubmit: () => void;
     } = $props();
 
     let editor: HTMLDivElement;
@@ -322,7 +324,10 @@
         if (event.key === "Enter") {
             // Shift+Enter: Browser fügt <br> ein (insertLineBreak), syncFromDom liest das als \n.
             // Enter ohne Shift bleibt blockiert (kein <div>-Wrapping; Submit kommt später).
-            if (!event.shiftKey) event.preventDefault();
+            if (!event.shiftKey) {
+                event.preventDefault();
+                if (!viewModel.isEmpty) onPromptSubmit();
+            }
             return;
         }
 

@@ -7,7 +7,7 @@
     import {fade} from "svelte/transition";
     import PromptInput from "$lib/app/ai/PromptInput.svelte";
     import {OvermailPromptViewModel} from "$lib/app/ai/OvermailPromptViewModel.svelte";
-    import type {PromptInputExports} from "$lib/app/ai/prompt";
+    import type {PromptInputExports, PromptMode} from "$lib/app/ai/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
     import {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
     import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
@@ -43,9 +43,6 @@
     onMount(() => () => chatViewModel.dispose());
 
     const promptViewModel = new OvermailPromptViewModel();
-    let promptEmpty = $derived(promptViewModel.isEmpty);
-
-    let promptType: "normal" | "ask-before-changes" | "read-only" = $state("normal");
 
     let promptInput: PromptInputExports | undefined = $state();
 
@@ -80,7 +77,7 @@
 
     <div class="flex flex-col min-h-24 max-h-56">
         <InputGroup.Root class="flex-1 min-h-0">
-            {#if promptEmpty}
+            {#if promptViewModel.isEmpty}
                 {#key placeholderKey}
                     <span
                             class="absolute top-2.5 left-3 text-muted-foreground pointer-events-none"
@@ -91,12 +88,22 @@
                     </span>
                 {/key}
             {/if}
-            <PromptInput bind:this={promptInput} viewModel={promptViewModel}/>
+            <PromptInput
+                    bind:this={promptInput}
+                    viewModel={promptViewModel}
+                    onPromptSubmit={() => chatViewModel.onPromptSubmitted(promptViewModel.prompt)}
+            />
 
             <InputGroup.Addon align="block-end" onmousedown={focusPromptFromAddon}>
-                <Select.Root type="single" bind:value={promptType}>
+                <Select.Root type="single" bind:value={promptViewModel.prompt.type}>
                     <Select.Trigger>
-                        {promptType === "normal" ? $_('ai.chat.mode.normal') : $_('ai.chat.mode.readOnly')}
+                        {#if promptViewModel.prompt.type === "normal"}
+                            {$_("ai.chat.mode.normal")}
+                        {:else if promptViewModel.prompt.type === "ask-before-changes"}
+                            {$_("ai.chat.mode.askBeforeChanges")}
+                        {:else if promptViewModel.prompt.type === "read-only"}
+                            {$_("ai.chat.mode.readOnly")}
+                        {/if}
                     </Select.Trigger>
                     <Select.Content
                             side="top"
@@ -104,7 +111,7 @@
                     >
                         <Select.Group>
                             <Select.Item value="normal">{$_('ai.chat.mode.normal')}</Select.Item>
-                            <Select.Item value="ask-before-changes">Bearbeitungen anfragen</Select.Item>
+                            <Select.Item value="ask-before-changes">{$_('ai.chat.mode.askBeforeChanges')}</Select.Item>
                             <Select.Item value="read-only">{$_('ai.chat.mode.readOnly')}</Select.Item>
                         </Select.Group>
                     </Select.Content>
@@ -122,7 +129,7 @@
                         variant="default"
                         class="rounded-full"
                         size="icon-xs"
-                        disabled={promptEmpty || promptViewModel.currentModel.type === "loading"}
+                        disabled={promptViewModel.isEmpty || promptViewModel.currentModel.type === "loading"}
                 >
                     <ArrowUpIcon/>
                     <span class="sr-only">{$_('ai.chat.send')}</span>

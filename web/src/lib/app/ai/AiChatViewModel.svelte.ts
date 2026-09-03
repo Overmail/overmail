@@ -1,3 +1,5 @@
+import type {Prompt} from "$lib/app/ai/prompt";
+
 export class AiChatViewModel {
     chats: AiChat[] = $state([]);
 
@@ -70,6 +72,50 @@ export class AiChatViewModel {
         } else {
             this.chats[index] = chat;
         }
+    }
+
+    async onPromptSubmitted(
+        prompt: Prompt
+    ) {
+        const response = await fetch('/api/webapp/ai/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: this.currentChatId,
+                prompt: {
+                    type: prompt.type,
+                    segments: prompt.segments.map((segment) => {
+                        switch (segment.type) {
+                            case "text":
+                                return {
+                                    type: "text",
+                                    content: segment.content,
+                                };
+                            case "email":
+                                return {
+                                    type: "email",
+                                    id: segment.email.id,
+                                };
+                            case "label":
+                                return {
+                                    type: "label",
+                                    id: segment.label.id,
+                                };
+                            case "sender":
+                                return {
+                                    type: "sender",
+                                    id: segment.sender.id,
+                                };
+                        }
+                    })
+                }
+            }),
+        });
+
+        const data = await response.json();
+        this.currentChatId = data.chat_id;
     }
 }
 

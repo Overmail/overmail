@@ -301,7 +301,7 @@
                                            {isSelected && row.domId !== activeRow?.domId ? 'bg-foreground/5' : ''}
                                            hover:bg-foreground/10"
                             >
-                                <span class="truncate {chat.name ? '' : 'text-muted-foreground italic'}">
+                                <span class="truncate {chat.name ? '' : 'text-muted-foreground'}">
                                     {titleOf(chat)}
                                 </span>
                                 <span class="truncate text-xs font-normal text-muted-foreground">

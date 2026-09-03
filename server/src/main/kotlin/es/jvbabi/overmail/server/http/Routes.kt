@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
+import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
@@ -85,6 +86,10 @@ internal fun Application.configureRouting() {
 
                     route("/socket") {
                         aiSocket()
+                    }
+
+                    route("/chat") {
+                        message()
                     }
                 }
             }

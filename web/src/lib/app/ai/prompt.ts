@@ -3,7 +3,10 @@ import type {OvermailPromptViewModel} from "./OvermailPromptViewModel.svelte";
 
 export type Prompt = {
     segments: PromptSegment[];
+    type: PromptMode;
 }
+
+export type PromptMode = "normal" | "read-only" | "ask-before-writes";
 
 export type PromptSegment = {
     type: "text",

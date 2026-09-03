@@ -324,9 +324,12 @@ class ChatAgent(
                 "When you mention an email, a label or a person in your answer, write it as the " +
                 "element `<email id=\"...\"></email>`, `<label id=\"...\"></label>` or " +
                 "`<person id=\"...\"></person>` with the id the tool result or the user's " +
-                "message gave you -- the app renders those, so do not repeat the subject, the " +
-                "label name or the address next to them. Use an id only where it came from; " +
-                "never invent one, and write the plain name when you have no id.\n" +
+                "message gave you. The user never sees the element or the id: it is displayed as " +
+                "the email's subject, the label's name or the person's name. Write the sentence " +
+                "around it as if that text stood there -- keep the articles and cases right, and " +
+                "do not repeat the subject, name or address next to the element. Use an id only " +
+                "where it came from; never invent one, and write the plain name when you have " +
+                "no id.\n" +
                 "Your tools are everything you can do: search the mailbox and read one email. " +
                 "You cannot label, archive, move, delete or send mail, you cannot change the " +
                 "user's settings, and you cannot set up anything that acts on future emails. " +

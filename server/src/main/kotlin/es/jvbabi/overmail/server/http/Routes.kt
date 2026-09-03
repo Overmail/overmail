@@ -3,9 +3,12 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
+import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.search.emailSearch
+import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
+import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
@@ -54,6 +57,9 @@ internal fun Application.configureRouting() {
             }
 
             route("/emails") {
+                // GET /emails?ids=a,b,c -- what a client-side cache asks for the ids it lacks.
+                emailsByIds()
+
                 route("/search") {
                     emailSearch()
                 }
@@ -70,12 +76,16 @@ internal fun Application.configureRouting() {
             }
 
             route("/labels") {
+                labelsByIds()
+
                 route("/search") {
                     labelSearch()
                 }
             }
 
             route("/senders") {
+                sendersByIds()
+
                 route("/search") {
                     senderSearch()
                 }

@@ -108,11 +108,19 @@ class SearchEmailsTool(
         data class Email(
             @SerialName("id") val id: String,
             @SerialName("subject") val subject: String,
+            /** The sender as an entity, so answers can point at the person rather than a string. */
+            @SerialName("sender_id") val senderId: String,
             @SerialName("sender_address") val senderAddress: String,
             @SerialName("sender_name") val senderName: String?,
             @SerialName("sent") val sent: String,
             @SerialName("is_read") val isRead: Boolean,
-            @SerialName("labels") val labels: List<String>,
+            @SerialName("labels") val labels: List<Label>,
+        )
+
+        @Serializable
+        data class Label(
+            @SerialName("id") val id: String,
+            @SerialName("name") val name: String,
         )
     }
 
@@ -139,6 +147,7 @@ class SearchEmailsTool(
                     Emails.senderName,
                     Emails.sent,
                     Emails.isRead,
+                    EmailUsers.id,
                     EmailUsers.address,
                 )
                 .where { ImapAccounts.user eq userId }
@@ -188,6 +197,7 @@ class SearchEmailsTool(
                     Result.Email(
                         id = id.toString(),
                         subject = row[Emails.subject],
+                        senderId = row[EmailUsers.id].value.toString(),
                         senderAddress = row[EmailUsers.address],
                         senderName = row[Emails.senderName],
                         sent = row[Emails.sent].toString(),
@@ -200,14 +210,17 @@ class SearchEmailsTool(
         }
     }
 
-    private fun labelsOf(emailIds: List<Uuid>): Map<Uuid, List<String>> {
+    private fun labelsOf(emailIds: List<Uuid>): Map<Uuid, List<Result.Label>> {
         if (emailIds.isEmpty()) return emptyMap()
 
         return EmailLabels
             .join(Labels, JoinType.INNER, EmailLabels.label, Labels.id)
-            .select(EmailLabels.email, Labels.name)
+            .select(EmailLabels.email, Labels.id, Labels.name)
             .where { EmailLabels.email inList emailIds }
-            .groupBy({ row -> row[EmailLabels.email].value }, { row -> row[Labels.name] })
+            .groupBy(
+                { row -> row[EmailLabels.email].value },
+                { row -> Result.Label(id = row[Labels.id].value.toString(), name = row[Labels.name]) },
+            )
     }
 
     companion object {

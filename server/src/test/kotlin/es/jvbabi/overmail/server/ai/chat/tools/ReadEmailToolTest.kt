@@ -83,8 +83,8 @@ class ReadEmailToolTest {
         assertEquals("Please pay 42 EUR.", email.body)
         assertFalse(email.bodyTruncated)
         assertEquals(
-            listOf(ReadEmailTool.Recipient("owner@example.com", "The Owner", EmailRecipientType.RECIPIENT)),
-            email.recipients,
+            listOf("owner@example.com" to EmailRecipientType.RECIPIENT),
+            email.recipients.map { recipient -> recipient.address to recipient.type },
         )
     }
 

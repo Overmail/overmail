@@ -48,7 +48,7 @@ class SearchEmailsToolTest {
 
         assertEquals("mensa@uni-potsdam.de", email.senderAddress)
         assertEquals("Mensa", email.senderName)
-        assertEquals(listOf("Studium"), email.labels)
+        assertEquals(listOf("Studium"), email.labels.map { label -> label.name })
         assertTrue(!email.isRead)
     }
 

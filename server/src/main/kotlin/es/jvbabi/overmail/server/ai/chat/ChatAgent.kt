@@ -321,6 +321,12 @@ class ChatAgent(
                 "Use `${SearchEmailsTool.NAME}` to find emails; it answers with metadata only, so " +
                 "read the ones whose content you need. Say what you searched for when nothing " +
                 "was found, rather than claiming there is no such email.\n" +
+                "When you mention an email, a label or a person in your answer, write it as the " +
+                "element `<email id=\"...\"></email>`, `<label id=\"...\"></label>` or " +
+                "`<person id=\"...\"></person>` with the id the tool result or the user's " +
+                "message gave you -- the app renders those, so do not repeat the subject, the " +
+                "label name or the address next to them. Use an id only where it came from; " +
+                "never invent one, and write the plain name when you have no id.\n" +
                 "Your tools are everything you can do: search the mailbox and read one email. " +
                 "You cannot label, archive, move, delete or send mail, you cannot change the " +
                 "user's settings, and you cannot set up anything that acts on future emails. " +

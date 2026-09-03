@@ -61,6 +61,8 @@ class ReadEmailTool(
         data class Email(
             @SerialName("id") val id: String,
             @SerialName("subject") val subject: String,
+            /** The sender as an entity, so answers can point at the person rather than a string. */
+            @SerialName("sender_id") val senderId: String,
             @SerialName("sender_address") val senderAddress: String,
             /** Display name from this mail's header, absent for a bare address. */
             @SerialName("sender_name") val senderName: String?,
@@ -83,6 +85,7 @@ class ReadEmailTool(
 
     @Serializable
     data class Recipient(
+        @SerialName("id") val id: String,
         @SerialName("address") val address: String,
         @SerialName("name") val name: String?,
         @SerialName("type") val type: EmailRecipientType,
@@ -104,6 +107,7 @@ class ReadEmailTool(
                     Emails.textContent,
                     Emails.htmlContent,
                     Emails.isRead,
+                    EmailUsers.id,
                     EmailUsers.address,
                     EmailUsers.avatar,
                 )
@@ -115,10 +119,11 @@ class ReadEmailTool(
 
             val recipients = EmailRecipients
                 .join(EmailUsers, JoinType.INNER, EmailRecipients.emailUser, EmailUsers.id)
-                .select(EmailUsers.address, EmailRecipients.name, EmailRecipients.type)
+                .select(EmailUsers.id, EmailUsers.address, EmailRecipients.name, EmailRecipients.type)
                 .where { EmailRecipients.email eq emailId }
                 .map { recipient ->
                     Recipient(
+                        id = recipient[EmailUsers.id].value.toString(),
                         address = recipient[EmailUsers.address],
                         name = recipient[EmailRecipients.name],
                         type = recipient[EmailRecipients.type],
@@ -141,6 +146,7 @@ class ReadEmailTool(
             Result.Email(
                 id = emailId.toString(),
                 subject = row[Emails.subject],
+                senderId = row[EmailUsers.id].value.toString(),
                 senderAddress = row[EmailUsers.address],
                 senderName = row[Emails.senderName],
                 sent = row[Emails.sent].toString(),

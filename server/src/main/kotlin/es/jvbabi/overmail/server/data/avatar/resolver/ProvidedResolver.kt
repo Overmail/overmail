@@ -32,7 +32,7 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
          */
         val addresses = mapOf(
             "email.openai.com" to "https://svgl.app/library/openai.svg",
-            "*.myhpi.de" to "https://hpi.de/_assets/7b3ba8bb3871137dffa4d9cccacf730f/Images/FavAndTouchIcons/favicon-32x32.png",
+            "*.myhpi.de" to "https://hpi.de/_assets/7b3ba8bb3871137dffa4d9cccacf730f/Images/FavAndTouchIcons/apple-touch-icon.png",
             "kontakt@manos-dresden.lernsax.de" to "https://manos-dresden.de/wp-content/uploads/2026/07/M-1.svg",
             "github.com" to "https://github.githubassets.com/favicons/favicon.svg",
             "spaceship.com" to "https://spaceship-cdn.com/static/spaceship/favicon/spaceship-icon.svg",
@@ -59,6 +59,7 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "googleplay-noreply@google.com" to "https://svgl.app/library/googleplay.svg",
             "accounts.google.com" to "https://svgl.app/library/google.svg",
             "noreply-accounts@google.com" to "https://svgl.app/library/google.svg",
+            "sc-noreply@google.com" to "https://svgl.app/library/google.svg",
             "cloudflare.com" to "https://svgl.app/library/cloudflare.svg",
             "*.cloudflare.com" to "https://svgl.app/library/cloudflare.svg",
             "account.netflix.com" to "https://svgl.app/library/netflix-icon.svg",
@@ -68,8 +69,26 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "slothbytes@mail.beehiiv.com" to "https://media.beehiiv.com/cdn-cgi/image/fit=scale-down,format=auto,onerror=redirect,quality=80/uploads/publication/logo/785df2cf-6a8b-4daa-b929-7bf60c7f57cb/thumb_sloth_bytes_logo.png",
             "mail.baseten.co" to "https://www.baseten.co/brand/mark/svg/Baseten_Symbol-9.svg",
             "apple.com" to "https://svgl.app/library/apple.svg",
+            "email.apple.com" to "https://svgl.app/library/apple.svg",
+            "insideapple.apple.com" to "https://svgl.app/library/apple.svg",
             "sa.noreply@samsung-mail.com" to "https://v3.account.samsung.com/favicon.ico",
             "noreply@t3.codes" to "https://raw.githubusercontent.com/pingdotgg/t3code/refs/heads/main/apps/marketing/public/icon.png",
+            "figma.com" to "https://svgl.app/library/figma.svg",
+            "tools@youngfounders.network" to "https://tools@youngfounders.network/yfn-logo.svg",
+            "traderepublic.com" to "https://companieslogo.com/img/orig/traderepublic-4820badb.svg?t=1720244494&download=true",
+            "finanzguru.de" to "https://cdn.brandfetch.io/idbbPE_Vqt/theme/dark/symbol.svg?c=1dxbfHSJFAPEGdCLU4o5B",
+            "linkedin.com" to "https://svgl.app/library/linkedin.svg",
+            "posthog.com" to "https://svgl.app/library/posthog.svg",
+            "frame.work" to "https://frame.work/favicon-192x192.png",
+            "ovh.com" to "https://www.ovhcloud.com/icon.svg",
+            "services.ovhcloud.com" to "https://www.ovhcloud.com/icon.svg",
+            "jetbrains.com" to "https://svgl.app/library/jetbrainsSolid.svg",
+            "microsoft.com" to "https://svgl.app/library/microsoft.svg",
+            "communication.microsoft.com" to "https://svgl.app/library/microsoft.svg",
+            "windowsinsiderprogram@e-mails.microsoft.com" to "https://svgl.app/library/windows.svg",
+            "e-mails.microsoft.com" to "https://svgl.app/library/microsoft.svg",
+            "mail.threads.net" to "https://svgl.app/library/threads.svg",
+            "reddit.com" to "https://svgl.app/library/reddit.svg",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

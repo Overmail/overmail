@@ -6,7 +6,7 @@ import es.jvbabi.overmail.server.data.notifier.AvatarEvent
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
-import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.http.avatar.avatarUrl
@@ -51,7 +51,7 @@ fun Route.stackSocket() {
             val emailLabelNotifier = application.dependencies.resolve<EmailLabelNotifier>()
             val avatarQueue = application.dependencies.resolve<AvatarQueue>()
             val avatarNotifier = application.dependencies.resolve<AvatarNotifier>()
-            val mailboxNotifier = application.dependencies.resolve<MailboxNotifier>()
+            val mailNotifier = application.dependencies.resolve<MailNotifier>()
 
             val user = call.user
             var latestMail = Clock.System.now()
@@ -259,7 +259,7 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (archived) mailboxNotifier.notifyMailboxChanged(user.id.value)
+                        if (archived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
                     }
                     is StackClientMessage.UnarchiveEmail -> {
                         val unarchived = database.query {
@@ -273,7 +273,7 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (unarchived) mailboxNotifier.notifyMailboxChanged(user.id.value)
+                        if (unarchived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
                     }
                 }
             }

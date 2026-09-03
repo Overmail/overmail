@@ -10,7 +10,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.structure.StructuredResponse
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
-import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvent
@@ -35,7 +35,7 @@ class EmailClassification(
     private val model: LLModel,
     private val overmailDatabase: OvermailDatabase,
     private val emailLabelNotifier: EmailLabelNotifier,
-    private val mailboxNotifier: MailboxNotifier,
+    private val mailNotifier: MailNotifier,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -155,8 +155,8 @@ class EmailClassification(
                     this.createdByAgent = true
                 }
             }
-            // Out of the mailbox now, so whoever counts it has to count again.
-            mailboxNotifier.notifyMailboxChanged(user.id.value)
+            // Out of the mailbox now, so whoever shows or counts it has to ask again.
+            mailNotifier.notifyMailChanged(user.id.value, email.id.value)
             return
         }
 
@@ -279,7 +279,10 @@ class EmailClassification(
             }
             // Notified after the transaction committed, so subscribers never see a label that
             // could still be rolled back.
-            attachedLabel?.let { emailLabelNotifier.notifyLabelUpsert(email.id.value, it) }
+            attachedLabel?.let {
+                emailLabelNotifier.notifyLabelUpsert(email.id.value, it)
+                mailNotifier.notifyMailChanged(user.id.value, email.id.value)
+            }
             log(
                 "Label '$requestedName': " +
                         (if (existing) "reused existing label '$resolvedName'" else "created new label") +

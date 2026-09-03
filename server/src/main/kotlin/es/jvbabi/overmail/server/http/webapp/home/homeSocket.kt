@@ -1,7 +1,7 @@
 package es.jvbabi.overmail.server.http.webapp.home
 
 import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
@@ -60,7 +60,8 @@ private val json = Json { ignoreUnknownKeys = true }
  * arriving, being archived, unarchived or filed as spam:
  *
  * - the size of the mailbox, which is sent on connect,
- * - the mails per day of a year, for the heatmap. The current year is sent on connect as well;
+ * - the mails per day of a year, for the heatmap. The current year (the server's) is sent on
+ *   connect as well;
  *   any other year is sent once the client asks for it and then stays subscribed for as long as
  *   this socket lives.
  *
@@ -72,7 +73,7 @@ fun Route.homeSocket() {
     authenticate {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
-            val mailboxNotifier = application.dependencies.resolve<MailboxNotifier>()
+            val mailNotifier = application.dependencies.resolve<MailNotifier>()
             val user = call.user
 
             // Two coroutines write here: the loop below, when a year is asked for, and the
@@ -100,12 +101,19 @@ fun Route.homeSocket() {
              * was, and cleaning up afterwards does not make a day quieter in hindsight.
              *
              * Grouped in the database rather than over loaded mails -- a year of a busy mailbox
-             * is tens of thousands of rows and all that is wanted is one number per day. Days
-             * are UTC days, so the year the socket picks is a UTC year too.
+             * is tens of thousands of rows and all that is wanted is one number per day.
+             *
+             * Days are the server's days. `sent` is stored as a local timestamp, so that is what
+             * the database groups by -- and the year window has to be cut in the same zone, or a
+             * mail sent in the hours around new year falls into one year's window while being
+             * grouped under the other's date and shows up in neither graph. A user in another
+             * zone sees the server's day boundaries; the way out of that is the client sending
+             * its own zone, not a second zone in here.
              */
             suspend fun mailGraph(year: Int): HomeServerMessage.MailGraph = database.query {
-                val from = LocalDate(year, 1, 1).atStartOfDayIn(TimeZone.UTC)
-                val until = LocalDate(year + 1, 1, 1).atStartOfDayIn(TimeZone.UTC)
+                val zone = TimeZone.currentSystemDefault()
+                val from = LocalDate(year, 1, 1).atStartOfDayIn(zone)
+                val until = LocalDate(year + 1, 1, 1).atStartOfDayIn(zone)
                 // Suppressed, not outdated: kotlinx' `Instant` is a typealias of the one in
                 // `kotlin.time` now, which makes the deprecated overload and its replacement the
                 // same signature, and the call lands on the deprecated one.
@@ -160,11 +168,11 @@ fun Route.homeSocket() {
             // client would sit on a stale number until it reconnects. Subscribed first, the
             // event is buffered and the collector below reads again.
             launch {
-                mailboxNotifier.subscribe(user.id.value)
+                mailNotifier.subscribe(user.id.value)
                     .onSubscription {
                         sending.withLock {
                             sendMailboxCount()
-                            sendMailGraph(Clock.System.now().toLocalDateTime(TimeZone.UTC).year)
+                            sendMailGraph(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year)
                         }
                     }
                     .collectLatest {

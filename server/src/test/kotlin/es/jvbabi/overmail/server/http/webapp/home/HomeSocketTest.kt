@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.webapp.home
 
-import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailArchive
@@ -53,7 +53,7 @@ class HomeSocketTest {
         Database.connect("jdbc:h2:mem:home-socket;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
     )
 
-    private val mailboxNotifier = MailboxNotifier()
+    private val mailNotifier = MailNotifier()
 
     private lateinit var signedIn: User
 
@@ -80,7 +80,7 @@ class HomeSocketTest {
         assertEquals(3, socket.nextCount())
 
         archive(mails[0], EmailArchiveAction.Archive)
-        mailboxNotifier.notifyMailboxChanged(signedIn.id.value)
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
 
         assertEquals(2, socket.nextCount())
         socket.close()
@@ -98,7 +98,7 @@ class HomeSocketTest {
         // Archiving what is already archived: the count is the same, so the socket stays quiet.
         // Well past the debounce, or this would pass without proving anything.
         archive(mails[0], EmailArchiveAction.Archive)
-        mailboxNotifier.notifyMailboxChanged(signedIn.id.value)
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
 
         assertNull(withTimeoutOrNull(2_000) { socket.nextCountOrNull() })
         socket.close()
@@ -165,7 +165,7 @@ class HomeSocketTest {
     fun `another year is sent once it is asked for`() = testApplication {
         setUp()
         installRoute()
-        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Old mail")
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.currentSystemDefault()), "Old mail")
 
         val socket = openSocket()
         assertEquals(currentYear, socket.nextGraph()["year"]!!.jsonPrimitive.int)
@@ -184,15 +184,15 @@ class HomeSocketTest {
     fun `a year on screen is updated when mail arrives`() = testApplication {
         setUp()
         installRoute()
-        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Old mail")
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.currentSystemDefault()), "Old mail")
 
         val socket = openSocket()
         socket.nextGraph()
         socket.requestYear(2020)
         socket.nextGraph()
 
-        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Another old mail")
-        mailboxNotifier.notifyMailboxChanged(signedIn.id.value)
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.currentSystemDefault()), "Another old mail")
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
 
         // Both years are re-read, so the one that changed comes back -- for 2020 that is the day
         // count, for the current year nothing changed and nothing is sent.
@@ -219,10 +219,10 @@ class HomeSocketTest {
     private fun JsonObject.days(): Map<String, Int> =
         getValue("days").jsonObject.mapValues { (_, count) -> count.jsonPrimitive.int }
 
-    private val currentYear get() = Clock.System.now().toLocalDateTime(TimeZone.UTC).year
+    private val currentYear get() = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year
 
-    /** `yyyy-mm-dd` of the UTC day the fixture's mails were sent on. */
-    private val today get() = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
+    /** `yyyy-mm-dd` of the day the fixture's mails were sent on, in the zone the server groups by. */
+    private val today get() = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
 
     private suspend fun archive(emailId: Uuid, action: EmailArchiveAction) {
         database.query {
@@ -280,7 +280,7 @@ class HomeSocketTest {
             install(Authentication) { alwaysSignedIn() }
             dependencies {
                 provide<OvermailDatabase> { database }
-                provide<MailboxNotifier> { mailboxNotifier }
+                provide<MailNotifier> { mailNotifier }
             }
             routing {
                 route("/api/webapp/home/socket") { homeSocket() }

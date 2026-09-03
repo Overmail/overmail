@@ -94,7 +94,10 @@
         "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}",
         "searchEmails": "Searching emails",
         "searchSubject": "Subject: {query}",
-        "searchSender": "From: {query}"
+        "searchSender": "From: {query}",
+        "thinking": "Thinking",
+        "toolCall": "Working",
+        "toolCalls": "{count, plural, one {# step} other {# steps}}"
       }
     },
     "labels": {

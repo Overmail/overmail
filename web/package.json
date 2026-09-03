@@ -38,6 +38,7 @@
 		"@tanstack/svelte-hotkeys": "^0.10.0",
 		"date-fns": "^4.4.0",
 		"dexie": "^4.4.5",
-		"svelte-i18n": "^4.0.1"
+		"svelte-i18n": "^4.0.1",
+		"thinking-orbs": "^0.3.1"
 	}
 }

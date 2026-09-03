@@ -1,11 +1,14 @@
-<!-- An answer: markdown, plus a chip for every mail the agent read while writing it. -->
+<!--
+    An answer: its markdown, and the tool calls the agent made while writing it, grouped into
+    what ran between two pieces of text.
+-->
 <script lang="ts">
     import SvelteMarkdown from "@humanspeak/svelte-markdown";
-    import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
-    import ToolCallSearchEmails from "$lib/app/ai/ToolCallSearchEmails.svelte";
+    import ToolCallGroup from "$lib/app/ai/ToolCallGroup.svelte";
     import EntityEmail from "$lib/app/entities/EntityEmail.svelte";
     import EntityLabel from "$lib/app/entities/EntityLabel.svelte";
     import EntityPerson from "$lib/app/entities/EntityPerson.svelte";
+    import {agentBlocks} from "$lib/app/ai/agentBlocks";
 
     let {
         content,
@@ -16,15 +19,14 @@
         streaming?: boolean;
     } = $props();
 
-    // Only the tool call elements are ours; everything else keeps the library's renderers, which
-    // sanitize urls and leave unknown html alone.
+    const blocks = $derived(agentBlocks(content));
+
+    // Only the entity elements are ours; everything else keeps the library's renderers, which
+    // sanitize urls and leave unknown html alone. The html `label` element is overridden on
+    // purpose: inside an answer the tag means the user's label, and a form label has nothing to
+    // do here.
     const renderers = {
         html: {
-            "toolcall-read-email": ToolCallReadEmail,
-            "toolcall-search-emails": ToolCallSearchEmails,
-            // What the agent mentions, written as <email id>, <label id> and <person id>. The
-            // html `label` element is overridden by this on purpose: inside an answer the tag
-            // means the user's label, and a form label has nothing to do here.
             email: EntityEmail,
             label: EntityLabel,
             person: EntityPerson,
@@ -35,5 +37,12 @@
 <!-- The markdown blocks bring no margins of their own here, so the spacing is set once. -->
 <div class="flex flex-col gap-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5
             [&_a]:underline [&_code]:font-mono [&_pre]:overflow-x-auto">
-    <SvelteMarkdown source={content} {streaming} {renderers}/>
+    {#each blocks as block, index (index)}
+        {#if block.type === "markdown"}
+            <SvelteMarkdown source={block.content} {streaming} {renderers}/>
+        {:else}
+            <!-- The last block of an answer that is still being written is what runs right now. -->
+            <ToolCallGroup calls={block.calls} isRunning={streaming && index === blocks.length - 1}/>
+        {/if}
+    {/each}
 </div>

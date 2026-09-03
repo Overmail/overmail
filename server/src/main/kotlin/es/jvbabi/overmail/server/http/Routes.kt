@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
 import es.jvbabi.overmail.server.http.webapp.ai.chat.message
+import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
@@ -98,8 +99,14 @@ internal fun Application.configureRouting() {
                                 chatHistory()
                             }
 
-                            route("/message/{messageId}/stream") {
-                                chatMessageStream()
+                            route("/message/{messageId}") {
+                                route("/stream") {
+                                    chatMessageStream()
+                                }
+
+                                route("/retry") {
+                                    retryMessage()
+                                }
                             }
                         }
                     }

@@ -12,7 +12,7 @@
 </script>
 
 <div class="flex flex-col">
-    <div class="flex flex-row flex-wrap px-16 pt-16 gap-16">
+    <div class="flex flex-row flex-wrap px-16 pt-16 gap-x-16 gap-y-8">
         <div class="flex flex-col gap-2">
             <HomeGreeting/>
             {#if home.mailboxCount !== null}

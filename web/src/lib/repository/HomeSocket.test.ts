@@ -1,5 +1,6 @@
 import {expect, test} from "bun:test";
-import {HomeSocket, type MailGraph, type SocketLike} from "./HomeSocket";
+import {HomeSocket, type MailGraph} from "./HomeSocket";
+import type {SocketLike} from "./ReconnectingSocket";
 
 /** A socket whose events this test fires by hand. */
 class FakeSocket implements SocketLike {

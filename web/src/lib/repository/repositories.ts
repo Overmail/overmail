@@ -3,6 +3,7 @@ import {AuthRepository} from "$lib/repository/AuthRepository";
 import {CurrentUserRepository} from "$lib/repository/CurrentUserRepository";
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
+import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import {HomeScreenRepository} from "$lib/repository/HomeScreenRepository.svelte";
 import {
     createEmailRepository,
@@ -22,6 +23,8 @@ import type {CachedEmail, CachedLabel, CachedSender} from "$lib/app/entities/cac
  */
 export type Repositories = {
     auth: AuthRepository;
+    /** Mail metadata over the content socket -- the live one. See also [emails]. */
+    mails: EmailRepository;
     currentUser: CurrentUserRepository;
     emailBody: EmailBodyRepository;
     home: HomeScreenRepository;
@@ -34,6 +37,7 @@ export type Repositories = {
 /** One builder per key, so nothing is constructed before somebody asks for it. */
 const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     auth: () => new AuthRepository(),
+    mails: () => new EmailRepository(),
     currentUser: () => new CurrentUserRepository(),
     emailBody: () => new EmailBodyRepository(),
     chatHistory: () => new ChatHistoryRepository(),

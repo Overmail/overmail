@@ -144,39 +144,46 @@ export class EntityRepository<T extends {id: string}> {
     }
 }
 
-export const emailRepository = new EntityRepository<CachedEmail>({
-    endpoint: "/api/emails",
-    key: "emails",
-    table: () => entityCache?.emails ?? null,
-    parse: (raw) => ({
-        id: raw.id,
-        subject: raw.subject,
-        senderId: raw.sender_id,
-        senderName: raw.sender_name,
-        senderAddress: raw.sender_address,
-        avatarUrl: raw.avatar_url,
-        avatarPadding: raw.avatar_padding,
-        sent: raw.sent,
-        isRead: raw.is_read,
-    }),
-});
+/** The three kinds the app looks up by id. Built by the repository container, not here. */
+export function createEmailRepository() {
+    return new EntityRepository<CachedEmail>({
+        endpoint: "/api/emails",
+        key: "emails",
+        table: () => entityCache?.emails ?? null,
+        parse: (raw) => ({
+            id: raw.id,
+            subject: raw.subject,
+            senderId: raw.sender_id,
+            senderName: raw.sender_name,
+            senderAddress: raw.sender_address,
+            avatarUrl: raw.avatar_url,
+            avatarPadding: raw.avatar_padding,
+            sent: raw.sent,
+            isRead: raw.is_read,
+        }),
+    });
+}
 
-export const labelRepository = new EntityRepository<CachedLabel>({
-    endpoint: "/api/labels",
-    key: "labels",
-    table: () => entityCache?.labels ?? null,
-    parse: (raw) => ({id: raw.id, name: raw.name, color: raw.color}),
-});
+export function createLabelRepository() {
+    return new EntityRepository<CachedLabel>({
+        endpoint: "/api/labels",
+        key: "labels",
+        table: () => entityCache?.labels ?? null,
+        parse: (raw) => ({id: raw.id, name: raw.name, color: raw.color}),
+    });
+}
 
-export const senderRepository = new EntityRepository<CachedSender>({
-    endpoint: "/api/senders",
-    key: "senders",
-    table: () => entityCache?.senders ?? null,
-    parse: (raw) => ({
-        id: raw.id,
-        name: raw.name,
-        address: raw.address,
-        avatarUrl: raw.avatar_url,
-        avatarPadding: raw.avatar_padding,
-    }),
-});
+export function createSenderRepository() {
+    return new EntityRepository<CachedSender>({
+        endpoint: "/api/senders",
+        key: "senders",
+        table: () => entityCache?.senders ?? null,
+        parse: (raw) => ({
+            id: raw.id,
+            name: raw.name,
+            address: raw.address,
+            avatarUrl: raw.avatar_url,
+            avatarPadding: raw.avatar_padding,
+        }),
+    });
+}

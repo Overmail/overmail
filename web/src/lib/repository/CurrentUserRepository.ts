@@ -48,5 +48,3 @@ export class CurrentUserRepository {
         return this.user;
     }
 }
-
-export const currentUserRepository = new CurrentUserRepository();

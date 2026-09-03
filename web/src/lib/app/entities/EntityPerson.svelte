@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
     import SenderSegment from "$lib/app/ai/segments/SenderSegment.svelte";
-    import {senderRepository} from "$lib/app/entities/EntityRepository.svelte";
+    import {useRepositories} from "$lib/repository/repositories";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
     import {Skeleton} from "$lib/components/ui/skeleton";
     import {_} from "svelte-i18n";
@@ -18,13 +18,15 @@
         attributes?: Record<string, string>;
     } = $props();
 
+    const {senders} = useRepositories();
+
     const entityId = $derived(id ?? attributeOf(attributes, "id") ?? "");
 
-    const entry = $derived(senderRepository.peek(entityId));
+    const entry = $derived(senders.peek(entityId));
 
     // In an effect, not while rendering: asking starts a load and writes state.
     $effect(() => {
-        if (entityId !== "") senderRepository.request(entityId);
+        if (entityId !== "") senders.request(entityId);
     });
 </script>
 

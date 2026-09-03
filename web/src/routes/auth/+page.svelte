@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import {
-		authRepository,
 		STEP_DONE,
 		STEP_EMAIL_VERIFICATION,
 		STEP_IDENTIFIER
 	} from '$lib/repository/AuthRepository';
 	import { _ } from 'svelte-i18n';
+	import { useRepositories } from '$lib/repository/repositories';
+
+	const { auth } = useRepositories();
 
 	let sessionId = $state<string | null>(null);
 	let namespace = $state<string | null>(null);
@@ -25,7 +27,7 @@
 		error = null;
 		identifier = '';
 		code = '';
-		sessionId = await authRepository.startLogin();
+		sessionId = await auth.startLogin();
 		await refresh();
 	}
 
@@ -34,12 +36,12 @@
 	 * tracking the step order in here.
 	 */
 	async function refresh() {
-		const step = await authRepository.checkFlow(sessionId!);
+		const step = await auth.checkFlow(sessionId!);
 		namespace = step.namespace;
 		maskedEmail = (step.payload?.email as string) ?? null;
 
 		if (namespace === STEP_DONE) {
-			await authRepository.finish(sessionId!);
+			await auth.finish(sessionId!);
 			await goto('/');
 		}
 	}
@@ -48,7 +50,7 @@
 		busy = true;
 		error = null;
 		try {
-			const result = await authRepository.submitIdentifier(sessionId!, identifier);
+			const result = await auth.submitIdentifier(sessionId!, identifier);
 			if (result.type !== 'success') {
 				error = $_('auth.signin.identifier.error');
 				return;
@@ -63,7 +65,7 @@
 		busy = true;
 		error = null;
 		try {
-			const result = await authRepository.submitCode(sessionId!, code);
+			const result = await auth.submitCode(sessionId!, code);
 			if (result.type !== 'success') {
 				error = $_('auth.signin.code.error');
 				return;

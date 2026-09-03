@@ -2,18 +2,19 @@ import type {Prompt} from "$lib/app/ai/composer/prompt";
 import {ChatHistoryRepository, type AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";
 
 export class AiChatViewModel {
+    /** Declared, not a constructor parameter property: the derived state below reads it. */
+    private readonly chatHistory: ChatHistoryRepository;
+
     chats: AiChat[] = $state([]);
 
     currentChatId: string | null = $state(null);
     currentChat: AiChat | null = $derived(this.chats.find((chat) => chat.id === this.currentChatId) ?? null);
 
-    private chatHistoryRepository = new ChatHistoryRepository();
-
     /** Messages of the open chat, oldest first. Empty while none is selected or loaded. */
-    currentChatMessages: AiChatMessage[] = $derived(
+    currentChatMessages: AiChatMessage[] = $derived.by(() =>
         this.currentChatId === null
             ? []
-            : this.chatHistoryRepository.chats.get(this.currentChatId)?.messages ?? []
+            : this.chatHistory.chats.get(this.currentChatId)?.messages ?? []
     );
 
     /** Newest first, regardless of whether a chat arrived with a page or as a live update. */
@@ -55,7 +56,9 @@ export class AiChatViewModel {
 
     private webSocketHandler: AiChatWebSocketHandler;
 
-    constructor() {
+    /** Handed the repository rather than building one: the chats belong to the app, not to a view. */
+    constructor(chatHistory: ChatHistoryRepository) {
+        this.chatHistory = chatHistory;
         this.webSocketHandler = new AiChatWebSocketHandler({
             onChats: (chats, oldestCreatedAt) => {
                 // A page can overlap with what is already here: the server's cursor includes the
@@ -97,12 +100,12 @@ export class AiChatViewModel {
     }
 
     async onChatHovered(chatId: string) {
-        await this.chatHistoryRepository.loadChat(chatId, false, false);
+        await this.chatHistory.loadChat(chatId, false, false);
     }
 
     async onChatSelected(chatId: string) {
         this.currentChatId = chatId;
-        await this.chatHistoryRepository.loadChat(chatId, true, true);
+        await this.chatHistory.loadChat(chatId, true, true);
     }
 
     /**
@@ -124,7 +127,7 @@ export class AiChatViewModel {
                 return;
             }
 
-            await this.chatHistoryRepository.loadChat(chatId, true, true);
+            await this.chatHistory.loadChat(chatId, true, true);
         } finally {
             this.isSending = false;
         }
@@ -175,7 +178,7 @@ export class AiChatViewModel {
             const data = await response.json();
             this.currentChatId = data.chat_id;
 
-            await this.chatHistoryRepository.loadChat(data.chat_id, true, true);
+            await this.chatHistory.loadChat(data.chat_id, true, true);
         } finally {
             // Released once the history holds the pending answer, which is what carries the
             // waiting state from here on.

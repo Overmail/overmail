@@ -5,8 +5,9 @@
     import AiChatSwitcher from "$lib/app/ai/chats/AiChatSwitcher.svelte";
     import ChatMessageList from "$lib/app/ai/messages/ChatMessageList.svelte";
     import ChatComposer from "$lib/app/ai/composer/ChatComposer.svelte";
+    import {useRepositories} from "$lib/repository/repositories";
 
-    const chatViewModel = new AiChatViewModel();
+    const chatViewModel = new AiChatViewModel(useRepositories().chatHistory);
 
     onMount(() => () => chatViewModel.dispose());
 

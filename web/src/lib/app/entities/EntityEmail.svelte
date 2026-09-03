@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
     import EmailSegment from "$lib/app/ai/segments/EmailSegment.svelte";
-    import {emailRepository} from "$lib/app/entities/EntityRepository.svelte";
+    import {useRepositories} from "$lib/repository/repositories";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
     import {Skeleton} from "$lib/components/ui/skeleton";
     import {_} from "svelte-i18n";
@@ -18,13 +18,15 @@
         attributes?: Record<string, string>;
     } = $props();
 
+    const {emails} = useRepositories();
+
     const entityId = $derived(id ?? attributeOf(attributes, "id") ?? "");
 
-    const entry = $derived(emailRepository.peek(entityId));
+    const entry = $derived(emails.peek(entityId));
 
     // In an effect, not while rendering: asking starts a load and writes state.
     $effect(() => {
-        if (entityId !== "") emailRepository.request(entityId);
+        if (entityId !== "") emails.request(entityId);
     });
 </script>
 

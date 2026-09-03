@@ -85,5 +85,3 @@ export class AuthRepository {
 		return await response.json();
 	}
 }
-
-export const authRepository = new AuthRepository();

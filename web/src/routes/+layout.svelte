@@ -3,7 +3,8 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import {page} from '$app/state';
 	import {goto} from '$app/navigation';
-	import {authRepository, type Session} from '$lib/repository/AuthRepository';
+	import {type Session} from '$lib/repository/AuthRepository';
+	import {provideRepositories} from '$lib/repository/repositories';
 	import * as Sidebar from "$lib/components/ui/sidebar";
 	import AppNavbar from "$lib/app/shell/AppNavbar.svelte";
 	import AppSidebar from "$lib/app/shell/sidebar/AppSidebar.svelte";
@@ -18,6 +19,9 @@
 	// context from above the page reaches it.
 	const header = createPageHeader();
 
+	// Once, above every page: from here down `useRepositories()` resolves to this set.
+	const repositories = provideRepositories();
+
 	let session = $state<Session | null>(null);
 	let checked = $state(false);
 
@@ -31,7 +35,7 @@
 		}
 
 		checked = false;
-		authRepository.getSession().then((result) => {
+		repositories.auth.getSession().then((result) => {
 			session = result;
 			checked = true;
 			if (!result) goto('/auth');

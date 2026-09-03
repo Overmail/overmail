@@ -28,6 +28,17 @@
       }
     }
   },
+  "home": {
+    "greeting": {
+      "night": "Gute Nacht, {name}",
+      "morning": "Guten Morgen, {name}",
+      "day": "Guten Tag, {name}",
+      "evening": "Guten Abend, {name}"
+    },
+    "mailbox": {
+      "count": "{count, plural, one {Du hast # Mail im Postfach} other {Du hast # Mails im Postfach}}"
+    }
+  },
   "myStack": {
     "shortcuts": {
       "archive": "Archivieren",

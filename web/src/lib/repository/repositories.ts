@@ -3,6 +3,7 @@ import {AuthRepository} from "$lib/repository/AuthRepository";
 import {CurrentUserRepository} from "$lib/repository/CurrentUserRepository";
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
+import {HomeScreenRepository} from "$lib/repository/HomeScreenRepository.svelte";
 import {
     createEmailRepository,
     createLabelRepository,
@@ -23,27 +24,50 @@ export type Repositories = {
     auth: AuthRepository;
     currentUser: CurrentUserRepository;
     emailBody: EmailBodyRepository;
+    home: HomeScreenRepository;
     chatHistory: ChatHistoryRepository;
     emails: EntityRepository<CachedEmail>;
     labels: EntityRepository<CachedLabel>;
     senders: EntityRepository<CachedSender>;
 };
 
+/** One builder per key, so nothing is constructed before somebody asks for it. */
+const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
+    auth: () => new AuthRepository(),
+    currentUser: () => new CurrentUserRepository(),
+    emailBody: () => new EmailBodyRepository(),
+    chatHistory: () => new ChatHistoryRepository(),
+    home: () => new HomeScreenRepository(),
+    emails: createEmailRepository,
+    labels: createLabelRepository,
+    senders: createSenderRepository,
+};
+
 /**
- * A fresh set. [overrides] is what a test replaces a single repository with; the app itself uses
+ * A fresh set. Every repository is built on first read and then kept, so importing this module
+ * constructs nothing -- a repository that opens a socket or a cache stays out of the server
+ * renderer and out of a test that never touches it.
+ *
+ * [overrides] is what a test replaces a single repository with; the app itself uses
  * [repositories].
  */
 export function createRepositories(overrides: Partial<Repositories> = {}): Repositories {
-    return {
-        auth: new AuthRepository(),
-        currentUser: new CurrentUserRepository(),
-        emailBody: new EmailBodyRepository(),
-        chatHistory: new ChatHistoryRepository(),
-        emails: createEmailRepository(),
-        labels: createLabelRepository(),
-        senders: createSenderRepository(),
-        ...overrides,
-    };
+    const built = new Map<keyof Repositories, unknown>();
+    const container = {} as Repositories;
+
+    for (const key of Object.keys(factories) as (keyof Repositories)[]) {
+        Object.defineProperty(container, key, {
+            enumerable: true,
+            get() {
+                const override = overrides[key];
+                if (override !== undefined) return override;
+                if (!built.has(key)) built.set(key, factories[key]());
+                return built.get(key);
+            },
+        });
+    }
+
+    return container;
 }
 
 /** The set this app runs on. Reach it through [useRepositories], not through this. */

@@ -29,6 +29,13 @@ import io.ktor.websocket.readText
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -36,6 +43,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** The home screen's live number: how many mails are in the mailbox right now. */
@@ -99,19 +107,122 @@ class HomeSocketTest {
     private suspend fun ApplicationTestBuilder.openSocket(): WebSocketSession =
         createClient { install(ClientWebSockets) }.webSocketSession("/api/webapp/home/socket")
 
-    /** The next count the server sends, or a failure if it stays quiet. */
-    private suspend fun WebSocketSession.nextCount(): Long =
-        withTimeout(5_000) { requireNotNull(nextCountOrNull()) { "no message from the socket" } }
+    /** The next message of [type], or a failure if the socket stays quiet. */
+    private suspend fun WebSocketSession.next(type: String): JsonObject =
+        withTimeout(5_000) { requireNotNull(nextOrNull(type)) { "no $type from the socket" } }
 
-    private suspend fun WebSocketSession.nextCountOrNull(): Long? {
+    /** Messages of other kinds are skipped: this socket sends the count and the graph. */
+    private suspend fun WebSocketSession.nextOrNull(type: String): JsonObject? {
         for (frame in incoming) {
             val text = (frame as? Frame.Text ?: continue).readText()
             val message = Json.parseToJsonElement(text).jsonObject
-            assertEquals("data.mailbox.count", message["type"]!!.jsonPrimitive.content)
-            return message["unarchived"]!!.jsonPrimitive.content.toLong()
+            if (message["type"]!!.jsonPrimitive.content != type) continue
+            return message
         }
         return null
     }
+
+    private suspend fun WebSocketSession.nextCount(): Long =
+        next("data.mailbox.count")["unarchived"]!!.jsonPrimitive.content.toLong()
+
+    private suspend fun WebSocketSession.nextCountOrNull(): Long? =
+        nextOrNull("data.mailbox.count")?.get("unarchived")?.jsonPrimitive?.content?.toLong()
+
+    private suspend fun WebSocketSession.nextGraph(): JsonObject = next("data.mail_graph")
+
+    private suspend fun WebSocketSession.requestYear(year: Int) =
+        send(Frame.Text("""{"type":"request.mail_graph","year":$year}"""))
+
+    private suspend fun addMail(sentAt: Instant, subject: String) {
+        database.query {
+            Email.new {
+                imapAccount = ImapAccount.all().first { it.user.id == signedIn.id }
+                sender = EmailUser.all().first()
+                senderName = "The Sender"
+                this.subject = subject
+                sent = sentAt
+                rawContent = ByteArray(0)
+            }
+        }
+    }
+
+    @Test
+    fun `the current year of the heatmap arrives without being asked for`() = testApplication {
+        setUp()
+        installRoute()
+
+        val socket = openSocket()
+        val graph = socket.nextGraph()
+
+        assertEquals(currentYear, graph["year"]!!.jsonPrimitive.int)
+        assertEquals(listOf(currentYear), graph["available_years"]!!.jsonArray.map { it.jsonPrimitive.int })
+        // Three mails, all sent now, so one day carries all of them.
+        assertEquals(mapOf(today to 3), graph.days())
+        socket.close()
+    }
+
+    @Test
+    fun `another year is sent once it is asked for`() = testApplication {
+        setUp()
+        installRoute()
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Old mail")
+
+        val socket = openSocket()
+        assertEquals(currentYear, socket.nextGraph()["year"]!!.jsonPrimitive.int)
+
+        socket.requestYear(2020)
+        val graph = socket.nextGraph()
+
+        assertEquals(2020, graph["year"]!!.jsonPrimitive.int)
+        assertEquals(mapOf("2020-06-15" to 1), graph.days())
+        // Every year with mail in it travels with the answer, whichever year was asked for.
+        assertEquals(listOf(2020, currentYear), graph["available_years"]!!.jsonArray.map { it.jsonPrimitive.int })
+        socket.close()
+    }
+
+    @Test
+    fun `a year on screen is updated when mail arrives`() = testApplication {
+        setUp()
+        installRoute()
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Old mail")
+
+        val socket = openSocket()
+        socket.nextGraph()
+        socket.requestYear(2020)
+        socket.nextGraph()
+
+        addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.UTC), "Another old mail")
+        mailboxNotifier.notifyMailboxChanged(signedIn.id.value)
+
+        // Both years are re-read, so the one that changed comes back -- for 2020 that is the day
+        // count, for the current year nothing changed and nothing is sent.
+        val graph = socket.nextGraph()
+        assertEquals(2020, graph["year"]!!.jsonPrimitive.int)
+        assertEquals(mapOf("2020-06-15" to 2), graph.days())
+        socket.close()
+    }
+
+    @Test
+    fun `a year outside the calendar is ignored`() = testApplication {
+        setUp()
+        installRoute()
+
+        val socket = openSocket()
+        socket.nextGraph()
+
+        socket.requestYear(12_345)
+
+        assertNull(withTimeoutOrNull(2_000) { socket.nextOrNull("data.mail_graph") })
+        socket.close()
+    }
+
+    private fun JsonObject.days(): Map<String, Int> =
+        getValue("days").jsonObject.mapValues { (_, count) -> count.jsonPrimitive.int }
+
+    private val currentYear get() = Clock.System.now().toLocalDateTime(TimeZone.UTC).year
+
+    /** `yyyy-mm-dd` of the UTC day the fixture's mails were sent on. */
+    private val today get() = Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()
 
     private suspend fun archive(emailId: Uuid, action: EmailArchiveAction) {
         database.query {

@@ -1,16 +1,19 @@
 package es.jvbabi.overmail.server.jobs.avatar
 
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
+import es.jvbabi.overmail.server.data.avatar.circlePadding
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailAvatar
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.util.maskEmail
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
@@ -107,20 +110,27 @@ class AvatarQueue(
                 return
             }
 
+            // Decoding and reading a picture is processor work, so it happens here rather than
+            // inside the transaction below, and off the IO dispatcher that one runs on. A format
+            // nothing can decode gets no padding, see EmailAvatars.circlePadding.
+            val circlePadding = withContext(Dispatchers.Default) { found.data.circlePadding() } ?: 0.0
+
             val avatarId = database.query {
                 val emailUser = EmailUser.findById(emailUserId) ?: return@query null
                 val avatar = EmailAvatar.new {
                     this.data = found.data
                     this.avatarSource = found.source
+                    this.circlePadding = circlePadding
                 }
                 emailUser.avatar = avatar
                 avatar.id.value
             } ?: return
 
-            avatarNotifier.notifyAvatarResolved(emailUserId, address, avatarId)
+            avatarNotifier.notifyAvatarResolved(emailUserId, address, avatarId, circlePadding)
 
             logger.info(
-                "Found a ${found.data.size} byte avatar for ${address.maskEmail()} via ${found.source}"
+                "Found a ${found.data.size} byte avatar for ${address.maskEmail()} via " +
+                        "${found.source}, needs ${"%.1f".format(circlePadding * 100)}% padding for a circle"
             )
         } catch (cancellation: CancellationException) {
             throw cancellation

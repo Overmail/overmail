@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
     import {EyeglassesIcon} from "phosphor-svelte";
+    import {OvermailAvatar} from "$lib/components/avatar";
     import {attributeOf} from "$lib/app/ai/toolCallAttributes";
     import {shortSubject} from "$lib/app/ai/emailSubject";
     import {_} from "svelte-i18n";
@@ -15,6 +16,8 @@
         subject: attributeOf(attributes, "subject") ?? "",
         // Empty rather than absent when the sender has no picture yet.
         avatarUrl: attributeOf(attributes, "avatarUrl") || null,
+        // Empty for a picture that needs none, see EmailAvatars.circlePadding on the server.
+        avatarPadding: Number(attributeOf(attributes, "avatarPadding")) || null,
     });
 </script>
 
@@ -24,7 +27,11 @@
         <EyeglassesIcon class="size-4 shrink-0"/>
         <span class="shrink-0">{$_("ai.chat.messages.readEmail")}</span>
         {#if email.avatarUrl}
-            <img src={email.avatarUrl} alt="" class="size-4 shrink-0 rounded-full object-cover"/>
+            <OvermailAvatar
+                    inline
+                    url={email.avatarUrl}
+                    class="size-4 shrink-0"
+            />
         {/if}
         <span class="truncate text-foreground" title={email.subject}>{shortSubject(email.subject)}</span>
     </span>

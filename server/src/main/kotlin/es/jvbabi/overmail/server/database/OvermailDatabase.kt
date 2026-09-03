@@ -32,6 +32,10 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(ImapAccounts)
             // Before the email users: their `avatar_id` points here.
             SchemaUtils.create(EmailAvatars)
+            // `create` alone skips columns of a table that already exists, and `circle_padding`
+            // was added to one earlier runs created. `IF NOT EXISTS` is what makes it a no-op on
+            // the runs after this, and both Postgres and the H2 the tests use understand it.
+            exec("ALTER TABLE email_avatars ADD COLUMN IF NOT EXISTS circle_padding DOUBLE PRECISION NULL")
             // `avatar_id` was added to a table earlier runs already created, and `create` alone
             // skips columns of a table that exists.
             SchemaUtils.create(EmailUsers)

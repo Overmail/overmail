@@ -18,6 +18,7 @@ export type EmailSearchResult = {
         address: MatchableText;
     };
     avatarUrl: string | null;
+    avatarPadding: number | null;
     to: string[];
     date: string;
 };
@@ -72,6 +73,7 @@ export class OvermailPromptViewModel {
                 name: string | null;
                 address: string;
                 avatar_url: string | null;
+                avatar_padding: number | null;
                 email_count: number;
             }[];
         } = await response.json();
@@ -81,6 +83,7 @@ export class OvermailPromptViewModel {
             name: sender.name,
             address: sender.address,
             avatarUrl: sender.avatar_url,
+            avatarPadding: sender.avatar_padding,
             emailCount: sender.email_count,
         }));
     }
@@ -95,6 +98,7 @@ export class OvermailPromptViewModel {
                 subject: MatchableText;
                 from: {name: MatchableText | null; address: MatchableText};
                 avatar_url: string | null;
+                avatar_padding: number | null;
                 to: string[];
                 date: string;
             }[];
@@ -105,6 +109,7 @@ export class OvermailPromptViewModel {
             subject: email.subject,
             from: email.from,
             avatarUrl: email.avatar_url,
+            avatarPadding: email.avatar_padding,
             to: email.to,
             date: email.date,
         }));

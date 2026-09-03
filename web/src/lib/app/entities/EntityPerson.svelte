@@ -36,9 +36,16 @@
         name: entry.value.name,
         address: entry.value.address,
         avatarUrl: entry.value.avatarUrl,
+        avatarPadding: entry.value.avatarPadding,
     }}/>
 {:else if entry.isLoading}
     <Skeleton class="inline-block h-3.5 w-24 align-[-0.15em] rounded"/>
 {:else}
-    <SenderSegment sender={{id: entityId, name: null, address: $_("ai.chat.messages.deletedReference"), avatarUrl: null}}/>
+    <SenderSegment sender={{
+        id: entityId,
+        name: null,
+        address: $_("ai.chat.messages.deletedReference"),
+        avatarUrl: null,
+        avatarPadding: null,
+    }}/>
 {/if}

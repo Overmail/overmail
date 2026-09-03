@@ -39,7 +39,7 @@ class ChatToolRegistryTest {
 
         assertEquals(
             "Ich schaue nach.\n\n"
-                + """<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" subject="Invoice 42"></toolcall-read-email>""",
+                + """<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" avatarPadding="" subject="Invoice 42"></toolcall-read-email>""",
             stream.snapshot().content,
         )
     }

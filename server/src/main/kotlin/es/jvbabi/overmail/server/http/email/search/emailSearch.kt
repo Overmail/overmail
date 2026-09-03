@@ -2,7 +2,8 @@ package es.jvbabi.overmail.server.http.email.search
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.FuzzyMatchResult
 import es.jvbabi.overmail.server.util.detailedFuzzyContains
 import io.ktor.server.auth.authenticate
@@ -59,6 +60,7 @@ private data class Candidate(
     val senderName: String?,
     val senderAddress: String,
     val avatarUrl: String?,
+    val avatarPadding: Double?,
     val sentAt: Instant,
 )
 
@@ -167,7 +169,16 @@ fun Route.emailSearch() {
                 val candidates = Emails
                     .leftJoin(ImapAccounts)
                     .leftJoin(EmailUsers)
-                    .select(Emails.id, Emails.subject, Emails.senderName, Emails.sent, EmailUsers.address, EmailUsers.avatar)
+                    .leftJoin(EmailAvatars)
+                    .select(
+                        Emails.id,
+                        Emails.subject,
+                        Emails.senderName,
+                        Emails.sent,
+                        EmailUsers.address,
+                        EmailUsers.avatar,
+                        EmailAvatars.circlePadding,
+                    )
                     .where { ImapAccounts.user eq user.id.value }
                     .andWhere { emailIsNotSpam() }
                     .orderBy(Emails.sent, SortOrder.DESC)
@@ -178,7 +189,8 @@ fun Route.emailSearch() {
                             subject = row[Emails.subject],
                             senderName = row[Emails.senderName],
                             senderAddress = row[EmailUsers.address],
-                            avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                            avatarUrl = row.avatarUrlOrNull(),
+                            avatarPadding = row.avatarPadding(),
                             sentAt = row[Emails.sent],
                         )
                     }
@@ -213,6 +225,7 @@ fun Route.emailSearch() {
                             address = matchable(candidate.senderAddress, addressRanges),
                         ),
                         avatarUrl = candidate.avatarUrl,
+                        avatarPadding = candidate.avatarPadding,
                         to = recipientsByEmail[candidate.id].orEmpty(),
                         date = candidate.sentAt.toString(),
                     )
@@ -234,6 +247,8 @@ private data class EmailSearchResponse(
         @SerialName("subject") val subject: MatchableString,
         @SerialName("from") val from: From,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
         @SerialName("to") val to: List<String>,
         @SerialName("date") val date: String
     ) {

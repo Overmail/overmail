@@ -65,6 +65,15 @@ dependencies {
     // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
     implementation("org.jsoup:jsoup:1.21.1")
 
+    // Rasterising an avatar to decide whether it survives a circle, see CircleFit. Batik is for
+    // the SVGs, which is what BIMI serves and most of the hand-kept logos are; the two ImageIO
+    // plugins add the formats the JDK has no reader for -- webp, and the .ico favicons.
+    implementation("org.apache.xmlgraphics:batik-transcoder:1.19")
+    // The image codecs Batik needs for an SVG that embeds a raster image.
+    implementation("org.apache.xmlgraphics:batik-codec:1.19")
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
+    implementation("com.twelvemonkeys.imageio:imageio-bmp:3.12.0")
+
     testImplementation(kotlin("test"))
     // Drives routes through the real plugin pipeline without binding a port.
     testImplementation("io.ktor:ktor-server-test-host:3.5.2")

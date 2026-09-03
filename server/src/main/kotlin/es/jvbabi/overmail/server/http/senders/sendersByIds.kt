@@ -2,10 +2,12 @@ package es.jvbabi.overmail.server.http.senders
 
 import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.http.entities.requestedIds
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -40,7 +42,8 @@ fun Route.sendersByIds() {
 
             val senders = database.query {
                 val rows = EmailUsers
-                    .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar)
+                    .leftJoin(EmailAvatars)
+                    .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar, EmailAvatars.circlePadding)
                     .where { (EmailUsers.id inList ids) and (EmailUsers.user eq userId) }
                     .toList()
 
@@ -61,7 +64,8 @@ fun Route.sendersByIds() {
                         id = id,
                         name = names[id],
                         address = row[EmailUsers.address],
-                        avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                        avatarUrl = row.avatarUrlOrNull(),
+                        avatarPadding = row.avatarPadding(),
                     )
                 }
             }
@@ -82,5 +86,7 @@ private data class SendersResponse(
         @SerialName("name") val name: String?,
         @SerialName("address") val address: String,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
     )
 }

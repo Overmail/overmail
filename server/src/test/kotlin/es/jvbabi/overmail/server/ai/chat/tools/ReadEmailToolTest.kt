@@ -99,7 +99,7 @@ class ReadEmailToolTest {
         tool.execute(ReadEmailTool.Args(emailId = Uuid.random().toString()))
 
         assertEquals(
-            listOf("""<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" subject="Invoice 42"></toolcall-read-email>"""),
+            listOf("""<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" avatarPadding="" subject="Invoice 42"></toolcall-read-email>"""),
             markup,
         )
     }
@@ -107,10 +107,10 @@ class ReadEmailToolTest {
     @Test
     fun `escapes the subject it puts into the markup`() {
         val id = Uuid.random()
-        val markup = ReadEmailTool.markup(id, subject = """Re: "5 < 6" & more""", avatarUrl = null)
+        val markup = ReadEmailTool.markup(id, subject = """Re: "5 < 6" & more""", avatarUrl = null, avatarPadding = null)
 
         assertEquals(
-            """<toolcall-read-email emailId="$id" avatarUrl="" subject="Re: &quot;5 &lt; 6&quot; &amp; more"></toolcall-read-email>""",
+            """<toolcall-read-email emailId="$id" avatarUrl="" avatarPadding="" subject="Re: &quot;5 &lt; 6&quot; &amp; more"></toolcall-read-email>""",
             markup,
         )
     }

@@ -34,12 +34,16 @@ export type PromptSender = {
     name: string | null;
     address: string;
     avatarUrl: string | null;
+    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
+    avatarPadding: number | null;
 }
 
 export type PromptEmail = {
     id: string;
     subject: string;
     avatarUrl: string | null;
+    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
+    avatarPadding: number | null;
 }
 
 // Props every trigger window receives from PromptInput. A window may additionally export an

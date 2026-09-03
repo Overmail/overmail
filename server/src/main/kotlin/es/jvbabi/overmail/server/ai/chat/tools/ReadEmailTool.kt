@@ -4,13 +4,15 @@ import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.User
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.HtmlToText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -100,6 +102,7 @@ class ReadEmailTool(
             val row = Emails
                 .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)
                 .join(EmailUsers, JoinType.INNER, Emails.sender, EmailUsers.id)
+                .leftJoin(EmailAvatars)
                 .select(
                     Emails.subject,
                     Emails.sent,
@@ -110,6 +113,7 @@ class ReadEmailTool(
                     EmailUsers.id,
                     EmailUsers.address,
                     EmailUsers.avatar,
+                    EmailAvatars.circlePadding,
                 )
                 // The ownership check is part of the lookup, not a test on the result: there is no
                 // moment where a foreign mail has been read.
@@ -139,7 +143,8 @@ class ReadEmailTool(
                 markup(
                     emailId = emailId,
                     subject = row[Emails.subject],
-                    avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                    avatarUrl = row.avatarUrlOrNull(),
+                    avatarPadding = row.avatarPadding(),
                 )
             )
 
@@ -165,7 +170,13 @@ class ReadEmailTool(
          * The element the chat renders for a mail the agent read. Written into the answer itself,
          * so it survives a reload like the rest of the message.
          */
-        fun markup(emailId: Uuid, subject: String, avatarUrl: String?): String =
-            """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" subject="${escapeAttribute(subject)}"></toolcall-read-email>"""
+        fun markup(
+            emailId: Uuid,
+            subject: String,
+            avatarUrl: String?,
+            avatarPadding: Double?,
+        ): String =
+            """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" """ +
+                    """avatarPadding="${avatarPadding ?: ""}" subject="${escapeAttribute(subject)}"></toolcall-read-email>"""
     }
 }

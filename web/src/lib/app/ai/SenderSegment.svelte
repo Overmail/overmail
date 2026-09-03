@@ -1,5 +1,6 @@
 <script lang="ts">
     import {UserIcon} from "phosphor-svelte";
+    import {OvermailAvatar} from "$lib/components/avatar";
     import type {PromptSender} from "./prompt";
 
     let {
@@ -10,10 +11,12 @@
 </script>
 
 <span class="inline whitespace-nowrap bg-card text-card-foreground px-1 mx-0.5 rounded outline">
-    {#if sender.avatarUrl}
-        <img src={sender.avatarUrl} alt="" class="inline size-3.5 rounded-full object-cover align-[-0.2em]"/>
-    {:else}
-        <UserIcon class="inline size-3.5 align-[-0.2em]"/>
-    {/if}
+    <OvermailAvatar
+            inline
+            url={sender.avatarUrl}
+            class="size-3.5"
+    >
+        {#snippet fallback()}<UserIcon class="size-full"/>{/snippet}
+    </OvermailAvatar>
     {sender.name ?? sender.address}
 </span>

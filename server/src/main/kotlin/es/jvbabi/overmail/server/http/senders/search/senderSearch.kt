@@ -2,7 +2,8 @@ package es.jvbabi.overmail.server.http.senders.search
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.fuzzyContains
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.di.*
@@ -26,6 +27,12 @@ private const val MAX_RESULTS = 10
  */
 private data class NameVariant(val name: String?, val emailCount: Long, val lastSent: Instant?)
 
+/**
+ * What every row of one sender carries the same: the address is on the address book entry and the
+ * picture hangs off that, so folding the name variants can just take it from the first row.
+ */
+private data class SenderAvatar(val address: String, val url: String?, val padding: Double?)
+
 fun Route.senderSearch() {
     authenticate {
         get {
@@ -43,19 +50,34 @@ fun Route.senderSearch() {
                 Emails
                     .innerJoin(EmailUsers)
                     .innerJoin(ImapAccounts)
-                    .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar, Emails.senderName, count, lastSent)
+                    .leftJoin(EmailAvatars)
+                    .select(
+                        EmailUsers.id,
+                        EmailUsers.address,
+                        EmailUsers.avatar,
+                        EmailAvatars.circlePadding,
+                        Emails.senderName,
+                        count,
+                        lastSent,
+                    )
                     .where { ImapAccounts.user eq user.id.value }
-                    .groupBy(EmailUsers.id, EmailUsers.address, EmailUsers.avatar, Emails.senderName)
+                    .groupBy(
+                        EmailUsers.id,
+                        EmailUsers.address,
+                        EmailUsers.avatar,
+                        EmailAvatars.circlePadding,
+                        Emails.senderName,
+                    )
                     .map { row ->
                         Triple(
                             row[EmailUsers.id].value,
-                            row[EmailUsers.address] to row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                            SenderAvatar(row[EmailUsers.address], row.avatarUrlOrNull(), row.avatarPadding()),
                             NameVariant(row[Emails.senderName], row[count], row[lastSent]),
                         )
                     }
                     .groupBy { (id, _, _) -> id }
                     .map { (id, rows) ->
-                        val (address, avatar) = rows.first().second
+                        val (address, avatarUrl, avatarPadding) = rows.first().second
                         val variants = rows.map { (_, _, variant) -> variant }
                         SenderSearchResponse.Sender(
                             id = id,
@@ -65,7 +87,8 @@ fun Route.senderSearch() {
                                 .maxWithOrNull(compareBy({ it.emailCount }, { it.lastSent }))
                                 ?.name,
                             address = address,
-                            avatarUrl = avatar,
+                            avatarUrl = avatarUrl,
+                            avatarPadding = avatarPadding,
                             emailCount = variants.sumOf { it.emailCount },
                         )
                     }
@@ -94,6 +117,8 @@ private data class SenderSearchResponse(
         @SerialName("name") val name: String?,
         @SerialName("address") val address: String,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
         @SerialName("email_count") val emailCount: Long,
     )
 }

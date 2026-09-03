@@ -32,11 +32,24 @@ class AvatarNotifier {
         }
     }
 
-    fun notifyAvatarResolved(emailUserId: EmailUser.Id, address: String, avatarId: EmailAvatar.Id) {
-        channels[emailUserId]?.tryEmit(AvatarEvent.Resolved(address, avatarId))
+    fun notifyAvatarResolved(
+        emailUserId: EmailUser.Id,
+        address: String,
+        avatarId: EmailAvatar.Id,
+        circlePadding: Double,
+    ) {
+        channels[emailUserId]?.tryEmit(AvatarEvent.Resolved(address, avatarId, circlePadding))
     }
 }
 
 sealed class AvatarEvent {
-    data class Resolved(val address: String, val avatarId: EmailAvatar.Id) : AvatarEvent()
+    /**
+     * [circlePadding] travels with the id because the lookup just worked it out; a client that got
+     * the picture with its batch instead reads the same number off the api answer.
+     */
+    data class Resolved(
+        val address: String,
+        val avatarId: EmailAvatar.Id,
+        val circlePadding: Double,
+    ) : AvatarEvent()
 }

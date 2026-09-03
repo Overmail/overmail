@@ -1,9 +1,9 @@
 <script lang="ts">
-    import * as Avatar from "$lib/components/ui/avatar";
+    import {OvermailAvatar} from "$lib/components/avatar";
     import * as Tooltip from "$lib/components/ui/tooltip";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
-    import {cn, initials} from "$lib/utils.js";
+    import {cn} from "$lib/utils.js";
     import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
@@ -41,12 +41,12 @@
 <div class={cn("flex flex-col w-3xl h-fit bg-background rounded-2xl drop-shadow-2xl", className)}>
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
-            <Avatar.Root class="size-12">
-                {#if from.avatar_url}
-                    <Avatar.Image src={from.avatar_url} alt=""/>
-                {/if}
-                <Avatar.Fallback class="text-base">{initials(from.name ?? from.email)}</Avatar.Fallback>
-            </Avatar.Root>
+            <OvermailAvatar
+                    url={from.avatar_url}
+                    name={from.name ?? from.email}
+                    class="size-12"
+                    fallbackClass="text-base"
+            />
             <div class="flex flex-col">
                 <span class="font-medium text-lg">{from.name ?? from.email}</span>
                 {#if from.name}

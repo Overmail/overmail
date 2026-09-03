@@ -35,9 +35,15 @@
         id: entry.value.id,
         subject: entry.value.subject,
         avatarUrl: entry.value.avatarUrl,
+        avatarPadding: entry.value.avatarPadding,
     }}/>
 {:else if entry.isLoading}
     <Skeleton class="inline-block h-3.5 w-28 align-[-0.15em] rounded"/>
 {:else}
-    <EmailSegment email={{id: entityId, subject: $_("ai.chat.messages.deletedReference"), avatarUrl: null}}/>
+    <EmailSegment email={{
+        id: entityId,
+        subject: $_("ai.chat.messages.deletedReference"),
+        avatarUrl: null,
+        avatarPadding: null,
+    }}/>
 {/if}

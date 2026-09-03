@@ -39,6 +39,7 @@ export class ChatHistoryRepository {
                                             id: segment.id,
                                             subject: segment.subject,
                                             avatarUrl: segment.avatar_url,
+                                            avatarPadding: segment.avatar_padding,
                                         },
                                     };
                                 case "label":
@@ -58,6 +59,7 @@ export class ChatHistoryRepository {
                                             address: segment.address,
                                             name: segment.name,
                                             avatarUrl: segment.avatar_url,
+                                            avatarPadding: segment.avatar_padding,
                                         },
                                     };
                                 default:
@@ -193,13 +195,13 @@ export type ChatMessageSegment = {
     content: string,
 } | {
     type: "email",
-    email: {id: string, subject: string | null, avatarUrl: string | null},
+    email: {id: string, subject: string | null, avatarUrl: string | null, avatarPadding: number | null},
 } | {
     type: "label",
     label: {id: string, name: string | null, color: string | null},
 } | {
     type: "sender",
-    sender: {id: string, address: string | null, name: string | null, avatarUrl: string | null},
+    sender: {id: string, address: string | null, name: string | null, avatarUrl: string | null, avatarPadding: number | null},
 }
 
 export type AiChatMessage = {

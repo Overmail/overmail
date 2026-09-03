@@ -45,13 +45,16 @@ export class EmailStackViewModel {
                 if (!email) return;
                 email.labels = email.labels.filter(l => !labelIds.includes(l.id));
             },
-            onAvatarResolved: (address, avatarUrl) => {
+            onAvatarResolved: (address, avatarUrl, avatarPadding) => {
                 // By address, not by mail: one sender fills a whole stack, and the picture found
                 // for it is the same in every mail it appears in.
                 this.emails.forEach(email => {
                     [email.from, ...email.to, ...email.cc, ...email.bcc]
                         .filter(participant => participant.email === address)
-                        .forEach(participant => participant.avatar_url = avatarUrl);
+                        .forEach(participant => {
+                            participant.avatar_url = avatarUrl;
+                            participant.avatar_padding = avatarPadding;
+                        });
                 });
             },
         })
@@ -116,13 +119,13 @@ class EmailStackWebSocketHandler {
     private readonly onEmails: (emails: StackEmail[]) => void
     private readonly onLabelsUpserted: (emailId: string, labels: Label[]) => void
     private readonly onLabelsDeleted: (emailId: string, labelIds: string[]) => void
-    private readonly onAvatarResolved: (address: string, avatarUrl: string) => void
+    private readonly onAvatarResolved: (address: string, avatarUrl: string, avatarPadding: number | null) => void
 
     constructor(config: {
         onEmails: (emails: StackEmail[]) => void,
         onLabelsUpserted: (emailId: string, labels: Label[]) => void,
         onLabelsDeleted: (emailId: string, labelIds: string[]) => void,
-        onAvatarResolved: (address: string, avatarUrl: string) => void,
+        onAvatarResolved: (address: string, avatarUrl: string, avatarPadding: number | null) => void,
     }) {
         this.onEmails = config.onEmails;
         this.onLabelsUpserted = config.onLabelsUpserted;
@@ -166,7 +169,7 @@ class EmailStackWebSocketHandler {
                     this.onLabelsDeleted(message.email_id, message.tag_ids);
                     break;
                 case "update.avatar":
-                    this.onAvatarResolved(message.address, message.avatar_url);
+                    this.onAvatarResolved(message.address, message.avatar_url, message.avatar_padding);
                     break;
             }
         }
@@ -230,6 +233,7 @@ type StackWebsocketServerMessage = {
     type: "update.avatar",
     address: string,
     avatar_url: string,
+    avatar_padding: number | null,
 }
 
 type StackWebsocketClientMessage = {
@@ -277,4 +281,6 @@ export type EmailUser = {
     email: string,
     /** Null while no picture has been found for the address -- the card shows initials then. */
     avatar_url: string | null,
+    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
+    avatar_padding: number | null,
 }

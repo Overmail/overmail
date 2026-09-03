@@ -2,10 +2,12 @@ package es.jvbabi.overmail.server.http.email
 
 import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.http.entities.requestedIds
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -43,6 +45,7 @@ fun Route.emailsByIds() {
                 Emails
                     .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)
                     .join(EmailUsers, JoinType.INNER, Emails.sender, EmailUsers.id)
+                    .leftJoin(EmailAvatars)
                     .select(
                         Emails.id,
                         Emails.subject,
@@ -52,6 +55,7 @@ fun Route.emailsByIds() {
                         EmailUsers.id,
                         EmailUsers.address,
                         EmailUsers.avatar,
+                        EmailAvatars.circlePadding,
                     )
                     .where { (Emails.id inList ids) and (ImapAccounts.user eq userId) }
                     .map { row ->
@@ -61,7 +65,8 @@ fun Route.emailsByIds() {
                             senderId = row[EmailUsers.id].value,
                             senderName = row[Emails.senderName],
                             senderAddress = row[EmailUsers.address],
-                            avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                            avatarUrl = row.avatarUrlOrNull(),
+                            avatarPadding = row.avatarPadding(),
                             sent = row[Emails.sent].epochSeconds,
                             isRead = row[Emails.isRead],
                         )
@@ -86,6 +91,8 @@ private data class EmailsResponse(
         @SerialName("sender_name") val senderName: String?,
         @SerialName("sender_address") val senderAddress: String,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
         @SerialName("sent") val sent: Long,
         @SerialName("is_read") val isRead: Boolean,
     )

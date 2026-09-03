@@ -8,6 +8,8 @@ export type CachedEmail = {
     senderName: string | null;
     senderAddress: string;
     avatarUrl: string | null;
+    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
+    avatarPadding: number | null;
     /** Unix seconds. */
     sent: number;
     isRead: boolean;
@@ -24,6 +26,8 @@ export type CachedSender = {
     name: string | null;
     address: string;
     avatarUrl: string | null;
+    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
+    avatarPadding: number | null;
 };
 
 /**

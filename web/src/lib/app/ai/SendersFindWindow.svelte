@@ -1,6 +1,6 @@
 <script lang="ts">
-    import * as Avatar from "$lib/components/ui/avatar";
-    import {cn, initials, scrollIntoViewWithin} from "$lib/utils.js";
+    import {OvermailAvatar} from "$lib/components/avatar";
+    import {cn, scrollIntoViewWithin} from "$lib/utils.js";
     import TriggerWindow from "./TriggerWindow.svelte";
     import type {PromptTriggerWindowProps} from "./prompt";
     import type {SenderSearchResult} from "./OvermailPromptViewModel.svelte";
@@ -51,6 +51,7 @@
                 name: sender.name,
                 address: sender.address,
                 avatarUrl: sender.avatarUrl,
+                avatarPadding: sender.avatarPadding,
             },
         });
     }
@@ -93,12 +94,11 @@
                     }}
                     onmouseenter={() => highlightedIndex = index}
             >
-                <Avatar.Root size="sm">
-                    {#if sender.avatarUrl}
-                        <Avatar.Image src={sender.avatarUrl} alt=""/>
-                    {/if}
-                    <Avatar.Fallback class="text-[0.625rem]">{initials(sender.name ?? sender.address)}</Avatar.Fallback>
-                </Avatar.Root>
+                <OvermailAvatar
+                        size="sm"
+                        url={sender.avatarUrl}
+                        name={sender.name ?? sender.address}
+                />
                 <span class="flex min-w-0 flex-1 flex-col">
                     <span class="truncate">{sender.name ?? sender.address}</span>
                     {#if sender.name}

@@ -155,6 +155,7 @@ export const emailRepository = new EntityRepository<CachedEmail>({
         senderName: raw.sender_name,
         senderAddress: raw.sender_address,
         avatarUrl: raw.avatar_url,
+        avatarPadding: raw.avatar_padding,
         sent: raw.sent,
         isRead: raw.is_read,
     }),
@@ -171,5 +172,11 @@ export const senderRepository = new EntityRepository<CachedSender>({
     endpoint: "/api/senders",
     key: "senders",
     table: () => entityCache?.senders ?? null,
-    parse: (raw) => ({id: raw.id, name: raw.name, address: raw.address, avatarUrl: raw.avatar_url}),
+    parse: (raw) => ({
+        id: raw.id,
+        name: raw.name,
+        address: raw.address,
+        avatarUrl: raw.avatar_url,
+        avatarPadding: raw.avatar_padding,
+    }),
 });

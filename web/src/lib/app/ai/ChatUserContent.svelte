@@ -13,7 +13,7 @@
      * The chips of the prompt. A reference the server could no longer resolve -- deleted since --
      * keeps its shape and says so instead of showing a blank chip.
      */
-    function emailChip(email: {id: string; subject: string | null; avatarUrl: string | null}): PromptEmail {
+    function emailChip(email: {id: string; subject: string | null; avatarUrl: string | null; avatarPadding: number | null}): PromptEmail {
         return {...email, subject: email.subject ?? $_("ai.chat.messages.deletedReference")};
     }
 
@@ -26,7 +26,7 @@
     }
 
     function senderChip(
-        sender: {id: string; address: string | null; name: string | null; avatarUrl: string | null},
+        sender: {id: string; address: string | null; name: string | null; avatarUrl: string | null; avatarPadding: number | null},
     ): PromptSender {
         return {...sender, address: sender.address ?? $_("ai.chat.messages.deletedReference")};
     }

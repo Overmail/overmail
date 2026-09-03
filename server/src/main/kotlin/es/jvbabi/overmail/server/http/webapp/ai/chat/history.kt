@@ -3,12 +3,14 @@ package es.jvbabi.overmail.server.http.webapp.ai.chat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessage.MessageContent.UserMessageContent.Segment
 import es.jvbabi.overmail.server.database.models.AiChatMessages
+import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPadding
+import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -99,13 +101,15 @@ private fun JdbcTransaction.resolveReferences(
     val emails = if (emailIds.isEmpty()) emptyMap() else Emails
         .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)
         .join(EmailUsers, JoinType.INNER, Emails.sender, EmailUsers.id)
-        .select(Emails.id, Emails.subject, EmailUsers.avatar)
+        .leftJoin(EmailAvatars)
+        .select(Emails.id, Emails.subject, EmailUsers.avatar, EmailAvatars.circlePadding)
         .where { (Emails.id inList emailIds) and (ImapAccounts.user eq userId) }
         .associate { row ->
             row[Emails.id].value to ChatHistorySegment.Email(
                 id = row[Emails.id].value,
                 subject = row[Emails.subject],
-                avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                avatarUrl = row.avatarUrlOrNull(),
+                avatarPadding = row.avatarPadding(),
             )
         }
 
@@ -121,7 +125,8 @@ private fun JdbcTransaction.resolveReferences(
         }
 
     val senders = if (senderIds.isEmpty()) emptyMap() else EmailUsers
-        .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar)
+        .leftJoin(EmailAvatars)
+        .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar, EmailAvatars.circlePadding)
         .where { (EmailUsers.id inList senderIds) and (EmailUsers.user eq userId) }
         .associate { row ->
             val id = row[EmailUsers.id].value
@@ -137,7 +142,8 @@ private fun JdbcTransaction.resolveReferences(
                     .limit(1)
                     .firstOrNull()
                     ?.get(Emails.senderName),
-                avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                avatarUrl = row.avatarUrlOrNull(),
+                avatarPadding = row.avatarPadding(),
             )
         }
 
@@ -155,9 +161,9 @@ private class ResolvedReferences(
      */
     fun payloadOf(segment: Segment): ChatHistorySegment = when (segment) {
         is Segment.Text -> ChatHistorySegment.Text(segment.content)
-        is Segment.Email -> emails[segment.id] ?: ChatHistorySegment.Email(segment.id, null, null)
+        is Segment.Email -> emails[segment.id] ?: ChatHistorySegment.Email(segment.id, null, null, null)
         is Segment.Label -> labels[segment.id] ?: ChatHistorySegment.Label(segment.id, null, null)
-        is Segment.Sender -> senders[segment.id] ?: ChatHistorySegment.Sender(segment.id, null, null, null)
+        is Segment.Sender -> senders[segment.id] ?: ChatHistorySegment.Sender(segment.id, null, null, null, null)
     }
 }
 
@@ -203,6 +209,8 @@ private sealed class ChatHistorySegment {
         @SerialName("id") val id: Uuid,
         @SerialName("subject") val subject: String?,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
     ) : ChatHistorySegment()
 
     @Serializable
@@ -220,5 +228,7 @@ private sealed class ChatHistorySegment {
         @SerialName("address") val address: String?,
         @SerialName("name") val name: String?,
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
     ) : ChatHistorySegment()
 }

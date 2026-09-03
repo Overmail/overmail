@@ -1,5 +1,6 @@
 <script lang="ts">
     import {EnvelopeSimpleIcon} from "phosphor-svelte";
+    import {OvermailAvatar} from "$lib/components/avatar";
     import type {PromptEmail} from "./prompt";
     import {shortSubject} from "./emailSubject";
 
@@ -14,10 +15,12 @@
         class="inline whitespace-nowrap bg-card text-card-foreground px-1 mx-0.5 rounded outline"
         title={email.subject}
 >
-    {#if email.avatarUrl}
-        <img src={email.avatarUrl} alt="" class="inline size-3.5 rounded-full object-cover align-[-0.2em]"/>
-    {:else}
-        <EnvelopeSimpleIcon class="inline size-3.5 align-[-0.2em]"/>
-    {/if}
+    <OvermailAvatar
+            inline
+            url={email.avatarUrl}
+            class="size-3.5"
+    >
+        {#snippet fallback()}<EnvelopeSimpleIcon class="size-full"/>{/snippet}
+    </OvermailAvatar>
     {shortSubject(email.subject)}
 </span>

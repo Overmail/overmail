@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.http.avatar.avatarUrl
+import es.jvbabi.overmail.server.http.avatar.avatarPaddings
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.di.*
@@ -110,47 +111,41 @@ fun Route.stackSocket() {
                         .map { sender -> sender.id.value }
                         .distinct()
 
+                    val recipientsByEmail = batch.associate { email -> email.id to email.recipients.toList() }
+
+                    // One query for the whole batch, before the mails are mapped: the number hangs
+                    // off the picture, and reading it through the entity would read the bytes.
+                    val avatarPaddings = avatarPaddings(
+                        batch.flatMap { email ->
+                            recipientsByEmail.getValue(email.id).map { it.emailUser.avatarId } +
+                                    email.sender.avatarId
+                        }.filterNotNull()
+                    )
+
+                    fun stackUser(name: String?, emailUser: EmailUser) = StackMail.User(
+                        name = name,
+                        email = emailUser.address,
+                        avatarUrl = emailUser.avatarId?.let(::avatarUrl),
+                        avatarPadding = emailUser.avatarId?.let(avatarPaddings::get),
+                    )
+
                     batch.map { email ->
-                            val recipients = email.recipients.toList()
+                            val recipients = recipientsByEmail.getValue(email.id)
                             StackMail(
                                 id = email.id.value,
                                 subject = email.subject,
                                 isRead = email.isRead,
                                 sentAt = email.sent.epochSeconds,
-                                from = email.sender.let { sender ->
-                                    StackMail.User(
-                                        name = email.senderName,
-                                        email = sender.address,
-                                        avatarUrl = sender.avatarId?.let(::avatarUrl),
-                                    )
-                                },
+                                from = stackUser(email.senderName, email.sender),
                                 to = recipients
                                     .filter { recipient -> recipient.type == EmailRecipientType.RECIPIENT }
-                                    .map { recipient ->
-                                        StackMail.User(
-                                            name = recipient.name,
-                                            email = recipient.emailUser.address,
-                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
-                                        )
-                                    },
+                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
                                 cc = recipients
                                     .filter { recipient -> recipient.type == EmailRecipientType.CC }
-                                    .map { recipient ->
-                                        StackMail.User(
-                                            name = recipient.name,
-                                            email = recipient.emailUser.address,
-                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
-                                        )
-                                    },
+                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
                                 bcc = recipients
                                     .filter { recipient -> recipient.type == EmailRecipientType.BCC }
-                                    .map { recipient ->
-                                        StackMail.User(
-                                            name = recipient.name,
-                                            email = recipient.emailUser.address,
-                                            avatarUrl = recipient.emailUser.avatarId?.let(::avatarUrl),
-                                        )
-                                    },
+                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
                                 labels = email.labels.map { labelAssignment ->
                                     StackMail.Label(
                                         id = labelAssignment.label.id.value,
@@ -214,6 +209,7 @@ fun Route.stackSocket() {
                                     StackServerMessage.AvatarResolved(
                                         address = event.address,
                                         avatarUrl = avatarUrl(event.avatarId),
+                                        avatarPadding = event.circlePadding.takeIf { it > 0 },
                                     )
                                 )
                             }
@@ -329,6 +325,8 @@ private sealed class StackServerMessage {
     data class AvatarResolved(
         @SerialName("address") val address: String,
         @SerialName("avatar_url") val avatarUrl: String,
+        /** How much of its box the picture gives up to fit a circle; null when none. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
     ) : StackServerMessage()
 }
 
@@ -369,6 +367,8 @@ private data class StackMail(
         @SerialName("email") val email: String,
         /** Null while no picture has been found for the address; the client shows initials then. */
         @SerialName("avatar_url") val avatarUrl: String?,
+        /** How much of its box the picture gives up to fit a circle; null when none. */
+        @SerialName("avatar_padding") val avatarPadding: Double?,
     )
 
     @Serializable

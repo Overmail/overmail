@@ -1,7 +1,7 @@
 <script lang="ts">
-    import * as Avatar from "$lib/components/ui/avatar";
+    import {OvermailAvatar} from "$lib/components/avatar";
     import {Spinner} from "$lib/components/ui/spinner";
-    import {cn, initials, scrollIntoViewWithin} from "$lib/utils.js";
+    import {cn, scrollIntoViewWithin} from "$lib/utils.js";
     import TriggerWindow from "./TriggerWindow.svelte";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
@@ -141,7 +141,15 @@
 
     function select(email: EmailSearchResult | undefined) {
         if (!email) return;
-        onReplace({type: "email", email: {id: email.id, subject: email.subject.text, avatarUrl: email.avatarUrl}});
+        onReplace({
+            type: "email",
+            email: {
+                id: email.id,
+                subject: email.subject.text,
+                avatarUrl: email.avatarUrl,
+                avatarPadding: email.avatarPadding,
+            },
+        });
     }
 
     // Keyboard events handed down by PromptInput; true means the event was consumed.
@@ -262,12 +270,11 @@
                     }}
                     ondblclick={() => select(email)}
             >
-                <Avatar.Root size="lg">
-                    {#if email.avatarUrl}
-                        <Avatar.Image src={email.avatarUrl} alt=""/>
-                    {/if}
-                    <Avatar.Fallback class="text-base">{initials(email.from.name?.text ?? email.from.address.text)}</Avatar.Fallback>
-                </Avatar.Root>
+                <OvermailAvatar
+                        size="lg"
+                        url={email.avatarUrl}
+                        name={email.from.name?.text ?? email.from.address.text}
+                />
                 <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span class="w-full truncate">
                         {#each matchParts(email.subject) as part}

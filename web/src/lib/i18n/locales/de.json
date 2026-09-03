@@ -97,7 +97,7 @@
         "searchSender": "Von: {query}",
         "thinking": "Denkt nach",
         "toolCall": "Arbeitet",
-        "toolCalls": "{count, plural, one {# Schritt} other {# Schritte}}"
+        "toolCalls": "{count, plural, one {# Toolcall} other {# Toolcalls}}"
       }
     },
     "labels": {

@@ -34,13 +34,14 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailAvatars)
             // `avatar_id` was added to a table earlier runs already created, and `create` alone
             // skips columns of a table that exists.
-            SchemaUtils.createMissingTablesAndColumns(EmailUsers)
+            SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)
             SchemaUtils.create(Labels, EmailLabels)
             SchemaUtils.create(Stacks, EmailStacks)
             SchemaUtils.create(EmailArchives)
+            SchemaUtils.create(AiChats)
         }
     }
 

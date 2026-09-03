@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.stack.stackSocket
+import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
@@ -80,6 +81,10 @@ internal fun Application.configureRouting() {
                 route("/ai") {
                     route("/current-config") {
                         currentAiConfig()
+                    }
+
+                    route("/socket") {
+                        aiSocket()
                     }
                 }
             }

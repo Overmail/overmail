@@ -5,10 +5,12 @@
     import * as Select from "$lib/components/ui/select";
     import {onMount} from "svelte";
     import {fade} from "svelte/transition";
-    import PromptInput from "$lib/app/ai/popover/PromptInput.svelte";
-    import {OvermailPromptViewModel} from "$lib/app/ai/popover/OvermailPromptViewModel.svelte";
-    import type {PromptInputExports} from "$lib/app/ai/popover/prompt";
+    import PromptInput from "$lib/app/ai/PromptInput.svelte";
+    import {OvermailPromptViewModel} from "$lib/app/ai/OvermailPromptViewModel.svelte";
+    import type {PromptInputExports} from "$lib/app/ai/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
+    import {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
+    import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
     import {_} from "svelte-i18n";
 
     // Keys, not strings: the rotation has to follow the ui language.
@@ -36,10 +38,14 @@
         return () => clearInterval(interval);
     })
 
+    const chatViewModel = new AiChatViewModel();
+
+    onMount(() => () => chatViewModel.dispose());
+
     const promptViewModel = new OvermailPromptViewModel();
     let promptEmpty = $derived(promptViewModel.isEmpty);
 
-    let promptType: "normal" | "read-only" = $state("normal");
+    let promptType: "normal" | "ask-before-changes" | "read-only" = $state("normal");
 
     let promptInput: PromptInputExports | undefined = $state();
 
@@ -55,10 +61,21 @@
     }
 </script>
 
-<h1 class="text-xl">{$_('ai.title')}</h1>
+<AiChatSwitcher viewModel={chatViewModel}/>
+
 <div class="flex flex-col h-192">
     <div class="w-full flex-1 overflow-y-auto">
-        {$_('ai.chat.history')}
+        <h2 class="text-muted-foreground text-sm font-medium tracking-tight">
+            {$_('ai.chat.history')}
+        </h2>
+
+        <!-- Debug-Ausgabe, bis der Verlauf gebaut ist: nur Anzahl und Zeitstempel. -->
+        <p class="text-muted-foreground text-sm">{chatViewModel.chats.length} chats loaded</p>
+        <ul class="text-muted-foreground text-xs font-mono">
+            {#each chatViewModel.chats as chat (chat.id)}
+                <li>{chat.created_at.toISOString()}</li>
+            {/each}
+        </ul>
     </div>
 
     <div class="flex flex-col min-h-24 max-h-56">
@@ -87,6 +104,7 @@
                     >
                         <Select.Group>
                             <Select.Item value="normal">{$_('ai.chat.mode.normal')}</Select.Item>
+                            <Select.Item value="ask-before-changes">Bearbeitungen anfragen</Select.Item>
                             <Select.Item value="read-only">{$_('ai.chat.mode.readOnly')}</Select.Item>
                         </Select.Group>
                     </Select.Content>

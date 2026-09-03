@@ -59,6 +59,19 @@
 		"title": "Overmail AI",
 		"chat": {
 			"history": "History",
+			"chats": {
+				"new": "New chat",
+				"untitled": "Untitled chat",
+				"empty": "No chats yet",
+				"loading": "Loading chats…",
+				"groups": {
+					"today": "Today",
+					"yesterday": "Yesterday",
+					"lastWeek": "Last 7 days",
+					"lastMonth": "Last 30 days",
+					"older": "Older"
+				}
+			},
 			"placeholders": {
 				"ask": "Ask something or give a task",
 				"summarize": "“Summarise this email in three sentences.”",

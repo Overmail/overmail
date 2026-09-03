@@ -11,8 +11,9 @@ object Users : UuidTable("users") {
     val email = varchar("email", 255).uniqueIndex()
 }
 
-class User(id: EntityID<Uuid>) : UuidEntity(id) {
+class User(id: EntityID<Id>) : UuidEntity(id) {
     companion object : UuidEntityClass<User>(Users)
+    typealias Id = Uuid
 
     var username by Users.username
     var email by Users.email

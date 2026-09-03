@@ -11,6 +11,7 @@ import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
+import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
@@ -60,6 +61,7 @@ private fun Application.configureDependencies() {
         provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
 
         provide<EmailLabelNotifier> { EmailLabelNotifier() }
+        provide<AiChatNotifier> { AiChatNotifier() }
         provide<AvatarNotifier> { AvatarNotifier() }
 
         // Creating the schema on first resolution keeps it in one place: every caller reaches

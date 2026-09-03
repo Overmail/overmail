@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
+import es.jvbabi.overmail.server.http.webapp.content.contentSocket
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
@@ -100,6 +101,12 @@ internal fun Application.configureRouting() {
             }
 
             route("/webapp") {
+                route("/content") {
+                    route("/socket") {
+                        contentSocket()
+                    }
+                }
+
                 route("/home") {
                     route("/socket") {
                         homeSocket()

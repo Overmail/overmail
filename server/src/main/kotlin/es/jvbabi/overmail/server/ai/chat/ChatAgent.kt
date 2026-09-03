@@ -192,19 +192,46 @@ class ChatAgent(
         stream: AiChatMessageStream,
     ): Message.Assistant {
         var firstTextOfTurn = true
+        var thinking = false
+
+        /** Closes an open thinking element, so nothing after it lands inside. */
+        fun endThinking() {
+            if (!thinking) return
+            thinking = false
+            stream.append(THINKING_END)
+        }
 
         val frames = requestLLMStreaming()
             .onEach { frame ->
-                if (frame !is StreamFrame.TextDelta) return@onEach
-                // A turn that follows text of an earlier turn (a remark before a tool call) would
-                // otherwise run into it without a break.
-                if (firstTextOfTurn) {
-                    firstTextOfTurn = false
-                    if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
+                when (frame) {
+                    is StreamFrame.ReasoningDelta -> {
+                        val text = frame.text ?: return@onEach
+                        if (!thinking) {
+                            thinking = true
+                            if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
+                            stream.append(THINKING_START)
+                        }
+                        stream.append(escapeThinking(text))
+                    }
+
+                    is StreamFrame.TextDelta -> {
+                        endThinking()
+                        // A turn that follows text of an earlier turn (a remark before a tool
+                        // call) would otherwise run into it without a break.
+                        if (firstTextOfTurn) {
+                            firstTextOfTurn = false
+                            if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
+                        }
+                        stream.append(frame.text)
+                    }
+
+                    // A tool call ends the thinking that led to it; everything else is not text.
+                    else -> endThinking()
                 }
-                stream.append(frame.text)
             }
             .toList()
+
+        endThinking()
 
         return frames.toMessageResponse().also { response ->
             appendPrompt { message(response) }
@@ -305,6 +332,23 @@ class ChatAgent(
     }
 
     internal companion object {
+
+        /**
+         * What the model reasoned before answering, shown next to the tools it used. The text
+         * lives inside the element, so it streams like the rest of the answer.
+         */
+        const val THINKING_START = "<toolcall-thinking>"
+        const val THINKING_END = "</toolcall-thinking>"
+
+        /**
+         * Reasoning is prose, and it ends up inside an element of the answer: `<` and `&` would
+         * otherwise start markup, and a blank line would end the element before its closing tag.
+         */
+        internal fun escapeThinking(text: String): String = text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(Regex("\\n\\s*\\n+"), "\n")
+
         /**
          * Grows with the tools: what the agent can do is the tool registry, and the list of what
          * it cannot do has to be kept next to it -- a model that is not told will happily promise

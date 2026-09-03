@@ -6,7 +6,7 @@
 -->
 <script lang="ts">
     import {CaretRightIcon, WrenchIcon} from "phosphor-svelte";
-    import {slide} from "svelte/transition";
+    import {fly, slide} from "svelte/transition";
     import ThinkingOrb from "$lib/components/orb/ThinkingOrb.svelte";
     import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
     import ToolCallSearchEmails from "$lib/app/ai/ToolCallSearchEmails.svelte";
@@ -40,31 +40,52 @@
     };
 
     const current = $derived(calls[calls.length - 1]);
+
+    // One line of text, whatever the group is doing: what runs right now, or what it took. It
+    // changes while the agent works, and the change is what the roll below animates.
+    const label = $derived(
+        isRunning
+            ? $_(LABELS[current.kind] ?? "ai.chat.messages.toolCall")
+            : $_("ai.chat.messages.toolCalls", {values: {count: calls.length}}),
+    );
 </script>
 
-<div class="rounded-lg border border-border/60 text-sm">
+<div class="text-sm">
     <button
             type="button"
-            class="flex w-full items-center gap-2 px-2 py-1.5 text-left text-muted-foreground
+            class="flex w-full items-center gap-2 py-1 text-left text-muted-foreground
                    transition-colors hover:text-foreground"
             aria-expanded={isExpanded}
             onclick={() => isExpanded = !isExpanded}
     >
         {#if isRunning}
             <ThinkingOrb variant={ORBS[current.kind] ?? "working"} size={20} class="shrink-0"/>
-            <span class="truncate">{$_(LABELS[current.kind] ?? "ai.chat.messages.toolCall")}</span>
         {:else}
-            <WrenchIcon class="size-4 shrink-0"/>
-            <span class="truncate">{$_("ai.chat.messages.toolCalls", {values: {count: calls.length}})}</span>
+            <WrenchIcon class="size-5 shrink-0 p-0.5"/>
         {/if}
 
+        <!-- Fixed height, stacked and clipped: the two lines pass each other inside the row
+             instead of pushing it apart or floating over it. -->
+        <span class="relative h-5 min-w-0 flex-1 overflow-hidden">
+            {#key label}
+                <span
+                        class="absolute inset-0 truncate"
+                        in:fly={{y: 12, duration: 220}}
+                        out:fly={{y: -12, duration: 220}}
+                >
+                    {label}
+                </span>
+            {/key}
+        </span>
+
         <CaretRightIcon
-                class="ms-auto size-3.5 shrink-0 transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
+                class="size-3.5 shrink-0 transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
         />
     </button>
 
     {#if isExpanded}
-        <ul class="flex flex-col gap-1.5 border-t border-border/60 px-2 py-1.5" transition:slide={{duration: 200}}>
+        <!-- Indented to where the label starts, so the rows read as its detail. -->
+        <ul class="flex flex-col gap-1.5 py-1 ps-7" transition:slide={{duration: 200}}>
             {#each calls as call, index (index)}
                 <li>
                     {#if call.kind === "thinking"}

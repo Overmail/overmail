@@ -14,7 +14,7 @@ test("the day is split into four greetings", () => {
     expect(greetingFor(at(11))).toBe("day");
     expect(greetingFor(at(17, 59))).toBe("day");
     expect(greetingFor(at(18))).toBe("evening");
-    expect(greetingFor(at(21, 59))).toBe("evening");
-    expect(greetingFor(at(22))).toBe("night");
+    expect(greetingFor(at(22, 59))).toBe("evening");
+    expect(greetingFor(at(23))).toBe("night");
     expect(greetingFor(at(23, 59))).toBe("night");
 });

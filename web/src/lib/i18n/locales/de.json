@@ -36,7 +36,11 @@
       "evening": "Guten Abend, {name}"
     },
     "mailbox": {
-      "count": "{count, plural, one {Du hast # Mail im Postfach} other {Du hast # Mails im Postfach}}"
+      "count": "{count, plural, one {Du hast eine Mail im Postfach.} other {Du hast noch # Mails im Postfach.}}"
+    },
+    "graph": {
+      "label": "Mails pro Tag in {year}",
+      "day": "{count, plural, =0 {Keine Mail} one {# Mail} other {# Mails}}"
     }
   },
   "myStack": {

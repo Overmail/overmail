@@ -3,6 +3,7 @@
     import HomeGreeting from "$lib/app/home/HomeGreeting.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import {Skeleton} from "$lib/components/ui/skeleton";
+    import EmailGraph from "$lib/app/home/EmailGraph.svelte";
 
     const {home} = useRepositories();
 
@@ -20,5 +21,9 @@
         {:else}
             <Skeleton class="h-5 w-56"/>
         {/if}
+    </div>
+
+    <div class="px-16 pt-10">
+        <EmailGraph/>
     </div>
 </div>

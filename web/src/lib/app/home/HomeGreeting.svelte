@@ -1,7 +1,3 @@
-<!--
-    The line at the top of the home screen: the time of day plus who is reading. Kept out of the
-    page because it is the only thing there that has to follow the clock.
--->
 <script lang="ts">
     import {onMount} from "svelte";
     import {_} from "svelte-i18n";

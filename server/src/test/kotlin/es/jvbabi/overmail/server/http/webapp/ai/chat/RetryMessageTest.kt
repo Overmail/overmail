@@ -114,7 +114,7 @@ class RetryMessageTest {
                     )
                 }
                 // No consumer in the test: the run is queued and stays there.
-                provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve()) }
+                provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve(), streamNotifier = resolve()) }
             }
             routing {
                 route("/api/webapp/ai/chat/{chatId}/message/{messageId}/retry") { retryMessage() }

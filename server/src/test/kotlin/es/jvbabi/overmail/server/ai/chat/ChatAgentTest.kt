@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.database.models.User
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
+import kotlin.test.assertNull
 import kotlin.time.Clock
 
 class ChatAgentTest {
@@ -26,6 +27,7 @@ class ChatAgentTest {
 
     @Test
     fun `run without a user message does not call the model`() = runTest {
+        val streamNotifier = AiChatStreamNotifier()
         val database = OvermailDatabase(
             Database.connect("jdbc:h2:mem:chat-agent;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
         )
@@ -35,7 +37,7 @@ class ChatAgentTest {
             config = ApplicationConfig.AiConfig(apiKey = "none", model = model.id, baseUrl = "http://localhost:1"),
             model = model,
             database = database,
-            streamNotifier = AiChatStreamNotifier(),
+            streamNotifier = streamNotifier,
             chatNotifier = AiChatNotifier(),
         )
 
@@ -61,6 +63,10 @@ class ChatAgentTest {
 
         // No user message in the chat, so there is nothing to answer: the run has to return
         // before the prompt executor is touched (the base url above points nowhere).
+        streamNotifier.open(messageId)
         agent.run(messageId)
+
+        // Even on that path the stream has to end, or a client waits for an answer forever.
+        assertNull(streamNotifier.of(messageId))
     }
 }

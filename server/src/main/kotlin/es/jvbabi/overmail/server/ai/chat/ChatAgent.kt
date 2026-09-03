@@ -103,13 +103,14 @@ class ChatAgent(
      * message as pending right away); this only fills it in.
      */
     suspend fun run(messageId: AiChatMessage.Id) {
-        val turn = loadTurn(messageId) ?: return
-
-        // Opened before the first token, closed after the answer is persisted: a reader attaching
-        // in between gets the text so far and the rest as it arrives, one attaching after that
-        // finds the finished message in the database.
+        // Before anything can go wrong: every exit from here has to end the stream, or a client
+        // waits for an answer that nobody is writing. The queue opened it when the message was
+        // enqueued, and opening is idempotent.
         val stream = streamNotifier.open(messageId)
+
         try {
+            val turn = loadTurn(messageId) ?: return
+
             try {
                 answer(turn, stream)
             } catch (exception: Exception) {

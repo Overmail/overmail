@@ -125,7 +125,7 @@ private fun Application.configureDependencies() {
             )
         }
 
-        provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve()) }
+        provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve(), streamNotifier = resolve()) }
 
         // Owns an http client, so one instance rather than one per lookup.
         provide<AvatarLookup> { AvatarLookup() }

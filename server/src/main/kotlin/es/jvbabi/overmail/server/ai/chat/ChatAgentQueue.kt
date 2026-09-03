@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.ai.chat
 
+import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +18,7 @@ private val logger = KotlinLogging.logger {}
  */
 class ChatAgentQueue(
     private val chatAgent: ChatAgent,
+    private val streamNotifier: AiChatStreamNotifier,
 ) {
 
     /** IDs currently waiting in [channel], so a message is never queued twice. */
@@ -26,7 +28,14 @@ class ChatAgentQueue(
 
     fun enqueue(messageId: AiChatMessage.Id) {
         if (!pending.add(messageId)) return
-        if (channel.trySend(messageId).isFailure) pending.remove(messageId)
+        if (channel.trySend(messageId).isFailure) {
+            pending.remove(messageId)
+            return
+        }
+
+        // Opened here, not when the run starts: between the two the client already asks for the
+        // stream, and without one it would be told the answer is done before it began.
+        streamNotifier.open(messageId)
     }
 
     /** Answers queued messages until the queue is closed. Suspends while it is empty. */

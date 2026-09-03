@@ -3,6 +3,9 @@
     import SvelteMarkdown from "@humanspeak/svelte-markdown";
     import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
     import ToolCallSearchEmails from "$lib/app/ai/ToolCallSearchEmails.svelte";
+    import EntityEmail from "$lib/app/entities/EntityEmail.svelte";
+    import EntityLabel from "$lib/app/entities/EntityLabel.svelte";
+    import EntityPerson from "$lib/app/entities/EntityPerson.svelte";
 
     let {
         content,
@@ -19,6 +22,12 @@
         html: {
             "toolcall-read-email": ToolCallReadEmail,
             "toolcall-search-emails": ToolCallSearchEmails,
+            // What the agent mentions, written as <email id>, <label id> and <person id>. The
+            // html `label` element is overridden by this on purpose: inside an answer the tag
+            // means the user's label, and a form label has nothing to do here.
+            email: EntityEmail,
+            label: EntityLabel,
+            person: EntityPerson,
         },
     };
 </script>

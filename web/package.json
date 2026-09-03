@@ -37,6 +37,7 @@
 		"@humanspeak/svelte-markdown": "^1.9.0",
 		"@tanstack/svelte-hotkeys": "^0.10.0",
 		"date-fns": "^4.4.0",
+		"dexie": "^4.4.5",
 		"svelte-i18n": "^4.0.1"
 	}
 }

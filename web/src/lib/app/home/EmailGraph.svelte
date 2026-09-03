@@ -51,7 +51,7 @@
 <Tabs.Root
         value={String(year)}
         onValueChange={(value) => (year = Number(value))}
-        class="flex flex-col"
+        class="flex min-w-0 flex-col"
 >
     <!-- Nothing to switch between while the mailbox holds one year. The list scrolls rather than
          wraps: a row of tabs that breaks across lines loses its shared pill. -->

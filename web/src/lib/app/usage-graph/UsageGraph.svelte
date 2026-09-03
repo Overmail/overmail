@@ -55,6 +55,20 @@
 	const ROWS = 7;
 
 	/**
+	 * How large a card gets, and how far apart two of them stand -- the `gap-1` below in pixels.
+	 *
+	 * The columns are `minmax(0, MAX_CARD)`: they take that size wherever there is room for it and
+	 * shrink when there is not. That is what makes the graph work in a row as well as in a column
+	 * -- it has a width of its own to be laid out at, and gives it up rather than scrolling when
+	 * the space is tighter than that.
+	 */
+	const MAX_CARD_PX = 12;
+	const GAP_PX = 4;
+
+	/** Below this a name no longer fits the row it belongs to, see the rail. */
+	const MIN_LABEL_PX = 10;
+
+	/**
 	 * The rail down the left, row for row with the cards — Monday first, like the rows themselves.
 	 *
 	 * Every other day is named and the rest are blank: seven labels down 16px rows read as a wall of
@@ -183,6 +197,17 @@
 	/** What is on screen: the drawing that has its counts, or an empty year until the first lands. */
 	const shown = $derived(drawn ?? draw(year, null));
 
+	/**
+	 * What one card came out at, measured rather than assumed: the columns shrink below
+	 * [MAX_CARD_PX] whenever the graph is given less room, and the rail beside them has to follow.
+	 */
+	let gridWidth = $state(0);
+	const cardSize = $derived(
+		shown.columns === 0
+			? 0
+			: Math.min(MAX_CARD_PX, (gridWidth - (shown.columns - 1) * GAP_PX) / shown.columns)
+	);
+
 	// The slot the pointer is on, and the card standing in it. The card is kept rather than
 	// measured: the bubble is hung off the element itself and places itself against it.
 	let hoveredSlot = $state<number | null>(null);
@@ -218,14 +243,24 @@
 		own box: a rail of unknown width in front of them would push every one of them along by
 		however wide the longest name happens to render.
 
-		Seven rows, the same gap, and stretched to the height the cards come out at, so the two line
-		up without either knowing the other's size. Left out on a narrow screen: below that the
-		cards are smaller than a 10px line box, and rows that no longer line up are worse than no
-		rail at all.
+		Its rows are the card size rather than seven equal parts of whatever height this ends up
+		with: the cards shrink with the width they are given, and a rail that sizes itself would
+		drift off their rows exactly when they are smallest.
 	-->
-	<div class="hidden grid-rows-7 gap-1 self-stretch pr-0.5 lg:grid" aria-hidden="true">
+	<div
+		class="grid gap-1 pr-0.5"
+		style="grid-template-rows: repeat({ROWS}, {cardSize}px)"
+		aria-hidden="true"
+	>
 		{#each weekdays as weekday, row (row)}
-			<div class="text-muted-foreground flex min-h-0 items-center overflow-hidden text-[10px] leading-none">
+			<!--
+				Hidden rather than left out once the cards are smaller than the text: the rail keeps
+				its box, so the cards keep their width and nothing can flip between the two states.
+			-->
+			<div
+				class="text-muted-foreground flex min-h-0 items-center overflow-hidden text-[10px] leading-none"
+				class:invisible={cardSize < MIN_LABEL_PX}
+			>
 				{weekday}
 			</div>
 		{/each}
@@ -243,8 +278,9 @@
 				there instead of tearing the grid down and putting a new one up.
 			-->
 			<div
-				class="grid w-full min-w-0 grid-flow-col grid-rows-7 gap-1"
-				style="--usage-tint: {color}; grid-template-columns: repeat({shown.columns}, minmax(0, 1fr))"
+				bind:clientWidth={gridWidth}
+				class="grid min-w-0 grid-flow-col grid-rows-7 gap-1"
+				style="--usage-tint: {color}; grid-template-columns: repeat({shown.columns}, minmax(0, {MAX_CARD_PX}px))"
 				role="img"
 				aria-label={label}
 				onmouseleave={leave}

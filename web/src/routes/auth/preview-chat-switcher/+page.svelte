@@ -1,8 +1,8 @@
 <!--
-    Wegwerf-Harness: rendert AiChatSwitcher gegen ein Fake-ViewModel, das das Paging des Servers
-    nachspielt (30 pro Seite, mit Verzögerung). Damit sind Auto-Load, Windowing und
-    Tastaturnavigation ohne laufenden Server und ohne Daten in der Datenbank prüfbar.
-    Liegt unter /auth, weil das Root-Layout alles andere hinter der Session wegsperrt.
+    Throwaway harness: renders AiChatSwitcher against a fake view model that replays the server's
+    paging (30 per page, with latency). That makes auto-load, windowing and keyboard navigation
+    checkable without a running server and without data in the database.
+    It lives under /auth because the root layout locks everything else behind the session.
 -->
 <script lang="ts">
     import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
@@ -23,8 +23,8 @@
         "Alte Reisebuchungen",
     ];
 
-    // Erste Zeile ohne Namen, damit der Unbenannt-Zustand sichtbar ist. Die Abstände wachsen,
-    // damit alle fünf Datumsgruppen vorkommen.
+    // The first row has no name, so the untitled state is visible. The gaps grow, so all five
+    // date groups occur.
     const allChats: AiChat[] = Array.from({length: TOTAL}, (_, index) => ({
         id: `chat-${index}`,
         name: index === 0 ? null : `${names[index % names.length]} ${index}`,
@@ -70,12 +70,12 @@
 </script>
 
 <div class="flex flex-col gap-8 p-8">
-    <!-- Breite wie im Popover: Popover.Content ist md:w-2xl. -->
+    <!-- Same width as in the popover: Popover.Content is md:w-2xl. -->
     <div class="w-2xl border border-dashed border-destructive/40">
         <AiChatSwitcher {viewModel}/>
     </div>
 
-    <!-- Schmal, damit die Kürzung überhaupt greifen muss. -->
+    <!-- Narrow, so the truncation actually has to kick in. -->
     <div class="w-72 border border-dashed border-destructive/40">
         <AiChatSwitcher viewModel={narrowViewModel}/>
     </div>

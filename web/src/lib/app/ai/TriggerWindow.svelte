@@ -20,9 +20,9 @@
     let element: HTMLDivElement;
 
     /**
-     * Ein- und Ausblenden wie ein Popover: Opacity plus ein leichtes Aufsteigen aus der
-     * Ankerkante. Animiert werden die eigenständigen Properties `translate` und `scale` —
-     * `transform` gehört clampToViewport und würde sich sonst mit der Transition überschreiben.
+     * Fades in and out like a popover: opacity plus a slight rise out of the anchor edge. The
+     * standalone `translate` and `scale` properties are what get animated -- `transform` belongs
+     * to clampToViewport and the transition would otherwise overwrite it.
      */
     function float(_node: Element, {duration}: {duration: number}) {
         return {
@@ -32,13 +32,13 @@
         };
     }
 
-    // Mindestabstand zur Viewport-Kante (p-4).
+    // Minimum distance to the viewport edge (p-4).
     const MARGIN = 16;
 
-    // Hält das Fenster im Viewport, damit es weder abgeschnitten wird noch die Seite
-    // zum Overflowen bringt. Horizontal per translate; vertikal bleibt die Unterkante
-    // am Anker (über dem Prompt) und stattdessen wird die Höhe begrenzt — das Fenster
-    // rutscht also nie nach unten über Cursor oder Eingabefeld.
+    // Keeps the window inside the viewport, so it is neither cut off nor makes the page
+    // overflow. Horizontally via translate; vertically the bottom edge stays on the anchor
+    // (above the prompt) and the height is capped instead -- the window never slides down
+    // over the cursor or the input field.
     function clampToViewport() {
         if (!element) return;
 
@@ -64,7 +64,7 @@
     });
 
     onMount(() => {
-        // Größenänderungen des Inhalts (z.B. nachgeladene Suchergebnisse) neu klammern.
+        // Re-clamp when the content changes size, e.g. search results arriving.
         const observer = new ResizeObserver(clampToViewport);
         observer.observe(element);
         window.addEventListener("resize", clampToViewport);

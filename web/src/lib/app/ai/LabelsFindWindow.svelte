@@ -18,9 +18,9 @@
     let labels: LabelSearchResult[] = $state([]);
     let highlightedIndex = $state(0);
 
-    // Das Highlight muss sichtbar bleiben, sobald es sich aendert -- auch wenn die Liste
-    // laenger ist als das Fenster. Gescrollt wird ausschliesslich der Listen-Container per
-    // scrollTop; scrollIntoView wuerde stattdessen das Fenster/Popover verschieben.
+    // The highlight has to stay visible as it moves, even when the list is taller than the
+    // window. Only the list container is scrolled, via scrollTop; scrollIntoView would move
+    // the window or the popover instead.
     let listElement: HTMLElement | undefined = $state();
     let itemElements: (HTMLElement | undefined)[] = $state([]);
 
@@ -32,7 +32,7 @@
     $effect(() => {
         const current = query;
         viewModel.findLabels(current).then((result) => {
-            if (current !== query) return; // veraltete Antwort
+            if (current !== query) return; // stale response
             labels = result;
             highlightedIndex = 0;
         });
@@ -50,7 +50,7 @@
 
     function select(option: Option | undefined) {
         if (!option || option.type === "create") {
-            // Label-Anlage gibt es noch nicht; Enter schließt nur das Fenster.
+            // Creating a label is not implemented yet; Enter only closes the window.
             onDismiss();
             return;
         }
@@ -61,7 +61,7 @@
         });
     }
 
-    // Vom PromptInput weitergereichte Tastatur-Events; true = Event verbraucht.
+    // Keyboard events handed down by PromptInput; true means the event was consumed.
     export function handleKey(event: KeyboardEvent): boolean {
         if (event.key === "ArrowDown" && options.length > 0) {
             highlightedIndex = (highlightedIndex + 1) % options.length;

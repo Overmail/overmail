@@ -4,7 +4,7 @@ export type LabelSearchResult = PromptLabel & {emailCount: number};
 
 export type SenderSearchResult = PromptSender & {emailCount: number};
 
-// end ist exklusiv, passend für String.slice.
+// end is exclusive, to match String.slice.
 export type MatchableText = {
     text: string;
     matches: {start: number; end: number}[];

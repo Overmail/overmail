@@ -1,10 +1,10 @@
 <!--
-    Die Chat-Liste des Switchers: nach Datum gruppiert, lädt beim Scrollen nach und hält nur die
-    sichtbaren Zeilen im DOM.
+    The switcher's chat list: grouped by date, pages in as you scroll and keeps only the visible
+    rows in the DOM.
 
-    Eigene Listbox statt Select.Item: bei Windowing kennt eine Select-Primitive nur die gerade
-    gerenderten Items, Pfeiltasten und Typeahead würden am Fensterrand abbrechen. Deshalb liegt
-    der Fokus hier immer auf dem Container und die aktive Zeile hängt an aria-activedescendant.
+    A hand-rolled listbox rather than Select.Item: with windowing, a select primitive only knows
+    the items currently rendered, so arrow keys and typeahead would stop at the window edge. That
+    is why focus stays on the container here and the active row hangs off aria-activedescendant.
 -->
 <script lang="ts">
     import {onMount} from "svelte";
@@ -19,28 +19,27 @@
         onSelect: (chatId: string) => void,
     } = $props();
 
-    // Feste Höhen, weil das Windowing die Position jeder Zeile ohne Messung ausrechnen muss.
-    // Sie stehen als inline style an den Zeilen, damit Modell und DOM nicht auseinanderlaufen
-    // können.
+    // Fixed heights, because the windowing has to compute every row's position without measuring.
+    // They are written onto the rows as an inline style, so model and DOM cannot drift apart.
     const ROW_HEIGHT = 54;
     const HEADING_HEIGHT = 28;
     const GROUP_GAP = 8;
 
-    /** Zeilen über dem und unter dem Fenster, damit Scrollen nicht an leeren Flächen vorbeiläuft. */
+    /** Rows above and below the window, so scrolling does not run past empty space. */
     const OVERSCAN = 4 * ROW_HEIGHT;
 
-    /** So weit vor dem Ende wird die nächste Seite angefragt. */
+    /** How far before the end the next page is requested. */
     const LOAD_MORE_THRESHOLD = 3 * ROW_HEIGHT;
 
-    /** Nach dieser Pause fängt eine Tasteneingabe eine neue Suche an, statt anzuhängen. */
+    /** After this pause a keystroke starts a new search instead of appending to the current one. */
     const TYPEAHEAD_RESET_MS = 600;
 
-    // date-fns hat eigene Kataloge, die relativen Daten müssen also separat auf die
-    // UI-Sprache gezeigt werden. `$locale` kann ein Regionaltag wie `de-DE` sein.
+    // date-fns has catalogs of its own, so the relative dates have to be pointed at the ui
+    // language separately. `$locale` can be a regional tag such as `de-DE`.
     const dateLocale = $derived($locale?.slice(0, 2) === "de" ? de : enUS);
 
-    // "vor 5 Minuten" veraltet, während die Liste offen ist. Alle Daten werden gegen diesen Wert
-    // gerechnet statt gegen Date.now(), damit Labels und Gruppierung zusammen weiterlaufen.
+    // "5 minutes ago" goes stale while the list is open. Every date is computed against this
+    // value rather than Date.now(), so labels and grouping move on together.
     let now = $state(new Date());
     onMount(() => {
         const interval = setInterval(() => now = new Date(), 60_000);
@@ -49,7 +48,7 @@
 
     const groupKeys = ["today", "yesterday", "lastWeek", "lastMonth", "older"] as const;
 
-    // Kalendertage, nicht verstrichene Stunden: ein Chat von 23:00 ist um 01:00 "gestern".
+    // Calendar days, not elapsed hours: a chat from 23:00 is "yesterday" at 01:00.
     function groupKeyOf(chat: AiChat): (typeof groupKeys)[number] {
         const days = differenceInCalendarDays(now, chat.created_at);
         if (days <= 0) return "today";
@@ -63,8 +62,8 @@
         | {kind: "heading", domId: string, labelKey: string, top: number, height: number}
         | {kind: "chat", domId: string, chat: AiChat, top: number, height: number};
 
-    // Gruppen und Zeilen in einer flachen Liste mit ausgerechneter Position -- darauf beruht
-    // sowohl das Windowing als auch die Pfeiltasten-Navigation.
+    // Groups and rows in one flat list with a precomputed position -- both the windowing and the
+    // arrow-key navigation build on that.
     const rows: Row[] = $derived.by(() => {
         const grouped = groupKeys
             .map((key) => ({
@@ -105,7 +104,7 @@
     let viewportHeight = $state(0);
     let listElement: HTMLDivElement | undefined = $state();
 
-    /** Indizes der Chat-Zeilen in [rows]; die Überschriften werden übersprungen. */
+    /** Indices of the chat rows within [rows]; the headings are skipped. */
     const chatRowIndices = $derived(
         rows.reduce<number[]>((acc, row, index) => {
             if (row.kind === "chat") acc.push(index);
@@ -122,17 +121,17 @@
         )
     );
 
-    // Die aktive Zeile bleibt gerendert, auch wenn sie aus dem Fenster gescrollt wurde:
-    // aria-activedescendant darf nicht auf ein Element zeigen, das es nicht mehr gibt. Die
-    // Reihenfolge ist egal, die Zeilen sind absolut positioniert.
+    // The active row stays rendered even once it is scrolled out of the window:
+    // aria-activedescendant must not point at an element that no longer exists. The order does
+    // not matter, the rows are positioned absolutely.
     const renderedRows = $derived(
         activeRow !== null && !windowedRows.includes(activeRow)
             ? [...windowedRows, activeRow]
             : windowedRows
     );
 
-    // Deckt beides ab: nah am Ende gescrollt, und Inhalt kürzer als das Fenster (dann kann man
-    // gar nicht scrollen, es gibt aber noch mehr). Die Mehrfachanfrage fängt das ViewModel ab.
+    // Covers both cases: scrolled close to the end, and content shorter than the window (nothing
+    // to scroll, yet there is more to come). Repeat requests are caught by the view model.
     $effect(() => {
         if (!viewModel.hasMoreChats) return;
         if (totalHeight - (scrollTop + viewportHeight) > LOAD_MORE_THRESHOLD) return;
@@ -155,7 +154,7 @@
         if (chatRowIndices.length === 0) return;
 
         const current = activeRowIndex === null ? -1 : chatRowIndices.indexOf(activeRowIndex);
-        // Von nirgendwo aus startet Pfeil-runter oben und Pfeil-hoch unten.
+        // From nowhere, arrow-down starts at the top and arrow-up at the bottom.
         const next = current === -1
             ? (direction === 1 ? 0 : chatRowIndices.length - 1)
             : Math.min(Math.max(current + direction, 0), chatRowIndices.length - 1);
@@ -181,8 +180,8 @@
         typeahead += character.toLowerCase();
         typeaheadTimeout = setTimeout(() => typeahead = "", TYPEAHEAD_RESET_MS);
 
-        // Ab der aktiven Zeile weitersuchen, damit wiederholte Anfangsbuchstaben durch die
-        // Treffer wandern statt am ersten zu kleben.
+        // Search on from the active row, so repeating an initial letter walks through the
+        // matches instead of sticking to the first one.
         const start = activeRowIndex === null ? 0 : chatRowIndices.indexOf(activeRowIndex) + 1;
         const order = [
             ...chatRowIndices.slice(start),
@@ -226,20 +225,20 @@
                 return;
         }
 
-        // Nur druckbare Einzelzeichen, damit Tab, Escape und Shortcuts durchkommen -- Escape
-        // schließt das Popover, das gehört nicht hierher.
+        // Printable single characters only, so Tab, Escape and shortcuts get through -- Escape
+        // closes the popover, which is not this component's business.
         if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
             event.preventDefault();
             runTypeahead(event.key);
         }
     }
 
-    /** Null, bis das Modell den Chat benannt hat; das passiert nach der ersten Nachricht. */
+    /** Null until the model has named the chat; that happens after the first message. */
     const titleOf = (chat: AiChat) => chat.name ?? $_('ai.chat.chats.untitled');
 
     export function focusList() {
         listElement?.focus();
-        // Die Auswahl ist der natürliche Startpunkt für die Tastatur.
+        // The current selection is the natural starting point for the keyboard.
         const selected = rows.findIndex(
             (row) => row.kind === "chat" && row.chat.id === viewModel.currentChatId
         );
@@ -267,10 +266,10 @@
                 {viewModel.isLoadingChats ? $_('ai.chat.chats.loading') : $_('ai.chat.chats.empty')}
             </p>
         {:else}
-            <!-- Trägt die volle Höhe aller Zeilen, damit die Scrollbar stimmt, obwohl nur das
-                 Fenster gerendert ist. -->
-            <!-- role=presentation auf den Wrappern: eine Listbox muss ihre Optionen besitzen,
-                 dazwischenliegende generische Divs würden diese Beziehung aufbrechen. -->
+            <!-- Carries the full height of all rows, so the scrollbar is right even though only
+                 the window is rendered. -->
+            <!-- role=presentation on the wrappers: a listbox has to own its options, and generic
+                 divs in between would break that relationship. -->
             <div role="presentation" class="relative" style="height: {totalHeight}px">
                 {#each renderedRows as row (row.domId)}
                     <div
@@ -285,9 +284,10 @@
                         {:else}
                             {@const chat = row.chat}
                             {@const isSelected = chat.id === viewModel.currentChatId}
-                            <!-- Kein tabindex und kein eigener Key-Handler: beim
-                                 aria-activedescendant-Muster bleibt der Fokus auf der Listbox, die
-                                 auch die Tastatur auswertet. Genau das meldet der Linter hier an. -->
+                            <!-- No tabindex and no key handler of its own: with the
+                                 aria-activedescendant pattern the focus stays on the listbox,
+                                 which also handles the keyboard. That is what the linter flags
+                                 here. -->
                             <!-- svelte-ignore a11y_interactive_supports_focus -->
                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                             <div
@@ -295,6 +295,7 @@
                                     role="option"
                                     aria-selected={isSelected}
                                     onclick={() => onSelect(chat.id)}
+                                    onmouseenter={() => viewModel.onChatHovered(chat.id)}
                                     class="mx-1.5 flex h-full cursor-default flex-col justify-center gap-0.5
                                            rounded-2xl px-3 text-sm font-medium
                                            {row.domId === activeRow?.domId ? 'bg-foreground/10' : ''}
@@ -315,8 +316,8 @@
         {/if}
     </div>
 
-    <!-- Overlay statt eigener Leiste: beim Nachladen soll die Höhe des Popovers gleich bleiben.
-         Der Verlauf blendet die Zeilen darunter weg, damit der Spinner lesbar bleibt. -->
+    <!-- An overlay rather than a bar of its own: the popover's height must not change while a
+         page loads. The gradient fades out the rows underneath, so the spinner stays legible. -->
     {#if viewModel.isLoadingChats && rows.length > 0}
         <div class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center
                     bg-gradient-to-t from-popover to-transparent pt-6 pb-2">

@@ -39,10 +39,9 @@
     let activeTrigger: ActiveTrigger | null = $state(null);
     let triggerWindow: PromptTriggerWindowExports | undefined = $state();
 
-    // Eine Trigger-Session startet nur in dem Moment, in dem das Trigger-Zeichen
-    // getippt wird — nicht, wenn der Cursor hinter einem alten Zeichen landet. Sie
-    // endet bei Escape, Auswahl, oder sobald der Cursor den Query-Bereich verlässt.
-    // Dadurch dürfen Leerzeichen in der Query vorkommen.
+    // A trigger session only starts in the moment the trigger character is typed, not when the
+    // cursor happens to land behind an old one. It ends on Escape, on a selection, or as soon as
+    // the cursor leaves the query range. That is what lets the query contain spaces.
     let session: {definition: PromptTriggerDefinition; node: Text; index: number} | null = null;
 
     // Mounted segment component + model segment per host element.
@@ -171,13 +170,13 @@
         selection?.addRange(range);
     }
 
-    // Setzt den Cursor ans Ende des Prompts. Für Klicks auf Flächen, die zwar den Text-Cursor
-    // zeigen, aber selbst nicht editierbar sind — etwa die Leiste unter dem Editor.
+    // Puts the cursor at the end of the prompt. For clicks on areas that show the text cursor
+    // but are not editable themselves, such as the bar below the editor.
     export function focusEnd() {
         editor.focus();
 
-        // Über eine Range statt setCaret: die deckt auch den Fall ab, dass am Ende ein
-        // Chip statt eines Textknotens steht.
+        // Via a range rather than setCaret: that also covers the case where a chip, not a text
+        // node, sits at the end.
         const range = document.createRange();
         range.selectNodeContents(editor);
         range.collapse(false);
@@ -197,9 +196,8 @@
         caretBeside(host, event.clientX >= rect.left + rect.width / 2);
     }
 
-    // Ein Zeichen zählt nur dann als Trigger, wenn es am Anfang eines Textabschnitts steht
-    // oder direkt hinter einem Whitespace — sonst öffnete jedes "foo:bar", "12:30" oder
-    // "a@b.tld" ein Fenster.
+    // A character only counts as a trigger at the start of a text run or directly after
+    // whitespace -- otherwise every "foo:bar", "12:30" or "a@b.tld" would open a window.
     function isTriggerPosition(node: Text, index: number, char: string): boolean {
         const content = node.textContent ?? "";
         if (content[index] !== char) return false;
@@ -208,7 +206,7 @@
         return before === "" || /\s$/.test(before);
     }
 
-    // Startet eine Session, wenn der eben eingefügte Text genau ein Trigger-Zeichen ist.
+    // Starts a session when the text just inserted is exactly one trigger character.
     function maybeStartSession(event: InputEvent) {
         if (event.inputType !== "insertText") return;
         const definition = triggers.find((trigger) => event.data === trigger.char);
@@ -225,9 +223,9 @@
         session = {definition, node, index};
     }
 
-    // Validiert die laufende Session gegen die aktuelle Cursor-Position: der Cursor muss im
-    // selben Textknoten hinter dem Trigger-Zeichen stehen, und das Zeichen muss dort noch an
-    // einer Trigger-Position sitzen — schreibt jemand davor, endet die Session.
+    // Validates the running session against the current cursor position: the cursor has to sit
+    // in the same text node behind the trigger character, and that character has to still be in
+    // a trigger position -- typing in front of it ends the session.
     function updateTrigger() {
         if (!session) {
             activeTrigger = null;
@@ -262,8 +260,8 @@
             index: session.index,
             caretOffset,
             left: Math.max(0, rect.left - wrapperRect.left),
-            // Über dem gesamten Eingabefeld statt über der Cursor-Zeile,
-            // damit das Fenster den Prompt nie überdeckt.
+            // Above the whole input rather than above the cursor's line, so the window never
+            // covers the prompt.
             bottom: wrapperRect.height + 4,
         };
     }
@@ -273,10 +271,10 @@
         activeTrigger = null;
     }
 
-    // Ersetzt den Trigger-Text (Zeichen + Query) durch ein Segment. Direkt hinter dem
-    // Segment steht danach garantiert ein Textknoten (bestehend oder neu), in dem der
-    // Cursor landet — er erscheint also nie im Label und auch zwischen zwei direkt
-    // aufeinanderfolgenden Nicht-Text-Segmenten bleibt eine Einfügestelle.
+    // Replaces the trigger text (character + query) with a segment. A text node -- existing or
+    // new -- is guaranteed to follow the segment, and that is where the cursor lands: it never
+    // shows up inside the label, and two adjacent non-text segments keep an insertion point
+    // between them.
     function replaceTrigger(segment: PromptSegment) {
         const trigger = activeTrigger;
         if (!trigger) return;
@@ -293,11 +291,10 @@
         const host = createSegmentHost(segment);
         trigger.node.after(host);
 
-        // Hinter dem Chip steht immer ein Leerzeichen: es trennt ihn vom nächsten Wort, macht
-        // das folgende Zeichen zu einer gültigen Trigger-Position und gibt dem Cursor eine
-        // echte Position hinter dem Chip — in einem leeren Textknoten zeichnet Chrome ihn
-        // sonst optisch noch im Chip davor. Stand hinter dem Cursor schon ein Whitespace,
-        // bleibt es bei dem einen.
+        // There is always a space behind the chip: it separates it from the next word, makes the
+        // following character a valid trigger position, and gives the cursor a real position
+        // behind the chip -- in an empty text node Chrome would otherwise still paint it inside
+        // the chip in front. If whitespace already followed the cursor, it stays at that one.
         const after = document.createTextNode(/^\s/.test(remainder) ? remainder : ` ${remainder}`);
         host.after(after);
 
@@ -322,8 +319,8 @@
         }
 
         if (event.key === "Enter") {
-            // Shift+Enter: Browser fügt <br> ein (insertLineBreak), syncFromDom liest das als \n.
-            // Enter ohne Shift bleibt blockiert (kein <div>-Wrapping; Submit kommt später).
+            // Shift+Enter: the browser inserts a <br> (insertLineBreak), which syncFromDom reads
+            // as \n. Plain Enter stays blocked, so the browser cannot wrap lines in <div>s.
             if (!event.shiftKey) {
                 event.preventDefault();
                 if (!viewModel.isEmpty) onPromptSubmit();
@@ -342,7 +339,7 @@
 
     onMount(() => {
         renderPrompt();
-        // Deckt Caret-Bewegungen per Tastatur und Maus ab.
+        // Covers caret moves by keyboard and by mouse.
         document.addEventListener("selectionchange", updateTrigger);
         return () => document.removeEventListener("selectionchange", updateTrigger);
     });

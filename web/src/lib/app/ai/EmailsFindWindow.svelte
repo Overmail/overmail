@@ -21,9 +21,9 @@
     let emails: EmailSearchResult[] = $state([]);
     let highlightedIndex = $state(0);
 
-    // Das Highlight muss sichtbar bleiben, sobald es sich aendert -- auch wenn die Liste
-    // laenger ist als das Fenster. Gescrollt wird ausschliesslich der Listen-Container per
-    // scrollTop; scrollIntoView wuerde stattdessen das Fenster/Popover verschieben.
+    // The highlight has to stay visible as it moves, even when the list is taller than the
+    // window. Only the list container is scrolled, via scrollTop; scrollIntoView would move
+    // the window or the popover instead.
     let listElement: HTMLElement | undefined = $state();
     let itemElements: (HTMLElement | undefined)[] = $state([]);
 
@@ -35,29 +35,29 @@
     type EmailBody = {text: string | null; html: string | null};
 
     const bodyRepository = new EmailBodyRepository();
-    // Beim Navigieren mit ↑/↓ nicht jedes Mal neu laden.
+    // So that navigating with up/down does not refetch every time.
     const bodyCache = new Map<string, EmailBody>();
 
-    /** Breite, auf der HTML-Mails typischerweise designt sind; darauf wird gerendert. */
+    /** The width html mails are typically designed for; that is what they are rendered at. */
     const PREVIEW_DESIGN_WIDTH = 640;
-    /** Innenabstand (p-2) der Vorschau-Ebene, geht von der nutzbaren Breite ab. */
+    /** Padding of the preview layer; comes off the usable width. */
     const PREVIEW_PADDING = 0;
-    /** Obergrenze gleichzeitig gemounteter Vorschau-Iframes. */
+    /** Upper bound on preview iframes mounted at the same time. */
     const MAX_MOUNTED_PREVIEWS = 20;
-    /** Vergrößerungsfaktor der Hover-Lupe, relativ zur angezeigten Vorschau. */
+    /** Magnification of the hover lens, relative to the preview as displayed. */
     const LENS_MAGNIFICATION = 2;
     const LENS_RADIUS = 120;
 
     let previewWidth = $state(0);
-    // `zoom` skaliert anders als `transform` auch das Layout mit — kein Spacer/Messen nötig.
-    // Dynamisch, damit die Mail die volle Panelbreite ausfüllt.
+    // Unlike `transform`, `zoom` scales the layout along with it -- no spacer and no measuring
+    // needed. Dynamic, so the mail fills the full panel width.
     let previewZoom = $derived(
         previewWidth > 0 ? (previewWidth - 2 * PREVIEW_PADDING) / PREVIEW_DESIGN_WIDTH : 0.45
     );
 
     /**
-     * Cursorposition der Lupe, null wenn keine aktiv. `panel*` platziert den Kreis im Panel,
-     * `content*` zeigt auf denselben Punkt im (ggf. gescrollten) Inhalt.
+     * Cursor position of the lens, null when none is active. `panel*` places the circle in the
+     * panel, `content*` points at the same spot in the (possibly scrolled) content.
      */
     let lens: {panelX: number; panelY: number; contentX: number; contentY: number} | null = $state(null);
 
@@ -74,9 +74,9 @@
         };
     }
 
-    // Einmal geladene Vorschauen bleiben (unsichtbar) gemountet: der Wechsel ist dann nur
-    // ein visibility-Toggle. Würde das iframe pro Wechsel neu gerendert, parst es sein
-    // srcdoc neu und lädt alle Bilder nach — das war die spürbare Verzögerung trotz Cache.
+    // Previews stay mounted (invisibly) once loaded, so switching is only a visibility toggle.
+    // Re-rendering the iframe on every switch would make it parse its srcdoc again and refetch
+    // all images -- that was the noticeable delay despite the cache.
     let mountedPreviews: {id: string; body: EmailBody}[] = $state([]);
 
     let currentEmailId = $derived(emails[highlightedIndex]?.id ?? null);
@@ -120,14 +120,13 @@
     $effect(() => {
         const current = query;
         viewModel.findEmails(current).then((result) => {
-            if (current !== query) return; // veraltete Antwort
+            if (current !== query) return; // stale response
             emails = result;
             highlightedIndex = 0;
         });
     });
 
-    // Zerlegt einen Text anhand seiner Match-Ranges (end exklusiv) in normale und
-    // hervorgehobene Abschnitte.
+    // Splits a text into plain and highlighted parts along its match ranges (end exclusive).
     function matchParts(matchable: MatchableText): {text: string; matched: boolean}[] {
         const parts: {text: string; matched: boolean}[] = [];
         let position = 0;
@@ -145,7 +144,7 @@
         onReplace({type: "email", email: {id: email.id, subject: email.subject.text, avatarUrl: email.avatarUrl}});
     }
 
-    // Vom PromptInput weitergereichte Tastatur-Events; true = Event verbraucht.
+    // Keyboard events handed down by PromptInput; true means the event was consumed.
     export function handleKey(event: KeyboardEvent): boolean {
         if (event.key === "ArrowDown" && emails.length > 0) {
             highlightedIndex = (highlightedIndex + 1) % emails.length;
@@ -165,9 +164,9 @@
 
 <TriggerWindow {left} {bottom} class="w-max min-w-80 max-w-[min(28rem,calc(100vw-2rem))] max-h-152 p-1">
     {#if currentEmailId !== null}
-        <!-- Vorschau des präferierten Inhalts (HTML vor Text) der markierten Mail. Alle schon
-             geladenen Vorschauen bleiben als unsichtbare Ebenen gemountet (invisible statt
-             hidden, damit Layout und ResizeObserver im iframe weiterlaufen). -->
+        <!-- Preview of the highlighted mail's preferred content (html over text). Every preview
+             already loaded stays mounted as an invisible layer (invisible rather than hidden, so
+             layout and the ResizeObserver inside the iframe keep working). -->
         <div class="relative mb-1 h-80 overflow-hidden rounded-sm border bg-background" bind:clientWidth={previewWidth}>
             {#if previewLoading}
                 <div class="flex h-full items-center justify-center">
@@ -186,12 +185,12 @@
                         onmouseleave={() => lens = null}
                         role="presentation"
                 >
-                    <!-- pointer-events-none: die Vorschau ist wirklich nur eine Vorschau. Ohne
-                         das schluckt das iframe die mousemove-Events und die Lupe bleibt stehen. -->
+                    <!-- pointer-events-none: the preview really is only a preview. Without it the
+                         iframe swallows the mousemove events and the lens freezes. -->
                     <div class="pointer-events-none">
                         {#if entry.body.html}
-                            <!-- Feste Designbreite, dynamischer Zoom auf die Panelbreite —
-                                 volle Breite, nie horizontal scrollen. -->
+                            <!-- Fixed design width, zoom scaled to the panel width: full width,
+                                 never a horizontal scrollbar. -->
                             <div style:zoom={previewZoom} style:width="{PREVIEW_DESIGN_WIDTH}px">
                                 <EmailHtmlBody html={entry.body.html}/>
                             </div>
@@ -206,10 +205,10 @@
                 </div>
             {/each}
 
-            <!-- Die Lupen liegen ausserhalb der Scroll-Ebenen: innerhalb wuerden sie am Rand
-                 den Scrollbereich vergroessern. Positioniert wird in Panel-Koordinaten, der
-                 Inhalt wird um die Scrollposition der Ebene verschoben. Pro Vorschau eine
-                 gemountete Kopie, damit beim Hovern nichts nachlaedt. -->
+            <!-- The lenses sit outside the scroll layers: inside, they would grow the scroll
+                 area at the edges. They are positioned in panel coordinates and their content is
+                 offset by the layer's scroll position. One mounted copy per preview, so hovering
+                 never triggers a load. -->
             {#each mountedPreviews as entry (entry.id)}
                 <div
                         class={cn(
@@ -257,7 +256,7 @@
                         index === highlightedIndex && "bg-accent text-accent-foreground",
                     )}
                     onmousedown={(event) => {
-                        // preventDefault: der Fokus muss im Prompt-Editor bleiben.
+                        // preventDefault: the focus has to stay in the prompt editor.
                         event.preventDefault();
                         highlightedIndex = index;
                     }}

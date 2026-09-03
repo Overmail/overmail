@@ -284,8 +284,7 @@ class ChatAgent(
 
         const val NAME_PROMPT =
             "Name the chat below after what the user wants, in their language. Answer with the " +
-                "name alone: at most five words, no quotes, no punctuation at the end, no " +
-                "explanation."
+                "name alone: keep it compact. But give it a descriptive name, the user might have many chats and needs to tell them apart. Do not use the user's name or email address in the title unless it is part of the subject or the user's request. Do not use quotes around the title."
 
         /** The column holds 255 characters, and a title that long is not a title. */
         const val MAX_CHAT_NAME_LENGTH = 60

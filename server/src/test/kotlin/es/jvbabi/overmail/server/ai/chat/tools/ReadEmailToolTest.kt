@@ -89,6 +89,33 @@ class ReadEmailToolTest {
     }
 
     @Test
+    fun `reports the mail it read as markup`() = runTest {
+        val fixture = setUp()
+        val markup = mutableListOf<String>()
+        val tool = ReadEmailTool(userId = fixture.ownerId, database = database, onEmailRead = markup::add)
+
+        tool.execute(ReadEmailTool.Args(emailId = fixture.emailId.toString()))
+        // Nothing to show for a mail that was not read.
+        tool.execute(ReadEmailTool.Args(emailId = Uuid.random().toString()))
+
+        assertEquals(
+            listOf("""<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" subject="Invoice 42"></toolcall-read-email>"""),
+            markup,
+        )
+    }
+
+    @Test
+    fun `escapes the subject it puts into the markup`() {
+        val id = Uuid.random()
+        val markup = ReadEmailTool.markup(id, subject = """Re: "5 < 6" & more""", avatarUrl = null)
+
+        assertEquals(
+            """<toolcall-read-email emailId="$id" avatarUrl="" subject="Re: &quot;5 &lt; 6&quot; &amp; more"></toolcall-read-email>""",
+            markup,
+        )
+    }
+
+    @Test
     fun `does not read a mail of another user`() = runTest {
         val fixture = setUp()
         val tool = ReadEmailTool(userId = fixture.strangerId, database = database)

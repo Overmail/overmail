@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.avatar.avatarUrl
 import es.jvbabi.overmail.server.util.HtmlToText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,6 +34,11 @@ private const val MAX_BODY_CHARS = 8_000
 class ReadEmailTool(
     private val userId: User.Id,
     private val database: OvermailDatabase,
+    /**
+     * Called with the markup for a mail that was read, so the answer can show which one the agent
+     * looked at. Not called when there was nothing to read.
+     */
+    private val onEmailRead: (String) -> Unit = {},
 ) : Tool<ReadEmailTool.Args, ReadEmailTool.Result>(
     argsType = typeToken<Args>(),
     resultType = typeToken<Result>(),
@@ -99,6 +105,7 @@ class ReadEmailTool(
                     Emails.htmlContent,
                     Emails.isRead,
                     EmailUsers.address,
+                    EmailUsers.avatar,
                 )
                 // The ownership check is part of the lookup, not a test on the result: there is no
                 // moment where a foreign mail has been read.
@@ -123,6 +130,14 @@ class ReadEmailTool(
             val body = row[Emails.textContent]
                 ?: row[Emails.htmlContent]?.let { html -> HtmlToText.convert(html) }
 
+            onEmailRead(
+                markup(
+                    emailId = emailId,
+                    subject = row[Emails.subject],
+                    avatarUrl = row[EmailUsers.avatar]?.value?.let(::avatarUrl),
+                )
+            )
+
             Result.Email(
                 id = emailId.toString(),
                 subject = row[Emails.subject],
@@ -139,5 +154,19 @@ class ReadEmailTool(
 
     companion object {
         const val NAME = "read_email"
+
+        /**
+         * The element the chat renders for a mail the agent read. Written into the answer itself,
+         * so it survives a reload like the rest of the message.
+         */
+        fun markup(emailId: Uuid, subject: String, avatarUrl: String?): String =
+            """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" subject="${escapeAttribute(subject)}"></toolcall-read-email>"""
+
+        /** A subject is arbitrary text and ends up inside an attribute, quotes and all. */
+        private fun escapeAttribute(value: String): String = value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
     }
 }

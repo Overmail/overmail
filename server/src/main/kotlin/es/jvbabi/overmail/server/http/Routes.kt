@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
+import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
@@ -80,6 +81,12 @@ internal fun Application.configureRouting() {
 
                 route("/search") {
                     labelSearch()
+                }
+            }
+
+            route("/users") {
+                route("/me") {
+                    getCurrentUser()
                 }
             }
 

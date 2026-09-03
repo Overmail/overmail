@@ -28,11 +28,10 @@
 <li class="flex flex-col gap-0.5" class:items-end={isUser}>
     <!-- 80% keeps the two sides apart even when a message is one long line. -->
     <div
-            class="max-w-[80%] rounded-lg px-3 py-2 text-sm break-words"
+            class="max-w-[80%] rounded-lg py-2 text-sm wrap-break-word"
             class:whitespace-pre-wrap={isUser}
-            class:bg-primary={isUser}
-            class:text-primary-foreground={isUser}
-            class:bg-muted={!isUser}
+            class:px-3={isUser}
+            class:bg-muted={isUser}
     >
         {#if message.type === "user"}
             <ChatUserContent segments={message.content}/>
@@ -44,10 +43,13 @@
         {/if}
     </div>
 
-    <div class="flex items-center gap-1 text-muted-foreground text-xs">
-        <RelativeTime date={message.created_at}/>
+    <div class="flex flex-col items-start gap-1 text-muted-foreground text-xs">
         {#if hasActions}
-            <ChatMessageActions disabled={isBusy} onRetry={() => onRetry(message.id)}/>
+            <div class="mb-2">
+                <ChatMessageActions disabled={isBusy} onRetry={() => onRetry(message.id)}/>
+            </div>
         {/if}
+
+        <RelativeTime date={message.created_at}/>
     </div>
 </li>

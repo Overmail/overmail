@@ -1,19 +1,24 @@
-<!-- An answer: its text, and a chip for every mail the agent read while writing it. -->
+<!-- An answer: markdown, plus a chip for every mail the agent read while writing it. -->
 <script lang="ts">
-    import EmailSegment from "$lib/app/ai/EmailSegment.svelte";
-    import {parseAgentMessage} from "$lib/app/ai/agentMessage";
+    import SvelteMarkdown from "@humanspeak/svelte-markdown";
+    import ToolCallReadEmail from "$lib/app/ai/ToolCallReadEmail.svelte";
 
-    let {content}: {content: string} = $props();
+    let {
+        content,
+        streaming = false,
+    }: {
+        content: string;
+        /** The answer is still being written, so the parser reuses what it already has. */
+        streaming?: boolean;
+    } = $props();
 
-    const parts = $derived(parseAgentMessage(content));
+    // Only the tool call elements are ours; everything else keeps the library's renderers, which
+    // sanitize urls and leave unknown html alone.
+    const renderers = {html: {"toolcall-read-email": ToolCallReadEmail}};
 </script>
 
-<div class="flex flex-col gap-2">
-    {#each parts as part, index (index)}
-        {#if part.type === "text"}
-            <span class="whitespace-pre-wrap break-words">{part.content}</span>
-        {:else}
-            <span><EmailSegment email={part.email}/></span>
-        {/if}
-    {/each}
+<!-- The markdown blocks bring no margins of their own here, so the spacing is set once. -->
+<div class="flex flex-col gap-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5
+            [&_a]:underline [&_code]:font-mono [&_pre]:overflow-x-auto">
+    <SvelteMarkdown source={content} {streaming} {renderers}/>
 </div>

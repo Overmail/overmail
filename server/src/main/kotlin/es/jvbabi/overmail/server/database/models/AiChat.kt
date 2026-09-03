@@ -17,6 +17,7 @@ class AiChat(id: EntityID<Id>) : UuidEntity(id) {
     var name by AiChats.name
     var nameSetByUser by AiChats.nameSetByUser
     var createdAt by AiChats.createdAt
+    val messages by AiChatMessage referrersOn AiChatMessages.chatId
 }
 
 object AiChats : UuidTable("ai_chats") {

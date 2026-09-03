@@ -21,11 +21,12 @@ repositories {
 
 dependencies {
 
-    implementation("org.jetbrains.exposed:exposed-core:1.4.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:1.4.0")
+    implementation("org.jetbrains.exposed:exposed-core:1.5.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:1.5.0")
     // The DAO entities. JDBC only -- this is what the driver below is here for.
-    implementation("org.jetbrains.exposed:exposed-dao:1.4.0")
-    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:1.4.0")
+    implementation("org.jetbrains.exposed:exposed-dao:1.5.0")
+    implementation("org.jetbrains.exposed:exposed-json:1.5.0")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
     implementation("org.postgresql:postgresql:42.7.13")
 

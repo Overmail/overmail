@@ -1,7 +1,11 @@
 <script lang="ts">
     import {_} from "svelte-i18n";
 
-    let {html}: { html: string } = $props();
+    let {html, onReady}: {
+        html: string;
+        /** Fires once the mail has been measured, i.e. as soon as the iframe has a height. */
+        onReady?: () => void;
+    } = $props();
 
     let iframe = $state<HTMLIFrameElement | null>(null);
     /** Content height in px; the iframe is sized to it so it never scrolls itself. */
@@ -54,6 +58,7 @@
         if (!el) return;
 
         let observer: ResizeObserver | null = null;
+        let reported = false;
 
         function attach() {
             const doc = el!.contentDocument;
@@ -69,6 +74,13 @@
             observer.observe(doc.body);
             // Images have no layout size until they arrive, and RO does not fire for that.
             for (const img of doc.images) img.addEventListener("load", () => measure(doc));
+
+            // After the first measurement, not before: this is what the card waits for, and
+            // waiting for it is only worth anything once there is a height to show.
+            if (!reported) {
+                reported = true;
+                onReady?.();
+            }
         }
 
         el.addEventListener("load", attach);

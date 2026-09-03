@@ -22,6 +22,81 @@
     /** How many handled mails stay mounted behind the current one, so their exit can play out. */
     const KEEP_DONE = 2;
 
+    /** Long enough for the last sheet to have landed, including its stagger. */
+    const INTRO_DURATION = 1200;
+
+    /**
+     * The mails whose card is laid out and may be shown. A card is held back until then: the body
+     * is an iframe and an iframe has no height before it has measured itself, so a mail that goes
+     * up right away is a header that then grows a body under the reader -- and the stack would
+     * fan out a batch of cards that are still empty.
+     */
+    let readyIds = $state(new Set<string>());
+
+    function onCardReady(id: string) {
+        if (readyIds.has(id)) return;
+
+        readyIds = new Set(readyIds).add(id);
+    }
+
+    /**
+     * The mails of the very first batch, which are the ones that get laid down. The set empties
+     * again once the animation is over, so a card that only scrolls into the rendered window
+     * later -- a mail from the first batch that was too deep to be mounted, or a mail from a
+     * later batch -- appears in the pile instead of being dealt onto it a second time.
+     */
+    let introIds = $state(new Set<string>());
+    /** Whether the fan has been let go, which is what starts the animation. */
+    let laidDown = $state(false);
+    let introStarted = false;
+
+    $effect(() => {
+        if (introStarted || emails.length === 0) return;
+        introStarted = true;
+
+        introIds = new Set(emails.slice(0, MAX_DEPTH + 1).map((email) => email.id));
+    });
+
+    // The whole batch goes down together, so it waits for the slowest body of the batch. Nothing
+    // guards against that never happening, because the card reports itself ready on a timeout
+    // rather than leaving the stack hanging on a mail that will not lay out.
+    $effect(() => {
+        if (laidDown || introIds.size === 0) return;
+
+        for (const id of introIds) {
+            if (!readyIds.has(id)) return;
+        }
+
+        laidDown = true;
+    });
+
+    $effect(() => {
+        if (!laidDown || introIds.size === 0) return;
+
+        const timer = setTimeout(() => (introIds = new Set()), INTRO_DURATION);
+        return () => clearTimeout(timer);
+    });
+
+    /**
+     * Where a card of the first batch comes in from: the fan is pushed in from below the window,
+     * opened wider the further back the sheet sits, and closes as it comes up into the stack.
+     * Only the offset from the resting position is described here -- the animation ends at no
+     * transform at all, so wherever the stack has arranged the card is where it lands.
+     */
+    function laid(id: string, depth: number) {
+        return {
+            // Viewport units, and past the full height of one: the sheets are pushed in from
+            // outside the window, so they have to start outside it however tall it is.
+            y: 105 + depth * 10 + jitter(id, 6, 5),
+            // Every other sheet to the other side, so the fan opens around the middle instead of
+            // leaning off to one side, and wider towards the back.
+            rotate: (depth % 2 === 0 ? -1 : 1) * (7 + depth * 4) + jitter(id, 7, 2),
+            // Back to front: the bottom of the pile is put down first and the sheet you are meant
+            // to read lands last, on top of it.
+            delay: (MAX_DEPTH - depth) * 70,
+        };
+    }
+
     // Math.random() would hand SSR and the client different numbers and blow up hydration, so the
     // jitter is a hash of the mail id instead: random-looking, but the same on both sides and
     // stable while the stack is being worked through.
@@ -80,11 +155,18 @@
                 const depth = Math.max(position, 0);
 
                 const gone = position < 0 ? exit(email, -position) : null;
+                // Null until the fan is let go, so a card that is only waiting for the rest of
+                // the batch carries no animation at all.
+                const lay = introIds.has(id) && laidDown ? laid(id, depth) : null;
 
                 return {
                     id,
                     email,
                     active,
+                    lay,
+                    // A card of the first batch is part of the fan and appears with it, not
+                    // before: the batch is one movement, not five cards popping in.
+                    shown: readyIds.has(id) && (laidDown || !introIds.has(id)),
                     // The current card stays straight and centred; everything below it drifts.
                     transform: gone ?? (active
                         ? "translate(-50%, 0)"
@@ -114,40 +196,55 @@
          changes style, so the same DOM node survives and the transition can run. Splitting the
          cases into two branches would tear the node down and rebuild it, and the card would
          teleport. -->
-    {#each virtualizedStack as { id, email, active, transform, fade, opacity, blur, z } (id)}
-        <!-- The scroll box goes around the card, not inside it: the card keeps its natural height
-             and the box slides it, so a long mail moves as one object — background, header and
-             shadow together — instead of the body sliding under a header that stays put.
-
-             inset-y-0 is what makes that work at all: only a box with a height of its own can
-             overflow. w-fit keeps it hugging the card, px-8 is there because a scroll box clips
-             and the drop shadow would go with it, and pb-32 matches the shortcut bar: the box
-             reaches the bottom of the page so the card disappears under the bar, and that padding
-             is extra scroll range at the end, which brings the last lines back out from under it.
-
-             The cards that are not current keep the same overflow rather than switching to
-             hidden: pointer-events-none already stops them from eating the wheel, and a card
-             leaving the stack would otherwise snap back to its top mid-flight. -->
+    {#each virtualizedStack as { id, email, active, transform, fade, opacity, blur, z, lay, shown } (id)}
+        <!-- Two boxes rather than one, because a card can be in two movements at once and they
+             do not compose in a single transform: the outer one is only ever the sheet being laid
+             down when the stack first arrives, the inner one holds the place in the pile and
+             slides between places from then on. inset-y-0 sits out here, since the height is what
+             the card is positioned against. -->
         <div
-                class={cn(
-                    "card-scroll absolute inset-y-0 left-1/2 w-fit overflow-y-auto overscroll-contain px-8 pt-2 pb-32",
-                    "transition-[transform,opacity,filter] duration-500 ease-out motion-reduce:transition-none",
-                    !active && "pointer-events-none",
-                )}
-                style="z-index: {z}; transform: {transform}; opacity: {opacity};{blur ? ` filter: blur(${blur}px);` : ''}"
-                aria-hidden={!active}
+                class={cn("absolute inset-y-0 left-1/2 w-fit", lay && "lay-down")}
+                style="z-index: {z};{lay ? ` --lay-y: ${lay.y}vh; --lay-rotate: ${lay.rotate}deg; animation-delay: ${lay.delay}ms;` : ''}"
         >
-            <!-- Hugs the card, so the tint below lines up with it instead of with the full-height
-                 scroll box. -->
-            <div class="relative w-fit">
-                <EmailCard
-                        {...email}
-                        onRequestReclassify={() => onRequestReclassify(email)}
-                />
-                <div
-                        class="pointer-events-none absolute inset-0 rounded-2xl bg-background transition-opacity duration-500 motion-reduce:transition-none"
-                        style="opacity: {fade}"
-                ></div>
+            <!-- The scroll box goes around the card, not inside it: the card keeps its natural
+                 height and the box slides it, so a long mail moves as one object — background,
+                 header and shadow together — instead of the body sliding under a header that
+                 stays put.
+
+                 h-full is what makes that work at all: only a box with a height of its own can
+                 overflow. w-fit keeps it hugging the card, px-8 is there because a scroll box
+                 clips and the drop shadow would go with it, and pb-32 matches the shortcut bar:
+                 the box reaches the bottom of the page so the card disappears under the bar, and
+                 that padding is extra scroll range at the end, which brings the last lines back
+                 out from under it.
+
+                 The cards that are not current keep the same overflow rather than switching to
+                 hidden: pointer-events-none already stops them from eating the wheel, and a card
+                 leaving the stack would otherwise snap back to its top mid-flight. -->
+            <div
+                    class={cn(
+                        "card-scroll h-full w-fit overflow-y-auto overscroll-contain px-8 pt-2 pb-32",
+                        "transition-[transform,opacity,filter] duration-500 ease-out motion-reduce:transition-none",
+                        !active && "pointer-events-none",
+                    )}
+                    style="transform: {transform}; opacity: {opacity};{blur ? ` filter: blur(${blur}px);` : ''}"
+                    aria-hidden={!active}
+            >
+                <!-- Hugs the card, so the tint below lines up with it instead of with the
+                     full-height scroll box. Hiding the card happens here rather than on the card
+                     itself, so the tint that belongs to it goes with it -- it is opaque enough to
+                     show as a rectangle over nothing. -->
+                <div class={cn("relative w-fit", !shown && "invisible")}>
+                    <EmailCard
+                            {...email}
+                            onRequestReclassify={() => onRequestReclassify(email)}
+                            onReady={() => onCardReady(id)}
+                    />
+                    <div
+                            class="pointer-events-none absolute inset-0 rounded-2xl bg-background transition-opacity duration-500 motion-reduce:transition-none"
+                            style="opacity: {fade}"
+                    ></div>
+                </div>
             </div>
         </div>
     {/each}
@@ -162,5 +259,36 @@
 
     .card-scroll::-webkit-scrollbar {
         display: none;
+    }
+
+    /* The first mails do not fade in, they are pushed in: the batch comes up from below the
+       window as an open fan and every sheet swings shut onto the pile. The origin is what makes
+       it a fan rather than five cards drifting in -- they all turn around the same point, the
+       bottom middle, so the angles read as one hand opening. It only applies while the animation
+       runs, since the animation ends at no transform at all.
+
+       Nothing here touches the opacity: the sheets start outside the window, so being pushed in
+       is the whole appearance, and `both` holds a sheet whose turn has not come yet out there
+       rather than letting it sit finished in the stack until its delay is up. The deceleration
+       curve is the push: fast off the bottom edge, a hair past the resting spot, settled. */
+    .lay-down {
+        transform-origin: bottom center;
+        animation: lay-down 750ms cubic-bezier(0.2, 1.04, 0.32, 1) both;
+    }
+
+    @keyframes lay-down {
+        from {
+            transform: translateY(var(--lay-y)) rotate(var(--lay-rotate));
+        }
+
+        to {
+            transform: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .lay-down {
+            animation: none;
+        }
     }
 </style>

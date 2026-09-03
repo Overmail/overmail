@@ -9,6 +9,7 @@
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
     import {getStackFocus} from "$lib/app/my-stack/stackFocus";
     import {_} from "svelte-i18n";
+    import {onMount} from "svelte";
 
     let {
         sent_at,
@@ -21,12 +22,43 @@
         labels,
         class: className,
         onRequestReclassify,
+        onReady,
     }: StackEmail & {
         class?: string;
         onRequestReclassify: () => Promise<boolean>;
+        /** Fires once the card is laid out and worth showing; see below. */
+        onReady?: () => void;
     } = $props();
 
     const stackFocus = getStackFocus();
+
+    /**
+     * How long a body gets to lay itself out before the card is shown anyway. Whoever is waiting
+     * on this is waiting to show the card, so a mail whose iframe never reports back has to end
+     * up on the pile regardless -- late and complete beats never.
+     */
+    const READY_TIMEOUT = 2000;
+
+    let reported = false;
+
+    function reportReady() {
+        if (reported) return;
+
+        reported = true;
+        onReady?.();
+    }
+
+    // An HTML body is only worth showing once the iframe has measured itself, and that is the one
+    // thing here that takes a moment; everything else is laid out as soon as it is mounted.
+    onMount(() => {
+        if (!body.html) {
+            reportReady();
+            return;
+        }
+
+        const timer = setTimeout(reportReady, READY_TIMEOUT);
+        return () => clearTimeout(timer);
+    });
 
     const fields = $derived([
         {key: "myStack.email.to", participants: to},
@@ -154,7 +186,7 @@
 
     <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
         {#if body.html}
-            <EmailHtmlBody html={body.html}/>
+            <EmailHtmlBody html={body.html} onReady={reportReady}/>
         {:else if body.text}
             {body.text}
         {:else}

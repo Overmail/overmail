@@ -19,6 +19,7 @@ import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
@@ -299,7 +300,10 @@ class ChatAgent(
                 "`[label:<id>]` and `[sender:<id>]`. Read an attached email with the " +
                 "`${ReadEmailTool.NAME}` tool before answering questions about it, instead of " +
                 "guessing from the id. Every tool only ever sees this user's own data.\n" +
-                "Your tools are everything you can do, and reading one email is all you have. " +
+                "Use `${SearchEmailsTool.NAME}` to find emails; it answers with metadata only, so " +
+                "read the ones whose content you need. Say what you searched for when nothing " +
+                "was found, rather than claiming there is no such email.\n" +
+                "Your tools are everything you can do: search the mailbox and read one email. " +
                 "You cannot label, archive, move, delete or send mail, you cannot change the " +
                 "user's settings, and you cannot set up anything that acts on future emails. " +
                 "When the user asks for something you have no tool for, say in one sentence that " +
@@ -340,20 +344,19 @@ internal fun chatToolRegistry(
     userId: User.Id,
     database: OvermailDatabase,
     stream: AiChatMessageStream,
-): ToolRegistry = ToolRegistry.builder()
-    .tool(
-        ReadEmailTool(
-            userId = userId,
-            database = database,
-            // Its own block in the answer: the client renders the element, and markdown only
-            // treats it as one when it stands alone.
-            onEmailRead = { markup ->
-                if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
-                stream.append(markup)
-            },
-        )
-    )
-    .build()
+): ToolRegistry {
+    // Its own block in the answer: the client renders the element, and markdown only treats it as
+    // one when it stands alone.
+    fun writeBlock(markup: String) {
+        if (stream.snapshot().content.isNotBlank()) stream.append("\n\n")
+        stream.append(markup)
+    }
+
+    return ToolRegistry.builder()
+        .tool(ReadEmailTool(userId = userId, database = database, onEmailRead = ::writeBlock))
+        .tool(SearchEmailsTool(userId = userId, database = database, onSearch = ::writeBlock))
+        .build()
+}
 
 /** Node names, so a run can be traced back to the graph without matching on property names. */
 object ChatAgentGraph {

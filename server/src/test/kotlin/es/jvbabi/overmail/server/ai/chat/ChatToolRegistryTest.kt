@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.ai.chat
 
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -39,6 +40,22 @@ class ChatToolRegistryTest {
         assertEquals(
             "Ich schaue nach.\n\n"
                 + """<toolcall-read-email emailId="${fixture.emailId}" avatarUrl="" subject="Invoice 42"></toolcall-read-email>""",
+            stream.snapshot().content,
+        )
+    }
+
+    @Test
+    fun `a search the agent runs is written into the stream`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+
+        val registry = chatToolRegistry(userId = fixture.userId, database = database, stream = stream)
+        val tool = registry.tools.filterIsInstance<SearchEmailsTool>().single()
+
+        tool.execute(SearchEmailsTool.Args(subject = "Invoice"))
+
+        assertEquals(
+            """<toolcall-search-emails subject="Invoice" sender=""></toolcall-search-emails>""",
             stream.snapshot().content,
         )
     }

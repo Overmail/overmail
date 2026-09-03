@@ -161,12 +161,5 @@ class ReadEmailTool(
          */
         fun markup(emailId: Uuid, subject: String, avatarUrl: String?): String =
             """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" subject="${escapeAttribute(subject)}"></toolcall-read-email>"""
-
-        /** A subject is arbitrary text and ends up inside an attribute, quotes and all. */
-        private fun escapeAttribute(value: String): String = value
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
     }
 }

@@ -10,6 +10,7 @@ import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.structure.StructuredResponse
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
+import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvent
@@ -34,6 +35,7 @@ class EmailClassification(
     private val model: LLModel,
     private val overmailDatabase: OvermailDatabase,
     private val emailLabelNotifier: EmailLabelNotifier,
+    private val mailboxNotifier: MailboxNotifier,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -153,6 +155,8 @@ class EmailClassification(
                     this.createdByAgent = true
                 }
             }
+            // Out of the mailbox now, so whoever counts it has to count again.
+            mailboxNotifier.notifyMailboxChanged(user.id.value)
             return
         }
 

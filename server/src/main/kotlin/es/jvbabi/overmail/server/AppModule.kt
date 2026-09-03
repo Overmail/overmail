@@ -16,6 +16,7 @@ import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
+import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -71,6 +72,7 @@ private fun Application.configureDependencies() {
         provide<AiChatNotifier> { AiChatNotifier() }
         provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
         provide<AvatarNotifier> { AvatarNotifier() }
+        provide<MailboxNotifier> { MailboxNotifier() }
 
         // Creating the schema on first resolution keeps it in one place: every caller reaches
         // the database through this provider, so nothing can query it before this ran.
@@ -106,6 +108,7 @@ private fun Application.configureDependencies() {
                 model = resolve(),
                 overmailDatabase = resolve(),
                 emailLabelNotifier = resolve(),
+                mailboxNotifier = resolve(),
             )
         }
 
@@ -145,7 +148,8 @@ private fun Application.configureDependencies() {
             ImporterManager(
                 database = resolve(),
                 coroutineScope = this@configureDependencies,
-                emailClassificationQueue = resolve()
+                emailClassificationQueue = resolve(),
+                mailboxNotifier = resolve(),
             )
         }
     }

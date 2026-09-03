@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.data.notifier.AvatarEvent
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
 import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
+import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.http.avatar.avatarUrl
@@ -42,29 +43,6 @@ private val json = Json {
     encodeDefaults = true
 }
 
-/**
- * True for mails that belong in the stack. The archive table is an event log, so only the latest
- * event decides: a mail is hidden when it has an Archive/Spam event with no Unarchive event at or
- * after it. Filtering the joined rows instead would resurface re-archived mails, because their
- * old Unarchive row still matches.
- */
-private fun emailIsNotArchived(): Op<Boolean> {
-    val laterUnarchive = EmailArchives.alias("later_unarchive")
-    return notExists(
-        EmailArchives.selectAll().where {
-            (EmailArchives.email eq Emails.id) and
-                    (EmailArchives.action neq EmailArchiveAction.Unarchive) and
-                    notExists(
-                        laterUnarchive.selectAll().where {
-                            (laterUnarchive[EmailArchives.email] eq EmailArchives.email) and
-                                    (laterUnarchive[EmailArchives.action] eq EmailArchiveAction.Unarchive) and
-                                    (laterUnarchive[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
-                        }
-                    )
-        }
-    )
-}
-
 fun Route.stackSocket() {
     authenticate {
         webSocket {
@@ -73,6 +51,7 @@ fun Route.stackSocket() {
             val emailLabelNotifier = application.dependencies.resolve<EmailLabelNotifier>()
             val avatarQueue = application.dependencies.resolve<AvatarQueue>()
             val avatarNotifier = application.dependencies.resolve<AvatarNotifier>()
+            val mailboxNotifier = application.dependencies.resolve<MailboxNotifier>()
 
             val user = call.user
             var latestMail = Clock.System.now()
@@ -265,30 +244,36 @@ fun Route.stackSocket() {
                 when (val clientMessage = json.decodeFromString<StackClientMessage>(message.readText())) {
                     is StackClientMessage.RequestEmails -> sendNewBatch()
                     is StackClientMessage.ArchiveEmail -> {
-                        database.query {
-                            val email = Email.findById(clientMessage.emailId) ?: return@query
+                        // Reports whether a row was written, so nothing is announced for a
+                        // request that changed nothing.
+                        val archived = database.query {
+                            val email = Email.findById(clientMessage.emailId) ?: return@query false
                             // The id comes from the client; without this check any signed-in
                             // user could archive mails of other users.
-                            if (email.imapAccount.user.id != user.id) return@query
-                            if (email.archiveState == EmailArchiveAction.Archive) return@query
+                            if (email.imapAccount.user.id != user.id) return@query false
+                            if (email.archiveState == EmailArchiveAction.Archive) return@query false
                             EmailArchive.new {
                                 this.email = email
                                 this.action = EmailArchiveAction.Archive
                                 this.createdByAgent = false
                             }
+                            true
                         }
+                        if (archived) mailboxNotifier.notifyMailboxChanged(user.id.value)
                     }
                     is StackClientMessage.UnarchiveEmail -> {
-                        database.query {
-                            val email = Email.findById(clientMessage.emailId) ?: return@query
-                            if (email.imapAccount.user.id != user.id) return@query
-                            if (email.archiveState == EmailArchiveAction.Unarchive) return@query
+                        val unarchived = database.query {
+                            val email = Email.findById(clientMessage.emailId) ?: return@query false
+                            if (email.imapAccount.user.id != user.id) return@query false
+                            if (email.archiveState == EmailArchiveAction.Unarchive) return@query false
                             EmailArchive.new {
                                 this.email = email
                                 this.action = EmailArchiveAction.Unarchive
                                 this.createdByAgent = false
                             }
+                            true
                         }
+                        if (unarchived) mailboxNotifier.notifyMailboxChanged(user.id.value)
                     }
                 }
             }

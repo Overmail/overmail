@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
+import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import kotlinx.coroutines.*
@@ -14,6 +15,7 @@ class ImporterManager(
     private val database: OvermailDatabase,
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
+    private val mailboxNotifier: MailboxNotifier,
 ) {
 
     private val importer = mutableMapOf<Uuid, EmailImporter>()
@@ -47,6 +49,7 @@ class ImporterManager(
                 account = account,
                 coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
                 emailClassificationQueue = this.emailClassificationQueue,
+                mailboxNotifier = this.mailboxNotifier,
             )
 
             newImporter.start()

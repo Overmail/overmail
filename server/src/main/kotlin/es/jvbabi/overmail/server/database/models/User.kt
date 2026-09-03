@@ -9,6 +9,8 @@ import kotlin.uuid.Uuid
 object Users : UuidTable("users") {
     val username = varchar("username", 255).uniqueIndex()
     val email = varchar("email", 255).uniqueIndex()
+    val firstname = varchar("firstname", 255)
+    val lastname = varchar("lastname", 255)
 }
 
 class User(id: EntityID<Id>) : UuidEntity(id) {
@@ -17,4 +19,6 @@ class User(id: EntityID<Id>) : UuidEntity(id) {
 
     var username by Users.username
     var email by Users.email
+    var firstname by Users.firstname
+    var lastname by Users.lastname
 }

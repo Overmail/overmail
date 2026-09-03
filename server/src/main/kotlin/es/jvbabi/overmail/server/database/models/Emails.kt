@@ -1,14 +1,21 @@
 package es.jvbabi.overmail.server.database.models
 
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.alias
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 import org.jetbrains.exposed.v1.dao.UuidEntity
 import org.jetbrains.exposed.v1.dao.UuidEntityClass
 import org.jetbrains.exposed.v1.datetime.timestamp
 import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -76,6 +83,31 @@ class Email(id: EntityID<Id>) : UuidEntity(id) {
             .orderBy(EmailArchives.createdAt, SortOrder.DESC)
             .limit(1)
             .singleOrNull()?.get(EmailArchives.action) ?: EmailArchiveAction.Unarchive
+}
+
+/**
+ * True for mails that are in the mailbox: the stack shows them, and they are what the home screen
+ * counts. The archive table is an event log, so only the latest event decides -- a mail is out
+ * when it has an Archive/Spam event with no Unarchive event at or after it. Filtering the joined
+ * rows instead would resurface re-archived mails, because their old Unarchive row still matches.
+ *
+ * Correlates on [Emails], so it goes into the `where` of a query over that table.
+ */
+fun emailIsNotArchived(): Op<Boolean> {
+    val laterUnarchive = EmailArchives.alias("later_unarchive")
+    return notExists(
+        EmailArchives.selectAll().where {
+            (EmailArchives.email eq Emails.id) and
+                    (EmailArchives.action neq EmailArchiveAction.Unarchive) and
+                    notExists(
+                        laterUnarchive.selectAll().where {
+                            (laterUnarchive[EmailArchives.email] eq EmailArchives.email) and
+                                    (laterUnarchive[EmailArchives.action] eq EmailArchiveAction.Unarchive) and
+                                    (laterUnarchive[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
+                        }
+                    )
+        }
+    )
 }
 
 /**

@@ -4,6 +4,7 @@ import es.jvbabi.overmail.core.Email
 import es.jvbabi.overmail.core.Email.Flag
 import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
+import es.jvbabi.overmail.server.data.notifier.MailboxNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
@@ -47,6 +48,7 @@ class EmailImporter(
     val account: ImapConnection,
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
+    private val mailboxNotifier: MailboxNotifier,
 ) {
 
     private var importerJob: Job? = null
@@ -163,6 +165,8 @@ class EmailImporter(
         if (storedId != null) {
             println("Imported: $subject")
             emailClassificationQueue.enqueue(storedId)
+            // The mail is in the mailbox now, so anything showing a count of it is stale.
+            mailboxNotifier.notifyMailboxChanged(account.userId)
         }
     }
 

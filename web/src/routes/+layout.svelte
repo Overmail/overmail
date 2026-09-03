@@ -8,8 +8,9 @@
 	import AppNavbar from "$lib/app/shell/AppNavbar.svelte";
 	import AppSidebar from "$lib/app/shell/sidebar/AppSidebar.svelte";
 	import {createPageHeader} from '$lib/app/shell/pageHeader.svelte';
-	import {_} from 'svelte-i18n';
 	import AppHeader from "$lib/app/shell/AppHeader.svelte";
+	import CheckingSession from "$lib/app/shell/CheckingSession.svelte";
+	import {fade} from 'svelte/transition';
 
 	let { children } = $props();
 
@@ -43,7 +44,12 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if !checked}
-	<p>{$_('app.checkingSession')}</p>
+	<!-- `fixed inset-0` rather than a viewport height: on a phone `h-screen` is 100vh, which is
+	     the viewport as it stands with the address bar out of the way and so taller than what is
+	     on screen -- the logo would sit below the optical middle and the loader under the bar. -->
+	<div transition:fade={{duration: 200}} class="fixed inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-background">
+		<CheckingSession />
+	</div>
 {:else if isAuthRoute || session}
 	{#if session}
 

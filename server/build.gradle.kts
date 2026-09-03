@@ -58,9 +58,9 @@ dependencies {
     // runtime scope, so it has to be declared here to compile against jakarta.mail.
     implementation("org.eclipse.angus:jakarta.mail:2.0.5")
     // Ktor logs through slf4j; without a binding it stays silent and warns on startup.
-    implementation("ch.qos.logback:logback-classic:1.5.20")
+    implementation("ch.qos.logback:logback-classic:1.5.38")
 
-    implementation("es.jvbabi.overmail:kamel:0.4.0")
+    implementation("es.jvbabi.overmail:kamel:0.5.3")
 
     // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
     implementation("org.jsoup:jsoup:1.21.1")

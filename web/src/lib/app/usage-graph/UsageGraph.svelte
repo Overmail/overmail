@@ -71,8 +71,8 @@
 		);
 	}
 
-	/** How far apart two neighbouring cards are in the wave; the whole grid takes ~1.5s to cross. */
-	const WAVE_STEP_MS = 25;
+	/** How far apart two neighbouring cards are in the wave; the whole grid takes ~0.6s to cross. */
+	const WAVE_STEP_MS = 10;
 
 	/**
 	 * What the quietest day that happened at all is worth.
@@ -212,17 +212,20 @@
 	}
 </script>
 
-<div class="flex w-fit gap-1">
+<div class="flex w-full gap-1">
 	<!--
 		Its own grid beside the cards rather than a first column inside them, so the cards keep their
 		own box: a rail of unknown width in front of them would push every one of them along by
 		however wide the longest name happens to render.
 
-		Same seven rows and the same gap, so the two line up without either knowing the other's size.
+		Seven rows, the same gap, and stretched to the height the cards come out at, so the two line
+		up without either knowing the other's size. Left out on a narrow screen: below that the
+		cards are smaller than a 10px line box, and rows that no longer line up are worse than no
+		rail at all.
 	-->
-	<div class="grid grid-rows-7 gap-1 pr-0.5" aria-hidden="true">
+	<div class="hidden grid-rows-7 gap-1 self-stretch pr-0.5 lg:grid" aria-hidden="true">
 		{#each weekdays as weekday, row (row)}
-			<div class="text-muted-foreground flex h-3 items-center text-[10px] leading-none">
+			<div class="text-muted-foreground flex min-h-0 items-center overflow-hidden text-[10px] leading-none">
 				{weekday}
 			</div>
 		{/each}
@@ -240,15 +243,15 @@
 				there instead of tearing the grid down and putting a new one up.
 			-->
 			<div
-				class="grid w-fit grid-flow-col grid-rows-7 gap-1"
-				style="--usage-tint: {color}"
+				class="grid w-full min-w-0 grid-flow-col grid-rows-7 gap-1"
+				style="--usage-tint: {color}; grid-template-columns: repeat({shown.columns}, minmax(0, 1fr))"
 				role="img"
 				aria-label={label}
 				onmouseleave={leave}
 			>
 				{#each shown.slots as slot, index (index)}
 					<div
-						class="card enter size-3 overflow-hidden rounded-xs"
+						class="card enter aspect-square w-full min-w-0 overflow-hidden rounded-xs"
 						class:blank={slot.date === null}
 						class:ahead={slot.ahead}
 						class:shimmer={isLoading}
@@ -298,7 +301,12 @@
 			var(--usage-tint, var(--primary)) var(--tint-share, 0%),
 			var(--accent)
 		);
-		transition: background-color 500ms ease-out;
+		/*
+			Short on purpose: switching a year is a colour change across the whole grid, and the
+			wave below only staggers it -- the last card has to land while the click still feels
+			like the cause of it.
+		*/
+		transition: background-color 220ms ease-out;
 		transition-delay: calc(var(--wave-delay) / 2);
 	}
 

@@ -7,7 +7,7 @@
     import {locale, _} from "svelte-i18n";
     import UsageGraph from "$lib/app/usage-graph/UsageGraph.svelte";
     import type {UsageGraphState} from "$lib/app/usage-graph/UsageGraph.svelte";
-    import {Button} from "$lib/components/ui/button";
+    import * as Tabs from "$lib/components/ui/tabs";
     import {useRepositories} from "$lib/repository/repositories";
 
     const {home} = useRepositories();
@@ -44,36 +44,44 @@
     }
 </script>
 
-<section class="flex flex-col">
-    <!-- Nothing to switch between while the mailbox holds one year. The row scrolls rather than
-         wraps, so the buttons keep one line. -->
+<!--
+    Tabs rather than a row of buttons: the years are views of the same thing, and this way the
+    grid below is the tab's panel and arrow keys walk the years.
+-->
+<Tabs.Root
+        value={String(year)}
+        onValueChange={(value) => (year = Number(value))}
+        class="flex flex-col"
+>
+    <!-- Nothing to switch between while the mailbox holds one year. The list scrolls rather than
+         wraps: a row of tabs that breaks across lines loses its shared pill. -->
     {#if years.length > 1}
-        <div class="flex max-w-full gap-1 overflow-x-auto">
-            {#each years as option (option)}
-                <Button
-                        variant={option === year ? "default" : "outline"}
-                        size="sm"
-                        aria-pressed={option === year}
-                        onclick={() => (year = option)}
-                >
-                    {option}
-                </Button>
-            {/each}
+        <div class="max-w-full overflow-x-auto">
+            <Tabs.List>
+                {#each years as option (option)}
+                    <Tabs.Trigger value={String(option)}>{option}</Tabs.Trigger>
+                {/each}
+            </Tabs.List>
         </div>
     {/if}
 
-    <!-- The grid is 53 weeks wide and does not wrap, so it scrolls on a narrow screen instead of
-         pushing the page sideways. The tooltip is portalled out of here and does not mind that a
-         box which scrolls in one axis clips in both. -->
-    <div class="overflow-x-auto pt-4">
+    <!--
+        One panel that follows the year rather than one per year: the cards are meant to stay
+        where they are and only change colour, and a panel per year would put a new grid up on
+        every switch.
+
+        Nothing scrolls in here: the graph takes the width it is given and sizes its cards from
+        it.
+    -->
+    <Tabs.Content value={String(year)} class="pt-4">
         <UsageGraph
                 {year}
                 state={usage}
                 label={$_("home.graph.label", {values: {year}})}
                 tooltip={dayTooltip}
         />
-    </div>
-</section>
+    </Tabs.Content>
+</Tabs.Root>
 
 <!-- The bubble around this is the tooltip's own, so what stands here is only what it says. -->
 {#snippet dayTooltip({date, count}: {date: string; count: number})}

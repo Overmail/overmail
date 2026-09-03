@@ -7,7 +7,7 @@
     import {fade} from "svelte/transition";
     import PromptInput from "$lib/app/ai/PromptInput.svelte";
     import {OvermailPromptViewModel} from "$lib/app/ai/OvermailPromptViewModel.svelte";
-    import type {PromptInputExports, PromptMode} from "$lib/app/ai/prompt";
+    import type {PromptInputExports, PromptSegment} from "$lib/app/ai/prompt";
     import {Spinner} from "$lib/components/ui/spinner";
     import {AiChatViewModel} from "$lib/app/ai/AiChatViewModel.svelte";
     import AiChatSwitcher from "$lib/app/ai/AiChatSwitcher.svelte";
@@ -46,10 +46,31 @@
 
     let promptInput: PromptInputExports | undefined = $state();
 
-    // Die Leiste unter dem Editor zeigt den Text-Cursor, ist aber selbst nicht editierbar —
-    // ein Klick darauf soll deshalb im Prompt landen statt ins Leere zu gehen. Bedienelemente
-    // sind ausgenommen, und preventDefault hält den Fokus im Editor, statt ihn erst zu
-    // verlieren und per Klick zurückzuholen.
+    /**
+     * A sent prompt as plain text. The history only carries the ids of the referenced mails,
+     * labels and senders, so they show up as the sigil they were typed with plus a short id --
+     * resolving them into names is a job for the rich rendering that replaces this.
+     */
+    function promptSegmentsAsText(segments: PromptSegment[]): string {
+        return segments
+            .map((segment) => {
+                switch (segment.type) {
+                    case "text":
+                        return segment.content;
+                    case "email":
+                        return `@${segment.email.id.slice(0, 8)}`;
+                    case "label":
+                        return `#${segment.label.id.slice(0, 8)}`;
+                    case "sender":
+                        return `:${segment.sender.id.slice(0, 8)}`;
+                }
+            })
+            .join("");
+    }
+
+    // The bar below the editor shows the text cursor but is not editable itself, so a click on
+    // it should land in the prompt instead of going nowhere. Controls are exempt, and
+    // preventDefault keeps the focus in the editor rather than losing it and clicking it back.
     function focusPromptFromAddon(event: MouseEvent) {
         if (!(event.target instanceof Element) || event.target.closest("button")) return;
 
@@ -66,11 +87,26 @@
             {$_('ai.chat.history')}
         </h2>
 
-        <!-- Debug-Ausgabe, bis der Verlauf gebaut ist: nur Anzahl und Zeitstempel. -->
-        <p class="text-muted-foreground text-sm">{chatViewModel.chats.length} chats loaded</p>
-        <ul class="text-muted-foreground text-xs font-mono">
-            {#each chatViewModel.chats as chat (chat.id)}
-                <li>{chat.created_at.toISOString()}</li>
+        <ul class="flex flex-col gap-3 py-3">
+            {#each chatViewModel.currentChatMessages as message (message.id)}
+                <li class="flex" class:justify-end={message.type === "user"}>
+                    <!-- 80% keeps the two sides apart even when a message is one long line. -->
+                    <div
+                            class="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words"
+                            class:bg-primary={message.type === "user"}
+                            class:text-primary-foreground={message.type === "user"}
+                            class:bg-muted={message.type === "assistant"}
+                    >
+                        {#if message.type === "user"}
+                            {promptSegmentsAsText(message.content)}
+                        {:else if message.content !== ""}
+                            {message.content}
+                        {:else}
+                            <!-- Nothing streamed yet: the answer is queued or just starting. -->
+                            <Spinner class="size-4"/>
+                        {/if}
+                    </div>
+                </li>
             {/each}
         </ul>
     </div>
@@ -99,7 +135,7 @@
                     <Select.Trigger>
                         {#if promptViewModel.prompt.type === "normal"}
                             {$_("ai.chat.mode.normal")}
-                        {:else if promptViewModel.prompt.type === "ask-before-changes"}
+                        {:else if promptViewModel.prompt.type === "ask-before-write"}
                             {$_("ai.chat.mode.askBeforeChanges")}
                         {:else if promptViewModel.prompt.type === "read-only"}
                             {$_("ai.chat.mode.readOnly")}
@@ -111,7 +147,7 @@
                     >
                         <Select.Group>
                             <Select.Item value="normal">{$_('ai.chat.mode.normal')}</Select.Item>
-                            <Select.Item value="ask-before-changes">{$_('ai.chat.mode.askBeforeChanges')}</Select.Item>
+                            <Select.Item value="ask-before-write">{$_('ai.chat.mode.askBeforeChanges')}</Select.Item>
                             <Select.Item value="read-only">{$_('ai.chat.mode.readOnly')}</Select.Item>
                         </Select.Group>
                     </Select.Content>

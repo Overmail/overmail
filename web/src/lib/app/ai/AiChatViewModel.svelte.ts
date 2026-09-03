@@ -1,10 +1,20 @@
 import type {Prompt} from "$lib/app/ai/prompt";
+import {ChatHistoryRepository, type AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";
 
 export class AiChatViewModel {
     chats: AiChat[] = $state([]);
 
     currentChatId: string | null = $state(null);
     currentChat: AiChat | null = $derived(this.chats.find((chat) => chat.id === this.currentChatId) ?? null);
+
+    private chatHistoryRepository = new ChatHistoryRepository();
+
+    /** Messages of the open chat, oldest first. Empty while none is selected or loaded. */
+    currentChatMessages: AiChatMessage[] = $derived(
+        this.currentChatId === null
+            ? []
+            : this.chatHistoryRepository.chats.get(this.currentChatId)?.messages ?? []
+    );
 
     /** Newest first, regardless of whether a chat arrived with a page or as a live update. */
     chatsNewestFirst: AiChat[] = $derived(
@@ -74,6 +84,15 @@ export class AiChatViewModel {
         }
     }
 
+    async onChatHovered(chatId: string) {
+        await this.chatHistoryRepository.loadChat(chatId, false, false);
+    }
+
+    async onChatSelected(chatId: string) {
+        this.currentChatId = chatId;
+        await this.chatHistoryRepository.loadChat(chatId, true, true);
+    }
+
     async onPromptSubmitted(
         prompt: Prompt
     ) {
@@ -116,6 +135,8 @@ export class AiChatViewModel {
 
         const data = await response.json();
         this.currentChatId = data.chat_id;
+
+        await this.chatHistoryRepository.loadChat(data.chat_id, true, true);
     }
 }
 

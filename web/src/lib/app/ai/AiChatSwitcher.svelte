@@ -12,15 +12,15 @@
 
     let list: ReturnType<typeof AiChatList> | undefined = $state();
 
-    // Der Fokus liegt auf der Listbox, nicht auf einer Zeile -- so funktionieren Pfeiltasten und
-    // Typeahead auch über Zeilen, die das Windowing gar nicht gerendert hat.
+    // Focus sits on the listbox, not on a row -- that is what makes arrow keys and typeahead
+    // work across rows the windowing never rendered.
     $effect(() => {
         if (open) list?.focusList();
     });
 
-    function selectChat(chatId: string) {
-        viewModel.currentChatId = chatId;
+    async function selectChat(chatId: string) {
         open = false;
+        await viewModel.onChatSelected(chatId);
     }
 </script>
 
@@ -28,8 +28,8 @@
     <Popover.Root bind:open>
         <Popover.Trigger>
             {#snippet child({props})}
-                <!-- pl-4.5: der Titel sitzt auf der Textkante der Einträge, die direkt darunter
-                     aufklappen (6px Zeilen-Einzug + 12px im Eintrag). -->
+                <!-- pl-4.5: the title lines up with the text edge of the entries that open
+                     right below it (6px row indent + 12px inside the entry). -->
                 <button
                         {...props}
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-3xl border border-transparent
@@ -48,9 +48,9 @@
             {/snippet}
         </Popover.Trigger>
 
-        <!-- Das Popover bringt von sich aus w-72, m-2, p-4 und gap-4 mit; Padding kommt hier
-             von der Liste. Breite auf den Trigger festgenagelt, damit ein langer Chat-Name sie
-             nicht aufbläht. -->
+        <!-- The popover ships w-72, m-2, p-4 and gap-4 of its own; here the padding comes from
+             the list. The width is pinned to the trigger, so a long chat name cannot inflate
+             it. -->
         <Popover.Content
                 side="bottom"
                 align="start"

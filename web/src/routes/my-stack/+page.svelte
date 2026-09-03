@@ -1,21 +1,17 @@
 <script lang="ts">
-    import * as Sidebar from "$lib/components/ui/sidebar";
-    import {Separator} from "$lib/components/ui/separator";
     import KeyCap from "$lib/components/key/KeyCap.svelte";
     import EmailStack from "$lib/app/my-stack/EmailStack.svelte";
     import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
     import {onMount} from "svelte";
     import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {createHotkeyAttachment} from "@tanstack/svelte-hotkeys";
-    import OvermailAiPopover from "$lib/app/ai/popover/OvermailAiPopover.svelte";
     import {setStackFocus} from "$lib/app/my-stack/stackFocus";
+    import {setPageHeader} from "$lib/app/shell/pageHeader.svelte";
     import {_} from "svelte-i18n";
 
     let viewModel: EmailStackViewModel = new EmailStackViewModel();
 
     const stackHasEmails = $derived(viewModel.emails.length > 0);
-
-    let showOvermailAI = $state(false);
 
     /** The element the shortcuts are registered on -- see stackFocus.ts for why they hang here. */
     let stack: HTMLElement | undefined = $state();
@@ -24,13 +20,14 @@
         stack?.focus();
     }
 
-    // Overlays opened from the stack (a card's menu, the assistant) give the keyboard back.
+    // Overlays opened from the stack (a card's menu) give the keyboard back, and so does the
+    // assistant, which the header owns.
     setStackFocus({restore: focusStack});
+    setPageHeader({restoreFocus: focusStack});
 
     onMount(() => {
-        // Nothing else on the page wants the focus, and the stack is worked through by keyboard --
-        // unless the assistant is already open, which puts the caret in the prompt itself.
-        if (!showOvermailAI) focusStack();
+        // Nothing else on the page wants the focus, and the stack is worked through by keyboard.
+        focusStack();
 
         return () => {
             viewModel.dispose();
@@ -71,19 +68,6 @@
         stackShortcut,
     );
 </script>
-
-<header
-        class="flex shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear h-12"
->
-    <div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <Sidebar.Trigger class="-ms-1" />
-        <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
-        <h1 class="text-base font-medium">{$_('myStack.title')}</h1>
-        <div class="ms-auto flex items-center gap-2">
-            <OvermailAiPopover bind:open={showOvermailAI} onCloseFocus={focusStack} />
-        </div>
-    </div>
-</header>
 
 <!-- flex-1 down the whole chain: <main> sits in the sidebar inset's flex column, and only a
      flex-1 item picks up the height left over by the header. A percentage height has nothing to

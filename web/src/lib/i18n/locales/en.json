@@ -28,12 +28,7 @@
       }
     }
   },
-  "home": {
-    "title": "Home",
-    "github": "GitHub"
-  },
   "myStack": {
-    "title": "Stack",
     "shortcuts": {
       "archive": "Archive",
       "unarchive": "Unarchive",

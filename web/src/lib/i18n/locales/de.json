@@ -28,12 +28,7 @@
       }
     }
   },
-  "home": {
-    "title": "Start",
-    "github": "GitHub"
-  },
   "myStack": {
-    "title": "Stack",
     "shortcuts": {
       "archive": "Archivieren",
       "unarchive": "Entarchivieren",

@@ -121,6 +121,7 @@ private fun Application.configureDependencies() {
                 model = resolve(),
                 database = resolve(),
                 streamNotifier = resolve(),
+                chatNotifier = resolve(),
             )
         }
 

@@ -21,8 +21,10 @@ import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
+import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessages
 import es.jvbabi.overmail.server.database.models.User
@@ -51,6 +53,7 @@ class ChatAgent(
     private val model: LLModel,
     private val database: OvermailDatabase,
     private val streamNotifier: AiChatStreamNotifier,
+    private val chatNotifier: AiChatNotifier,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -116,7 +119,9 @@ class ChatAgent(
                 throw exception
             }
 
-            finish(messageId, content = stream.snapshot().content)
+            val answer = stream.snapshot().content
+            finish(messageId, content = answer)
+            nameChat(turn, answer)
         } finally {
             // After the row is written, so a client that reloads on `done` sees the same text it
             // was just streamed.
@@ -185,6 +190,44 @@ class ChatAgent(
         return frames.toMessageResponse().also { response -> appendPrompt { message(response) } }
     }
 
+    /**
+     * Gives the chat a name once, from its first exchange. Skipped as soon as it has one -- and
+     * never for a name the user typed, which is what `nameSetByUser` is there for.
+     */
+    private suspend fun nameChat(turn: ChatTurn, answer: String) {
+        val needsName = database.query {
+            AiChat.findById(turn.chatId)?.let { chat -> !chat.nameSetByUser && chat.name == null } == true
+        }
+        if (!needsName) return
+
+        val name = try {
+            promptExecutor.execute(
+                prompt = prompt("overmail-chat-name") {
+                    system(NAME_PROMPT)
+                    user("Message:\n${turn.request}\n\nAnswer:\n$answer")
+                },
+                model = model,
+            ).textContent()
+        } catch (exception: Exception) {
+            // A nameless chat is worth far less than a failed answer, so this stays a warning:
+            // the answer itself is already written and must not be rolled back over a title.
+            logger.warn(exception) { "Naming the chat of message failed" }
+            return
+        }
+
+        val cleaned = cleanChatName(name) ?: return
+
+        // Read back inside the transaction that writes it: the client is told about the new name
+        // right after, and an entity from an earlier transaction cannot be written here.
+        val chat = database.query {
+            AiChat.findById(turn.chatId)
+                ?.takeIf { !it.nameSetByUser && it.name == null }
+                ?.also { it.name = cleaned }
+        } ?: return
+
+        chatNotifier.notifyChatUpsert(userId = turn.userId, chat = chat)
+    }
+
     private fun toolRegistry(userId: User.Id): ToolRegistry = ToolRegistry.builder()
         .tool(ReadEmailTool(userId = userId, database = database))
         .build()
@@ -213,7 +256,12 @@ class ChatAgent(
             return@query null
         }
 
-        ChatTurn(userId = message.chat.user.id.value, history = previous.dropLast(1), request = request.text)
+        ChatTurn(
+            chatId = message.chat.id.value,
+            userId = message.chat.user.id.value,
+            history = previous.dropLast(1),
+            request = request.text,
+        )
     }
 
     private suspend fun finish(messageId: AiChatMessage.Id, content: String) = database.query {
@@ -233,6 +281,28 @@ class ChatAgent(
                 "`[label:<id>]` and `[sender:<id>]`. Read an attached email with the " +
                 "`${ReadEmailTool.NAME}` tool before answering questions about it, instead of " +
                 "guessing from the id. Every tool only ever sees this user's own data."
+
+        const val NAME_PROMPT =
+            "Name the chat below after what the user wants, in their language. Answer with the " +
+                "name alone: at most five words, no quotes, no punctuation at the end, no " +
+                "explanation."
+
+        /** The column holds 255 characters, and a title that long is not a title. */
+        const val MAX_CHAT_NAME_LENGTH = 60
+
+        /**
+         * Models like to wrap a title in quotes or add a line about it, so only the first line is
+         * kept. Null when nothing usable is left.
+         */
+        fun cleanChatName(name: String): String? = name
+            .trim()
+            .lineSequence()
+            .firstOrNull { line -> line.isNotBlank() }
+            ?.trim()
+            ?.trim('"', '\'', '“', '”', '„', '`')
+            ?.trim()
+            ?.take(MAX_CHAT_NAME_LENGTH)
+            ?.takeIf { it.isNotBlank() }
     }
 }
 
@@ -244,6 +314,7 @@ object ChatAgentGraph {
 }
 
 private data class ChatTurn(
+    val chatId: AiChat.Id,
     /** Owner of the chat. Everything the tools may touch is scoped to them. */
     val userId: User.Id,
     /** The turns before the one being answered, oldest first. */

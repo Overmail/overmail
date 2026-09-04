@@ -295,6 +295,22 @@ export class EmailRepository {
     }
 
     /**
+     * Puts [id] in front of the classification agent again: `POST /api/emails/{id}/classify`.
+     *
+     * Answers whether the server took it, and that is all there is to wait for -- what the agent
+     * makes of the mail arrives over the socket as its labels, whenever the run gets to it. The
+     * mail itself is unchanged by the request, so nothing is read again here.
+     */
+    async requestClassification(id: string): Promise<boolean> {
+        const response = await fetch(`/api/emails/${id}/classify`, {method: "POST"});
+        if (!response.ok) {
+            console.error(`Could not classify mail ${id}: ${response.status} ${response.statusText}`);
+        }
+
+        return response.ok;
+    }
+
+    /**
      * What follows any of the writes above.
      *
      * The mail is read again rather than assumed, see [requestSnapshot]: nothing about it is

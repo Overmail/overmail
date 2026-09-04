@@ -76,7 +76,8 @@
       "archive": "Mail archivieren",
       "unarchive": "Zurück ins Postfach",
       "more": "Weitere Aktionen",
-      "markSpam": "Als Spam markieren"
+      "markSpam": "Als Spam markieren",
+      "reclassify": "Neu klassifizieren"
     },
     "preview": {
       "noContent": "Kein Inhalt verfügbar"

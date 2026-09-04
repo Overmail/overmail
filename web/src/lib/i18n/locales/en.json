@@ -76,7 +76,8 @@
       "archive": "Archive the mail",
       "unarchive": "Move back to the mailbox",
       "more": "More actions",
-      "markSpam": "Mark as spam"
+      "markSpam": "Mark as spam",
+      "reclassify": "Classify again"
     },
     "preview": {
       "noContent": "No content available"

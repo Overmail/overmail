@@ -7,15 +7,19 @@
         CaretDownIcon,
         CaretUpIcon,
         CheckIcon,
+        DotsThreeVerticalIcon,
         EnvelopeSimpleIcon,
         EnvelopeSimpleOpenIcon,
         LinkSimpleIcon,
         ProhibitIcon,
         ShareNetworkIcon,
+        SparkleIcon,
         TrayArrowDownIcon,
         XIcon
     } from "phosphor-svelte";
+    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import * as Tooltip from "$lib/components/ui/tooltip";
+    import {_} from "svelte-i18n";
     import {scale, slide} from "svelte/transition";
     import {cubicOut} from "svelte/easing";
     import {emailSlug} from "$lib/app/mails/emailPath";
@@ -32,6 +36,7 @@
         onChangeArchiveState,
         onShareMail,
         onChangeReadState,
+        onReclassify,
     }: {
         mail: EmailMeta,
         hasNextMail: boolean,
@@ -43,6 +48,8 @@
         onChangeArchiveState: (newState: EmailMeta["archiveState"]) => Promise<void>;
         onShareMail: () => void;
         onChangeReadState: (isRead: boolean) => Promise<void>;
+        /** Hands the mail back to the classification agent; see the menu at the end of the bar. */
+        onReclassify: () => void;
     } = $props();
 
     /**
@@ -258,6 +265,26 @@
                 In neuem Tab öffnen
             </Tooltip.Content>
         </Tooltip.Root>
+
+        <!-- What is not worth a button of its own. No tooltip on the trigger: it opens a menu
+             that would sit under it, and the menu says what it does. -->
+        <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+                {#snippet child({props})}
+                    <Button {...props} class="mr-1" variant="ghost" size="icon">
+                        <DotsThreeVerticalIcon />
+                        <span class="sr-only">{$_('mails.panel.more')}</span>
+                    </Button>
+                {/snippet}
+            </DropdownMenu.Trigger>
+
+            <DropdownMenu.Content align="end" class="w-64">
+                <DropdownMenu.Item onclick={onReclassify}>
+                    <SparkleIcon />
+                    {$_('mails.panel.reclassify')}
+                </DropdownMenu.Item>
+            </DropdownMenu.Content>
+        </DropdownMenu.Root>
 
         <Tooltip.Root>
             <Tooltip.Trigger>

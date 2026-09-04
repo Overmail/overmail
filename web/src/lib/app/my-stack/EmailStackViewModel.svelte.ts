@@ -144,10 +144,7 @@ export class EmailStackViewModel {
     }
 
     async onRequestEmailClassification(emailId: string) {
-        const result = await fetch(`/api/emails/${emailId}/classify`, {
-            method: "POST",
-        });
-        return result.ok;
+        return this.mails.requestClassification(emailId);
     }
 
     /**

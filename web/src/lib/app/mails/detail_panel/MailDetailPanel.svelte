@@ -79,6 +79,7 @@
                 onChangeArchiveState={(newState) => mails.setArchiveState(mail.id, newState)}
                 onShareMail={() => alert("Sharing is not yet supported. Note that sharing a mail is not the same as forwarding it.")}
                 onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
+                onReclassify={() => mails.requestClassification(mail.id)}
         />
 
         <div class="px-6 font-display text-2xl mt-4 text-pretty">

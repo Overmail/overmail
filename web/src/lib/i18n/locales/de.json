@@ -46,6 +46,12 @@
   "mails": {
     "title": "Alle Mails",
     "count": "{count, plural, one {# Mail} other {# Mails}}",
+    "groups": {
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "week": "Diese Woche",
+      "month": "Dieser Monat"
+    },
     "empty": "Keine Mails im Postfach.",
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",

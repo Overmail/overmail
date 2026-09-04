@@ -1,18 +1,25 @@
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import {
+    MailLayout,
+    foldGroups,
+    type MailGrouping,
+    type MailGroupCount,
+} from "$lib/app/mails/grouping";
 
 /** How many mails one request asks for. The server caps this at 500. */
 const PAGE_SIZE = 100;
 
 /**
- * The mailbox by position: which mail sits at which row.
+ * The mailbox by position: which mail sits at which row, and where the headers between them go.
  *
  * Only positions and ids. What a row shows comes from the email repository, which this keeps
  * subscribed for the rows near the viewport and lets go of behind it -- the repository's grace
  * period is what makes that survive a flick of the scroll wheel.
  *
- * The list is as long as the mailbox as soon as the first page came back, so a windowed table can
- * be the right length before it knows what is in it. A hole in it is a mail that exists and has
- * not been asked for; scrolling onto one is what asks.
+ * Two answers make the list: the stretches say how long it is and where the headers sit, which is
+ * what lets a windowed table lay itself out before a single mail is loaded, and the pages fill in
+ * which mail sits where. A hole is a mail that exists and has not been asked for; scrolling onto
+ * one is what asks.
  */
 export class MailListViewModel {
     /** The mailbox by position, newest first; undefined for a row not asked for yet. */
@@ -35,7 +42,27 @@ export class MailListViewModel {
     /** The rows this holds a subscription for, by id. */
     private readonly subscribed = new Map<string, () => void>();
 
-    constructor(private readonly mails: EmailRepository) {}
+    /** The stretches as the server counted them, or null while they are on their way. */
+    private groupCounts: MailGroupCount[] | null = $state(null);
+
+    private isLoadingGroups = false;
+
+    /**
+     * Where every row sits. Until the stretches are here it is the mailbox without headers, so a
+     * table can already page and draw.
+     */
+    layout: MailLayout = $derived(
+        this.groupCounts === null
+            ? MailLayout.flat(this.total)
+            // Read as the layout is built rather than kept ticking: the stretches are re-read
+            // when the list changes, and a table open at midnight is nobody's problem.
+            : new MailLayout(foldGroups(this.groupCounts, new Date()))
+    );
+
+    constructor(
+        private readonly mails: EmailRepository,
+        private readonly grouping: MailGrouping = "date",
+    ) {}
 
     /** The mail at [index], or undefined while that page is not here. */
     idAt(index: number): string | undefined {
@@ -43,12 +70,12 @@ export class MailListViewModel {
     }
 
     /**
-     * Makes sure the rows between [from] and [to] are on their way and stay up to date. Cheap to
-     * call on every scroll frame: it asks for the pages that are missing and nothing else.
+     * Makes sure the rows between [fromRow] and [toRow] -- rows of the layout, headers included --
+     * are on their way and stay up to date. Cheap to call on every scroll frame: it asks for the
+     * pages that are missing and nothing else.
      */
-    window(from: number, to: number) {
-        const first = Math.max(0, Math.min(from, to));
-        const last = Math.max(from, to);
+    window(fromRow: number, toRow: number) {
+        void this.loadGroups();
 
         // Nothing is known before the first page, and it is that page which reports the length.
         if (!this.initialized) {
@@ -56,20 +83,40 @@ export class MailListViewModel {
             return;
         }
 
-        const end = Math.min(last, this.total - 1);
-        if (first > end) return;
+        const first = Math.max(0, Math.min(fromRow, toRow));
+        const last = Math.max(fromRow, toRow);
 
-        for (let offset = Math.floor(first / PAGE_SIZE) * PAGE_SIZE; offset <= end; offset += PAGE_SIZE) {
+        // Which mails those rows hold. The headers in between are the reason this is not the
+        // range itself.
+        let firstMail: number | undefined;
+        let lastMail: number | undefined;
+        for (let row = first; row <= last; row++) {
+            const entry = this.layout.rowAt(row);
+            if (entry?.kind !== "mail") continue;
+            firstMail ??= entry.index;
+            lastMail = entry.index;
+        }
+
+        if (firstMail === undefined || lastMail === undefined) return;
+
+        for (
+            let offset = Math.floor(firstMail / PAGE_SIZE) * PAGE_SIZE;
+            offset <= lastMail;
+            offset += PAGE_SIZE
+        ) {
             void this.load(offset);
         }
 
-        this.subscribeRange(first, end);
+        this.subscribeRange(firstMail, lastMail);
     }
 
     /** Asks again after a failure -- what the retry button does. */
     retry() {
         this.failed = false;
         this.pages.clear();
+        this.groupCounts = null;
+        this.isLoadingGroups = false;
+        void this.loadGroups();
         void this.load(0);
     }
 
@@ -100,6 +147,32 @@ export class MailListViewModel {
         for (const id of wanted) {
             if (this.subscribed.has(id)) continue;
             this.subscribed.set(id, this.mails.subscribe(id));
+        }
+    }
+
+    /**
+     * The stretches, once. They are the shape of the list, not its contents -- a mail arriving
+     * changes them, and asking again is what a reload or [retry] is for.
+     */
+    private async loadGroups() {
+        if (this.groupCounts !== null || this.isLoadingGroups) return;
+        this.isLoadingGroups = true;
+
+        try {
+            const response = await fetch(`/api/emails/list/groups?by=${this.grouping}`);
+            if (!response.ok) throw new Error(`Could not read the mailbox shape: ${response.status}`);
+
+            const answer = (await response.json()) as {groups?: MailGroupCount[]};
+            // Checked rather than trusted: everything downstream lays out rows from this, and a
+            // missing array would come out as an empty mailbox rather than as a failure.
+            if (!Array.isArray(answer.groups)) throw new Error("The mailbox shape has no stretches");
+
+            this.groupCounts = answer.groups;
+        } catch (error) {
+            console.error(error);
+            // Left unset: the list stays flat, which is a listing without headers rather than no
+            // listing at all.
+            this.isLoadingGroups = false;
         }
     }
 

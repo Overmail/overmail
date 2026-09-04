@@ -46,6 +46,12 @@
   "mails": {
     "title": "All mail",
     "count": "{count, plural, one {# mail} other {# mails}}",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "month": "This month"
+    },
     "empty": "No mail in this mailbox.",
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",

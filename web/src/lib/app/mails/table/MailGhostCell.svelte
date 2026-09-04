@@ -13,7 +13,7 @@
 
 <div class="flex items-center gap-2">
     {#if withAvatar}
-        <Skeleton class="size-6 rounded-full"/>
+        <Skeleton class="size-5 rounded-full"/>
     {/if}
     <Skeleton class="h-4 {widthClass}"/>
 </div>

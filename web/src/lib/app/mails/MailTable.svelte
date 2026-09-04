@@ -16,14 +16,15 @@
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel} from "./MailListViewModel.svelte";
     import MailGhostCell from "./table/MailGhostCell.svelte";
+    import MailGroupHeader from "./table/MailGroupHeader.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
     /**
-     * Rows cap at 32px -- the cell height is what a table row follows, see the classes below. Not
-     * an estimate but the height: every row is one clipped line, and the scrollbar is sized from
-     * this number.
+     * Not estimates but the heights: every row is one clipped line, so the scrollbar is sized
+     * from these two numbers rather than from anything measured.
      */
-    const ROW_HEIGHT = 32;
+    const ROW_HEIGHT = 40;
+    const HEADER_HEIGHT = 32;
 
     /** How many rows around the viewport are held and kept up to date. */
     const OVERSCAN = 12;
@@ -41,7 +42,7 @@
 
     /** Whether the length is known at all yet. Before that a handful of rows stand in for it. */
     const visibleRowCount = $derived(
-        list.total === 0 && !list.initialized ? PLACEHOLDER_ROWS : list.total
+        list.layout.length === 0 && !list.initialized ? PLACEHOLDER_ROWS : list.layout.length
     );
 
     const virtualizer = createVirtualizer<HTMLDivElement, HTMLTableRowElement>(() => {
@@ -50,22 +51,37 @@
         // there would not make the binding of the element reach the virtualizer.
         const scrollElement = viewport;
 
+        // Read here as well, so the sizes follow the layout: a stretch of headers appearing
+        // changes which rows are tall and which are not.
+        const layout = list.layout;
+
         return {
             count: visibleRowCount,
             getScrollElement: () => scrollElement,
-            estimateSize: () => ROW_HEIGHT,
+            estimateSize: (index: number) =>
+                layout.rowAt(index)?.kind === "header" ? HEADER_HEIGHT : ROW_HEIGHT,
             overscan: OVERSCAN,
         };
     });
 
-    /** The indexes on screen, with the mail each of them holds once it is known. */
+    /**
+     * The rows on screen: what the layout says each of them is, and the mail it holds once that
+     * is known. A `row` of undefined is a mail whose page is not here yet.
+     */
     const visible = $derived(
         virtualizer.items
             .filter((item) => item.index < visibleRowCount)
             .map((item) => {
-                const id = list.idAt(item.index);
+                const entry = list.layout.rowAt(item.index);
+                if (entry?.kind === "header") return {item, entry, row: undefined};
+
+                const id = entry === undefined ? undefined : list.idAt(entry.index);
                 const mail = id === undefined ? null : mails.peek(id).value;
-                return {item, row: id !== null && mail !== null ? {id: id!, mail} : undefined};
+                return {
+                    item,
+                    entry,
+                    row: id !== undefined && mail !== null ? {id, mail} : undefined,
+                };
             })
     );
 
@@ -133,7 +149,10 @@
     >
         <!-- The row count is stated for a screen reader, because the DOM no longer carries it: a
              windowed table holds the rows near the viewport and nothing else. -->
-        <Table.Root class="min-w-[52rem] table-fixed" aria-rowcount={list.total}>
+        <!-- The body reads back rather than at full contrast: a mailbox is a long list of rows nobody
+             reads one by one, so what has been read stays quiet and the unread rows below step
+             forward against it. -->
+        <Table.Root class="text-muted-foreground min-w-[52rem] table-fixed" aria-rowcount={list.total}>
             <colgroup>
                 {#each columns as column (column.id)}
                     {@const width = COLUMN_WIDTHS[column.id ?? ""]}
@@ -151,14 +170,25 @@
                     </tr>
                 {/if}
 
-                {#each visible as {item, row} (row?.id ?? `pending-${item.index}`)}
+                {#each visible as {item, entry, row} (row?.id ?? `row-${item.index}`)}
                     {@const modelRow = row === undefined ? undefined : rowsById.get(row.id)}
-                    {#if modelRow}
+                    {#if entry?.kind === "header"}
+                        <!-- The stretch this and the rows below it belong to. One cell across the
+                             table: a heading is not a value in a column. -->
+                        <Table.Row class="border-0 hover:bg-transparent">
+                            <Table.Cell
+                                    colspan={columns.length}
+                                    class="h-8 items-baseline gap-2 py-0 align-bottom"
+                            >
+                                <MailGroupHeader label={entry.label} count={entry.count}/>
+                            </Table.Cell>
+                        </Table.Row>
+                    {:else if modelRow}
                         <!-- No line between rows: what separates them is the row height and the
                              hover, which is enough for one clipped line per mail. -->
-                        <Table.Row aria-rowindex={item.index + 1} class={cn("h-8 border-0")}>
+                        <Table.Row aria-rowindex={item.index + 1} class={cn("h-10 border-0")}>
                             {#each modelRow.getAllCells() as cell (cell.id)}
-                                <Table.Cell class="h-8 overflow-hidden py-0">
+                                <Table.Cell class="h-10 overflow-hidden py-0">
                                     <FlexRender {cell}/>
                                 </Table.Cell>
                             {/each}
@@ -166,10 +196,10 @@
                     {:else}
                         <!-- A mail the list has and does not hold yet: the shape of the row
                              without the content, so nothing shifts when it arrives. -->
-                        <Table.Row aria-rowindex={item.index + 1} class="h-8 border-0 hover:bg-transparent">
+                        <Table.Row aria-rowindex={item.index + 1} class="h-10 border-0 hover:bg-transparent">
                             {#each columns as column (column.id)}
                                 {@const ghost = GHOST_SHAPES[column.id ?? ""]}
-                                <Table.Cell class="h-8 overflow-hidden py-0">
+                                <Table.Cell class="h-10 overflow-hidden py-0">
                                     {#if ghost}
                                         <MailGhostCell widthClass={ghost.width} withAvatar={ghost.withAvatar}/>
                                     {/if}
@@ -185,7 +215,7 @@
                     </tr>
                 {/if}
 
-                {#if list.initialized && list.total === 0}
+                {#if list.initialized && list.layout.length === 0}
                     <Table.Row class="border-0 hover:bg-transparent">
                         <Table.Cell colspan={columns.length} class="h-24 text-center">
                             <MailsEmpty/>

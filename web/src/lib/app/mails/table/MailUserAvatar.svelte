@@ -7,11 +7,11 @@
     const displayName = $derived(participant.name ?? participant.address);
 </script>
 
-<!-- 24px, which is what holds a row within 32px. The picture travels with the mail's metadata,
-     so there is nothing to look up here. -->
+<!-- Small on purpose: a row is one line, and the face is what it is next to rather than what it
+     is about. The picture travels with the mail's metadata, so there is nothing to look up. -->
 <OvermailAvatar
         url={participant.avatarUrl}
         name={displayName}
-        class="size-6"
-        fallbackClass="text-[10px]"
+        class="size-5"
+        fallbackClass="text-[9px]"
 />

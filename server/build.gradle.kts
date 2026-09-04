@@ -60,7 +60,7 @@ dependencies {
     // Ktor logs through slf4j; without a binding it stays silent and warns on startup.
     implementation("ch.qos.logback:logback-classic:1.5.38")
 
-    implementation("es.jvbabi.overmail:kamel:0.5.3")
+    implementation("es.jvbabi.overmail:kamel:0.5.4")
 
     // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
     implementation("org.jsoup:jsoup:1.21.1")
@@ -94,6 +94,8 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // See Main.kt: without this the avatar tests bounce a Java icon into the macOS dock.
+    jvmArgs("-Djava.awt.headless=true")
 }
 tasks.register<JavaExec>("runServer") {
     group = "application"
@@ -101,4 +103,5 @@ tasks.register<JavaExec>("runServer") {
     classpath = sourceSets["main"].runtimeClasspath
     // The server reads ./data/config.json, which lives at the repository root, not in this module.
     workingDir = rootProject.projectDir
+    jvmArgs("-Djava.awt.headless=true")
 }

@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
@@ -60,10 +61,18 @@ fun Route.contentSocket() {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
+            val avatarQueue = application.dependencies.resolve<AvatarQueue>()
             val user = call.user
 
             /** The ids this socket keeps up to date. Guarded by [lock]. */
             val subscribed = mutableSetOf<Uuid>()
+
+            /**
+             * Who sent the mails above, as they last went out. A picture is found for an address,
+             * not for a mail, so this is how an address book event turns into the ids on screen
+             * that it changed. Guarded by [lock].
+             */
+            val senderByEmail = mutableMapOf<Uuid, Uuid>()
             val lock = Mutex()
 
             /** Ids to look at again, filled by the subscription and drained in bursts below. */
@@ -74,7 +83,19 @@ fun Route.contentSocket() {
 
                 val mails = database.query { loadEmailMeta(user.id.value, ids) }
                 if (mails.isNotEmpty()) {
+                    lock.withLock {
+                        mails.forEach { mail -> senderByEmail[mail.id] = mail.sender.id }
+                    }
                     sendSerialized<ContentServerMessage>(ContentServerMessage.Emails(mails))
+
+                    // A lookup is a request to a third party, so it happens after the mails went
+                    // out rather than inside their query. Whatever is found arrives as a change
+                    // to the sender and comes back over this socket, see MailEvent.SenderChanged.
+                    mails.map { it.sender }
+                        .filter { sender -> sender.avatarUrl == null }
+                        .map { sender -> sender.id }
+                        .distinct()
+                        .forEach(avatarQueue::enqueue)
                 }
 
                 // An id that answered nothing does not exist, or is not this user's. The client
@@ -82,7 +103,10 @@ fun Route.contentSocket() {
                 // nobody can see is not looked up again and again.
                 val unknown = ids.toSet() - mails.map { it.id }.toSet()
                 if (unknown.isNotEmpty()) {
-                    lock.withLock { subscribed -= unknown }
+                    lock.withLock {
+                        subscribed -= unknown
+                        senderByEmail.keys -= unknown
+                    }
                     sendSerialized<ContentServerMessage>(ContentServerMessage.Unknown(unknown.toList()))
                 }
             }
@@ -97,6 +121,14 @@ fun Route.contentSocket() {
                     .collect { event ->
                         when (event) {
                             is MailEvent.Changed -> changes.send(event.emailId)
+                            // Translated to the mails on screen here rather than sent on as an
+                            // address: everything past this point deals in mail ids.
+                            is MailEvent.SenderChanged -> {
+                                val fromSender = lock.withLock {
+                                    senderByEmail.filterValues { it == event.senderId }.keys.toList()
+                                }
+                                fromSender.forEach { changes.send(it) }
+                            }
                         }
                     }
             }
@@ -139,7 +171,10 @@ fun Route.contentSocket() {
                     }
 
                     is ContentClientMessage.UnsubscribeEmails -> {
-                        lock.withLock { subscribed -= message.ids.toSet() }
+                        lock.withLock {
+                            subscribed -= message.ids.toSet()
+                            senderByEmail.keys -= message.ids.toSet()
+                        }
                     }
                 }
             }

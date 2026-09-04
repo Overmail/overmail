@@ -2,33 +2,41 @@ package es.jvbabi.overmail.server.http.stack
 
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.data.notifier.AvatarEvent
-import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
-import es.jvbabi.overmail.server.data.notifier.EmailLabelEvent
-import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.models.*
-import es.jvbabi.overmail.server.http.avatar.avatarUrl
-import es.jvbabi.overmail.server.http.avatar.avatarPaddings
-import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
-import io.ktor.server.auth.*
-import io.ktor.server.plugins.di.*
-import io.ktor.server.routing.*
-import io.ktor.server.websocket.*
-import io.ktor.websocket.*
-import kotlinx.coroutines.launch
+import es.jvbabi.overmail.server.database.models.Email
+import es.jvbabi.overmail.server.database.models.EmailAiClassificationEvents
+import es.jvbabi.overmail.server.database.models.EmailArchive
+import es.jvbabi.overmail.server.database.models.EmailArchiveAction
+import es.jvbabi.overmail.server.database.models.Emails
+import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.emailIsNotArchived
+import io.ktor.server.auth.authenticate
+import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.application
+import io.ktor.server.websocket.sendSerialized
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.core.notExists
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 private const val STACK_SIZE = 10
 
@@ -43,105 +51,53 @@ private val json = Json {
     encodeDefaults = true
 }
 
+/**
+ * Which mails are on the pile, and in what order: `GET /api/stack`.
+ *
+ * Membership only. What a card shows -- subject, sender, labels, whether it is still in the
+ * mailbox -- is subscribed per mail over the content socket, which is also where every later
+ * change to it comes from. This socket answers one question: what comes next.
+ *
+ * It hands out batches of [STACK_SIZE] from a cursor that walks backwards through send time, so
+ * asking again continues where the last batch ended rather than repeating it.
+ */
 fun Route.stackSocket() {
     authenticate {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
-            val emailLabelNotifier = application.dependencies.resolve<EmailLabelNotifier>()
-            val avatarQueue = application.dependencies.resolve<AvatarQueue>()
-            val avatarNotifier = application.dependencies.resolve<AvatarNotifier>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
 
             val user = call.user
-            var latestMail = Clock.System.now()
 
             /**
-             * Senders this socket is already waiting on a picture for. A sender fills batch after
-             * batch, and subscribing to it twice would send its avatar down here twice.
+             * How far the pile has been handed out. The next batch includes this second again, so
+             * mails sharing it are never skipped -- which means a batch repeats the mail the last
+             * one ended on, and a client dedupes by id.
              */
-            val watchedSenders = mutableSetOf<EmailUser.Id>()
+            var latestMail = Clock.System.now()
 
             suspend fun sendNewBatch() {
-                // Selected column by column instead of through the Email entity: that one reads
-                // raw_content with every row, which is the whole mail source.
-                var latestMailForThisBatch: Instant? = null
-                // The senders of this batch that have no picture yet, so they can be looked up
-                // once the mails are out. Collected inside the transaction: reading it off the
-                // sender entities afterwards would query a closed one.
-                var sendersWithoutAvatar: List<EmailUser.Id> = emptyList()
-                val mails = database.query {
-                    val batch = Emails
+                var oldestOfBatch: Instant? = null
+
+                val ids = database.query {
+                    Emails
                         .leftJoin(ImapAccounts)
-                        .select(Emails.columns)
+                        .select(Emails.id, Emails.sent)
                         .where { ImapAccounts.user eq user.id }
                         .andWhere { Emails.sent lessEq latestMail }
                         .andWhere { emailIsNotArchived() }
                         .orderBy(Emails.sent, SortOrder.DESC)
                         .limit(STACK_SIZE)
-                        .let { Email.wrapRows(it) }
-                        .toList()
-
-                    if (batch.isNotEmpty()) latestMailForThisBatch = batch.minOf { it.sent }
-
-                    sendersWithoutAvatar = batch
-                        .map { it.sender }
-                        .filter { sender -> sender.avatarId == null }
-                        .map { sender -> sender.id.value }
-                        .distinct()
-
-                    val recipientsByEmail = batch.associate { email -> email.id to email.recipients.toList() }
-
-                    // One query for the whole batch, before the mails are mapped: the number hangs
-                    // off the picture, and reading it through the entity would read the bytes.
-                    val avatarPaddings = avatarPaddings(
-                        batch.flatMap { email ->
-                            recipientsByEmail.getValue(email.id).map { it.emailUser.avatarId } +
-                                    email.sender.avatarId
-                        }.filterNotNull()
-                    )
-
-                    fun stackUser(name: String?, emailUser: EmailUser) = StackMail.User(
-                        name = name,
-                        email = emailUser.address,
-                        avatarUrl = emailUser.avatarId?.let(::avatarUrl),
-                        avatarPadding = emailUser.avatarId?.let(avatarPaddings::get),
-                    )
-
-                    batch.map { email ->
-                            val recipients = recipientsByEmail.getValue(email.id)
-                            StackMail(
-                                id = email.id.value,
-                                subject = email.subject,
-                                isRead = email.isRead,
-                                sentAt = email.sent.epochSeconds,
-                                from = stackUser(email.senderName, email.sender),
-                                to = recipients
-                                    .filter { recipient -> recipient.type == EmailRecipientType.RECIPIENT }
-                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
-                                cc = recipients
-                                    .filter { recipient -> recipient.type == EmailRecipientType.CC }
-                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
-                                bcc = recipients
-                                    .filter { recipient -> recipient.type == EmailRecipientType.BCC }
-                                    .map { recipient -> stackUser(recipient.name, recipient.emailUser) },
-                                labels = email.labels.map { labelAssignment ->
-                                    StackMail.Label(
-                                        id = labelAssignment.label.id.value,
-                                        name = labelAssignment.label.name,
-                                        color = labelAssignment.label.color,
-                                        description = labelAssignment.label.description,
-                                        assignmentReason = labelAssignment.reason,
-                                        createdByAgent = labelAssignment.labeledByAgent
-                                    )
-                                }.distinctBy { it.id },
-                            )
+                        .map { row ->
+                            oldestOfBatch = minOf(oldestOfBatch ?: row[Emails.sent], row[Emails.sent])
+                            row[Emails.id].value
                         }
                 }
 
                 // Classify ahead of the stack: the window is the next AI_PROCESSED_EMAIL_PUFFER
                 // mails the stack is going to serve (this batch included), in stack order. The
-                // window is cut BEFORE looking at the classification status — filtering first
+                // window is cut BEFORE looking at the classification status -- filtering first
                 // would make it "the first 50 unclassified mails" and reach arbitrarily far past
                 // the stack into old mail. Within the window, a mail is enqueued unless it has a
                 // finished run or one that started recently (= still running); unfinished runs
@@ -175,65 +131,10 @@ fun Route.stackSocket() {
                         .forEach { row -> classificationQueue.enqueue(emailId = row[Emails.id].value) }
                 }
 
-                sendSerialized<StackServerMessage>(StackServerMessage.Emails(mails))
+                sendSerialized<StackServerMessage>(StackServerMessage.Emails(ids))
 
-                // After the mails went out, never before: a lookup is a request to a third party
-                // and would hold up the batch. What is cached already travelled with the mails
-                // above, the rest arrives through the subscription below.
-                sendersWithoutAvatar.forEach { senderId ->
-                    if (watchedSenders.add(senderId)) launch {
-                        avatarNotifier.subscribe(senderId).collect { event ->
-                            when (event) {
-                                is AvatarEvent.Resolved -> sendSerialized<StackServerMessage>(
-                                    StackServerMessage.AvatarResolved(
-                                        address = event.address,
-                                        avatarUrl = avatarUrl(event.avatarId),
-                                        avatarPadding = event.circlePadding.takeIf { it > 0 },
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    avatarQueue.enqueue(senderId)
-                }
-
-                mails.forEach { mail ->
-                    launch {
-                        emailLabelNotifier.subscribe(mail.id).collect { event ->
-                            when (event) {
-                                is EmailLabelEvent.Upsert -> {
-                                    sendSerialized<StackServerMessage>(
-                                        StackServerMessage.EmailTagsAdded(
-                                            emailId = mail.id,
-                                            tags = listOf(
-                                                StackMail.Label(
-                                                    id = event.label.id.value,
-                                                    name = event.label.name,
-                                                    color = event.label.color,
-                                                    description = event.label.description,
-                                                    assignmentReason = null,
-                                                    createdByAgent = event.label.createdByAgent
-                                                )
-                                            )
-                                        )
-                                    )
-                                }
-                                is EmailLabelEvent.Delete -> {
-                                    sendSerialized<StackServerMessage>(
-                                        StackServerMessage.EmailTagsDeleted(
-                                            emailId = mail.id,
-                                            tagIds = listOf(event.label.id.value)
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (latestMailForThisBatch != null) {
-                    latestMail = latestMailForThisBatch
+                if (oldestOfBatch != null) {
+                    latestMail = oldestOfBatch
                 }
             }
 
@@ -283,36 +184,10 @@ fun Route.stackSocket() {
 
 @Serializable
 private sealed class StackServerMessage {
+    /** The next batch of the pile, newest first. The ids are what a client subscribes to. */
     @Serializable
     @SerialName("data.emails")
-    data class Emails(@SerialName("emails") val emails: List<StackMail>) : StackServerMessage()
-
-    @Serializable
-    @SerialName("update.email.tags.upsert")
-    data class EmailTagsAdded(
-        @SerialName("email_id") val emailId: Uuid,
-        @SerialName("tags") val tags: List<StackMail.Label>
-    ) : StackServerMessage()
-
-    @Serializable
-    @SerialName("update.email.tags.delete")
-    data class EmailTagsDeleted(
-        @SerialName("email_id") val emailId: Uuid,
-        @SerialName("tag_ids") val tagIds: List<Uuid>
-    ) : StackServerMessage()
-
-    /**
-     * A picture that was found after the mails went out. By address rather than by mail: one
-     * sender appears in many of them, and the picture is the same in each.
-     */
-    @Serializable
-    @SerialName("update.avatar")
-    data class AvatarResolved(
-        @SerialName("address") val address: String,
-        @SerialName("avatar_url") val avatarUrl: String,
-        /** How much of its box the picture gives up to fit a circle; null when none. */
-        @SerialName("avatar_padding") val avatarPadding: Double?,
-    ) : StackServerMessage()
+    data class Emails(@SerialName("email_ids") val emailIds: List<Email.Id>) : StackServerMessage()
 }
 
 @Serializable
@@ -324,45 +199,12 @@ private sealed class StackClientMessage {
     @Serializable
     @SerialName("update.email.archive")
     data class ArchiveEmail(
-        @SerialName("email_id") val emailId: Uuid,
+        @SerialName("email_id") val emailId: Email.Id,
     ) : StackClientMessage()
 
     @Serializable
     @SerialName("update.email.unarchive")
     data class UnarchiveEmail(
-        @SerialName("email_id") val emailId: Uuid,
+        @SerialName("email_id") val emailId: Email.Id,
     ) : StackClientMessage()
-}
-
-@Serializable
-private data class StackMail(
-    @SerialName("id") val id: Uuid,
-    @SerialName("subject") val subject: String,
-    @SerialName("sent_at") val sentAt: Long,
-    @SerialName("is_read") val isRead: Boolean,
-    @SerialName("from") val from: User,
-    @SerialName("to") val to: List<User>,
-    @SerialName("cc") val cc: List<User>,
-    @SerialName("bcc") val bcc: List<User>,
-    @SerialName("labels") val labels: List<Label>,
-) {
-    @Serializable
-    data class User(
-        @SerialName("name") val name: String?,
-        @SerialName("email") val email: String,
-        /** Null while no picture has been found for the address; the client shows initials then. */
-        @SerialName("avatar_url") val avatarUrl: String?,
-        /** How much of its box the picture gives up to fit a circle; null when none. */
-        @SerialName("avatar_padding") val avatarPadding: Double?,
-    )
-
-    @Serializable
-    data class Label(
-        @SerialName("id") val id: Uuid,
-        @SerialName("name") val name: String,
-        @SerialName("color") val color: String,
-        @SerialName("label_description") val description: String?,
-        @SerialName("assignment_reason") val assignmentReason: String?,
-        @SerialName("created_by_agent") val createdByAgent: Boolean,
-    )
 }

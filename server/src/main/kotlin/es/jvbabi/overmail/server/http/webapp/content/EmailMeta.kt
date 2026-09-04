@@ -4,6 +4,8 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailArchives
 import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailLabels
+import es.jvbabi.overmail.server.database.models.EmailRecipientType
+import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
@@ -41,11 +43,15 @@ data class EmailMeta(
      * holds any more.
      */
     @SerialName("archive_state") val archiveState: String,
-    @SerialName("sender") val sender: Sender,
+    @SerialName("sender") val sender: Participant,
+    @SerialName("to") val to: List<Participant>,
+    @SerialName("cc") val cc: List<Participant>,
+    @SerialName("bcc") val bcc: List<Participant>,
     @SerialName("labels") val labels: List<Label>,
 ) {
+    /** Somebody a mail is from or to, as the address book has them. */
     @Serializable
-    data class Sender(
+    data class Participant(
         @SerialName("id") val id: Uuid,
         /** Display name from this mail's header, absent for a bare address. */
         @SerialName("name") val name: String?,
@@ -74,8 +80,9 @@ data class EmailMeta(
  * An id that does not exist or is somebody else's is simply missing from the answer -- the caller
  * cannot tell the two apart, and neither can the client.
  *
- * Three queries rather than one join: the labels and the archive log are one-to-many, and joining
- * them onto the mail would multiply its row and hand every mail's subject over once per label.
+ * A query per one-to-many rather than one big join: labels, recipients and the archive log all
+ * multiply a mail's row, and joined together they would hand every subject over once per
+ * combination of the three.
  *
  * Has to run inside a transaction.
  */
@@ -107,6 +114,20 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
             )
         }
 
+    val recipientsByEmail = (EmailRecipients innerJoin EmailUsers leftJoin EmailAvatars)
+        .select(
+            EmailRecipients.email,
+            EmailRecipients.name,
+            EmailRecipients.type,
+            EmailUsers.id,
+            EmailUsers.address,
+            EmailUsers.avatar,
+            EmailAvatars.circlePadding,
+        )
+        .where { EmailRecipients.email inList wanted }
+        .toList()
+        .groupBy { row -> row[EmailRecipients.email].value }
+
     // Read in order and collected into a map, so the last event of a mail is the one that stays:
     // the archive table is a log, and only its latest row says where the mail is now.
     val archiveByEmail = EmailArchives
@@ -134,19 +155,36 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
         .where { (Emails.id inList wanted) and (ImapAccounts.user eq userId) }
         .map { row ->
             val id = row[Emails.id].value
+            val recipients = recipientsByEmail[id] ?: emptyList()
+
+            fun participants(type: EmailRecipientType) = recipients
+                .filter { recipient -> recipient[EmailRecipients.type] == type }
+                .map { recipient ->
+                    EmailMeta.Participant(
+                        id = recipient[EmailUsers.id].value,
+                        name = recipient[EmailRecipients.name],
+                        address = recipient[EmailUsers.address],
+                        avatarUrl = recipient.avatarUrlOrNull(),
+                        avatarPadding = recipient.avatarPadding(),
+                    )
+                }
+
             EmailMeta(
                 id = id,
                 subject = row[Emails.subject],
                 sent = row[Emails.sent].epochSeconds,
                 isRead = row[Emails.isRead],
                 archiveState = (archiveByEmail[id] ?: EmailArchiveAction.Unarchive).wire(),
-                sender = EmailMeta.Sender(
+                sender = EmailMeta.Participant(
                     id = row[EmailUsers.id].value,
                     name = row[Emails.senderName],
                     address = row[EmailUsers.address],
                     avatarUrl = row.avatarUrlOrNull(),
                     avatarPadding = row.avatarPadding(),
                 ),
+                to = participants(EmailRecipientType.RECIPIENT),
+                cc = participants(EmailRecipientType.CC),
+                bcc = participants(EmailRecipientType.BCC),
                 labels = (labelsByEmail[id] ?: emptyList()).distinctBy { it.id },
             )
         }

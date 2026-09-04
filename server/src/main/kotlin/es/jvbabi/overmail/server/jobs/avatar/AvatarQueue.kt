@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.jobs.avatar
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.avatar.circlePadding
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailAvatar
 import es.jvbabi.overmail.server.database.models.EmailUser
@@ -44,6 +45,7 @@ class AvatarQueue(
     private val database: OvermailDatabase,
     private val avatarLookup: AvatarLookup,
     private val avatarNotifier: AvatarNotifier,
+    private val mailNotifier: MailNotifier,
 ) {
     private val logger = LoggerFactory.getLogger(AvatarQueue::class.java)
 
@@ -115,7 +117,7 @@ class AvatarQueue(
             // nothing can decode gets no padding, see EmailAvatars.circlePadding.
             val circlePadding = withContext(Dispatchers.Default) { found.data.circlePadding() } ?: 0.0
 
-            val avatarId = database.query {
+            val stored = database.query {
                 val emailUser = EmailUser.findById(emailUserId) ?: return@query null
                 val avatar = EmailAvatar.new {
                     this.data = found.data
@@ -123,10 +125,16 @@ class AvatarQueue(
                     this.circlePadding = circlePadding
                 }
                 emailUser.avatar = avatar
-                avatar.id.value
+                // The owner is read here, inside the transaction that has the row: the notifier
+                // below is per user, and a reference does not resolve once this is closed.
+                avatar.id.value to emailUser.user.id.value
             } ?: return
+            val (avatarId, userId) = stored
 
             avatarNotifier.notifyAvatarResolved(emailUserId, address, avatarId, circlePadding)
+            // Every mail of this sender shows the picture now, so whoever has one on screen has
+            // to read it again.
+            mailNotifier.notifySenderChanged(userId, emailUserId)
 
             logger.info(
                 "Found a ${found.data.size} byte avatar for ${address.maskEmail()} via " +

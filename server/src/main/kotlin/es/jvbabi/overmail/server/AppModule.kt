@@ -17,7 +17,6 @@ import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
-import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.configureRouting
@@ -68,7 +67,6 @@ private fun Application.configureDependencies() {
         provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
         provide<ApplicationConfig.AiConfig> { resolve<ApplicationConfig>().ai }
 
-        provide<EmailLabelNotifier> { EmailLabelNotifier() }
         provide<AiChatNotifier> { AiChatNotifier() }
         provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
         provide<AvatarNotifier> { AvatarNotifier() }
@@ -107,7 +105,6 @@ private fun Application.configureDependencies() {
                 config = resolve<ApplicationConfig>(),
                 model = resolve(),
                 overmailDatabase = resolve(),
-                emailLabelNotifier = resolve(),
                 mailNotifier = resolve(),
             )
         }
@@ -139,6 +136,7 @@ private fun Application.configureDependencies() {
                 database = resolve(),
                 avatarLookup = resolve(),
                 avatarNotifier = resolve(),
+                mailNotifier = resolve(),
             )
         }
 

@@ -9,7 +9,6 @@ import ai.koog.prompt.executor.model.executeStructured
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.structure.StructuredResponse
 import es.jvbabi.overmail.server.config.ApplicationConfig
-import es.jvbabi.overmail.server.data.notifier.EmailLabelNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -34,7 +33,6 @@ class EmailClassification(
     config: ApplicationConfig,
     private val model: LLModel,
     private val overmailDatabase: OvermailDatabase,
-    private val emailLabelNotifier: EmailLabelNotifier,
     private val mailNotifier: MailNotifier,
 ) {
 
@@ -279,10 +277,7 @@ class EmailClassification(
             }
             // Notified after the transaction committed, so subscribers never see a label that
             // could still be rolled back.
-            attachedLabel?.let {
-                emailLabelNotifier.notifyLabelUpsert(email.id.value, it)
-                mailNotifier.notifyMailChanged(user.id.value, email.id.value)
-            }
+            attachedLabel?.let { mailNotifier.notifyMailChanged(user.id.value, email.id.value) }
             log(
                 "Label '$requestedName': " +
                         (if (existing) "reused existing label '$resolvedName'" else "created new label") +

@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.data.notifier
 
 import es.jvbabi.overmail.server.database.models.Email
+import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.User
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,9 +38,21 @@ class MailNotifier {
     fun notifyMailChanged(userId: User.Id, emailId: Email.Id) {
         channels[userId]?.tryEmit(MailEvent.Changed(emailId))
     }
+
+    /**
+     * Something on an address book entry changed -- a picture was found for it. One event for the
+     * address rather than one per mail: a sender fills a mailbox, and a reader knows which of the
+     * mails it shows are from it.
+     */
+    fun notifySenderChanged(userId: User.Id, senderId: EmailUser.Id) {
+        channels[userId]?.tryEmit(MailEvent.SenderChanged(senderId))
+    }
 }
 
 sealed class MailEvent {
     /** [emailId] moved somehow; ask again for what you show of it. */
     data class Changed(val emailId: Email.Id) : MailEvent()
+
+    /** Every mail from [senderId] now reads differently; ask again for the ones you show. */
+    data class SenderChanged(val senderId: EmailUser.Id) : MailEvent()
 }

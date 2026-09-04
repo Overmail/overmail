@@ -1,15 +1,20 @@
 package es.jvbabi.overmail.server.http.webapp.content
 
+import es.jvbabi.overmail.server.data.avatar.AvatarLookup
+import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailArchive
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailLabel
+import es.jvbabi.overmail.server.database.models.EmailRecipient
+import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -70,6 +75,43 @@ class ContentSocketTest {
         assertEquals(false, mail["is_read"]!!.jsonPrimitive.content.toBoolean())
         assertEquals("sender@example.com", mail["sender"]!!.jsonObject["address"]!!.jsonPrimitive.content)
         assertEquals(0, mail["labels"]!!.jsonArray.size)
+        socket.close()
+    }
+
+    @Test
+    fun `the metadata carries who the mail was addressed to`() = testApplication {
+        val mails = setUp()
+        installRoute()
+        addRecipient(mails[0], "team@example.com", EmailRecipientType.RECIPIENT, "The Team")
+        addRecipient(mails[0], "boss@example.com", EmailRecipientType.CC, null)
+
+        val socket = openSocket()
+        socket.subscribe(mails[0])
+
+        val mail = socket.nextEmails().single().jsonObject
+        val to = mail["to"]!!.jsonArray.single().jsonObject
+        assertEquals("team@example.com", to["address"]!!.jsonPrimitive.content)
+        assertEquals("The Team", to["name"]!!.jsonPrimitive.content)
+        assertEquals("boss@example.com", mail["cc"]!!.jsonArray.single().jsonObject["address"]!!.jsonPrimitive.content)
+        assertEquals(0, mail["bcc"]!!.jsonArray.size)
+        socket.close()
+    }
+
+    @Test
+    fun `a picture found for the sender reaches the mails that show it`() = testApplication {
+        val mails = setUp()
+        installRoute()
+
+        val socket = openSocket()
+        socket.subscribe(mails[0])
+        val sender = socket.nextEmails().single().jsonObject["sender"]!!.jsonObject
+        val senderId = Uuid.parse(sender["id"]!!.jsonPrimitive.content)
+
+        // What the avatar queue announces once a lookup came back: the address changed, not the
+        // mail -- and the socket has to work out which of the mails on screen that touches.
+        mailNotifier.notifySenderChanged(signedIn.id.value, senderId)
+
+        assertEquals(mails[0].toString(), socket.nextEmails().single().jsonObject["id"]!!.jsonPrimitive.content)
         socket.close()
     }
 
@@ -229,6 +271,25 @@ class ContentSocketTest {
         }
     }
 
+    private suspend fun addRecipient(
+        emailId: Uuid,
+        address: String,
+        type: EmailRecipientType,
+        name: String?,
+    ) {
+        database.query {
+            EmailRecipient.new {
+                email = Email.findById(emailId)!!
+                emailUser = EmailUser.new {
+                    user = signedIn
+                    this.address = address
+                }
+                this.name = name
+                this.type = type
+            }
+        }
+    }
+
     private suspend fun archive(emailId: Uuid, action: EmailArchiveAction) {
         database.query {
             EmailArchive.new {
@@ -291,6 +352,16 @@ class ContentSocketTest {
             dependencies {
                 provide<OvermailDatabase> { database }
                 provide<MailNotifier> { mailNotifier }
+                // Nothing consumes it in the test: the senders of a batch are enqueued and stay
+                // in the queue, which is all this socket does with it.
+                provide<AvatarQueue> {
+                    AvatarQueue(
+                        database = database,
+                        avatarLookup = AvatarLookup(),
+                        avatarNotifier = AvatarNotifier(),
+                        mailNotifier = mailNotifier,
+                    )
+                }
             }
             routing {
                 route("/api/webapp/content/socket") { contentSocket() }

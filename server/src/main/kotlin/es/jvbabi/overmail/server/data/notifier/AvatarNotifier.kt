@@ -19,7 +19,7 @@ class AvatarNotifier {
     private val channels = ConcurrentHashMap<EmailUser.Id, MutableSharedFlow<AvatarEvent>>()
 
     fun subscribe(emailUserId: EmailUser.Id): SharedFlow<AvatarEvent> {
-        // replay = 1, unlike EmailLabelNotifier: a lookup is enqueued right after this and can
+        // replay = 1, unlike MailNotifier: a lookup is enqueued right after this and can
         // finish before the collector is attached, and a shared flow without replay drops what it
         // emits while nobody listens. Replaying the last picture costs a duplicate message to a
         // client that already has it, which is an assignment of the same url.

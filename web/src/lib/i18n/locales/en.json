@@ -44,7 +44,10 @@
     }
   },
   "mails": {
-    "title": "All mail",
+    "title": {
+      "unarchived": "Mailbox",
+      "all": "All mail"
+    },
     "count": "{count, plural, one {# mail} other {# mails}}",
     "groups": {
       "today": "Today",
@@ -53,13 +56,14 @@
       "month": "This month"
     },
     "filters": {
-      "archived": "Archived"
+      "allMails": "All mail"
     },
     "empty": "No mail in this mailbox.",
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",
-    "table": {
-      "noSubject": "(no subject)"
+    "noSubject": "(no subject)",
+    "preview": {
+      "noContent": "No content available"
     }
   },
   "myStack": {
@@ -144,8 +148,7 @@
       "emailCount": "{count, plural, one {# mail} other {# mails}}"
     },
     "emails": {
-      "empty": "No emails found",
-      "noPreview": "No content available"
+      "empty": "No emails found"
     }
   },
   "ui": {

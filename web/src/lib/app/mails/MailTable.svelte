@@ -44,10 +44,13 @@
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
 
-    /** Whether the archived mails are in the list. The view model starts the list over on this. */
-    let showArchived = $state(false);
+    /**
+     * Which mails the list is about. The mailbox as it stands unless somebody asks for all of it;
+     * the view model holds both, so switching is not a reload.
+     */
+    let allMails = $state(false);
 
-    $effect(() => list.setIncludeArchived(showArchived));
+    $effect(() => list.setScope(allMails ? "all" : "unarchived"));
 
     /** The box the rows sit in, measured to know where the list starts on the page. */
     let listElement = $state<HTMLDivElement | null>(null);
@@ -167,17 +170,20 @@
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
          header's height, and the background is its own -- rows would show through it. -->
     <div class="bg-background sticky top-12 z-20 flex items-baseline gap-2 px-4 py-2">
-        <h2 class="font-heading text-sm font-medium">{$_("mails.title")}</h2>
+        <h2 class="font-heading text-sm font-medium">
+            {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
+        </h2>
         {#if list.initialized}
             <span class="text-muted-foreground text-xs tabular-nums">
                 {$_("mails.count", {values: {count: list.total}})}
             </span>
         {/if}
 
-        <!-- The filters live at this end of the bar, and this is the first of them. -->
-        <Toggle bind:pressed={showArchived} size="sm" class="ms-auto text-xs">
+        <!-- The filters live at this end of the bar, and this is the first of them. Not
+             "archived yes or no" but which list it is: the mailbox, or everything that arrived. -->
+        <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
             <ArchiveIcon data-icon="inline-start"/>
-            {$_("mails.filters.archived")}
+            {$_("mails.filters.allMails")}
         </Toggle>
     </div>
 

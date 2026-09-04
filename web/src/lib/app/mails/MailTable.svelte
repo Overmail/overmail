@@ -144,7 +144,7 @@
 
             <Table.Header class="sticky top-0 z-10">
                 {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-                    <Table.Row class="hover:bg-transparent">
+                    <Table.Row class="border-0 hover:bg-transparent">
                         {#each headerGroup.headers as header (header.id)}
                             <!-- The heads carry their own bottom line as a shadow: the row's
                                  border belongs to the table and is left behind once the cells
@@ -176,7 +176,9 @@
                 {#each visible as {item, row} (row?.id ?? `pending-${item.index}`)}
                     {@const modelRow = row === undefined ? undefined : rowsById.get(row.id)}
                     {#if modelRow}
-                        <Table.Row aria-rowindex={item.index + 2} class={cn("h-8")}>
+                        <!-- No line between rows: what separates them is the row height and the
+                             hover, which is enough for one clipped line per mail. -->
+                        <Table.Row aria-rowindex={item.index + 2} class={cn("h-8 border-0")}>
                             {#each modelRow.getAllCells() as cell (cell.id)}
                                 <Table.Cell class="h-8 overflow-hidden py-0">
                                     <FlexRender {cell}/>
@@ -186,7 +188,7 @@
                     {:else}
                         <!-- A mail the list has and does not hold yet: the shape of the row
                              without the content, so nothing shifts when it arrives. -->
-                        <Table.Row aria-rowindex={item.index + 2} class="h-8 hover:bg-transparent">
+                        <Table.Row aria-rowindex={item.index + 2} class="h-8 border-0 hover:bg-transparent">
                             {#each columns as column (column.id)}
                                 {@const ghost = GHOST_SHAPES[column.id ?? ""]}
                                 <Table.Cell class="h-8 overflow-hidden py-0">
@@ -206,7 +208,7 @@
                 {/if}
 
                 {#if list.initialized && list.total === 0}
-                    <Table.Row class="hover:bg-transparent">
+                    <Table.Row class="border-0 hover:bg-transparent">
                         <Table.Cell colspan={columns.length} class="h-24 text-center">
                             <MailsEmpty/>
                         </Table.Cell>

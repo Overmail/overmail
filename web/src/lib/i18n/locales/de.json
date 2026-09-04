@@ -53,9 +53,7 @@
       "sender": "VON",
       "subject": "BETREFF",
       "sentAt": "GESENDET",
-      "noSubject": "(kein Betreff)",
-      "unread": "Ungelesen",
-      "archived": "Archiviert"
+      "noSubject": "(kein Betreff)"
     }
   },
   "myStack": {

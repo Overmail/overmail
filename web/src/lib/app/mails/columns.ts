@@ -2,7 +2,6 @@ import {createColumnHelper, renderComponent, tableFeatures} from "@tanstack/svel
 import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
 import MailSenderCell from "./table/MailSenderCell.svelte";
 import MailSentAtCell from "./table/MailSentAtCell.svelte";
-import MailStatusCell from "./table/MailStatusCell.svelte";
 import MailSubjectCell from "./table/MailSubjectCell.svelte";
 
 /**
@@ -45,11 +44,6 @@ export const columns = columnHelper.columns([
         header: "mails.table.sentAt",
         cell: cell(MailSentAtCell as MailCell),
     }),
-    columnHelper.display({
-        id: "status",
-        header: "",
-        cell: cell(MailStatusCell as MailCell),
-    }),
 ]);
 
 /**
@@ -62,7 +56,6 @@ export const COLUMN_WIDTHS: Record<string, string | undefined> = {
     sender: "18rem",
     subject: undefined,
     sent: "11rem",
-    status: "7rem",
 };
 
 /**
@@ -76,5 +69,4 @@ export const GHOST_SHAPES: Record<string, {width: string; withAvatar?: boolean}>
     sender: {width: "w-44", withAvatar: true},
     subject: {width: "w-full"},
     sent: {width: "w-28"},
-    status: {width: "w-16"},
 };

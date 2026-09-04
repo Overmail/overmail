@@ -53,9 +53,7 @@
       "sender": "FROM",
       "subject": "SUBJECT",
       "sentAt": "SENT",
-      "noSubject": "(no subject)",
-      "unread": "Unread",
-      "archived": "Archived"
+      "noSubject": "(no subject)"
     }
   },
   "myStack": {

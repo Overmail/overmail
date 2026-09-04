@@ -74,8 +74,11 @@
     <InputGroup.Root class="flex-1 min-h-0">
         {#if promptViewModel.isEmpty}
             {#key placeholderKey}
+                <!-- inset-x-3 rather than a left edge alone: that is what gives the line a width
+                     to be cut off at, so a long hint ends in an ellipsis instead of wrapping over
+                     the first line the user types. -->
                 <span
-                        class="absolute top-2.5 left-3 text-muted-foreground pointer-events-none"
+                        class="absolute inset-x-3 top-2.5 truncate text-muted-foreground pointer-events-none"
                         in:fade={{delay: 300, duration: 300}}
                         out:fade={{duration: 300}}
                 >
@@ -112,11 +115,13 @@
                 </Select.Content>
             </Select.Root>
 
-            <InputGroup.Text class="ms-auto">
+            <!-- min-w-0 on both: a flex item does not shrink below its text on its own, and
+                 without that the model name pushes the send button out of a narrow panel. -->
+            <InputGroup.Text class="ms-auto min-w-0">
                 {#if promptViewModel.currentModel.type === "loading"}
                     <Spinner />
                 {:else}
-                    {promptViewModel.currentModel.model}
+                    <span class="min-w-0 truncate">{promptViewModel.currentModel.model}</span>
                 {/if}
             </InputGroup.Text>
             <Separator orientation="vertical" class="h-4!"/>

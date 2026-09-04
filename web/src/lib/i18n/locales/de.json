@@ -6,6 +6,9 @@
       "home": "Start",
       "stack": "Stack"
     },
+    "panel": {
+      "resize": "Breite des Assistenten ändern"
+    },
     "language": {
       "label": "Sprache"
     }

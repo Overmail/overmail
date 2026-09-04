@@ -1,5 +1,6 @@
 import type {Prompt} from "$lib/app/ai/composer/prompt";
 import {ChatHistoryRepository, type AiChatMessage} from "$lib/app/ai/ChatHistoryRepository";
+import {SessionValue} from "$lib/hooks/session-value.svelte";
 
 export class AiChatViewModel {
     /** Declared, not a constructor parameter property: the derived state below reads it. */
@@ -7,7 +8,27 @@ export class AiChatViewModel {
 
     chats: AiChat[] = $state([]);
 
-    currentChatId: string | null = $state(null);
+    /**
+     * The chat this tab has open. Kept in the tab's storage as well: the panel is built anew on
+     * every reload, and coming back to an empty prompt loses the thread the user was in.
+     */
+    private readonly storedChatId = new SessionValue<string | null>(
+        "overmail.panel.chat",
+        null,
+        (stored) => typeof stored === "string" ? stored : null,
+    );
+
+    private chatId: string | null = $state(null);
+
+    get currentChatId(): string | null {
+        return this.chatId;
+    }
+
+    set currentChatId(next: string | null) {
+        this.chatId = next;
+        this.storedChatId.current = next;
+    }
+
     currentChat: AiChat | null = $derived(this.chats.find((chat) => chat.id === this.currentChatId) ?? null);
 
     /** Messages of the open chat, oldest first. Empty while none is selected or loaded. */
@@ -76,6 +97,24 @@ export class AiChatViewModel {
         });
 
         this.webSocketHandler.start();
+
+        const restored = this.storedChatId.current;
+        if (restored !== null) {
+            // Straight to the field: the storage already says this, and the setter would only
+            // write back what it just read.
+            this.chatId = restored;
+            void this.restoreChat(restored);
+        }
+    }
+
+    /**
+     * The messages of the chat that was open before the reload. Deleted in the meantime -- in
+     * another tab, or from another device -- and the panel falls back to a new chat rather than
+     * showing an empty message list under a title that is not there either.
+     */
+    private async restoreChat(chatId: string) {
+        const loaded = await this.chatHistory.loadChat(chatId, true, true);
+        if (!loaded && this.currentChatId === chatId) this.currentChatId = null;
     }
 
     dispose() {

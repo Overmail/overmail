@@ -11,6 +11,8 @@
 	import {createPageHeader} from '$lib/app/shell/pageHeader.svelte';
 	import AppHeader from "$lib/app/shell/AppHeader.svelte";
 	import CheckingSession from "$lib/app/shell/CheckingSession.svelte";
+	import {SidePanelState} from "$lib/app/shell/sidePanel.svelte";
+	import SidePanelResizer from "$lib/app/shell/SidePanelResizer.svelte";
 	import {fade} from 'svelte/transition';
 
 	let { children } = $props();
@@ -42,7 +44,12 @@
 		});
 	});
 
-	let sidebarOpen = $state(false);
+	// Whether it is open and how wide it is come out of the tab's sessionStorage, which the panel
+	// may read because it is never part of a server render: it only exists once the session check
+	// below is through, and that runs on the client.
+	const panel = new SidePanelState();
+
+	let panelElement: HTMLElement | undefined = $state();
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
@@ -57,7 +64,7 @@
 {:else if isAuthRoute || session}
 	{#if session}
 
-		<Sidebar.Provider style="--panel-width: 36rem;">
+		<Sidebar.Provider style="--panel-width: {panel.width}px;">
 			<AppNavbar />
 			<!-- Renders the <main> and stretches to the wrapper's min-h-svh, so pages can size
 			     their content with flex-1 instead of a percentage height that has nothing to
@@ -65,7 +72,7 @@
 			<Sidebar.Inset>
 				<AppHeader
 						{header}
-						bind:sidebarOpen={sidebarOpen}
+						bind:sidebarOpen={panel.open}
 				/>
 				{@render children()}
 			</Sidebar.Inset>
@@ -77,17 +84,29 @@
 			     behind it scrolls. -->
 			<div
 					class={[
-						"shrink-0 transition-[width] duration-200 ease-linear",
-						sidebarOpen ? "w-(--panel-width)" : "w-0",
+						"shrink-0",
+						// The panel follows the pointer during a drag; animating the box next to it
+						// would leave the page a fifth of a second behind the edge being dragged.
+						panel.isResizing ? "" : "transition-[width] duration-200 ease-linear",
+						panel.open ? "w-(--panel-width)" : "w-0",
 					]}
 			></div>
 			<div
+					bind:this={panelElement}
 					class={[
-						"fixed inset-y-0 z-10 flex w-(--panel-width) flex-col border-s bg-background",
-						"transition-[left,right] duration-200 ease-linear",
-						sidebarOpen ? "inset-e-0" : "-inset-e-(--panel-width)",
+						// Above the header's z-30 rather than below it: the panel's own z is the
+						// stacking context the grip lives in, and it reaches a few pixels into the
+						// page, where the header would otherwise paint over its top.
+						"fixed inset-y-0 z-40 flex w-(--panel-width) flex-col border-s bg-background",
+						panel.isResizing ? "" : "transition-[left,right] duration-200 ease-linear",
+						panel.open ? "inset-e-0" : "-inset-e-(--panel-width)",
 					]}
 			>
+				<!-- Only while open: closed, the panel sits outside the window, and a handle out
+				     there is still in the tab order. -->
+				{#if panel.open}
+					<SidePanelResizer {panel} element={panelElement} />
+				{/if}
 				<AppSidebar />
 			</div>
 		</Sidebar.Provider>

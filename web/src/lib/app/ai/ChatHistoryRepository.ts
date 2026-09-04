@@ -4,14 +4,15 @@ export class ChatHistoryRepository {
     chats = new SvelteMap<string, AiChat>()
     private streamingHandler = new ChatResponseStreamingHandler();
 
-    async loadChat(chatId: string, withActiveStream: boolean, forceReload: boolean = false) {
+    /** Whether the chat is in the map afterwards -- a caller that restored an id needs to know. */
+    async loadChat(chatId: string, withActiveStream: boolean, forceReload: boolean = false): Promise<boolean> {
         if (!forceReload && this.chats.has(chatId)) {
-            return;
+            return true;
         }
         const response = await fetch(`/api/webapp/ai/chat/${chatId}/history`);
         if (!response.ok) {
             console.error(`Failed to load chat history for chat ${chatId}: ${response.status} ${response.statusText}`);
-            return;
+            return false;
         }
 
         const data = await response.json();
@@ -108,6 +109,7 @@ export class ChatHistoryRepository {
 
 
         this.chats.set(chatId, chat);
+        return true;
     }
 
     /**

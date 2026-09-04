@@ -6,6 +6,9 @@
       "home": "Home",
       "stack": "Stack"
     },
+    "panel": {
+      "resize": "Resize the assistant"
+    },
     "language": {
       "label": "Language"
     }

@@ -20,8 +20,11 @@
     const item = $derived(currentNavItem(page.url.pathname));
 </script>
 
+<!-- Sticky: the page is one scroll container, so without this the bar with the page's name and
+     the assistant scrolls away with the greeting. Above what the pages stick themselves, and with
+     a background of its own -- rows would otherwise run through it. -->
 <header
-        class="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear h-12"
+        class="bg-background sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-[width,height] ease-linear h-12"
 >
     <div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <Sidebar.Trigger class="-ms-1" />

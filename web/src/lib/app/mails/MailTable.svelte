@@ -10,7 +10,7 @@
     import {_} from "svelte-i18n";
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
-    import {createVirtualizer} from "$lib/hooks/virtualizer.svelte";
+    import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
@@ -42,29 +42,47 @@
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
 
-    let viewport = $state<HTMLDivElement | null>(null);
+    /** The box the rows sit in, measured to know where the list starts on the page. */
+    let listElement = $state<HTMLDivElement | null>(null);
+
+    /**
+     * How far down the page the first row sits. The page is the scroll container, so this is
+     * what tells the virtualizer which of its rows the scroll position means -- and it is why
+     * the greeting and the heatmap above simply scroll away before the rows start moving.
+     */
+    let scrollMargin = $state(0);
+
+    $effect(() => {
+        const element = listElement;
+        if (element === null) return;
+
+        const measure = () => (scrollMargin = element.getBoundingClientRect().top + window.scrollY);
+        measure();
+
+        // Everything above the list can change height -- the heatmap filling in, the greeting
+        // arriving, the window being resized -- and each of those moves where the list starts.
+        const observer = new ResizeObserver(measure);
+        observer.observe(document.body);
+        return () => observer.disconnect();
+    });
 
     /** Whether the length is known at all yet. Before that a handful of rows stand in for it. */
     const visibleRowCount = $derived(
         list.layout.length === 0 && !list.initialized ? PLACEHOLDER_ROWS : list.layout.length
     );
 
-    const virtualizer = createVirtualizer<HTMLDivElement, HTMLTableRowElement>(() => {
-        // Read out here rather than only inside `getScrollElement`: that closure is called by the
-        // virtualizer, long after the effect that tracks these options has run, so reading it
-        // there would not make the binding of the element reach the virtualizer.
-        const scrollElement = viewport;
-
-        // Read here as well, so the sizes follow the layout: a stretch of headers appearing
-        // changes which rows are tall and which are not.
+    const virtualizer = createWindowVirtualizer<HTMLTableRowElement>(() => {
+        // Read out here rather than inside the callbacks below: those are called by the
+        // virtualizer, long after the effect that tracks these options has run.
         const layout = list.layout;
 
         return {
             count: visibleRowCount,
-            getScrollElement: () => scrollElement,
+            // Follows the layout: a stretch of headers appearing changes which rows are tall.
             estimateSize: (index: number) =>
                 layout.rowAt(index)?.kind === "header" ? HEADER_HEIGHT : ROW_HEIGHT,
             overscan: OVERSCAN,
+            scrollMargin,
         };
     });
 
@@ -127,13 +145,21 @@
     $effect(() => () => list.dispose());
 
     // Spacer rows rather than absolutely positioned ones: a `<tr>` taken out of the flow loses
-    // the table layout, and with it the column widths the sticky header lines up with.
-    const paddingTop = $derived(visible[0]?.item.start ?? 0);
-    const paddingBottom = $derived(virtualizer.totalSize - (visible.at(-1)?.item.end ?? 0));
+    // the table layout, and with it the column widths.
+    //
+    // Item positions are page positions, so the margin comes back off them -- what is padded
+    // here is the space inside the list, not the space in front of it.
+    const paddingTop = $derived((visible[0]?.item.start ?? scrollMargin) - scrollMargin);
+    const paddingBottom = $derived(
+        virtualizer.totalSize - ((visible.at(-1)?.item.end ?? scrollMargin) - scrollMargin)
+    );
 </script>
 
-<section class="flex flex-col gap-3">
-    <div class="flex items-baseline gap-2 px-4">
+<section class="flex flex-col">
+    <!-- Stays under the app header while the rows run past it: this is the bar the filters go
+         into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
+         header's height, and the background is its own -- rows would show through it. -->
+    <div class="bg-background sticky top-12 z-20 flex items-baseline gap-2 px-4 py-2">
         <h2 class="font-heading text-sm font-medium">{$_("mails.title")}</h2>
         {#if list.initialized}
             <span class="text-muted-foreground text-xs tabular-nums">
@@ -142,14 +168,12 @@
         {/if}
     </div>
 
-    <!-- The scroll container, and the element the virtualizer measures. Its own box rather than
-         the table's wrapper, which never scrolls.
-
-         No frame and nothing rounded: the list is rows and nothing else, and a rounded box that
-         scrolls clips the first and the last of them at the corners. -->
+    <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap
+         above scroll away before the rows begin to move. The table's own wrapper is kept from
+         scrolling as well, or it would clip the rows vertically along with sideways. -->
     <div
-            bind:this={viewport}
-            class="h-[70vh] overflow-auto [&>[data-slot=table-container]]:overflow-visible"
+            bind:this={listElement}
+            class="[&>[data-slot=table-container]]:overflow-visible"
     >
         <!-- The row count is stated for a screen reader, because the DOM no longer carries it: a
              windowed table holds the rows near the viewport and nothing else. -->

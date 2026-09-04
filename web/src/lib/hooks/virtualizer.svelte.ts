@@ -3,6 +3,9 @@ import {
 	elementScroll,
 	observeElementOffset,
 	observeElementRect,
+	observeWindowOffset,
+	observeWindowRect,
+	windowScroll,
 	type PartialKeys,
 	type VirtualItem,
 	type VirtualizerOptions
@@ -15,6 +18,12 @@ export type VirtualizerRuneOptions<
 > = PartialKeys<
 	VirtualizerOptions<TScrollElement, TItemElement>,
 	'observeElementRect' | 'observeElementOffset' | 'scrollToFn' | 'onChange'
+>;
+
+/** The same, for a list the page itself scrolls -- there is no element to be handed. */
+export type WindowVirtualizerRuneOptions<TItemElement extends Element> = PartialKeys<
+	VirtualizerOptions<Window, TItemElement>,
+	'getScrollElement' | 'observeElementRect' | 'observeElementOffset' | 'scrollToFn' | 'onChange'
 >;
 
 /**
@@ -30,6 +39,39 @@ export type VirtualizerRuneOptions<
 export function createVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
 	getOptions: () => VirtualizerRuneOptions<TScrollElement, TItemElement>
 ) {
+	return virtualizerRune<TScrollElement, TItemElement>(() => ({
+		observeElementRect,
+		observeElementOffset,
+		scrollToFn: elementScroll,
+		...getOptions()
+	}));
+}
+
+/**
+ * The same, for a list the page scrolls rather than a box of its own.
+ *
+ * What a caller owes it beyond the options of the element version is `scrollMargin`: how far
+ * down the page the list starts. Without it every item sits that far too high, and with it a
+ * header above the list scrolls away before the rows begin to move.
+ */
+export function createWindowVirtualizer<TItemElement extends Element>(
+	getOptions: () => WindowVirtualizerRuneOptions<TItemElement>
+) {
+	return virtualizerRune<Window, TItemElement>(() => ({
+		// Null while there is no window: this is constructed on the server too, and the effects
+		// that attach the observers are what does not run there.
+		getScrollElement: () => (typeof window === 'undefined' ? null : window),
+		observeElementRect: observeWindowRect,
+		observeElementOffset: observeWindowOffset,
+		scrollToFn: windowScroll,
+		initialRect: { width: 0, height: 0 },
+		...getOptions()
+	}));
+}
+
+function virtualizerRune<TScrollElement extends Element | Window, TItemElement extends Element>(
+	resolveOptions: () => Omit<VirtualizerOptions<TScrollElement, TItemElement>, 'onChange'>
+) {
 	// The virtualizer mutates itself in place, so it cannot be `$state` itself. What the getters
 	// below hand out is copied off it whenever it reports a change.
 	let items = $state<VirtualItem[]>([]);
@@ -41,10 +83,7 @@ export function createVirtualizer<TScrollElement extends Element, TItemElement e
 	}
 
 	const resolve = (): VirtualizerOptions<TScrollElement, TItemElement> => ({
-		observeElementRect,
-		observeElementOffset,
-		scrollToFn: elementScroll,
-		...getOptions(),
+		...resolveOptions(),
 		onChange: () => publish()
 	});
 

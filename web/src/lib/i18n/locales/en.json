@@ -50,10 +50,8 @@
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",
     "table": {
-      "sender": "FROM",
-      "subject": "SUBJECT",
-      "sentAt": "SENT",
-      "noSubject": "(no subject)"
+      "noSubject": "(no subject)",
+      "sentRelative": "{days, plural, =1 {yesterday} =2 {2 days ago} other {3 days ago}}"
     }
   },
   "myStack": {

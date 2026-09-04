@@ -122,12 +122,11 @@
         {/if}
     </div>
 
-    <!-- The scroll container has to be this one and not the table's own wrapper: the sticky
-         header sticks to its nearest scrolling ancestor, and the wrapper never scrolls.
+    <!-- The scroll container, and the element the virtualizer measures. Its own box rather than
+         the table's wrapper, which never scrolls.
 
-         No frame around it: the rows carry their own lines and the header its shadow, which is
-         all the structure the list needs. Nothing is rounded either -- a rounded box that scrolls
-         clips the first and last row at the corners. -->
+         No frame and nothing rounded: the list is rows and nothing else, and a rounded box that
+         scrolls clips the first and the last of them at the corners. -->
     <div
             bind:this={viewport}
             class="h-[70vh] overflow-auto [&>[data-slot=table-container]]:overflow-visible"
@@ -141,27 +140,6 @@
                     <col style={width ? `width: ${width}` : undefined}/>
                 {/each}
             </colgroup>
-
-            <Table.Header class="sticky top-0 z-10">
-                {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-                    <Table.Row class="border-0 hover:bg-transparent">
-                        {#each headerGroup.headers as header (header.id)}
-                            <!-- The heads carry their own bottom line as a shadow: the row's
-                                 border belongs to the table and is left behind once the cells
-                                 lift out of the flow. The background is on the cells, not the row
-                                 -- rows scroll under a sticky `thead` and a transparent one lets
-                                 them show through. -->
-                            <Table.Head
-                                    class="font-heading bg-background h-8 py-0 text-xs shadow-[inset_0_-1px_0_var(--border)]"
-                            >
-                                {#if header.column.columnDef.header}
-                                    {$_(String(header.column.columnDef.header))}
-                                {/if}
-                            </Table.Head>
-                        {/each}
-                    </Table.Row>
-                {/each}
-            </Table.Header>
 
             <Table.Body>
                 <!-- The rows that are not rendered, as height. A bare row rather than a
@@ -178,7 +156,7 @@
                     {#if modelRow}
                         <!-- No line between rows: what separates them is the row height and the
                              hover, which is enough for one clipped line per mail. -->
-                        <Table.Row aria-rowindex={item.index + 2} class={cn("h-8 border-0")}>
+                        <Table.Row aria-rowindex={item.index + 1} class={cn("h-8 border-0")}>
                             {#each modelRow.getAllCells() as cell (cell.id)}
                                 <Table.Cell class="h-8 overflow-hidden py-0">
                                     <FlexRender {cell}/>
@@ -188,7 +166,7 @@
                     {:else}
                         <!-- A mail the list has and does not hold yet: the shape of the row
                              without the content, so nothing shifts when it arrives. -->
-                        <Table.Row aria-rowindex={item.index + 2} class="h-8 border-0 hover:bg-transparent">
+                        <Table.Row aria-rowindex={item.index + 1} class="h-8 border-0 hover:bg-transparent">
                             {#each columns as column (column.id)}
                                 {@const ghost = GHOST_SHAPES[column.id ?? ""]}
                                 <Table.Cell class="h-8 overflow-hidden py-0">

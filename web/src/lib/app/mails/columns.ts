@@ -27,21 +27,21 @@ const cell = (component: MailCell) => {
     return ({row}: {row: {original: MailTableRow}}) => renderComponent(component, {mail: row.original.mail});
 };
 
-/** The headers are keys, not text: they have to follow the locale, see MailTable. */
+/**
+ * No headers: the columns are a sender, a subject and a time, which a reader recognises without
+ * being told. The widths below are what gives the table its shape instead.
+ */
 export const columns = columnHelper.columns([
     columnHelper.display({
         id: "sender",
-        header: "mails.table.sender",
         cell: cell(MailSenderCell as MailCell),
     }),
     columnHelper.display({
         id: "subject",
-        header: "mails.table.subject",
         cell: cell(MailSubjectCell as MailCell),
     }),
     columnHelper.display({
         id: "sent",
-        header: "mails.table.sentAt",
         cell: cell(MailSentAtCell as MailCell),
     }),
 ]);

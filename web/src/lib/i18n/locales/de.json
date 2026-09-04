@@ -50,10 +50,8 @@
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",
     "table": {
-      "sender": "VON",
-      "subject": "BETREFF",
-      "sentAt": "GESENDET",
-      "noSubject": "(kein Betreff)"
+      "noSubject": "(kein Betreff)",
+      "sentRelative": "{days, plural, =1 {gestern} =2 {vorgestern} other {vor drei Tagen}}"
     }
   },
   "myStack": {

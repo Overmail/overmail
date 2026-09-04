@@ -1,6 +1,4 @@
-import type {Prompt, PromptLabel, PromptSegment, PromptSender} from "$lib/app/ai/composer/prompt";
-
-export type LabelSearchResult = PromptLabel & {emailCount: number};
+import type {Prompt, PromptSegment, PromptSender} from "$lib/app/ai/composer/prompt";
 
 export type SenderSearchResult = PromptSender & {emailCount: number};
 
@@ -45,22 +43,6 @@ export class OvermailPromptViewModel {
 
     setSegments(segments: PromptSegment[]) {
         this.prompt.segments = segments;
-    }
-
-    async findLabels(query: string): Promise<LabelSearchResult[]> {
-        const response = await fetch(`/api/labels/search?query=${encodeURIComponent(query)}`);
-        if (!response.ok) return [];
-
-        const data: {
-            labels: {id: string; name: string; color: string; email_count: number}[];
-        } = await response.json();
-
-        return data.labels.map((label) => ({
-            id: label.id,
-            name: label.name,
-            color: label.color,
-            emailCount: label.email_count,
-        }));
     }
 
     async findSenders(query: string): Promise<SenderSearchResult[]> {

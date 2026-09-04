@@ -24,6 +24,8 @@
 <script lang="ts">
 	import { cn, type WithElementRef } from "$lib/utils.js";
 	import type { HTMLAnchorAttributes } from "svelte/elements";
+	import { XIcon } from "phosphor-svelte";
+	import { _ } from "svelte-i18n";
 
 	let {
 		ref = $bindable(null),
@@ -32,6 +34,7 @@
 		variant = "default",
 		color,
 		style,
+		onremove,
 		children,
 		...restProps
 	}: WithElementRef<HTMLAnchorAttributes> & {
@@ -42,6 +45,11 @@
 		 * which colour comes in. See the style block below.
 		 */
 		color?: string;
+		/**
+		 * Makes the badge removable: an X after the content, and this is what pressing it calls.
+		 * Without it the badge carries no button at all and stays a label like any other.
+		 */
+		onremove?: () => void;
 	} = $props();
 
 	const tintStyle = $derived(
@@ -60,6 +68,29 @@
 	{...restProps}
 >
 	{@render children?.()}
+
+	{#if onremove}
+		<!--
+			A button, because it is one: the badge itself is a span or a link, and the X has to be
+			reachable by keyboard either way. `data-icon=inline-end` is what makes the badge
+			tighten its trailing padding for it, the same as for an icon a caller puts there, and
+			the size is set here because the badge only sizes its own direct children.
+		-->
+		<button
+			type="button"
+			data-icon="inline-end"
+			class="inline-flex shrink-0 items-center justify-center rounded-xs opacity-60 outline-none transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 cursor-pointer"
+			onclick={(event) => {
+				// A removable badge can be a link as well, and the X is not the way to it.
+				event.preventDefault();
+				event.stopPropagation();
+				onremove();
+			}}
+		>
+			<XIcon class="size-3.5" />
+			<span class="sr-only">{$_("ui.badge.remove")}</span>
+		</button>
+	{/if}
 </svelte:element>
 
 <!--

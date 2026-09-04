@@ -104,6 +104,13 @@
       }
     }
   },
+  "labels": {
+    "empty": "No labels found",
+    "emailCount": "{count, plural, one {# mail} other {# mails}}",
+    "create": "New label “{name}”",
+    "search": "Search labels",
+    "add": "Add a label"
+  },
   "ai": {
     "title": "Overmail AI",
     "chat": {
@@ -149,11 +156,6 @@
         "toolCalls": "{count, plural, one {# tool call} other {# tool calls}}"
       }
     },
-    "labels": {
-      "empty": "No labels found",
-      "emailCount": "{count, plural, one {# mail} other {# mails}}",
-      "create": "New label “{name}”"
-    },
     "shortcuts": {
       "navigate": "Navigate",
       "select": "Select",
@@ -168,6 +170,9 @@
     }
   },
   "ui": {
+    "badge": {
+      "remove": "Remove"
+    },
     "sidebar": {
       "toggle": "Toggle sidebar",
       "title": "Sidebar",

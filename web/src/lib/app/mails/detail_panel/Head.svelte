@@ -16,6 +16,8 @@
         XIcon
     } from "phosphor-svelte";
     import * as Tooltip from "$lib/components/ui/tooltip";
+    import {scale, slide} from "svelte/transition";
+    import {cubicOut} from "svelte/easing";
     import {emailSlug} from "$lib/app/mails/emailPath";
     import {page} from "$app/state";
 
@@ -43,7 +45,18 @@
         onChangeReadState: (isRead: boolean) => Promise<void>;
     } = $props();
 
+    /**
+     * Zoom and fade, for two things that take the same place: the one going out and the one
+     * coming in overlap, so the button reads as one thing changing rather than two swapping.
+     * Short, because it says "that worked" and nothing more.
+     */
+    const SWAP_MS = 140;
+    const swap = {duration: SWAP_MS, start: 0.4, opacity: 0, easing: cubicOut};
+
     const emailPageUrl = $derived(page.url.origin + "/emails/" + emailSlug(mail.id, mail.subject));
+
+    /** Anything but the mailbox: archived, or filed as spam. Neither can be filed again. */
+    const isFiled = $derived(mail.archiveState !== "unarchive");
 
     let showCopyCheckmark = $state(false);
     let hideCopyCheckmarkTimeout: ReturnType<typeof setTimeout> | null = $state(null);
@@ -133,78 +146,98 @@
             </Tooltip.Trigger>
 
             <Tooltip.Content>
-                E-Mail Teilen
+                E-Mail teilen
             </Tooltip.Content>
         </Tooltip.Root>
 
-        {#if mail.archiveState === "archive" || mail.archiveState === "spam"}
-            <Tooltip.Root>
-                <Tooltip.Trigger>
-                    <Button
-                            variant="ghost"
-                            size="icon"
-                            onclick={() => onChangeArchiveState("unarchive")}
-                    >
-                        <TrayArrowDownIcon />
-                    </Button>
-                </Tooltip.Trigger>
+        <!-- The way out and the way back sit in the same place, so they cross over each other
+             instead of one replacing the other. A grid with both children in the one cell: the
+             box is as big as they are, with nothing to keep in step by hand. -->
+        <div class="grid grid-cols-1 grid-rows-1 *:col-start-1 *:row-start-1">
+            {#if isFiled}
+                <div transition:scale={swap}>
+                    <Tooltip.Root>
+                        <Tooltip.Trigger>
+                            <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onclick={() => onChangeArchiveState("unarchive")}
+                            >
+                                <TrayArrowDownIcon />
+                            </Button>
+                        </Tooltip.Trigger>
 
-                <Tooltip.Content>
-                    Zurück ins Postfach verschieben
-                </Tooltip.Content>
-            </Tooltip.Root>
-        {:else}
-            <Tooltip.Root>
-                <Tooltip.Trigger>
-                    <Button
-                            variant="ghost"
-                            size="icon"
-                            onclick={() => onChangeArchiveState("archive")}
-                    >
-                        <ArchiveIcon />
-                    </Button>
-                </Tooltip.Trigger>
+                        <Tooltip.Content>
+                            Zurück ins Postfach verschieben
+                        </Tooltip.Content>
+                    </Tooltip.Root>
+                </div>
+            {:else}
+                <div transition:scale={swap}>
+                    <Tooltip.Root>
+                        <Tooltip.Trigger>
+                            <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onclick={() => onChangeArchiveState("archive")}
+                            >
+                                <ArchiveIcon />
+                            </Button>
+                        </Tooltip.Trigger>
 
-                <Tooltip.Content>
-                    Archivieren
-                </Tooltip.Content>
-            </Tooltip.Root>
+                        <Tooltip.Content>
+                            Archivieren
+                        </Tooltip.Content>
+                    </Tooltip.Root>
+                </div>
+            {/if}
+        </div>
 
-            <Tooltip.Root>
-                <Tooltip.Trigger>
-                    <Button
-                            variant="ghost"
-                            size="icon"
-                            onclick={() => onChangeArchiveState("spam")}
-                    >
-                        <ProhibitIcon />
-                    </Button>
-                </Tooltip.Trigger>
+        {#if !isFiled}
+            <!-- Spam is only a decision about a mail that is in the mailbox. It squeezes out of
+                 the row rather than leaving a hole in it: the width slides, the icon zooms. -->
+            <div transition:slide={{axis: "x", duration: SWAP_MS, easing: cubicOut}}>
+                <div transition:scale={swap}>
+                    <Tooltip.Root>
+                        <Tooltip.Trigger>
+                            <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onclick={() => onChangeArchiveState("spam")}
+                            >
+                                <ProhibitIcon />
+                            </Button>
+                        </Tooltip.Trigger>
 
-                <Tooltip.Content>
-                    Als Spam markieren
-                </Tooltip.Content>
-            </Tooltip.Root>
+                        <Tooltip.Content>
+                            Als Spam markieren
+                        </Tooltip.Content>
+                    </Tooltip.Root>
+                </div>
+            </div>
         {/if}
 
         <Tooltip.Root>
             <Tooltip.Trigger>
+                <!-- The checkmark grows out of the link rather than taking its place in the
+                     next frame: both in the one grid cell, and the button centres them the way
+                     it centres a single icon -- `grid` is the only thing it takes over from it. -->
                 <Button
-                        class="mr-1"
+                        class="mr-1 grid *:col-start-1 *:row-start-1"
                         variant="ghost"
                         size="icon"
                         onclick={copyLinkToClipboard}
                 >
-                    {#if !showCopyCheckmark}
-                        <LinkSimpleIcon />
+                    {#if showCopyCheckmark}
+                        <span transition:scale={swap}><CheckIcon /></span>
                     {:else}
-                        <CheckIcon />
+                        <span transition:scale={swap}><LinkSimpleIcon /></span>
                     {/if}
                 </Button>
             </Tooltip.Trigger>
 
             <Tooltip.Content>
-                E-Mail URL kopieren
+                E-Mail URL kopieren (Nur du kannst ihn verwenden)
             </Tooltip.Content>
         </Tooltip.Root>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import {untrack} from "svelte";
     import {quintOut} from "svelte/easing";
-    import {useRepositories} from "$lib/repository/repositories.ts";
+    import {useRepositories} from "$lib/repository/repositories";
     import Head from "./Head.svelte";
     import type {MailStep} from "$lib/app/mails/MailListViewModel.svelte.js";
     import Labels from "$lib/app/mails/detail_panel/Labels.svelte";

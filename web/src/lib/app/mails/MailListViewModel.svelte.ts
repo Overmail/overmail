@@ -42,6 +42,12 @@ export class MailListViewModel {
     /** The rows this holds a subscription for, by id. */
     private readonly subscribed = new Map<string, () => void>();
 
+    /**
+     * Whether the list holds archived mails as well. Off by default: archiving a mail is putting
+     * it away, and a list that shows it anyway is a list where that did nothing.
+     */
+    private includeArchived = $state(false);
+
     /** The stretches as the server counted them, or null while they are on their way. */
     private groupCounts: MailGroupCount[] | null = $state(null);
 
@@ -63,6 +69,17 @@ export class MailListViewModel {
         private readonly mails: EmailRepository,
         private readonly grouping: MailGrouping = "date",
     ) {}
+
+    /**
+     * Switches the archived mails in or out. A different filter is a different list, so
+     * everything held for the old one goes -- its pages, its stretches and its subscriptions.
+     */
+    setIncludeArchived(include: boolean) {
+        if (include === this.includeArchived) return;
+
+        this.includeArchived = include;
+        this.reset();
+    }
 
     /** The mail at [index], or undefined while that page is not here. */
     idAt(index: number): string | undefined {
@@ -112,12 +129,21 @@ export class MailListViewModel {
 
     /** Asks again after a failure -- what the retry button does. */
     retry() {
-        this.failed = false;
+        this.reset();
+        void this.loadGroups();
+        void this.load(0);
+    }
+
+    /** Back to knowing nothing, so the next window asks for everything again. */
+    private reset() {
+        this.dispose();
+        this.entries = {};
         this.pages.clear();
         this.groupCounts = null;
         this.isLoadingGroups = false;
-        void this.loadGroups();
-        void this.load(0);
+        this.total = 0;
+        this.initialized = false;
+        this.failed = false;
     }
 
     /** Lets go of every row. The table calls this when it goes away. */
@@ -159,7 +185,9 @@ export class MailListViewModel {
         this.isLoadingGroups = true;
 
         try {
-            const response = await fetch(`/api/emails/list/groups?by=${this.grouping}`);
+            const response = await fetch(
+                `/api/emails/list/groups?by=${this.grouping}&archived=${this.includeArchived}`
+            );
             if (!response.ok) throw new Error(`Could not read the mailbox shape: ${response.status}`);
 
             const answer = (await response.json()) as {groups?: MailGroupCount[]};
@@ -181,7 +209,9 @@ export class MailListViewModel {
         this.pages.add(offset);
 
         try {
-            const response = await fetch(`/api/emails/list?offset=${offset}&limit=${PAGE_SIZE}`);
+            const response = await fetch(
+                `/api/emails/list?offset=${offset}&limit=${PAGE_SIZE}&archived=${this.includeArchived}`
+            );
             if (!response.ok) throw new Error(`Could not read the mailbox: ${response.status}`);
 
             const page = (await response.json()) as {total: number; offset: number; ids: string[]};

@@ -10,6 +10,8 @@
     import {_} from "svelte-i18n";
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
+    import {Toggle} from "$lib/components/ui/toggle";
+    import {ArchiveIcon} from "phosphor-svelte";
     import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
@@ -41,6 +43,11 @@
 
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
+
+    /** Whether the archived mails are in the list. The view model starts the list over on this. */
+    let showArchived = $state(false);
+
+    $effect(() => list.setIncludeArchived(showArchived));
 
     /** The box the rows sit in, measured to know where the list starts on the page. */
     let listElement = $state<HTMLDivElement | null>(null);
@@ -166,6 +173,12 @@
                 {$_("mails.count", {values: {count: list.total}})}
             </span>
         {/if}
+
+        <!-- The filters live at this end of the bar, and this is the first of them. -->
+        <Toggle bind:pressed={showArchived} size="sm" class="ms-auto text-xs">
+            <ArchiveIcon data-icon="inline-start"/>
+            {$_("mails.filters.archived")}
+        </Toggle>
     </div>
 
     <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap

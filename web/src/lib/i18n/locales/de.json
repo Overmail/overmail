@@ -52,6 +52,9 @@
       "week": "Diese Woche",
       "month": "Dieser Monat"
     },
+    "filters": {
+      "archived": "Archivierte"
+    },
     "empty": "Keine Mails im Postfach.",
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",

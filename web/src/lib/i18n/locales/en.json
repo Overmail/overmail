@@ -52,6 +52,9 @@
       "week": "This week",
       "month": "This month"
     },
+    "filters": {
+      "archived": "Archived"
+    },
     "empty": "No mail in this mailbox.",
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",

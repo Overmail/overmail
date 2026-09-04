@@ -4,6 +4,7 @@
     import {useRepositories} from "$lib/repository/repositories";
     import {Skeleton} from "$lib/components/ui/skeleton";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
+    import MailTable from "$lib/app/mails/MailTable.svelte";
 
     const {home} = useRepositories();
 
@@ -25,5 +26,9 @@
         </div>
 
         <EmailGraph/>
+    </div>
+
+    <div class="px-16 pt-12 pb-16">
+        <MailTable/>
     </div>
 </div>

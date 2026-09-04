@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.list.emailList
+import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
@@ -66,6 +67,10 @@ internal fun Application.configureRouting() {
 
                 route("/list") {
                     emailList()
+
+                    route("/groups") {
+                        emailListGroups()
+                    }
                 }
 
                 route("/search") {

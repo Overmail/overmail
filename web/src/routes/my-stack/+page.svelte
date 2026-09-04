@@ -74,6 +74,10 @@
     );
 </script>
 
+<svelte:head>
+    <title>Stack - Overmail</title>
+</svelte:head>
+
 <!-- flex-1 down the whole chain: <main> sits in the sidebar inset's flex column, and only a
      flex-1 item picks up the height left over by the header. A percentage height has nothing to
      resolve against here, since none of these boxes has a height of its own. -->

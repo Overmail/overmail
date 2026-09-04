@@ -5,12 +5,33 @@
     import {Skeleton} from "$lib/components/ui/skeleton";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
+    import {onMount} from "svelte";
 
     const {home} = useRepositories();
 
     // The socket is up while this page is: the effect's teardown releases it.
     $effect(() => home.connect());
+
+    let currentUserName = $state<string | null>(null);
+    let title = $derived.by(() => {
+        let result = "Postfach"
+        if (home.mailboxCount !== null) result += " (" + home.mailboxCount + ")";
+        if (currentUserName) result += " • " + currentUserName;
+
+        return result;
+    })
+    const {currentUser} = useRepositories();
+
+    onMount(() => {
+        currentUser.get().then((user) => {
+            if (user) currentUserName = user.firstname + " " + user.lastname;
+        })
+    })
 </script>
+
+<svelte:head>
+    <title>{title}</title>
+</svelte:head>
 
 <div class="flex flex-col">
     <div class="flex flex-row flex-wrap px-16 pt-16 gap-x-16 gap-y-8">

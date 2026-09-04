@@ -102,19 +102,36 @@ class EmailListGroupsTest {
         setUp()
         installRoute()
         val spam = addMail(daysAgo(0))
+        val archived = addMail(daysAgo(0))
         addMail(daysAgo(0))
         addMail(daysAgo(2))
         archive(spam, EmailArchiveAction.Spam)
+        archive(archived, EmailArchiveAction.Archive)
 
         val byDate = client.get("/api/emails/list/groups?by=date").groups()
             .sumOf { it["count"]!!.jsonPrimitive.long }
         val ungrouped = client.get("/api/emails/list/groups?by=none").groups()
             .single()["count"]!!.jsonPrimitive.long
 
-        // Spam is out of both, and every mail is in exactly one stretch -- which is what lets a
-        // layout be built from them.
+        // Spam and the archived mail are out of both, and every mail left is in exactly one
+        // stretch -- which is what lets a layout be built from them.
         assertEquals(2, byDate)
         assertEquals(2, ungrouped)
+    }
+
+    @Test
+    fun `the stretches grow with the archived mails when they are asked for`() = testApplication {
+        setUp()
+        installRoute()
+        val archived = addMail(daysAgo(0))
+        addMail(daysAgo(0))
+        archive(archived, EmailArchiveAction.Archive)
+
+        val counted = client.get("/api/emails/list/groups?by=date&archived=true").groups()
+            .sumOf { it["count"]!!.jsonPrimitive.long }
+
+        // The same filter the listing uses, or a header would count mails the rows do not show.
+        assertEquals(2, counted)
     }
 
     @Test

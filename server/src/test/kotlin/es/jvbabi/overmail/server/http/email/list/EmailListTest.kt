@@ -55,7 +55,7 @@ class EmailListTest {
     }
 
     @Test
-    fun `spam is left out, archived mails are not`() = testApplication {
+    fun `spam and archived mails are left out`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
@@ -63,8 +63,33 @@ class EmailListTest {
 
         val page = client.get("/api/emails/list").page()
 
+        // Putting a mail away has to mean something in the listing it was put away from.
+        assertEquals(1, page["total"]!!.jsonPrimitive.long)
+        assertEquals(listOf(mails[2].toString()), page.ids())
+    }
+
+    @Test
+    fun `archived mails come back on request, spam does not`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        archive(mails[0], EmailArchiveAction.Spam)
+        archive(mails[1], EmailArchiveAction.Archive)
+
+        val page = client.get("/api/emails/list?archived=true").page()
+
         assertEquals(2, page["total"]!!.jsonPrimitive.long)
         assertEquals(listOf(mails[1], mails[2]).map { it.toString() }, page.ids())
+    }
+
+    @Test
+    fun `a mail taken back out of the archive is in the listing again`() = testApplication {
+        val mails = setUp(count = 1)
+        installRoute()
+        archive(mails[0], EmailArchiveAction.Archive)
+        archive(mails[0], EmailArchiveAction.Unarchive)
+
+        // Only the latest event of the log counts, see emailIsNotArchived.
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list").ids())
     }
 
     @Test

@@ -4,7 +4,6 @@ import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
-import es.jvbabi.overmail.server.database.models.emailIsNotSpam
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
@@ -30,8 +29,8 @@ private const val DEFAULT_LIMIT = 100
  * socket, so this answer stays the same size whether a row carries a subject or a whole thread --
  * and a listing that scrolls asks for the slice it needs rather than for mails it will not draw.
  *
- * Offset paging, so an index in a virtualized list is a request: `offset` is that index. Spam is
- * left out, archived mails are not -- see `emailIsNotSpam`.
+ * Offset paging, so an index in a virtualized list is a request: `offset` is that index. What the
+ * list holds is `listFilter`: spam never, archived mails on request.
  */
 fun Route.emailList() {
     authenticate {
@@ -42,12 +41,13 @@ fun Route.emailList() {
 
             val database = call.application.dependencies.resolve<OvermailDatabase>()
             val userId = call.user.id.value
+            val includeArchived = call.listIncludesArchived()
 
             val answer = database.query {
                 val mailbox = Emails
                     .leftJoin(ImapAccounts)
                     .select(Emails.id)
-                    .where { (ImapAccounts.user eq userId) and emailIsNotSpam() }
+                    .where { (ImapAccounts.user eq userId) and listFilter(includeArchived) }
 
                 // The count comes from the same query as the page, so the length a client sizes
                 // its scrollbar from and the ids it draws cannot disagree.

@@ -14,14 +14,20 @@ class Label(id: EntityID<Uuid>) : UuidEntity(id) {
         /**
          * Derives a stable default color from the label name, so labels created without an
          * explicit color pick (e.g. by the classification agent) are visually distinguishable
-         * and the same name always yields the same color. Saturation and brightness are fixed
-         * to keep the colors readable; only the hue varies.
+         * and the same name always yields the same color. Only the hue varies.
+         *
+         * Pale on purpose: a label is a chip behind a subject line, and a screen full of them is
+         * a screen full of colour. What has to be told apart is the hue, and it takes far less
+         * saturation than it looks like to do that -- so this is a tint, not a paint.
          */
         fun defaultColorFor(name: String): String {
             val hue = (name.trim().lowercase().hashCode().toUInt() % 360u).toInt() / 360f
-            val rgb = java.awt.Color.HSBtoRGB(hue, 0.55f, 0.80f)
+            val rgb = java.awt.Color.HSBtoRGB(hue, SATURATION, BRIGHTNESS)
             return "#%06X".format(rgb and 0xFFFFFF)
         }
+
+        private const val SATURATION = 0.25f
+        private const val BRIGHTNESS = 0.92f
     }
 
     var name by Labels.name

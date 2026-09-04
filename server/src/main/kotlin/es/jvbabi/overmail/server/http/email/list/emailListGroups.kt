@@ -28,9 +28,8 @@ import org.jetbrains.exposed.v1.jdbc.select
  * the listing itself has (newest first) and every mail is in exactly one of them, so the n-th
  * mail row of a layout built from these is the n-th mail of `GET /api/emails/list`.
  *
- * Which mails it counts is `listFilter`, the same as the listing itself: spam never, archived
- * mails on `?archived=true`. A stretch that counted mails the rows do not show would be a header
- * over the wrong number.
+ * Which mails it counts is `?scope=`, the same as the listing itself, see [MailScope]. A stretch
+ * that counted mails the rows do not show would be a header over the wrong number.
  *
  * `by=date` is one stretch per calendar day. Folding those into what a reader is shown -- today,
  * yesterday, the rest of this week, the rest of this month, then month by month -- is the
@@ -47,7 +46,7 @@ fun Route.emailListGroups() {
 
             val database = call.application.dependencies.resolve<OvermailDatabase>()
             val userId = call.user.id.value
-            val includeArchived = call.listIncludesArchived()
+            val scope = call.mailScope() ?: return@get call.respond(HttpStatusCode.BadRequest)
 
             val groups = database.query {
                 val mails = Emails.id.count()
@@ -61,7 +60,7 @@ fun Route.emailListGroups() {
                             count = Emails
                                 .leftJoin(ImapAccounts)
                                 .select(Emails.id)
-                                .where { (ImapAccounts.user eq userId) and listFilter(includeArchived) }
+                                .where { (ImapAccounts.user eq userId) and scope.filter() }
                                 .count(),
                         )
                     )
@@ -76,7 +75,7 @@ fun Route.emailListGroups() {
                         Emails
                             .leftJoin(ImapAccounts)
                             .select(day, mails)
-                            .where { (ImapAccounts.user eq userId) and listFilter(includeArchived) }
+                            .where { (ImapAccounts.user eq userId) and scope.filter() }
                             .groupBy(day)
                             .orderBy(day, SortOrder.DESC)
                             .map { row -> EmailGroup(key = row[day].toString(), count = row[mails]) }

@@ -6,19 +6,29 @@ import io.ktor.server.application.ApplicationCall
 import org.jetbrains.exposed.v1.core.Op
 
 /**
- * Whether the listing holds archived mails as well: `?archived=true`.
+ * Which mails a listing is about.
  *
- * Off unless asked for. Archiving a mail is putting it away, and a listing that shows it anyway
- * is a listing where archiving did nothing.
+ * Not a question of archived or not: [UNARCHIVED] is the mailbox as it stands, [ALL] is everything
+ * that ever arrived. Spam is in neither -- that is a folder of its own, not a scope of this one.
  */
-internal fun ApplicationCall.listIncludesArchived(): Boolean =
-    request.queryParameters["archived"]?.toBooleanStrictOrNull() ?: false
+enum class MailScope(val wire: String) {
+    UNARCHIVED("unarchived"),
+    ALL("all"),
+}
+
+/** What `?scope=` asks for. The mailbox as it stands unless something else is named. */
+internal fun ApplicationCall.mailScope(): MailScope? {
+    val requested = request.queryParameters["scope"] ?: return MailScope.UNARCHIVED
+    return MailScope.entries.firstOrNull { it.wire == requested }
+}
 
 /**
- * What a listing holds. Spam is never in it; archived mails only on request.
+ * The predicate behind a scope.
  *
- * One place for both the ids and the stretches they fall into -- two predicates that drift apart
- * would be a table whose headers count mails its rows do not show.
+ * One place for the ids and for the stretches they fall into -- two that drifted apart would be
+ * headers counting mails the rows do not show.
  */
-internal fun listFilter(includeArchived: Boolean): Op<Boolean> =
-    if (includeArchived) emailIsNotSpam() else emailIsNotArchived()
+internal fun MailScope.filter(): Op<Boolean> = when (this) {
+    MailScope.UNARCHIVED -> emailIsNotArchived()
+    MailScope.ALL -> emailIsNotSpam()
+}

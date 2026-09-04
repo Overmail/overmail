@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.database.models.truncatedToSecond
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
@@ -21,8 +22,14 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import io.ktor.http.HttpStatusCode
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
@@ -43,19 +50,83 @@ class EmailListTest {
     private lateinit var signedIn: User
 
     @Test
-    fun `answers a slice, newest first, with the length of the whole list`() = testApplication {
+    fun `answers a page, newest first, with the length of the whole list`() = testApplication {
         val mails = setUp(count = 5)
         installRoute()
 
-        val page = client.get("/api/emails/list?offset=1&limit=2").page()
+        val page = client.get("/api/emails/list?limit=2").page()
 
         assertEquals(5, page["total"]!!.jsonPrimitive.long)
-        assertEquals(1, page["offset"]!!.jsonPrimitive.long)
-        assertEquals(mails.subList(1, 3).map { it.toString() }, page.ids())
+        assertEquals(mails.take(2).map { it.toString() }, page.ids())
     }
 
     @Test
-    fun `spam and archived mails are left out`() = testApplication {
+    fun `the cursor of a page is where the next one carries on`() = testApplication {
+        val mails = setUp(count = 5)
+        installRoute()
+
+        val first = client.get("/api/emails/list?limit=2").page()
+        val cursor = first["next"]!!.jsonObject
+        val second = client
+            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
+                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
+            .page()
+
+        // Where the last page ended, not one mail earlier or later.
+        assertEquals(mails.subList(2, 4).map { it.toString() }, second.ids())
+    }
+
+    @Test
+    fun `the last page says there is nothing after it`() = testApplication {
+        setUp(count = 2)
+        installRoute()
+
+        val page = client.get("/api/emails/list?limit=10").page()
+
+        assertEquals(JsonNull, page["next"])
+    }
+
+    @Test
+    fun `a day boundary as the cursor lands between two days`() = testApplication {
+        val mails = setUp(count = 4)
+        installRoute()
+
+        // The fixture puts one mail per day, newest first, so midnight of the newest day is the
+        // boundary the second mail sits below -- which is how a table jumps to a date.
+        val startOfToday = Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault()).date
+            .atStartOfDayIn(TimeZone.currentSystemDefault())
+
+        val page = client.get("/api/emails/list?before=${startOfToday.epochSeconds}").page()
+
+        assertEquals(mails.drop(1).map { it.toString() }, page.ids())
+    }
+
+    @Test
+    fun `mails sharing a second are neither repeated nor skipped`() = testApplication {
+        setUp(count = 0)
+        installRoute()
+        // Three mails in the same second: without the id as a tiebreaker their order is the
+        // database's mood, and a page boundary inside them loses one or hands it out twice.
+        // Truncated, as every writer stores it -- see Emails.sent, which is a dedup key at
+        // second precision, and which is what lets the cursor be a second.
+        val sameSecond = Clock.System.now().truncatedToSecond()
+        repeat(3) { addMail(sameSecond) }
+
+        val first = client.get("/api/emails/list?limit=2").page()
+        val cursor = first["next"]!!.jsonObject
+        val second = client
+            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
+                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
+            .page()
+
+        val seen = first.ids() + second.ids()
+        assertEquals(3, seen.size)
+        assertEquals(3, seen.toSet().size)
+    }
+
+    @Test
+    fun `the mailbox as it stands holds neither spam nor archived mails`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
@@ -69,16 +140,24 @@ class EmailListTest {
     }
 
     @Test
-    fun `archived mails come back on request, spam does not`() = testApplication {
+    fun `every mail is in the other scope, spam still is not`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        val page = client.get("/api/emails/list?archived=true").page()
+        val page = client.get("/api/emails/list?scope=all").page()
 
         assertEquals(2, page["total"]!!.jsonPrimitive.long)
         assertEquals(listOf(mails[1], mails[2]).map { it.toString() }, page.ids())
+    }
+
+    @Test
+    fun `a scope nobody offers is refused`() = testApplication {
+        setUp(count = 1)
+        installRoute()
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?scope=spam").status)
     }
 
     @Test
@@ -128,20 +207,18 @@ class EmailListTest {
     }
 
     @Test
-    fun `a nonsense range is answered with what there is`() = testApplication {
+    fun `a nonsense request is answered with what there is`() = testApplication {
         setUp(count = 2)
         installRoute()
 
-        // Past the end: an empty page rather than an error, the length still reported.
-        val beyond = client.get("/api/emails/list?offset=99&limit=5000").page()
+        // Before the epoch: an empty page rather than an error, the length still reported.
+        val beyond = client.get("/api/emails/list?before=0&limit=5000").page()
         assertEquals(2, beyond["total"]!!.jsonPrimitive.long)
         assertEquals(0, beyond.ids().size)
 
-        // A negative offset is the start of the list, and the limit is clamped into what one
-        // request may ask for.
-        val clamped = client.get("/api/emails/list?offset=-5&limit=0").page()
-        assertEquals(0, clamped["offset"]!!.jsonPrimitive.long)
-        assertEquals(1, clamped.ids().size)
+        // The limit is clamped into what one request may ask for.
+        assertEquals(1, client.get("/api/emails/list?limit=0").ids().size)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?before=heute").status)
     }
 
     private suspend fun io.ktor.client.statement.HttpResponse.page() =
@@ -161,6 +238,17 @@ class EmailListTest {
                 createdByAgent = false
             }
         }
+    }
+
+    private suspend fun addMail(sentAt: kotlin.time.Instant): Uuid = database.query {
+        Email.new {
+            imapAccount = ImapAccount.all().first { it.user.id == signedIn.id }
+            sender = EmailUser.all().first()
+            senderName = "The Sender"
+            subject = "Mail at $sentAt"
+            sent = sentAt
+            rawContent = ByteArray(0)
+        }.id.value
     }
 
     /** [count] mails, newest first in the returned list. */

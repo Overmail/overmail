@@ -1,5 +1,6 @@
 <script lang="ts">
     import {_} from "svelte-i18n";
+    import {cn} from "$lib/utils";
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import MailLabelBadges from "./MailLabelBadges.svelte";
 
@@ -9,8 +10,15 @@
 </script>
 
 <!-- The subject is the column that absorbs the leftover width, so the badges have room. -->
-<div class="flex min-w-0 items-center gap-2">
-    <span class="truncate" class:text-muted-foreground={subject === ""} class:font-medium={!mail.isRead}>
+<div class="flex flex-row min-w-0 items-center gap-2">
+    <div class="size-1.5">
+        {#if !mail.isRead}
+            <div class="size-1.25 bg-blue-500 rounded-full"></div>
+        {/if}
+    </div>
+    <!-- The muted tone is the table's, so only unread pulls out of it. A mail without a subject
+         stays back even then: the stand-in is not what the mail says. -->
+    <span class={cn("truncate", !mail.isRead && "font-medium", !mail.isRead && subject !== "" && "text-foreground/85")}>
         {subject || $_("mails.table.noSubject")}
     </span>
     <MailLabelBadges labels={mail.labels}/>

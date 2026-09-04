@@ -28,7 +28,7 @@
         <EmailGraph/>
     </div>
 
-    <div class="px-16 pt-12 pb-16">
+    <div class="px-4 pt-12 pb-16">
         <MailTable/>
     </div>
 </div>

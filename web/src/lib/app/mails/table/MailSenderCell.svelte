@@ -1,4 +1,5 @@
 <script lang="ts">
+    import {cn} from "$lib/utils";
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import MailUserAvatar from "./MailUserAvatar.svelte";
 
@@ -12,5 +13,7 @@
     <MailUserAvatar participant={mail.sender}/>
 
     <!-- min-w-0 lets the flex child shrink, without it truncate never kicks in. -->
-    <span class="min-w-0 truncate" class:font-medium={!mail.isRead}>{displayName}</span>
+    <!-- Unread is the one thing that pulls out of the table's muted body, and only just: the
+         weight already carries it, the colour needs no more than a step. -->
+    <span class={cn("min-w-0 truncate", !mail.isRead && "text-foreground/85 font-medium")}>{displayName}</span>
 </div>

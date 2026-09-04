@@ -1,4 +1,3 @@
-import {SvelteMap} from "svelte/reactivity";
 import {ReconnectingSocket, type SocketLike} from "$lib/repository/ReconnectingSocket";
 
 const ENDPOINT = "/api/webapp/content/socket";
@@ -22,6 +21,17 @@ export type EmailLabel = {
     createdByAgent: boolean;
 };
 
+/** Somebody a mail is from or to, as the address book has them. */
+export type EmailParticipant = {
+    id: string;
+    /** Display name from this mail's header, absent for a bare address. */
+    name: string | null;
+    address: string;
+    avatarUrl: string | null;
+    /** How much of its box the picture gives up to fit a circle; null when none. */
+    avatarPadding: number | null;
+};
+
 /** Everything a screen shows of a mail without opening it. The body is fetched separately. */
 export type EmailMeta = {
     id: string;
@@ -31,15 +41,10 @@ export type EmailMeta = {
     isRead: boolean;
     /** Where the mail stands; anything but `unarchive` is out of the mailbox. */
     archiveState: "unarchive" | "archive" | "spam";
-    sender: {
-        id: string;
-        /** Display name from this mail's header, absent for a bare address. */
-        name: string | null;
-        address: string;
-        avatarUrl: string | null;
-        /** How much of its box the picture gives up to fit a circle; null when none. */
-        avatarPadding: number | null;
-    };
+    sender: EmailParticipant;
+    to: EmailParticipant[];
+    cc: EmailParticipant[];
+    bcc: EmailParticipant[];
     labels: EmailLabel[];
 };
 
@@ -56,19 +61,24 @@ type ContentServerMessage =
     | {type: "data.emails"; emails: WireEmail[]}
     | {type: "data.emails.unknown"; ids: string[]};
 
+type WireParticipant = {
+    id: string;
+    name: string | null;
+    address: string;
+    avatar_url: string | null;
+    avatar_padding: number | null;
+};
+
 type WireEmail = {
     id: string;
     subject: string;
     sent: number;
     is_read: boolean;
     archive_state: EmailMeta["archiveState"];
-    sender: {
-        id: string;
-        name: string | null;
-        address: string;
-        avatar_url: string | null;
-        avatar_padding: number | null;
-    };
+    sender: WireParticipant;
+    to: WireParticipant[];
+    cc: WireParticipant[];
+    bcc: WireParticipant[];
     labels: {
         id: string;
         name: string;
@@ -91,7 +101,9 @@ type WireEmail = {
  * the same thing here (see [merge]).
  */
 export class EmailRepository {
-    private readonly entries = new SvelteMap<string, EmailEntry>();
+    /** What is known per id. A record rather than a map: one reactivity mechanism, and runes
+     *  are the one that a test can drive without a browser. */
+    private entries: Record<string, EmailEntry> = $state({});
 
     /** How many callers hold [id]. A mail is on the socket while this is above zero. */
     private readonly watchers = new Map<string, number>();
@@ -132,7 +144,7 @@ export class EmailRepository {
 
     /** What is known about [id] right now. Safe to call while rendering: it changes nothing. */
     peek(id: string): EmailEntry {
-        return this.entries.get(id) ?? LOADING;
+        return this.entries[id] ?? LOADING;
     }
 
     /**
@@ -153,7 +165,7 @@ export class EmailRepository {
         const watchers = (this.watchers.get(id) ?? 0) + 1;
         this.watchers.set(id, watchers);
 
-        if (!this.entries.has(id)) this.entries.set(id, LOADING);
+        if (this.entries[id] === undefined) this.entries[id] = LOADING;
 
         // Only the first watcher subscribes; a grace period that was still running means the
         // server never stopped sending it, so there is nothing to ask for either.
@@ -180,7 +192,7 @@ export class EmailRepository {
      * the same store, so a screen does not wait for the socket to say what it was just told.
      */
     merge(mails: EmailMeta[]) {
-        for (const mail of mails) this.entries.set(mail.id, {value: mail, isLoading: false});
+        for (const mail of mails) this.entries[mail.id] = {value: mail, isLoading: false};
     }
 
     private release(id: string) {
@@ -236,10 +248,20 @@ export class EmailRepository {
             case "data.emails.unknown":
                 // Gone, never existed, or not ours -- the same answer either way, and the same
                 // one a caller gets for an id it made up.
-                for (const id of message.ids) this.entries.set(id, MISSING);
+                for (const id of message.ids) this.entries[id] = MISSING;
                 break;
         }
     }
+}
+
+function parseParticipant(participant: WireParticipant): EmailParticipant {
+    return {
+        id: participant.id,
+        name: participant.name,
+        address: participant.address,
+        avatarUrl: participant.avatar_url,
+        avatarPadding: participant.avatar_padding,
+    };
 }
 
 /** The api shape, in the app's own. */
@@ -250,13 +272,10 @@ function parse(mail: WireEmail): EmailMeta {
         sent: mail.sent,
         isRead: mail.is_read,
         archiveState: mail.archive_state,
-        sender: {
-            id: mail.sender.id,
-            name: mail.sender.name,
-            address: mail.sender.address,
-            avatarUrl: mail.sender.avatar_url,
-            avatarPadding: mail.sender.avatar_padding,
-        },
+        sender: parseParticipant(mail.sender),
+        to: mail.to.map(parseParticipant),
+        cc: mail.cc.map(parseParticipant),
+        bcc: mail.bcc.map(parseParticipant),
         labels: mail.labels.map((label) => ({
             id: label.id,
             name: label.name,

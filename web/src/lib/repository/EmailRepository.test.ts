@@ -46,6 +46,17 @@ function wireMail(id: string, subject = "Invoice 42") {
             avatar_url: null,
             avatar_padding: null,
         },
+        to: [
+            {
+                id: "s-2",
+                name: null,
+                address: "me@example.com",
+                avatar_url: null,
+                avatar_padding: null,
+            },
+        ],
+        cc: [],
+        bcc: [],
         labels: [
             {
                 id: "l-1",
@@ -89,6 +100,9 @@ test("a subscription asks the socket and fills the entry", async () => {
     const mail = repo.peek("m-1").value as EmailMeta;
     expect(mail.subject).toBe("Invoice 42");
     expect(mail.isRead).toBe(false);
+    expect(mail.to).toEqual([
+        {id: "s-2", name: null, address: "me@example.com", avatarUrl: null, avatarPadding: null},
+    ]);
     expect(mail.labels[0]).toEqual({
         id: "l-1",
         name: "Studium",
@@ -217,6 +231,9 @@ test("merge takes what another feed already knows", () => {
             isRead: true,
             archiveState: "unarchive",
             sender: {id: "s", name: null, address: "a@b.c", avatarUrl: null, avatarPadding: null},
+            to: [],
+            cc: [],
+            bcc: [],
             labels: [],
         },
     ]);

@@ -8,8 +8,13 @@
     import {setStackFocus} from "$lib/app/my-stack/stackFocus";
     import {setPageHeader} from "$lib/app/shell/pageHeader.svelte";
     import {_} from "svelte-i18n";
+    import {useRepositories} from "$lib/repository/repositories";
 
-    let viewModel: EmailStackViewModel = new EmailStackViewModel();
+    const repositories = useRepositories();
+    let viewModel: EmailStackViewModel = new EmailStackViewModel(
+        repositories.mails,
+        repositories.emailBody,
+    );
 
     const stackHasEmails = $derived(viewModel.emails.length > 0);
 

@@ -1,86 +1,124 @@
-import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
+import type {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
+import type {EmailMeta, EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import {ReconnectingSocket, type SocketLike} from "$lib/repository/ReconnectingSocket";
 
+const ENDPOINT = "/api/stack";
+
+/** How few mails may be left below the current one before the next batch is asked for. */
 const MAX_EMAILS_BEFORE_REFETCH = 5;
 
+/** What the stack itself knows about a mail, on top of what the mail is. */
+export type Classification = {type: "keep"} | {type: "archive"};
+
+export type EmailBody = {
+    text: string | null;
+    html: string | null;
+};
+
+/** One card: the mail as the server has it, plus the body and what happened to it here. */
+export type StackEmail = EmailMeta & {
+    body: EmailBody;
+    classification: Classification | null;
+};
+
+/**
+ * The pile of mails, one card at a time.
+ *
+ * Two sources feed this: the stack socket says *which* mails are on the pile and in what order,
+ * and the email repository says what each of them is -- subject, sender, labels -- and keeps that
+ * current for as long as the card is here. Nothing about a mail is stored twice; what this holds
+ * is the order, the bodies, and which cards have been handled.
+ */
 export class EmailStackViewModel {
-    emails: StackEmail[] = $state([])
-    currentEmailId = $state<string | null>(null);
-    currentEmail = $derived(this.emails.find(e => e.id === this.currentEmailId));
-    currentEmailIndex = $derived(this.emails.findIndex(e => e.id === this.currentEmailId));
+    /** The pile, newest first, as the socket handed it out. */
+    private ids: string[] = $state([]);
 
-    private webSocketHandler: EmailStackWebSocketHandler;
+    /** Bodies, by mail. A card waits for its own before it is shown. */
+    private bodies: Record<string, EmailBody> = $state({});
 
-    constructor() {
-        this.webSocketHandler = new EmailStackWebSocketHandler({
-            onEmails: (emails) => {
-                const isFirstBatchOfEmails = this.emails.length === 0;
-                emails.forEach(email => {
-                    if (!this.emails.find(e => e.id === email.id)) {
-                        this.emails.push(email);
-                    } else {
-                        const index = this.emails.findIndex(e => e.id === email.id);
-                        this.emails[index] = email;
-                    }
-                })
+    /** Cards the reader has dealt with, and how. Local: the pile animates them away. */
+    private handled: Record<string, Classification> = $state({});
 
-                if (isFirstBatchOfEmails && emails.length > 0) {
-                    this.currentEmailId = emails[0].id;
-                }
-            },
-            onLabelsUpserted: (emailId, labels) => {
-                console.log(labels);
-                const email = this.emails.find(e => e.id === emailId);
-                if (!email) return;
-                labels.forEach(label => {
-                    const index = email.labels.findIndex(l => l.id === label.id);
-                    if (index === -1) {
-                        email.labels.push(label);
-                    } else {
-                        email.labels[index] = label;
-                    }
-                });
-            },
-            onLabelsDeleted: (emailId, labelIds) => {
-                const email = this.emails.find(e => e.id === emailId);
-                if (!email) return;
-                email.labels = email.labels.filter(l => !labelIds.includes(l.id));
-            },
-            onAvatarResolved: (address, avatarUrl, avatarPadding) => {
-                // By address, not by mail: one sender fills a whole stack, and the picture found
-                // for it is the same in every mail it appears in.
-                this.emails.forEach(email => {
-                    [email.from, ...email.to, ...email.cc, ...email.bcc]
-                        .filter(participant => participant.email === address)
-                        .forEach(participant => {
-                            participant.avatar_url = avatarUrl;
-                            participant.avatar_padding = avatarPadding;
-                        });
-                });
-            },
-        })
+    /** The subscription of every mail on the pile, so they can be let go of together. */
+    private readonly releases = new Map<string, () => void>();
 
-        this.webSocketHandler.start();
+    /** What the reader picked, which may be a card that is not drawable (yet). */
+    private selectedId: string | null = $state(null);
+
+    /**
+     * The cards to draw, newest first.
+     *
+     * A mail appears once it is known and its body is here; one that left the mailbox without
+     * this reader doing it -- the agent filing it as spam -- disappears, while one handled here
+     * stays so the pile can animate it away.
+     */
+    emails: StackEmail[] = $derived(
+        this.ids
+            .map((id): StackEmail | null => {
+                const meta = this.mails.peek(id).value;
+                const body = this.bodies[id];
+                if (meta === null || body === undefined) return null;
+
+                const classification = this.handled[id] ?? null;
+                if (meta.archiveState !== "unarchive" && classification === null) return null;
+
+                return {...meta, body, classification};
+            })
+            .filter((email): email is StackEmail => email !== null)
+    );
+
+    /**
+     * The card on top. Always one that is actually drawn: a pick whose mail is still loading --
+     * or turned out to be gone -- would otherwise leave the pile stuck on a card that is not
+     * there, with nothing to move on from.
+     */
+    currentEmailId: string | null = $derived(
+        this.emails.some((email) => email.id === this.selectedId)
+            ? this.selectedId
+            : (this.emails[0]?.id ?? null)
+    );
+
+    currentEmail = $derived(this.emails.find((email) => email.id === this.currentEmailId));
+    currentEmailIndex = $derived(this.emails.findIndex((email) => email.id === this.currentEmailId));
+
+    private readonly socket: StackSocket;
+
+    constructor(
+        private readonly mails: EmailRepository,
+        private readonly bodyRepository: EmailBodyRepository,
+        open?: (url: string) => SocketLike,
+    ) {
+        this.socket = new StackSocket({
+            onEmailIds: (ids) => this.receive(ids),
+            open,
+        });
+        this.socket.start();
     }
 
     dispose() {
-        this.webSocketHandler.stop();
+        this.socket.stop();
+        this.releases.forEach((release) => release());
+        this.releases.clear();
     }
 
     onKeepEmail() {
-        if (!this.currentEmailId) return;
-        this.currentEmail!!.classification = {type: "keep"};
+        const id = this.currentEmailId;
+        if (!id) return;
+        this.handled[id] = {type: "keep"};
 
         this.onNextEmail();
     }
 
     onArchiveOrUnarchiveEmail() {
-        if (!this.currentEmailId) return;
-        if (this.currentEmail!!.classification?.type === "archive") {
-            this.currentEmail!!.classification = null;
-            this.webSocketHandler.unarchiveEmail(this.currentEmailId);
+        const id = this.currentEmailId;
+        if (!id) return;
+
+        if (this.handled[id]?.type === "archive") {
+            delete this.handled[id];
+            this.socket.unarchiveEmail(id);
         } else {
-            this.currentEmail!!.classification = {type: "archive"};
-            this.webSocketHandler.archiveEmail(this.currentEmailId);
+            this.handled[id] = {type: "archive"};
+            this.socket.archiveEmail(id);
         }
 
         this.onNextEmail();
@@ -89,18 +127,18 @@ export class EmailStackViewModel {
     onNextEmail() {
         if (this.currentEmailIndex === -1) return;
         if (this.currentEmailIndex + 1 >= this.emails.length) return;
-        this.currentEmailId = this.emails[this.currentEmailIndex + 1].id;
+        this.selectedId = this.emails[this.currentEmailIndex + 1].id;
 
         const remainingEmails = this.emails.length - (this.currentEmailIndex + 1);
         if (remainingEmails <= MAX_EMAILS_BEFORE_REFETCH) {
-            this.webSocketHandler.requestNextBatch();
+            this.socket.requestNextBatch();
         }
     }
 
     onPreviousEmail() {
         if (this.currentEmailIndex === -1) return;
         if (this.currentEmailIndex - 1 < 0) return;
-        this.currentEmailId = this.emails[this.currentEmailIndex - 1].id;
+        this.selectedId = this.emails[this.currentEmailIndex - 1].id;
     }
 
     async onRequestEmailClassification(emailId: string) {
@@ -109,178 +147,102 @@ export class EmailStackViewModel {
         });
         return result.ok;
     }
+
+    /**
+     * A batch of the pile. Ids that are already here are skipped: a batch starts again with the
+     * mail the last one ended on, and after a reconnect the socket starts over from the top.
+     */
+    private receive(ids: string[]) {
+        for (const id of ids) {
+            if (this.releases.has(id)) continue;
+
+            // Kept up to date for as long as the card is on the pile; the body is fetched once,
+            // because a mail's source does not change.
+            this.releases.set(id, this.mails.subscribe(id));
+            void this.loadBody(id);
+            this.ids.push(id);
+        }
+    }
+
+    private async loadBody(id: string) {
+        try {
+            this.bodies[id] = await this.bodyRepository.getBody(id);
+        } catch (error) {
+            console.error(`Failed to load the body of ${id}:`, error);
+            // Shown without one rather than kept off the pile: the card is the mail, and a body
+            // that cannot be loaded is not a reason to hide it.
+            this.bodies[id] = {text: null, html: null};
+        }
+    }
 }
 
-class EmailStackWebSocketHandler {
-    private webSocket: WebSocket | null = null;
-    private isStopped: boolean = false;
+type StackServerMessage = {
+    type: "data.emails";
+    email_ids: string[];
+};
 
-    private readonly emailBodyRepository = new EmailBodyRepository();
-    private readonly onEmails: (emails: StackEmail[]) => void
-    private readonly onLabelsUpserted: (emailId: string, labels: Label[]) => void
-    private readonly onLabelsDeleted: (emailId: string, labelIds: string[]) => void
-    private readonly onAvatarResolved: (address: string, avatarUrl: string, avatarPadding: number | null) => void
+type StackClientMessage =
+    | {type: "request.emails"}
+    | {type: "update.email.archive"; email_id: string}
+    | {type: "update.email.unarchive"; email_id: string};
+
+/**
+ * The pile's own socket: which mails are on it, and what the reader did with them.
+ *
+ * A fresh connection sends the top of the pile on its own, so there is nothing to ask for after a
+ * reconnect -- but what the reader did while it was down is worth keeping, so writes wait for the
+ * connection instead of being dropped.
+ */
+class StackSocket {
+    private readonly socket: ReconnectingSocket<StackServerMessage>;
+    private readonly queued: StackClientMessage[] = [];
 
     constructor(config: {
-        onEmails: (emails: StackEmail[]) => void,
-        onLabelsUpserted: (emailId: string, labels: Label[]) => void,
-        onLabelsDeleted: (emailId: string, labelIds: string[]) => void,
-        onAvatarResolved: (address: string, avatarUrl: string, avatarPadding: number | null) => void,
+        onEmailIds: (ids: string[]) => void;
+        open?: (url: string) => SocketLike;
     }) {
-        this.onEmails = config.onEmails;
-        this.onLabelsUpserted = config.onLabelsUpserted;
-        this.onLabelsDeleted = config.onLabelsDeleted;
-        this.onAvatarResolved = config.onAvatarResolved;
+        this.socket = new ReconnectingSocket<StackServerMessage>({
+            url: ENDPOINT,
+            open: config.open,
+            onOpen: () => {
+                const waiting = this.queued.splice(0);
+                waiting.forEach((message) => this.send(message));
+            },
+            onMessage: (message) => {
+                switch (message.type) {
+                    case "data.emails":
+                        config.onEmailIds(message.email_ids);
+                        break;
+                }
+            },
+        });
     }
-
-    private requestQueue: StackWebsocketClientMessage[] = [];
 
     start() {
-        this.webSocket = new WebSocket('/api/stack');
-        this.webSocket.onclose = (e) => {
-            if (!e.wasClean && !this.isStopped) setTimeout(() => this.start(), 1000);
-        }
-
-        this.webSocket.onopen = () => {
-            const q = [...this.requestQueue];
-            this.requestQueue = [];
-            q.forEach((message) => this.request(message));
-        }
-
-        this.webSocket.onmessage = async (event) => {
-            const message: StackWebsocketServerMessage = JSON.parse(event.data);
-
-            switch (message.type) {
-                case "data.emails":
-                    const emails: StackEmail[] = await Promise.all(
-                        message.emails.map(async (email) => ({
-                            ...email,
-                            body: await this.emailBodyRepository.getBody(email.id),
-                            sent_at: new Date(email.sent_at * 1000),
-                            classification: null,
-                        }))
-                    );
-                    this.onEmails(emails);
-                    break;
-                case "update.email.tags.upsert":
-                    this.onLabelsUpserted(message.email_id, message.tags);
-                    break;
-                case "update.email.tags.delete":
-                    this.onLabelsDeleted(message.email_id, message.tag_ids);
-                    break;
-                case "update.avatar":
-                    this.onAvatarResolved(message.address, message.avatar_url, message.avatar_padding);
-                    break;
-            }
-        }
-    }
-
-    private request(message: StackWebsocketClientMessage) {
-        if (this.webSocket?.readyState === WebSocket.OPEN) {
-            this.webSocket.send(JSON.stringify(message));
-        } else {
-            this.requestQueue.push(message);
-        }
-    }
-
-    requestNextBatch() {
-        this.request({type: "request.emails"});
-    }
-
-    archiveEmail(emailId: string) {
-        this.request({
-            type: "update.email.archive",
-            email_id: emailId
-        });
-    }
-
-    unarchiveEmail(emailId: string) {
-        this.request({
-            type: "update.email.unarchive",
-            email_id: emailId
-        });
+        this.socket.start();
     }
 
     stop() {
-        this.isStopped = true;
-        this.webSocket?.close();
-        this.webSocket = null;
+        this.socket.stop();
     }
-}
 
-type StackWebsocketServerMessage = {
-    type: "data.emails",
-    emails: {
-        id: string,
-        subject: string,
-        from: EmailUser,
-        to: EmailUser[],
-        cc: EmailUser[],
-        bcc: EmailUser[],
-        sent_at: number,
-        labels: Label[]
-    }[]
-} | {
-    type: "update.email.tags.upsert",
-    email_id: string,
-    tags: Label[],
-} | {
-    type: "update.email.tags.delete",
-    email_id: string,
-    tag_ids: string[],
-} | {
-    // A picture the server looked up after the batch went out; see AvatarQueue on the server.
-    type: "update.avatar",
-    address: string,
-    avatar_url: string,
-    avatar_padding: number | null,
-}
+    requestNextBatch() {
+        this.send({type: "request.emails"});
+    }
 
-type StackWebsocketClientMessage = {
-    type: "request.emails",
-} | {
-    type: "update.email.archive",
-    email_id: string,
-} | {
-    type: "update.email.unarchive",
-    email_id: string,
-}
+    archiveEmail(emailId: string) {
+        this.send({type: "update.email.archive", email_id: emailId});
+    }
 
-export type StackEmail = {
-    id: string,
-    subject: string,
-    from: EmailUser,
-    to: EmailUser[],
-    cc: EmailUser[],
-    bcc: EmailUser[],
-    sent_at: Date,
-    body: {
-        text: string | null,
-        html: string | null,
-    },
-    classification: Classification | null,
-    labels: Label[],
-}
+    unarchiveEmail(emailId: string) {
+        this.send({type: "update.email.unarchive", email_id: emailId});
+    }
 
-export type Label = {
-    id: string;
-    name: string;
-    color: string;
-    assignment_reason: string | null;
-    label_description: string | null;
-}
-
-export type Classification = {
-    type: "keep"
-} | {
-    type: "archive"
-}
-
-export type EmailUser = {
-    name: string,
-    email: string,
-    /** Null while no picture has been found for the address -- the card shows initials then. */
-    avatar_url: string | null,
-    /** How much of its box the picture gives up to fit the circle; null when it needs none. */
-    avatar_padding: number | null,
+    private send(message: StackClientMessage) {
+        if (!this.socket.isOpen) {
+            this.queued.push(message);
+            return;
+        }
+        this.socket.send(message);
+    }
 }

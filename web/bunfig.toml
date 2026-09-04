@@ -1,0 +1,3 @@
+[test]
+# Runes have to be compiled before a test can import a `.svelte.ts` module, see the plugin.
+preload = ["./bun-svelte.ts"]

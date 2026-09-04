@@ -4,7 +4,8 @@
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
-    import type {EmailUser, Label, StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import type {EmailLabel, EmailParticipant} from "$lib/repository/EmailRepository.svelte";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
     import {getStackFocus} from "$lib/app/my-stack/stackFocus";
@@ -12,8 +13,8 @@
     import {onMount} from "svelte";
 
     let {
-        sent_at,
-        from,
+        sent,
+        sender,
         to,
         cc,
         bcc,
@@ -66,8 +67,8 @@
         {key: "myStack.email.bcc", participants: bcc},
     ].filter((field) => field.participants.length > 0));
 
-    function formatParticipant(participant: EmailUser): string {
-        return participant.name ? `${participant.name} (${participant.email})` : participant.email;
+    function formatParticipant(participant: EmailParticipant): string {
+        return participant.name ? `${participant.name} (${participant.address})` : participant.address;
     }
 
 </script>
@@ -77,21 +78,22 @@
     <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
         <div class="flex flex-row gap-4 items-center">
             <OvermailAvatar
-                    url={from.avatar_url}
-                    name={from.name ?? from.email}
+                    url={sender.avatarUrl}
+                    name={sender.name ?? sender.address}
                     class="size-12"
                     fallbackClass="text-base"
             />
             <div class="flex flex-col">
-                <span class="font-medium text-lg">{from.name ?? from.email}</span>
-                {#if from.name}
-                    <span class="font-light text-base">{from.email}</span>
+                <span class="font-medium text-lg">{sender.name ?? sender.address}</span>
+                {#if sender.name}
+                    <span class="font-light text-base">{sender.address}</span>
                 {/if}
             </div>
         </div>
 
         <div class="flex flex-row items-center gap-1">
-            <span class="font-light text-accent-foreground">{sent_at.toLocaleString()}</span>
+            <!-- Unix seconds off the wire; the card is the only place that needs them as a date. -->
+            <span class="font-light text-accent-foreground">{new Date(sent * 1000).toLocaleString()}</span>
 
             <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
@@ -147,7 +149,7 @@
 
     <!-- Chips carry the label color as a dot and a subtle tint; the text keeps the theme's
          foreground color so any label color stays readable in light and dark mode. -->
-    {#snippet chip(label: Label, props: Record<string, unknown> = {})}
+    {#snippet chip(label: EmailLabel, props: Record<string, unknown> = {})}
         <span
                 {...props}
                 class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
@@ -160,7 +162,7 @@
 
     <div class="px-8 pt-3 flex flex-row flex-wrap items-center gap-1.5">
         {#each labels as label (label.id)}
-            {#if label.label_description || label.assignment_reason}
+            {#if label.description || label.assignmentReason}
                 <Tooltip.Root>
                     <Tooltip.Trigger>
                         {#snippet child({props})}
@@ -168,11 +170,11 @@
                         {/snippet}
                     </Tooltip.Trigger>
                     <Tooltip.Content side="bottom" class="flex-col items-start gap-0.5">
-                        {#if label.label_description}
-                            <p>{label.label_description}</p>
+                        {#if label.description}
+                            <p>{label.description}</p>
                         {/if}
-                        {#if label.assignment_reason}
-                            <p class="text-background/70">{label.assignment_reason}</p>
+                        {#if label.assignmentReason}
+                            <p class="text-background/70">{label.assignmentReason}</p>
                         {/if}
                     </Tooltip.Content>
                 </Tooltip.Root>

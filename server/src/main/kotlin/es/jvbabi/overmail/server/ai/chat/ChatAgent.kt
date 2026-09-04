@@ -23,12 +23,16 @@ import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLModel
+import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
+import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
+import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
@@ -60,6 +64,8 @@ class ChatAgent(
     private val database: OvermailDatabase,
     private val streamNotifier: AiChatStreamNotifier,
     private val chatNotifier: AiChatNotifier,
+    /** Handed to the tools that write: what they change has to reach the screens showing it. */
+    private val mailNotifier: MailNotifier,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -170,7 +176,12 @@ class ChatAgent(
             strategy = strategy(stream, recorder),
             // Built per run and bound to the owner of this chat: the tools take no user argument,
             // so there is nothing the model could say to reach another user's data.
-            toolRegistry = chatToolRegistry(userId = turn.userId, database = database, stream = stream),
+            toolRegistry = chatToolRegistry(
+                userId = turn.userId,
+                database = database,
+                mailNotifier = mailNotifier,
+                stream = stream,
+            ),
         )
 
         // The return value is the last message only; what the client saw -- and what is stored --
@@ -365,6 +376,13 @@ class ChatAgent(
                 "Use `${SearchEmailsTool.NAME}` to find emails; it answers with metadata only, so " +
                 "read the ones whose content you need. Say what you searched for when nothing " +
                 "was found, rather than claiming there is no such email.\n" +
+                "Labels are the user's own vocabulary for their mailbox, and the tools that write " +
+                "them change what the user sees right away. Only use them when the user asked for " +
+                "it. `${CreateLabelTool.NAME}` makes one -- and answers with the existing label " +
+                "when that name is already taken, which is how to turn a name into an id. " +
+                "`${LabelEmailTool.NAME}` and `${UnlabelEmailTool.NAME}` attach and detach one " +
+                "email at a time. Prefer a label the user already has over a new one, and say " +
+                "which labels you changed.\n" +
                 "When you mention an email, a label or a person in your answer, write it as the " +
                 "element `<email id=\"...\"></email>`, `<label id=\"...\"></label>` or " +
                 "`<person id=\"...\"></person>` with the id the tool result or the user's " +
@@ -468,6 +486,7 @@ internal class ChatToolCallRecorder {
 internal fun chatToolRegistry(
     userId: User.Id,
     database: OvermailDatabase,
+    mailNotifier: MailNotifier,
     stream: AiChatMessageStream,
 ): ToolRegistry {
     // Its own block in the answer: the client renders the element, and markdown only treats it as
@@ -480,6 +499,23 @@ internal fun chatToolRegistry(
     return ToolRegistry.builder()
         .tool(ReadEmailTool(userId = userId, database = database, onEmailRead = ::writeBlock))
         .tool(SearchEmailsTool(userId = userId, database = database, onSearch = ::writeBlock))
+        .tool(CreateLabelTool(userId = userId, database = database, onLabelCreated = ::writeBlock))
+        .tool(
+            LabelEmailTool(
+                userId = userId,
+                database = database,
+                mailNotifier = mailNotifier,
+                onLabelAttached = ::writeBlock,
+            )
+        )
+        .tool(
+            UnlabelEmailTool(
+                userId = userId,
+                database = database,
+                mailNotifier = mailNotifier,
+                onLabelDetached = ::writeBlock,
+            )
+        )
         .build()
 }
 

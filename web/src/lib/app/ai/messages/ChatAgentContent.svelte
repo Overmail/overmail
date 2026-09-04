@@ -36,9 +36,17 @@
     };
 </script>
 
-<!-- The markdown blocks bring no margins of their own here, so the spacing is set once. -->
-<div class="flex flex-col gap-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5
-            [&_a]:underline [&_code]:font-mono [&_pre]:overflow-x-auto">
+<!--
+    The markdown blocks bring no margins of their own here, so the spacing is set once.
+
+    min-w-0 and the two overflow rules are what keep an answer inside the panel: a code block or
+    a table can be wider than the column it is read in, and then it is that box that scrolls
+    rather than the whole conversation. A table gets `block` for it -- its rows keep their table
+    layout inside, and the box around them is what can be scrolled.
+-->
+<div class="flex min-w-0 flex-col gap-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5
+            [&_a]:underline [&_code]:font-mono [&_pre]:max-w-full [&_pre]:overflow-x-auto
+            [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
     {#each blocks as block, index (index)}
         {#if block.type === "markdown"}
             <SvelteMarkdown source={block.content} {streaming} {renderers}/>

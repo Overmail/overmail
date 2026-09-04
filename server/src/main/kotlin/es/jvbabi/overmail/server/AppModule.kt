@@ -124,6 +124,7 @@ private fun Application.configureDependencies() {
                 database = resolve(),
                 streamNotifier = resolve(),
                 chatNotifier = resolve(),
+                mailNotifier = resolve(),
             )
         }
 

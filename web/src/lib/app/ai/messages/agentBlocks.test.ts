@@ -46,3 +46,24 @@ test("an answer without tool calls is one markdown block", () => {
     expect(agentBlocks("**Hallo**")).toEqual([{type: "markdown", content: "**Hallo**"}]);
     expect(agentBlocks("")).toEqual([]);
 });
+
+test("the label calls carry ids and nothing else", () => {
+    // What the label tools write: only ids, because the chip is looked up when the answer is
+    // shown -- see CreateLabelTool.markup and its two siblings.
+    const created = '<toolcall-create-label labelId="l-1"></toolcall-create-label>';
+    const attached = '<toolcall-label-email emailId="m-1" labelId="l-1"></toolcall-label-email>';
+    const detached = '<toolcall-unlabel-email emailId="m-1" labelId="l-1"></toolcall-unlabel-email>';
+
+    const blocks = agentBlocks(`${created}\n\n${attached}\n\n${detached}`);
+
+    expect(blocks).toEqual([
+        {
+            type: "tools",
+            calls: [
+                {kind: "create-label", attributes: {labelId: "l-1"}, content: ""},
+                {kind: "label-email", attributes: {emailId: "m-1", labelId: "l-1"}, content: ""},
+                {kind: "unlabel-email", attributes: {emailId: "m-1", labelId: "l-1"}, content: ""},
+            ],
+        },
+    ]);
+});

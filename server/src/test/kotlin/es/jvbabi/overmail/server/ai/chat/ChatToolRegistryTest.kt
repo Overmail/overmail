@@ -1,13 +1,24 @@
 package es.jvbabi.overmail.server.ai.chat
 
+import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
+import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
+import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
+import es.jvbabi.overmail.server.database.models.EmailLabel
+import es.jvbabi.overmail.server.database.models.EmailLabels
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
+import es.jvbabi.overmail.server.database.models.Label
+import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
@@ -32,7 +43,7 @@ class ChatToolRegistryTest {
         val stream = AiChatMessageStream()
         stream.append("Ich schaue nach.")
 
-        val registry = chatToolRegistry(userId = fixture.userId, database = database, stream = stream)
+        val registry = registry(fixture.userId, stream)
         val tool = registry.tools.filterIsInstance<ReadEmailTool>().single()
 
         tool.execute(ReadEmailTool.Args(emailId = fixture.emailId.toString()))
@@ -49,7 +60,7 @@ class ChatToolRegistryTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
 
-        val registry = chatToolRegistry(userId = fixture.userId, database = database, stream = stream)
+        val registry = registry(fixture.userId, stream)
         val tool = registry.tools.filterIsInstance<SearchEmailsTool>().single()
 
         tool.execute(SearchEmailsTool.Args(subject = "Invoice"))
@@ -65,12 +76,116 @@ class ChatToolRegistryTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
 
-        val registry = chatToolRegistry(userId = fixture.userId, database = database, stream = stream)
+        val registry = registry(fixture.userId, stream)
         val tool = registry.tools.filterIsInstance<ReadEmailTool>().single()
 
         tool.execute(ReadEmailTool.Args(emailId = Uuid.random().toString()))
 
         assertTrue(stream.snapshot().content.isEmpty())
+    }
+
+    @Test
+    fun `a label the agent makes is written into the stream, and the one that was there is not`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        val tool = registry(fixture.userId, stream).tools.filterIsInstance<CreateLabelTool>().single()
+
+        val created = tool.execute(CreateLabelTool.Args(name = "  Uni   Kram ")) as CreateLabelTool.Result.Label
+        // Normalized, coloured here, and announced in the answer.
+        assertEquals("Uni Kram", created.name)
+        assertTrue(Regex("^#[0-9A-Fa-f]{6}$").matches(created.color))
+        assertTrue(!created.existed)
+        assertEquals(CreateLabelTool.markup(Uuid.parse(created.labelId)), stream.snapshot().content)
+
+        // The same name again is that label, not a second one -- and nothing new to show.
+        val again = tool.execute(CreateLabelTool.Args(name = "uni kram")) as CreateLabelTool.Result.Label
+        assertEquals(created.labelId, again.labelId)
+        assertTrue(again.existed)
+        assertEquals(1, database.query { Labels.selectAll().where { Labels.owner eq fixture.userId }.count().toInt() })
+        assertEquals(CreateLabelTool.markup(Uuid.parse(created.labelId)), stream.snapshot().content)
+    }
+
+    @Test
+    fun `a label goes on a mail and comes off again`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        val registry = registry(fixture.userId, stream)
+        val attach = registry.tools.filterIsInstance<LabelEmailTool>().single()
+        val detach = registry.tools.filterIsInstance<UnlabelEmailTool>().single()
+        val labelId = labelOfSignedIn(fixture.userId)
+
+        val attached = attach.execute(
+            LabelEmailTool.Args(emailId = fixture.emailId.toString(), labelId = labelId.toString())
+        ) as LabelEmailTool.Result.Attached
+        assertTrue(!attached.alreadyThere)
+        assertEquals(1, assignments(fixture.emailId, labelId))
+        assertEquals(LabelEmailTool.markup(fixture.emailId, labelId), stream.snapshot().content)
+
+        // Twice is once, and the second time leaves nothing in the answer.
+        val twice = attach.execute(
+            LabelEmailTool.Args(emailId = fixture.emailId.toString(), labelId = labelId.toString())
+        ) as LabelEmailTool.Result.Attached
+        assertTrue(twice.alreadyThere)
+        assertEquals(1, assignments(fixture.emailId, labelId))
+        assertEquals(LabelEmailTool.markup(fixture.emailId, labelId), stream.snapshot().content)
+
+        val detached = detach.execute(
+            UnlabelEmailTool.Args(emailId = fixture.emailId.toString(), labelId = labelId.toString())
+        ) as UnlabelEmailTool.Result.Detached
+        assertTrue(!detached.wasNotThere)
+        assertEquals(0, assignments(fixture.emailId, labelId))
+        assertTrue(stream.snapshot().content.endsWith(UnlabelEmailTool.markup(fixture.emailId, labelId)))
+    }
+
+    @Test
+    fun `a label of somebody else is not put on a mail`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        val tool = registry(fixture.userId, stream).tools.filterIsInstance<LabelEmailTool>().single()
+
+        val foreign = database.query {
+            val stranger = User.new {
+                username = "stranger-${Uuid.random()}"
+                email = "stranger-${Uuid.random()}@example.com"
+                firstname = "Some"
+                lastname = "One"
+            }
+            Label.new {
+                name = "Privat"
+                color = "#ffffff"
+                owner = stranger
+                createdByAgent = false
+            }.id.value
+        }
+
+        val result = tool.execute(
+            LabelEmailTool.Args(emailId = fixture.emailId.toString(), labelId = foreign.toString())
+        )
+
+        // Unknown, exactly like an id that is nothing at all -- and nothing was written.
+        assertTrue(result is LabelEmailTool.Result.NotFound)
+        assertEquals(0, assignments(fixture.emailId, foreign))
+        assertTrue(stream.snapshot().content.isEmpty())
+    }
+
+    private fun registry(userId: User.Id, stream: AiChatMessageStream) = chatToolRegistry(
+        userId = userId,
+        database = database,
+        mailNotifier = MailNotifier(),
+        stream = stream,
+    )
+
+    private suspend fun labelOfSignedIn(userId: User.Id): Uuid = database.query {
+        Label.new {
+            name = "Studium"
+            color = "#eeeeff"
+            owner = User.findById(userId)!!
+            createdByAgent = false
+        }.id.value
+    }
+
+    private suspend fun assignments(emailId: Uuid, labelId: Uuid): Int = database.query {
+        EmailLabel.find { (EmailLabels.email eq emailId) and (EmailLabels.label eq labelId) }.count().toInt()
     }
 
     private data class Fixture(val userId: User.Id, val emailId: Email.Id)

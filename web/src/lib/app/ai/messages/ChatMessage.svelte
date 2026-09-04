@@ -26,10 +26,10 @@
     const hasActions = $derived(message.type === "assistant" && !message.pending && message.content !== "");
 </script>
 
-<li class="flex flex-col gap-0.5" class:items-end={isUser}>
+<li class="flex min-w-0 flex-col gap-0.5" class:items-end={isUser}>
     <!-- 80% keeps the two sides apart even when a message is one long line. -->
     <div
-            class="max-w-[80%] rounded-lg py-2 text-sm wrap-break-word"
+            class="min-w-0 max-w-[80%] rounded-lg py-2 text-sm wrap-break-word"
             class:whitespace-pre-wrap={isUser}
             class:px-3={isUser}
             class:bg-muted={isUser}

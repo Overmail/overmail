@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
@@ -161,6 +162,7 @@ class MessageTest {
                         database = database,
                         streamNotifier = resolve(),
                         chatNotifier = resolve(),
+                        mailNotifier = MailNotifier(),
                     )
                 }
                 // No consumer in the test: the runs are queued and stay there.

@@ -143,11 +143,15 @@
         "askBeforeChanges": "Ask before changes"
       },
       "send": "Send",
+      "scrollToEnd": "Scroll to the end",
       "hint": "Mention #labels, @emails or :people",
       "messages": {
         "deletedReference": "Deleted",
         "retry": "Try again",
         "readEmail": "Reading email",
+        "createLabel": "New label",
+        "labelEmail": "Label added",
+        "unlabelEmail": "Label removed",
         "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}",
         "searchEmails": "Searching emails",
         "searchSubject": "Subject: {query}",

@@ -8,6 +8,8 @@
     import {CaretRightIcon, WrenchIcon} from "phosphor-svelte";
     import {fly, slide} from "svelte/transition";
     import ThinkingOrb from "$lib/components/orb/ThinkingOrb.svelte";
+    import ToolCallCreateLabel from "$lib/app/ai/messages/tool-calls/ToolCallCreateLabel.svelte";
+    import ToolCallLabelEmail from "$lib/app/ai/messages/tool-calls/ToolCallLabelEmail.svelte";
     import ToolCallReadEmail from "$lib/app/ai/messages/tool-calls/ToolCallReadEmail.svelte";
     import ToolCallSearchEmails from "$lib/app/ai/messages/tool-calls/ToolCallSearchEmails.svelte";
     import ToolCallThinking from "$lib/app/ai/messages/tool-calls/ToolCallThinking.svelte";
@@ -30,12 +32,18 @@
     const ORBS: Record<string, OrbState> = {
         "search-emails": "searching",
         "read-email": "working",
+        "create-label": "working",
+        "label-email": "working",
+        "unlabel-email": "working",
         thinking: "breathing",
     };
 
     const LABELS: Record<string, string> = {
         "search-emails": "ai.chat.messages.searchEmails",
         "read-email": "ai.chat.messages.readEmail",
+        "create-label": "ai.chat.messages.createLabel",
+        "label-email": "ai.chat.messages.labelEmail",
+        "unlabel-email": "ai.chat.messages.unlabelEmail",
         thinking: "ai.chat.messages.thinking",
     };
 
@@ -94,6 +102,12 @@
                         <ToolCallReadEmail attributes={call.attributes}/>
                     {:else if call.kind === "search-emails"}
                         <ToolCallSearchEmails attributes={call.attributes}/>
+                    {:else if call.kind === "create-label"}
+                        <ToolCallCreateLabel attributes={call.attributes}/>
+                    {:else if call.kind === "label-email"}
+                        <ToolCallLabelEmail attributes={call.attributes}/>
+                    {:else if call.kind === "unlabel-email"}
+                        <ToolCallLabelEmail attributes={call.attributes} detached/>
                     {/if}
                 </li>
             {/each}

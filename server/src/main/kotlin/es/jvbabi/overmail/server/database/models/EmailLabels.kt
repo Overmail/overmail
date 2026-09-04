@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.datetime.CurrentTimestamp
 import org.jetbrains.exposed.v1.datetime.timestamp
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.uuid.Uuid
@@ -66,3 +67,9 @@ fun attachLabelToEmail(emailId: Uuid, labelId: Uuid): Boolean {
 
     return true
 }
+/**
+ * Takes [labelId] off [emailId] and says whether there was anything to take off -- which is what
+ * decides whether there is a change to announce. Inside a transaction.
+ */
+fun detachLabelFromEmail(emailId: Uuid, labelId: Uuid): Boolean =
+    EmailLabels.deleteWhere { (email eq emailId) and (label eq labelId) } > 0

@@ -143,11 +143,15 @@
         "askBeforeChanges": "Vor Änderungen fragen"
       },
       "send": "Senden",
+      "scrollToEnd": "Zum Ende scrollen",
       "hint": "Markiere #labels, @emails oder :personen",
       "messages": {
         "deletedReference": "Gelöscht",
         "retry": "Erneut versuchen",
         "readEmail": "Lese E-Mail",
+        "createLabel": "Neues Label",
+        "labelEmail": "Label vergeben",
+        "unlabelEmail": "Label entfernt",
         "tokensOutput": "{count, plural, one {# Token Ausgabe} other {# Tokens Ausgabe}}",
         "searchEmails": "Suche Mails",
         "searchSubject": "Betreff: {query}",

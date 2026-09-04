@@ -23,5 +23,10 @@
     });
 </script>
 
-<span class="text-muted-foreground text-xs font-medium">{text}</span>
-<span class="text-muted-foreground/60 text-xs tabular-nums">{count}</span>
+<!-- The space above is what sets one stretch off from the one before it. Its whole box is
+     HEADER_HEIGHT in MailTable: the virtualizer sizes the row from that number, so a taller
+     header here drifts the list unless that one follows. -->
+<div class="flex flex-row items-center gap-1 mt-10 mb-1 h-4 ml-4">
+    <span class="text-muted-foreground text-xs font-medium">{text}</span>
+    <span class="text-muted-foreground/60 text-xs tabular-nums">{count}</span>
+</div>

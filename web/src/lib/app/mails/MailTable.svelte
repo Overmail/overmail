@@ -22,9 +22,13 @@
     /**
      * Not estimates but the heights: every row is one clipped line, so the scrollbar is sized
      * from these two numbers rather than from anything measured.
+     *
+     * Which is also the catch -- a row that renders taller than its number here drifts the whole
+     * list. [HEADER_HEIGHT] is the box MailGroupHeader takes: its own line plus the space it sets
+     * above and below itself, so the two have to be changed together.
      */
     const ROW_HEIGHT = 40;
-    const HEADER_HEIGHT = 32;
+    const HEADER_HEIGHT = 60;
 
     /** How many rows around the viewport are held and kept up to date. */
     const OVERSCAN = 12;
@@ -176,10 +180,7 @@
                         <!-- The stretch this and the rows below it belong to. One cell across the
                              table: a heading is not a value in a column. -->
                         <Table.Row class="border-0 hover:bg-transparent">
-                            <Table.Cell
-                                    colspan={columns.length}
-                                    class="h-8 items-baseline gap-2 py-0 align-bottom"
-                            >
+                            <Table.Cell colspan={columns.length} class="p-0 align-bottom">
                                 <MailGroupHeader label={entry.label} count={entry.count}/>
                             </Table.Cell>
                         </Table.Row>

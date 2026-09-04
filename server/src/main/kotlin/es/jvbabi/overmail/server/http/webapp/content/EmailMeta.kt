@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailArchives
 import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailLabels
+import es.jvbabi.overmail.server.database.models.EmailPreviews
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
@@ -37,6 +38,11 @@ data class EmailMeta(
     /** Unix seconds. */
     @SerialName("sent") val sent: Long,
     @SerialName("is_read") val isRead: Boolean,
+    /**
+     * How the body begins, as one line. Null for a mail whose body nothing has looked at yet;
+     * empty for one with nothing readable in it.
+     */
+    @SerialName("preview") val preview: String?,
     /**
      * `unarchive`, `archive` or `spam` -- the latest event of the archive log. It travels with
      * the mail so a listing can drop a row that left the mailbox without asking what its window
@@ -140,6 +146,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
     return Emails
         .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)
         .join(EmailUsers, JoinType.INNER, Emails.sender, EmailUsers.id)
+        .join(EmailPreviews, JoinType.LEFT, Emails.id, EmailPreviews.email)
         .leftJoin(EmailAvatars)
         .select(
             Emails.id,
@@ -147,6 +154,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
             Emails.senderName,
             Emails.sent,
             Emails.isRead,
+            EmailPreviews.preview,
             EmailUsers.id,
             EmailUsers.address,
             EmailUsers.avatar,
@@ -174,6 +182,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
                 subject = row[Emails.subject],
                 sent = row[Emails.sent].epochSeconds,
                 isRead = row[Emails.isRead],
+                preview = row[EmailPreviews.preview],
                 archiveState = (archiveByEmail[id] ?: EmailArchiveAction.Unarchive).wire(),
                 sender = EmailMeta.Participant(
                     id = row[EmailUsers.id].value,

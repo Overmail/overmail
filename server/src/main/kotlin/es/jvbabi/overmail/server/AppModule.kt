@@ -22,6 +22,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
+import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
@@ -142,6 +143,8 @@ private fun Application.configureDependencies() {
 
         provide<AvatarShapeBackfill> { AvatarShapeBackfill(database = resolve()) }
 
+        provide<EmailPreviewQueue> { EmailPreviewQueue(database = resolve()) }
+
         provide<ImporterManager> {
             ImporterManager(
                 database = resolve(),
@@ -168,6 +171,15 @@ private fun Application.startJobs() {
 
     launch {
         dependencies.resolve<AvatarShapeBackfill>().run()
+    }
+
+    launch {
+        dependencies.resolve<EmailPreviewQueue>().consume()
+    }
+
+    // After the consumer above, which is what drains what this fills.
+    launch {
+        dependencies.resolve<EmailPreviewQueue>().backfill()
     }
 
     launch {

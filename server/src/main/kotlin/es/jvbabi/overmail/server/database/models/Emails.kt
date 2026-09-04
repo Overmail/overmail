@@ -41,6 +41,7 @@ object Emails : UuidTable("emails") {
     val textContent = text("text_content").nullable()
     val htmlContent = text("html_content").nullable()
 
+
     val isRead = bool("is_read").default(false)
 
     init {

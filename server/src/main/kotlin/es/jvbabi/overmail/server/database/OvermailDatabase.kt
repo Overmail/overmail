@@ -33,6 +33,8 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)
+            // After the mails: the preview is keyed by one.
+            SchemaUtils.create(EmailPreviews)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)
             SchemaUtils.create(Labels, EmailLabels)

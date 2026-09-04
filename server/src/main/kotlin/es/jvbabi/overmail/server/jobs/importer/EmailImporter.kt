@@ -8,9 +8,11 @@ import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
+import es.jvbabi.overmail.server.database.models.EmailPreviews
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
+import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -18,6 +20,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.insertIgnoreAndGetId
 import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.upsert
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
@@ -226,6 +229,13 @@ class EmailImporter(
             it[Emails.htmlContent] = htmlContent
             it[Emails.isRead] = isRead
         }.value
+
+        // Written here rather than left to the queue: the body is parsed anyway, so the preview
+        // costs nothing at this point, and a mail is in a listing the moment it is imported.
+        EmailPreviews.upsert {
+            it[email] = emailId
+            it[preview] = mailPreview(textContent, htmlContent)
+        }
 
         recipients
             // The unique index is (mail, address, field), so an address listed twice in the same

@@ -105,6 +105,7 @@ export class EmailStackViewModel {
         const id = this.currentEmailId;
         if (!id) return;
         this.handled[id] = {type: "keep"};
+        this.markRead(id);
 
         this.onNextEmail();
     }
@@ -112,6 +113,7 @@ export class EmailStackViewModel {
     onArchiveOrUnarchiveEmail() {
         const id = this.currentEmailId;
         if (!id) return;
+        this.markRead(id);
 
         if (this.handled[id]?.type === "archive") {
             delete this.handled[id];
@@ -149,6 +151,20 @@ export class EmailStackViewModel {
     }
 
     /**
+     * Dealing with a card is having seen the mail, so it stops being new everywhere else it is
+     * shown. Only the server is told: what the card looks like comes from the mail repository,
+     * and the change comes back over its socket like any other.
+     *
+     * Skipped for a mail that is already read, which is what a card being handled twice -- kept,
+     * then archived -- looks like from here.
+     */
+    private markRead(id: string) {
+        if (this.mails.peek(id).value?.isRead !== false) return;
+
+        this.socket.markEmailRead(id);
+    }
+
+    /**
      * A batch of the pile. Ids that are already here are skipped: a batch starts again with the
      * mail the last one ended on, and after a reconnect the socket starts over from the top.
      */
@@ -183,6 +199,7 @@ type StackServerMessage = {
 
 type StackClientMessage =
     | {type: "request.emails"}
+    | {type: "update.email.read"; email_id: string}
     | {type: "update.email.archive"; email_id: string}
     | {type: "update.email.unarchive"; email_id: string};
 
@@ -228,6 +245,10 @@ class StackSocket {
 
     requestNextBatch() {
         this.send({type: "request.emails"});
+    }
+
+    markEmailRead(emailId: string) {
+        this.send({type: "update.email.read", email_id: emailId});
     }
 
     archiveEmail(emailId: string) {

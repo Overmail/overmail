@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.exists
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
@@ -34,6 +35,7 @@ import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -144,6 +146,26 @@ fun Route.stackSocket() {
                 val message = frame as? Frame.Text ?: continue
                 when (val clientMessage = json.decodeFromString<StackClientMessage>(message.readText())) {
                     is StackClientMessage.RequestEmails -> sendNewBatch()
+                    is StackClientMessage.MarkEmailRead -> {
+                        // Columns rather than the entity: loading an Email reads its raw source
+                        // with it, and this write touches one flag. The ownership check and the
+                        // "not already read" check are part of the statement, so its row count
+                        // is the answer to whether anything changed -- the id comes from the
+                        // client, and a mail of another user must not be touched.
+                        val markedRead = database.query {
+                            Emails.update({
+                                (Emails.id eq clientMessage.emailId) and
+                                        (Emails.isRead eq false) and
+                                        exists(
+                                            ImapAccounts.selectAll().where {
+                                                (ImapAccounts.id eq Emails.imapAccount) and
+                                                        (ImapAccounts.user eq user.id)
+                                            }
+                                        )
+                            }) { it[Emails.isRead] = true } > 0
+                        }
+                        if (markedRead) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
+                    }
                     is StackClientMessage.ArchiveEmail -> {
                         // Reports whether a row was written, so nothing is announced for a
                         // request that changed nothing.
@@ -195,6 +217,13 @@ private sealed class StackClientMessage {
     @Serializable
     @SerialName("request.emails")
     object RequestEmails : StackClientMessage()
+
+    /** The reader dealt with the mail on the pile, so they have seen it. */
+    @Serializable
+    @SerialName("update.email.read")
+    data class MarkEmailRead(
+        @SerialName("email_id") val emailId: Email.Id,
+    ) : StackClientMessage()
 
     @Serializable
     @SerialName("update.email.archive")

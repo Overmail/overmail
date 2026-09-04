@@ -22,6 +22,30 @@ private val invisible = Regex("[\\p{Cf}\\u034F]")
 /** Every kind of space, not the seven that Java calls whitespace: `\\s` misses U+00A0 and U+2007. */
 private val spaces = Regex("[\\s\\p{Z}]+")
 
+/**
+ * Drops the links a newsletter puts in front of its own text -- a "view in browser", a tracking
+ * redirect -- so the preview starts where the reading starts.
+ *
+ * Only leading ones, and never the last thing left: a mail that is a bare link keeps it, because
+ * then that link is what the mail says.
+ */
+private fun withoutLeadingLinks(line: String): String {
+    var rest = line
+
+    while (true) {
+        val space = rest.indexOf(' ')
+        if (space < 0) return rest
+
+        val first = rest.take(space)
+        if (!first.isLink()) return rest
+
+        rest = rest.substring(space + 1)
+    }
+}
+
+private fun String.isLink(): Boolean =
+    startsWith("http://") || startsWith("https://") || startsWith("www.")
+
 /** What is left of a body once nothing invisible is in the way: one line, or nothing at all. */
 private fun readable(body: String): String =
     body.replace(invisible, "").replace(spaces, " ").trim()
@@ -47,12 +71,13 @@ fun mailPreview(text: String?, html: String?): String {
         ?: html?.let(HtmlToText::convert)?.let(::readable)?.takeIf { it.isNotEmpty() }
         ?: return ""
 
-    if (line.length <= MAIL_PREVIEW_LENGTH) return line
+    val text = withoutLeadingLinks(line)
+    if (text.length <= MAIL_PREVIEW_LENGTH) return text
 
     // Cut at the last space in reach, so the preview does not end mid-word. A line without one
     // that close -- a URL, a language that does not space its words -- is cut where it is.
-    val cut = line.lastIndexOf(' ', MAIL_PREVIEW_LENGTH)
+    val cut = text.lastIndexOf(' ', MAIL_PREVIEW_LENGTH)
     val end = if (cut >= MAIL_PREVIEW_LENGTH - WORD_BOUNDARY_SLACK) cut else MAIL_PREVIEW_LENGTH
 
-    return line.take(end).trimEnd() + "…"
+    return text.take(end).trimEnd() + "…"
 }

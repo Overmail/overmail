@@ -86,6 +86,43 @@ class MailPreviewTest {
     }
 
     @Test
+    fun `a link in front of the text is not the preview`() {
+        // What the newsletter that showed this looks like: a tracking redirect, then the prose.
+        val preview = mailPreview(
+            text = "https://commonmain.dev/r/92baa92b?m=e2b9 Kotlin Multiplatform Newsletter #17",
+            html = null,
+        )
+
+        assertEquals("Kotlin Multiplatform Newsletter #17", preview)
+    }
+
+    @Test
+    fun `several links in front are all dropped`() {
+        val preview = mailPreview(
+            text = "https://example.test/view www.example.test/unsubscribe Guten Tag",
+            html = null,
+        )
+
+        assertEquals("Guten Tag", preview)
+    }
+
+    @Test
+    fun `a mail that is nothing but a link keeps it`() {
+        val link = "https://example.test/only"
+
+        // Dropping it would leave an empty preview, and then the link is what the mail says.
+        assertEquals(link, mailPreview(text = link, html = null))
+        assertEquals(link, mailPreview(text = "  $link  ", html = null))
+    }
+
+    @Test
+    fun `a link inside the text stays where it is`() {
+        val body = "Bitte bestätigen: https://example.test/confirm"
+
+        assertEquals(body, mailPreview(text = body, html = null))
+    }
+
+    @Test
     fun `a long body is cut at a word, with an ellipsis`() {
         val body = List(80) { "Wort" }.joinToString(" ")
 

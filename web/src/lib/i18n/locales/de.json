@@ -56,8 +56,7 @@
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",
     "table": {
-      "noSubject": "(kein Betreff)",
-      "sentRelative": "{days, plural, =1 {gestern} =2 {vorgestern} other {vor drei Tagen}}"
+      "noSubject": "(kein Betreff)"
     }
   },
   "myStack": {

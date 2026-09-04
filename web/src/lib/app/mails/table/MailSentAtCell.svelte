@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {locale, _} from "svelte-i18n";
+    import {locale} from "svelte-i18n";
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import {sentAtLabel} from "../sentAt";
 
@@ -34,8 +34,6 @@
         switch (label.kind) {
             case "time":
                 return formats.time.format(sentAt);
-            case "relative":
-                return $_("mails.table.sentRelative", {values: {days: label.days}});
             case "date":
                 return (label.withYear ? formats.dateWithYear : formats.date).format(sentAt);
         }

@@ -13,17 +13,11 @@ test("today is a time", () => {
     expect(sentAtLabel(at(2026, 9, 4, 23, 59), now)).toEqual({kind: "time"});
 });
 
-test("the days after that are named", () => {
-    expect(sentAtLabel(at(2026, 9, 3), now)).toEqual({kind: "relative", days: 1});
-    expect(sentAtLabel(at(2026, 9, 2), now)).toEqual({kind: "relative", days: 2});
-    expect(sentAtLabel(at(2026, 9, 1), now)).toEqual({kind: "relative", days: 3});
-});
-
 test("a calendar day, not a 24 hour window", () => {
-    // Half an hour old and already yesterday, which is what a reader means by it.
+    // Half an hour old and already another day, which is what a reader means by it.
     expect(sentAtLabel(at(2026, 9, 3, 23, 30), at(2026, 9, 4, 0, 0))).toEqual({
-        kind: "relative",
-        days: 1,
+        kind: "date",
+        withYear: false,
     });
 });
 

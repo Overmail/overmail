@@ -31,6 +31,7 @@ function wireMail(id: string, archiveState = "unarchive") {
         subject: `Subject of ${id}`,
         sent: 1_700_000_000,
         is_read: false,
+        preview: "Wie die Mail beginnt",
         archive_state: archiveState,
         sender: {
             id: "s-1",
@@ -139,15 +140,36 @@ test("a mail archived here stays for its animation, and the pile is told", async
     expect(viewModel.currentEmailId).toBe("m-2");
 });
 
-test("keeping a mail moves on without telling the server", async () => {
+test("keeping a mail moves on and leaves it in the mailbox", async () => {
     const {viewModel, pile, serve} = stack();
 
     await serve(["m-1", "m-2"]);
     viewModel.onKeepEmail();
 
     expect(viewModel.currentEmailId).toBe("m-2");
-    // Keeping is nothing the server has to know: the mail stays where it is.
-    expect(pile().sent.some((message) => String(message.type).startsWith("update."))).toBe(false);
+    // Nothing moves the mail; the only thing the server hears is that it has been seen.
+    expect(pile().sent.filter((message) => String(message.type).startsWith("update."))).toEqual([
+        {type: "update.email.read", email_id: "m-1"},
+    ]);
+});
+
+test("dealing with a card marks the mail read, and only the first time", async () => {
+    const {viewModel, pile, content, serve} = stack();
+
+    await serve(["m-1", "m-2"]);
+    viewModel.onKeepEmail();
+
+    expect(pile().sent).toContainEqual({type: "update.email.read", email_id: "m-1"});
+
+    // It comes back read, so going back to that card and archiving it does not say so again.
+    content().deliver({type: "data.emails", emails: [{...wireMail("m-1"), is_read: true}]});
+    await settle();
+    viewModel.onPreviousEmail();
+    viewModel.onArchiveOrUnarchiveEmail();
+
+    expect(pile().sent.filter((message) => message.type === "update.email.read")).toEqual([
+        {type: "update.email.read", email_id: "m-1"},
+    ]);
 });
 
 test("walking back and forth stays inside the pile", async () => {

@@ -38,6 +38,7 @@ function wireMail(id: string, subject = "Invoice 42") {
         subject,
         sent: 1_700_000_000,
         is_read: false,
+        preview: "Wie die Mail beginnt",
         archive_state: "unarchive",
         sender: {
             id: "s-1",
@@ -229,6 +230,7 @@ test("merge takes what another feed already knows", () => {
             subject: "From a listing",
             sent: 1,
             isRead: true,
+            preview: null,
             archiveState: "unarchive",
             sender: {id: "s", name: null, address: "a@b.c", avatarUrl: null, avatarPadding: null},
             to: [],

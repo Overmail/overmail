@@ -39,6 +39,11 @@ export type EmailMeta = {
     /** Unix seconds. */
     sent: number;
     isRead: boolean;
+    /**
+     * How the body begins, as one line. Null for a mail whose body nothing has looked at yet;
+     * empty for one with nothing readable in it.
+     */
+    preview: string | null;
     /** Where the mail stands; anything but `unarchive` is out of the mailbox. */
     archiveState: "unarchive" | "archive" | "spam";
     sender: EmailParticipant;
@@ -74,6 +79,7 @@ type WireEmail = {
     subject: string;
     sent: number;
     is_read: boolean;
+    preview: string | null;
     archive_state: EmailMeta["archiveState"];
     sender: WireParticipant;
     to: WireParticipant[];
@@ -271,6 +277,7 @@ function parse(mail: WireEmail): EmailMeta {
         subject: mail.subject,
         sent: mail.sent,
         isRead: mail.is_read,
+        preview: mail.preview,
         archiveState: mail.archive_state,
         sender: parseParticipant(mail.sender),
         to: mail.to.map(parseParticipant),

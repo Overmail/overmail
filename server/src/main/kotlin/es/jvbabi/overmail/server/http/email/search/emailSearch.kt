@@ -32,28 +32,6 @@ import kotlin.uuid.Uuid
 
 private const val MAX_RESULTS = 10
 
-/**
- * True for mails whose latest archive event is not Spam. The archive table is an event log, so
- * only the latest event decides (see `emailIsNotArchived` in `http/stack/stackSocket.kt`): a mail
- * counts as spam when it has a Spam event with no other event at or after it.
- */
-private fun emailIsNotSpam(): Op<Boolean> {
-    val laterNonSpam = EmailArchives.alias("later_non_spam")
-    return notExists(
-        EmailArchives.selectAll().where {
-            (EmailArchives.email eq Emails.id) and
-                    (EmailArchives.action eq EmailArchiveAction.Spam) and
-                    notExists(
-                        laterNonSpam.selectAll().where {
-                            (laterNonSpam[EmailArchives.email] eq EmailArchives.email) and
-                                    (laterNonSpam[EmailArchives.action] neq EmailArchiveAction.Spam) and
-                                    (laterNonSpam[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
-                        }
-                    )
-        }
-    )
-}
-
 private data class Candidate(
     val id: Uuid,
     val subject: String,

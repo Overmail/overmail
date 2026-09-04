@@ -111,6 +111,31 @@ fun emailIsNotArchived(): Op<Boolean> {
 }
 
 /**
+ * True for mails whose latest archive event is not Spam -- everything a listing shows, archived
+ * mails included: a mailbox is still where an archived mail lives, spam is not.
+ *
+ * Same event log as [emailIsNotArchived] and the same reasoning: only the latest event decides.
+ *
+ * Correlates on [Emails], so it goes into the `where` of a query over that table.
+ */
+fun emailIsNotSpam(): Op<Boolean> {
+    val laterNonSpam = EmailArchives.alias("later_non_spam")
+    return notExists(
+        EmailArchives.selectAll().where {
+            (EmailArchives.email eq Emails.id) and
+                    (EmailArchives.action eq EmailArchiveAction.Spam) and
+                    notExists(
+                        laterNonSpam.selectAll().where {
+                            (laterNonSpam[EmailArchives.email] eq EmailArchives.email) and
+                                    (laterNonSpam[EmailArchives.action] neq EmailArchiveAction.Spam) and
+                                    (laterNonSpam[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
+                        }
+                    )
+        }
+    )
+}
+
+/**
  * Mails are deduplicated by account, send second and subject, so send times are stored and looked
  * up at second precision.
  */

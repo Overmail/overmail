@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.emailsByIds
+import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
@@ -62,6 +63,10 @@ internal fun Application.configureRouting() {
             route("/emails") {
                 // GET /emails?ids=a,b,c -- what a client-side cache asks for the ids it lacks.
                 emailsByIds()
+
+                route("/list") {
+                    emailList()
+                }
 
                 route("/search") {
                     emailSearch()

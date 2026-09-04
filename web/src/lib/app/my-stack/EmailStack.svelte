@@ -130,10 +130,10 @@
         const reach = 100 + steps * 15;
 
         if (email.classification?.type === "archive") {
-            return `translate(calc(-50% - ${reach}vw), ${40 + jitter(id, 4, 20)}px) rotate(${-12 + spin}deg)`;
+            return `translate(${-reach}vw, ${40 + jitter(id, 4, 20)}px) rotate(${-12 + spin}deg)`;
         }
 
-        return `translate(calc(-50% + ${jitter(id, 4, 30)}px), ${reach}vh) rotate(${spin}deg)`;
+        return `translate(${jitter(id, 4, 30)}px, ${reach}vh) rotate(${spin}deg)`;
     }
 
     /**
@@ -167,10 +167,13 @@
                     // A card of the first batch is part of the fan and appears with it, not
                     // before: the batch is one movement, not five cards popping in.
                     shown: readyIds.has(id) && (laidDown || !introIds.has(id)),
-                    // The current card stays straight and centred; everything below it drifts.
+                    // The current card stays straight where the box already is; everything below
+                    // it drifts. Nothing here centres the card -- that is the layout's job, see
+                    // the wrapper below, and a transform doing it as well would put every card's
+                    // box half a card away from where the card is drawn.
                     transform: gone ?? (active
-                        ? "translate(-50%, 0)"
-                        : `translate(calc(-50% + ${jitter(id, 2, 10)}px), ${depth * 10 + jitter(id, 3, 6)}px) rotate(${jitter(id, 1, 2.5)}deg)`),
+                        ? "translate(0, 0)"
+                        : `translate(${jitter(id, 2, 10)}px, ${depth * 10 + jitter(id, 3, 6)}px) rotate(${jitter(id, 1, 2.5)}deg)`),
                     // Faded via an opaque-card + translucent-overlay sandwich rather than opacity
                     // on the card itself: the cards below have to stay solid, or the whole stack
                     // shows through itself. Handled ones may go properly transparent, since there
@@ -190,21 +193,40 @@
 
 <!-- Every card is positioned against this box, so a long mail never grows the stack. Nothing
      clips the cards themselves: the drop shadow has to stay visible, or the ones behind stop
-     reading as separate cards. -->
-<div class={cn("relative isolate w-3xl", className)}>
+     reading as separate cards.
+
+     The column is a card of 48rem with 2rem of shadow room on either side, and it gives way on a
+     screen too narrow for that rather than pushing past the edge -- the cards are laid out
+     against this box, so whatever it is wide is what they are wide. -->
+<div class={cn("relative isolate w-full max-w-[52rem]", className)}>
     <!-- One wrapper shape for every card, current or not: moving up the stack or off it only
          changes style, so the same DOM node survives and the transition can run. Splitting the
          cases into two branches would tear the node down and rebuild it, and the card would
          teleport. -->
     {#each virtualizedStack as { id, email, active, transform, fade, opacity, blur, z, lay, shown } (id)}
         <!-- Two boxes rather than one, because a card can be in two movements at once and they
-             do not compose in a single transform: the outer one is only ever the sheet being laid
-             down when the stack first arrives, the inner one holds the place in the pile and
-             slides between places from then on. inset-y-0 sits out here, since the height is what
-             the card is positioned against. -->
+             do not compose in a single transform: the outer one is only ever the sheet being
+             pushed in when the stack first arrives, the inner one holds the place in the pile and
+             slides between places from then on. The height sits out here, since that is what the
+             card is positioned against.
+
+             The box is simply the column, which is what the card fills -- no width of its own and
+             nothing centring it. A transform would move the card but leave its box behind, and
+             the box of a card that is off to the side or already gone would then sit over the one
+             you are reading and swallow the clicks meant for it; the menu in its top right corner
+             is exactly there.
+
+             Only the current card takes clicks at all, and that is decided here rather than on
+             the scroll box, so it covers the card, its tint and the empty space around them in
+             one go. -->
         <div
-                class={cn("absolute inset-y-0 left-1/2 w-fit", lay && "lay-down")}
+                class={cn(
+                    "absolute inset-0",
+                    !active && "pointer-events-none",
+                    lay && "lay-down",
+                )}
                 style="z-index: {z};{lay ? ` --lay-y: ${lay.y}vh; --lay-rotate: ${lay.rotate}deg; animation-delay: ${lay.delay}ms;` : ''}"
+                aria-hidden={!active}
         >
             <!-- The scroll box goes around the card, not inside it: the card keeps its natural
                  height and the box slides it, so a long mail moves as one object — background,
@@ -212,29 +234,27 @@
                  stays put.
 
                  h-full is what makes that work at all: only a box with a height of its own can
-                 overflow. w-fit keeps it hugging the card, px-8 is there because a scroll box
-                 clips and the drop shadow would go with it, and pb-32 matches the shortcut bar:
-                 the box reaches the bottom of the page so the card disappears under the bar, and
-                 that padding is extra scroll range at the end, which brings the last lines back
-                 out from under it.
+                 overflow. The horizontal padding is what the drop shadow lives in, since a scroll
+                 box clips -- overflow in one axis makes the other one clip too. pb-32 matches the
+                 shortcut bar: the box reaches the bottom of the page so the card disappears under
+                 the bar, and that padding is extra scroll range at the end, which brings the last
+                 lines back out from under it.
 
                  The cards that are not current keep the same overflow rather than switching to
-                 hidden: pointer-events-none already stops them from eating the wheel, and a card
-                 leaving the stack would otherwise snap back to its top mid-flight. -->
+                 hidden: the wrapper already stops them from eating the wheel, and a card leaving
+                 the stack would otherwise snap back to its top mid-flight. -->
             <div
                     class={cn(
-                        "card-scroll h-full w-fit overflow-y-auto overscroll-contain px-8 pt-2 pb-32",
+                        "card-scroll h-full w-full overflow-y-auto overscroll-contain px-4 pt-2 pb-32 sm:px-8",
                         "transition-[transform,opacity,filter] duration-500 ease-out motion-reduce:transition-none",
-                        !active && "pointer-events-none",
                     )}
                     style="transform: {transform}; opacity: {opacity};{blur ? ` filter: blur(${blur}px);` : ''}"
-                    aria-hidden={!active}
             >
-                <!-- Hugs the card, so the tint below lines up with it instead of with the
+                <!-- Wraps the card alone, so the tint below lines up with it instead of with the
                      full-height scroll box. Hiding the card happens here rather than on the card
                      itself, so the tint that belongs to it goes with it -- it is opaque enough to
                      show as a rectangle over nothing. -->
-                <div class={cn("relative w-fit", !shown && "invisible")}>
+                <div class={cn("relative", !shown && "invisible")}>
                     <EmailCard
                             {...email}
                             onRequestReclassify={() => onRequestReclassify(email)}

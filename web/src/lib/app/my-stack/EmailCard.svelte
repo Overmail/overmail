@@ -73,25 +73,29 @@
 
 </script>
 
-<!-- `class` goes last, so the caller can place and rotate the card in the stack. -->
-<div class={cn("flex flex-col w-3xl h-fit bg-background rounded-2xl drop-shadow-2xl", className)}>
-    <div class="flex flex-row items-center justify-between gap-6 px-8 pt-8">
-        <div class="flex flex-row gap-4 items-center">
+<!-- `class` goes last, so the caller can place and rotate the card in the stack. The width comes
+     from the stack rather than from here: the card fills the column it is laid into, so a narrow
+     screen gets a narrow card instead of one that reaches past the edge of it. -->
+<div class={cn("flex flex-col w-full h-fit bg-background rounded-2xl drop-shadow-2xl", className)}>
+    <!-- min-w-0 down this row: a flex item does not shrink below its content on its own, so a
+         long address or a spelled-out date would push the card wider than the column it is in. -->
+    <div class="flex flex-row items-center justify-between gap-6 px-4 pt-8 sm:px-8">
+        <div class="flex min-w-0 flex-row gap-4 items-center">
             <OvermailAvatar
                     url={sender.avatarUrl}
                     name={sender.name ?? sender.address}
                     class="size-12"
                     fallbackClass="text-base"
             />
-            <div class="flex flex-col">
-                <span class="font-medium text-lg">{sender.name ?? sender.address}</span>
+            <div class="flex min-w-0 flex-col">
+                <span class="truncate font-medium text-lg">{sender.name ?? sender.address}</span>
                 {#if sender.name}
-                    <span class="font-light text-base">{sender.address}</span>
+                    <span class="truncate font-light text-base">{sender.address}</span>
                 {/if}
             </div>
         </div>
 
-        <div class="flex flex-row items-center gap-1">
+        <div class="flex shrink-0 flex-row items-center gap-1">
             <!-- Unix seconds off the wire; the card is the only place that needs them as a date. -->
             <span class="font-light text-accent-foreground">{new Date(sent * 1000).toLocaleString()}</span>
 
@@ -134,16 +138,16 @@
         </div>
     </div>
 
-    <div class="px-8 pt-4 flex flex-row flex-wrap items-center gap-x-10">
+    <div class="px-4 pt-4 flex flex-row flex-wrap items-center gap-x-10 sm:px-8">
         {#each fields as field (field.key)}
-            <div class="flex flex-row items-center gap-1">
-                <span class="font-bold text-muted-foreground px-1 py-0.5 rounded-sm w-16">{$_(field.key)}</span>
-                <span>{field.participants.map(formatParticipant).join(", ")}</span>
+            <div class="flex min-w-0 flex-row items-center gap-1">
+                <span class="font-bold text-muted-foreground px-1 py-0.5 rounded-sm w-16 shrink-0">{$_(field.key)}</span>
+                <span class="min-w-0 wrap-anywhere">{field.participants.map(formatParticipant).join(", ")}</span>
             </div>
         {/each}
     </div>
 
-    <div class="px-8 pt-6 flex flex-row flex-wrap items-center gap-x-8 text-xl">
+    <div class="px-4 pt-6 flex flex-row flex-wrap items-center gap-x-8 text-xl wrap-anywhere sm:px-8">
         {subject}
     </div>
 
@@ -160,7 +164,7 @@
         </span>
     {/snippet}
 
-    <div class="px-8 pt-3 flex flex-row flex-wrap items-center gap-1.5">
+    <div class="px-4 pt-3 flex flex-row flex-wrap items-center gap-1.5 sm:px-8">
         {#each labels as label (label.id)}
             {#if label.description || label.assignmentReason}
                 <Tooltip.Root>
@@ -186,7 +190,7 @@
 
     <div class="mx-4 my-4 h-px bg-accent"></div>
 
-    <div class="pb-8 px-8 whitespace-pre-wrap wrap-anywhere">
+    <div class="pb-8 px-4 whitespace-pre-wrap wrap-anywhere sm:px-8">
         {#if body.html}
             <EmailHtmlBody html={body.html} onReady={reportReady}/>
         {:else if body.text}

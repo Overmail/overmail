@@ -4,6 +4,7 @@
     "checkingSession": "Sitzung wird geprüft…",
     "nav": {
       "home": "Start",
+      "mails": "Mails",
       "stack": "Stack"
     },
     "language": {
@@ -41,6 +42,21 @@
     "graph": {
       "label": "Mails pro Tag in {year}",
       "day": "{count, plural, =0 {Keine Mail} one {# Mail} other {# Mails}}"
+    }
+  },
+  "mails": {
+    "title": "Alle Mails",
+    "count": "{count, plural, one {# Mail} other {# Mails}}",
+    "empty": "Keine Mails im Postfach.",
+    "loadFailed": "Weitere Mails konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "table": {
+      "sender": "VON",
+      "subject": "BETREFF",
+      "sentAt": "GESENDET",
+      "noSubject": "(kein Betreff)",
+      "unread": "Ungelesen",
+      "archived": "Archiviert"
     }
   },
   "myStack": {

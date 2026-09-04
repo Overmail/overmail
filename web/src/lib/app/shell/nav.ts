@@ -1,5 +1,5 @@
 import type {Component} from "svelte";
-import {HouseIcon, StackIcon} from "phosphor-svelte";
+import {HouseIcon, StackIcon, TrayIcon} from "phosphor-svelte";
 
 /**
  * A page behind the sidebar.
@@ -21,6 +21,12 @@ export const navItems: NavItem[] = [
         icon: HouseIcon,
         href: "/",
         matches: (pathname) => pathname === "/",
+    },
+    {
+        key: "app.nav.mails",
+        icon: TrayIcon,
+        href: "/mails",
+        matches: (pathname) => pathname.startsWith("/mails"),
     },
     {
         key: "app.nav.stack",

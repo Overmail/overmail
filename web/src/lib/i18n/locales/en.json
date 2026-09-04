@@ -4,6 +4,7 @@
     "checkingSession": "Checking session…",
     "nav": {
       "home": "Home",
+      "mails": "Mail",
       "stack": "Stack"
     },
     "language": {
@@ -41,6 +42,21 @@
     "graph": {
       "label": "Mails per day in {year}",
       "day": "{count, plural, =0 {No mail} one {# mail} other {# mails}}"
+    }
+  },
+  "mails": {
+    "title": "All mail",
+    "count": "{count, plural, one {# mail} other {# mails}}",
+    "empty": "No mail in this mailbox.",
+    "loadFailed": "Could not load more mail.",
+    "retry": "Try again",
+    "table": {
+      "sender": "FROM",
+      "subject": "SUBJECT",
+      "sentAt": "SENT",
+      "noSubject": "(no subject)",
+      "unread": "Unread",
+      "archived": "Archived"
     }
   },
   "myStack": {

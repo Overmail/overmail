@@ -116,7 +116,9 @@
             <div class="pointer-events-none absolute inset-0 backdrop-blur-lg mask-[linear-gradient(to_bottom,transparent_75%,black_100%)]"></div>
 
             <!-- relative, so the keys paint above the absolutely positioned blur layers. -->
-            <div class="relative flex h-full flex-row items-center justify-center gap-6">
+            <!-- Wraps rather than running past the edge: six shortcuts do not fit next to each
+                 other on a narrow screen, and a row that overflows here scrolls the whole page. -->
+            <div class="relative flex h-full flex-row flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4">
                 <div class="flex flex-row items-center justify-center gap-2">
                     <KeyCap key="A" class="size-10" />
                     <span class="flex flex-row items-center gap-1">

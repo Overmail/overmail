@@ -153,7 +153,14 @@
         "searchSender": "From: {query}",
         "thinking": "Thinking",
         "toolCall": "Working",
-        "toolCalls": "{count, plural, one {# tool call} other {# tool calls}}"
+        "toolCalls": "{count, plural, one {# tool call} other {# tool calls}}",
+        "externalLink": {
+          "title": "Open this link?",
+          "description": "This link leads out of Overmail, and the text of a link is written by the assistant.",
+          "cancel": "Cancel",
+          "open": "Open",
+          "openInNewTab": "Open in new tab"
+        }
       }
     },
     "shortcuts": {
@@ -177,6 +184,9 @@
       "toggle": "Toggle sidebar",
       "title": "Sidebar",
       "description": "Displays the mobile sidebar."
+    },
+    "dialog": {
+      "close": "Close"
     },
     "sheet": {
       "close": "Close"

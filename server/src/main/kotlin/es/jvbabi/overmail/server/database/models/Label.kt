@@ -26,6 +26,13 @@ class Label(id: EntityID<Uuid>) : UuidEntity(id) {
             return "#%06X".format(rgb and 0xFFFFFF)
         }
 
+        /**
+         * A label name as it is stored and looked up: trimmed, and runs of whitespace as one
+         * space. Everything that writes a label goes through this -- the classification agent
+         * and a reader typing a name -- so "  Uni   Kram" and "Uni Kram" are one label.
+         */
+        fun normalizeName(name: String): String = name.trim().replace(Regex("\\s+"), " ")
+
         private const val SATURATION = 0.25f
         private const val BRIGHTNESS = 0.92f
     }

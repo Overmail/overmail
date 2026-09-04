@@ -328,3 +328,42 @@ test("a write goes out as it was asked for, and the mail is read again after it"
         globalThis.fetch = original;
     }
 });
+
+test("a label goes on and off a mail, and a new one is made on it", async () => {
+    const {repo, latest} = repository();
+    const requests: {url: string; method: string | undefined; body: string | undefined}[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: {method?: string; body?: string}) => {
+        requests.push({url: String(url), method: init?.method, body: init?.body});
+        return new Response(null, {status: 204});
+    }) as unknown as typeof fetch;
+
+    try {
+        repo.subscribe("m-1");
+        await settle();
+
+        await repo.attachLabel("m-1", "l-1");
+        expect(requests.at(-1)).toEqual({
+            url: "/api/emails/m-1/labels/l-1",
+            method: "POST",
+            body: undefined,
+        });
+        // The mail is read again, like after every write about it.
+        expect(latest().sent.at(-1)).toEqual({type: "subscribe.emails", ids: ["m-1"]});
+
+        await repo.detachLabel("m-1", "l-1");
+        expect(requests.at(-1)?.method).toBe("DELETE");
+        expect(requests.at(-1)?.url).toBe("/api/emails/m-1/labels/l-1");
+
+        // One request makes the label and hangs it on the mail; no colour goes out, the server
+        // picks the one the name derives to.
+        await repo.createLabelOn("m-1", "Uni Kram");
+        expect(requests.at(-1)?.url).toBe("/api/labels");
+        expect(JSON.parse(requests.at(-1)!.body!)).toEqual({
+            name: "Uni Kram",
+            attach_to_email_ids: ["m-1"],
+        });
+    } finally {
+        globalThis.fetch = original;
+    }
+});

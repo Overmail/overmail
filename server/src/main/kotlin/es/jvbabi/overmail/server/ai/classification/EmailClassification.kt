@@ -233,12 +233,12 @@ class EmailClassification(
         log("Origin labels derived from the sender classification: ${originLabels.map { it.name }}")
 
         // Model labels come first so their richer descriptions win when both name a label equally.
-        val labels = (finalizedClassification.data.labels + originLabels).distinctBy { normalizeLabelName(it.name).lowercase() }
+        val labels = (finalizedClassification.data.labels + originLabels).distinctBy { Label.normalizeName(it.name).lowercase() }
 
         labels.forEach { label ->
             // Normalized before lookup and storage, so model output that differs only in stray
             // whitespace still resolves onto the exact stored label name.
-            val requestedName = normalizeLabelName(label.name)
+            val requestedName = Label.normalizeName(label.name)
             if (requestedName.isEmpty()) {
                 log("Skipping label with blank name (reason: ${label.reason})")
                 return@forEach
@@ -288,11 +288,6 @@ class EmailClassification(
                         " (reason: ${label.reason})"
             )
         }
-    }
-
-    companion object {
-        /** Trims and collapses inner whitespace, so lookups and storage always see one spelling. */
-        private fun normalizeLabelName(name: String): String = name.trim().replace(Regex("\\s+"), " ")
     }
 }
 

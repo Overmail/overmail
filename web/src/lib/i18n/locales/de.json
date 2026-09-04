@@ -153,7 +153,14 @@
         "searchSender": "Von: {query}",
         "thinking": "Denkt nach",
         "toolCall": "Arbeitet",
-        "toolCalls": "{count, plural, one {# Toolcall} other {# Toolcalls}}"
+        "toolCalls": "{count, plural, one {# Toolcall} other {# Toolcalls}}",
+        "externalLink": {
+          "title": "Link öffnen?",
+          "description": "Dieser Link führt aus Overmail heraus.",
+          "cancel": "Abbrechen",
+          "open": "Öffnen",
+          "openInNewTab": "In neuem Tab öffnen"
+        }
       }
     },
     "shortcuts": {
@@ -177,6 +184,9 @@
       "toggle": "Seitenleiste umschalten",
       "title": "Seitenleiste",
       "description": "Zeigt die mobile Seitenleiste."
+    },
+    "dialog": {
+      "close": "Schließen"
     },
     "sheet": {
       "close": "Schließen"

@@ -258,7 +258,44 @@ export class EmailRepository {
     }
 
     /**
-     * What follows either of the two writes above.
+     * Hangs a label that exists on [id], or takes it off again.
+     *
+     * The pair of ids is the whole address of it -- see `EmailLabels` on the server -- so this
+     * needs nothing but the label a caller already holds, and the same as above applies: what a
+     * mail carries afterwards is read again rather than assumed.
+     */
+    async attachLabel(id: string, labelId: string): Promise<void> {
+        const response = await fetch(`/api/emails/${id}/labels/${labelId}`, {method: "POST"});
+
+        this.afterWrite(id, response);
+    }
+
+    async detachLabel(id: string, labelId: string): Promise<void> {
+        const response = await fetch(`/api/emails/${id}/labels/${labelId}`, {method: "DELETE"});
+
+        this.afterWrite(id, response);
+    }
+
+    /**
+     * A label of that name on [id]: created and attached in one request, and a name this user
+     * already has is that label rather than a second one of the same name.
+     *
+     * No colour goes out: the server picks the one the name derives to, the same as for the
+     * labels the agent makes. `attach_to_email_ids` takes a list because that is what a
+     * selection of mails will need; here it is the one mail that is open.
+     */
+    async createLabelOn(id: string, name: string): Promise<void> {
+        const response = await fetch("/api/labels", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name, attach_to_email_ids: [id]}),
+        });
+
+        this.afterWrite(id, response);
+    }
+
+    /**
+     * What follows any of the writes above.
      *
      * The mail is read again rather than assumed, see [requestSnapshot]: nothing about it is
      * written here, and the screen that pressed the button must not be the last one to hear what

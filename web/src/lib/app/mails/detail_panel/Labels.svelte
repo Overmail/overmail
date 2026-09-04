@@ -11,12 +11,15 @@
         labels,
         onAddLabel,
         onCreateLabel,
+        onRemoveLabel,
     }: {
         labels: EmailLabel[],
         /** What the plus leads to. Without it picking one only closes the list again. */
         onAddLabel?: (label: LabelSearchResult) => void,
         /** The same for the last row of the list: a label of that name does not exist yet. */
         onCreateLabel?: (name: string) => void,
+        /** Without it a label carries no X, which is what a mail nobody may sort looks like. */
+        onRemoveLabel?: (label: EmailLabel) => void,
     } = $props();
 
     let open = $state(false);
@@ -43,6 +46,7 @@
                 class="shrink-0 font-normal"
                 color={label.color}
                 title={label.description ?? label.name}
+                onremove={onRemoveLabel && (() => onRemoveLabel(label))}
         >
             {label.name}
         </Badge>

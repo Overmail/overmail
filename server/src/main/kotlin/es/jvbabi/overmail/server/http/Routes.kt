@@ -5,11 +5,14 @@ import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
+import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
+import es.jvbabi.overmail.server.http.email.item.labels.detachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.search.emailSearch
+import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
@@ -110,11 +113,19 @@ internal fun Application.configureRouting() {
                     route("/spam") {
                         setEmailArchiveState(EmailArchiveAction.Spam)
                     }
+
+                    // The pair addresses the assignment; there is no id for it, see
+                    // `EmailLabels`.
+                    route("/labels/{labelId}") {
+                        attachEmailLabel()
+                        detachEmailLabel()
+                    }
                 }
             }
 
             route("/labels") {
                 labelsByIds()
+                createLabel()
 
                 route("/search") {
                     labelSearch()

@@ -8,6 +8,7 @@
     import EntityEmail from "$lib/app/entities/EntityEmail.svelte";
     import EntityLabel from "$lib/app/entities/EntityLabel.svelte";
     import EntityPerson from "$lib/app/entities/EntityPerson.svelte";
+    import MarkdownLink from "$lib/app/ai/messages/MarkdownLink.svelte";
     import {agentBlocks} from "$lib/app/ai/messages/agentBlocks";
 
     let {
@@ -21,11 +22,12 @@
 
     const blocks = $derived(agentBlocks(content));
 
-    // Only the entity elements are ours; everything else keeps the library's renderers, which
-    // sanitize urls and leave unknown html alone. The html `label` element is overridden on
-    // purpose: inside an answer the tag means the user's label, and a form label has nothing to
-    // do here.
+    // Only the entity elements and the link are ours; everything else keeps the library's
+    // renderers, which sanitize urls and leave unknown html alone. The html `label` element is
+    // overridden on purpose: inside an answer the tag means the user's label, and a form label
+    // has nothing to do here.
     const renderers = {
+        link: MarkdownLink,
         html: {
             email: EntityEmail,
             label: EntityLabel,

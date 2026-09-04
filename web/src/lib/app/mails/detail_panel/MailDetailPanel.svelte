@@ -85,8 +85,13 @@
             {mail.subject}
         </div>
 
+        <!-- Every one of these is a write about the open mail, so they go through the repository
+             and come back over the socket as the mail's metadata. -->
         <Labels
                 labels={mail.labels}
+                onAddLabel={(label) => mails.attachLabel(mail.id, label.id)}
+                onCreateLabel={(name) => mails.createLabelOn(mail.id, name)}
+                onRemoveLabel={(label) => mails.detachLabel(mail.id, label.id)}
         />
     {/if}
 </div>

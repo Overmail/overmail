@@ -113,7 +113,7 @@
 </script>
 
 <section class="flex flex-col gap-3">
-    <div class="flex items-baseline gap-2">
+    <div class="flex items-baseline gap-2 px-4">
         <h2 class="font-heading text-sm font-medium">{$_("mails.title")}</h2>
         {#if list.initialized}
             <span class="text-muted-foreground text-xs tabular-nums">
@@ -123,10 +123,14 @@
     </div>
 
     <!-- The scroll container has to be this one and not the table's own wrapper: the sticky
-         header sticks to its nearest scrolling ancestor, and the wrapper never scrolls. -->
+         header sticks to its nearest scrolling ancestor, and the wrapper never scrolls.
+
+         No frame around it: the rows carry their own lines and the header its shadow, which is
+         all the structure the list needs. Nothing is rounded either -- a rounded box that scrolls
+         clips the first and last row at the corners. -->
     <div
             bind:this={viewport}
-            class="h-[70vh] overflow-auto rounded-md border [&>[data-slot=table-container]]:overflow-visible"
+            class="h-[70vh] overflow-auto [&>[data-slot=table-container]]:overflow-visible"
     >
         <!-- The row count is stated for a screen reader, because the DOM no longer carries it: a
              windowed table holds the rows near the viewport and nothing else. -->

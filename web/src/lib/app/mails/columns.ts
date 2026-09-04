@@ -59,7 +59,7 @@ export const columns = columnHelper.columns([
  * room.
  */
 export const COLUMN_WIDTHS: Record<string, string | undefined> = {
-    sender: "13rem",
+    sender: "18rem",
     subject: undefined,
     sent: "11rem",
     status: "7rem",
@@ -73,7 +73,7 @@ export const COLUMN_WIDTHS: Record<string, string | undefined> = {
  * described here rather than rendered through a column's cell.
  */
 export const GHOST_SHAPES: Record<string, {width: string; withAvatar?: boolean}> = {
-    sender: {width: "w-32", withAvatar: true},
+    sender: {width: "w-44", withAvatar: true},
     subject: {width: "w-full"},
     sent: {width: "w-28"},
     status: {width: "w-16"},

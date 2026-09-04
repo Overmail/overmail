@@ -309,14 +309,14 @@ test("a write goes out as it was asked for, and the mail is read again after it"
         latest().deliver([{...wireMail("m-1"), is_read: true}]);
         await repo.setRead("m-1", false);
         expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/unread", method: "POST"});
-        await repo.setArchiveStateTo("m-1", "archive");
+        await repo.setArchiveState("m-1", "archive");
         expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/archive", method: "POST"});
-        await repo.setArchiveStateTo("m-1", "spam");
+        await repo.setArchiveState("m-1", "spam");
         expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/spam", method: "POST"});
 
         // Asked for where it already is: still a request, because what is known here can be
         // behind and a click that does nothing is worse than one that writes nothing.
-        await repo.setArchiveStateTo("m-1", "unarchive");
+        await repo.setArchiveState("m-1", "unarchive");
         expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/unarchive", method: "POST"});
 
         // A mail nothing is watching is not asked for again -- that would subscribe it.

@@ -23,7 +23,7 @@
     import {emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
-    import MailDetailPanel from "./MailDetailPanel.svelte";
+    import MailDetailPanel from "./detail_panel/MailDetailPanel.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 

@@ -250,7 +250,7 @@ export class EmailRepository {
     }
 
     /** Where [id] stands: in the mailbox, archived, or filed as spam. */
-    async setArchiveStateTo(id: string, state: EmailMeta["archiveState"]): Promise<void> {
+    async setArchiveState(id: string, state: EmailMeta["archiveState"]): Promise<void> {
         // `unarchive`, `archive`, `spam`: the state a mail is in is the route that puts it there.
         const response = await fetch(`/api/emails/${id}/${state}`, {method: "POST"});
 

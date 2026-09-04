@@ -10,9 +10,12 @@
 
     let {
         date,
+        title,
         class: className,
     }: {
         date: Date;
+        /** Where the coarse label is not enough, e.g. the exact moment on hover. */
+        title?: string;
         class?: string;
     } = $props();
 
@@ -29,6 +32,6 @@
     });
 </script>
 
-<time datetime={date.toISOString()} class={className}>
+<time datetime={date.toISOString()} {title} class={className}>
     {formatDistance(date, now, {addSuffix: true, locale: dateLocale})}
 </time>

@@ -18,14 +18,14 @@
     </div>
     <!-- The muted tone is the table's, so only unread pulls out of it. A mail without a subject
          stays back even then: the stand-in is not what the mail says. -->
-    <span class={cn("truncate", !mail.isRead && "font-medium", !mail.isRead && subject !== "" && "text-foreground/85")}>
-        {subject || $_("mails.table.noSubject")}
+    <span class={cn("truncate", !mail.isRead && "font-semibold", !mail.isRead && subject !== "" && "text-foreground/85")}>
+        {subject || $_("mails.noSubject")}
     </span>
 
     <!-- How the mail begins, cut to one line by the server. Not there for a mail whose body
          nothing has looked at yet, and empty for one with nothing readable in it -- either way
          the row is the subject alone, which is what it was before. -->
-    <div class="text-muted-foreground min-w-0 flex-1 truncate font-light">
+    <div class="text-muted-foreground/60 min-w-0 flex-1 truncate font-light">
         {#if mail.preview}
             {mail.preview}
         {/if}

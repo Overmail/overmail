@@ -3,7 +3,7 @@
     import {Spinner} from "$lib/components/ui/spinner";
     import {cn, scrollIntoViewWithin} from "$lib/utils.js";
     import TriggerWindow from "$lib/app/ai/composer/windows/TriggerWindow.svelte";
-    import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
+    import EmailBodyPreview from "$lib/app/mails/EmailBodyPreview.svelte";
     import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
     import type {PromptTriggerWindowProps} from "$lib/app/ai/composer/prompt";
     import type {EmailSearchResult, MatchableText} from "$lib/app/ai/composer/OvermailPromptViewModel.svelte";
@@ -38,41 +38,8 @@
     // So that navigating with up/down does not refetch every time.
     const bodyCache = new Map<string, EmailBody>();
 
-    /** The width html mails are typically designed for; that is what they are rendered at. */
-    const PREVIEW_DESIGN_WIDTH = 640;
-    /** Padding of the preview layer; comes off the usable width. */
-    const PREVIEW_PADDING = 0;
     /** Upper bound on preview iframes mounted at the same time. */
     const MAX_MOUNTED_PREVIEWS = 20;
-    /** Magnification of the hover lens, relative to the preview as displayed. */
-    const LENS_MAGNIFICATION = 2;
-    const LENS_RADIUS = 120;
-
-    let previewWidth = $state(0);
-    // Unlike `transform`, `zoom` scales the layout along with it -- no spacer and no measuring
-    // needed. Dynamic, so the mail fills the full panel width.
-    let previewZoom = $derived(
-        previewWidth > 0 ? (previewWidth - 2 * PREVIEW_PADDING) / PREVIEW_DESIGN_WIDTH : 0.45
-    );
-
-    /**
-     * Cursor position of the lens, null when none is active. `panel*` places the circle in the
-     * panel, `content*` points at the same spot in the (possibly scrolled) content.
-     */
-    let lens: {panelX: number; panelY: number; contentX: number; contentY: number} | null = $state(null);
-
-    function onPreviewMousemove(event: MouseEvent) {
-        const layer = event.currentTarget as HTMLElement;
-        const rect = layer.getBoundingClientRect();
-        const panelX = event.clientX - rect.left;
-        const panelY = event.clientY - rect.top;
-        lens = {
-            panelX,
-            panelY,
-            contentX: panelX - PREVIEW_PADDING + layer.scrollLeft,
-            contentY: panelY - PREVIEW_PADDING + layer.scrollTop,
-        };
-    }
 
     // Previews stay mounted (invisibly) once loaded, so switching is only a visibility toggle.
     // Re-rendering the iframe on every switch would make it parse its srcdoc again and refetch
@@ -81,10 +48,6 @@
 
     let currentEmailId = $derived(emails[highlightedIndex]?.id ?? null);
 
-    $effect(() => {
-        void currentEmailId;
-        lens = null;
-    });
     let previewLoading = $derived(
         currentEmailId !== null && !mountedPreviews.some((entry) => entry.id === currentEmailId)
     );
@@ -175,7 +138,7 @@
         <!-- Preview of the highlighted mail's preferred content (html over text). Every preview
              already loaded stays mounted as an invisible layer (invisible rather than hidden, so
              layout and the ResizeObserver inside the iframe keep working). -->
-        <div class="relative mb-1 h-80 overflow-hidden rounded-sm border bg-background" bind:clientWidth={previewWidth}>
+        <div class="relative mb-1 h-80 overflow-hidden rounded-sm border bg-background">
             {#if previewLoading}
                 <div class="flex h-full items-center justify-center">
                     <Spinner/>
@@ -183,69 +146,11 @@
             {/if}
 
             {#each mountedPreviews as entry (entry.id)}
-                <div
-                        class={cn(
-                            "absolute inset-0 cursor-none overflow-y-auto overflow-x-hidden",
-                            entry.id !== currentEmailId && "invisible",
-                            entry.body.text && !entry.body.html && "p-2",
-                        )}
-                        onmousemove={onPreviewMousemove}
-                        onmouseleave={() => lens = null}
-                        role="presentation"
-                >
-                    <!-- pointer-events-none: the preview really is only a preview. Without it the
-                         iframe swallows the mousemove events and the lens freezes. -->
-                    <div class="pointer-events-none">
-                        {#if entry.body.html}
-                            <!-- Fixed design width, zoom scaled to the panel width: full width,
-                                 never a horizontal scrollbar. -->
-                            <div style:zoom={previewZoom} style:width="{PREVIEW_DESIGN_WIDTH}px">
-                                <EmailHtmlBody html={entry.body.html}/>
-                            </div>
-                        {:else if entry.body.text}
-                            <pre class="whitespace-pre-wrap font-sans text-xs">{entry.body.text}</pre>
-                        {:else}
-                            <div class="flex h-64 items-center justify-center text-xs text-muted-foreground">
-                                {$_('ai.emails.noPreview')}
-                            </div>
-                        {/if}
-                    </div>
-                </div>
-            {/each}
-
-            <!-- The lenses sit outside the scroll layers: inside, they would grow the scroll
-                 area at the edges. They are positioned in panel coordinates and their content is
-                 offset by the layer's scroll position. One mounted copy per preview, so hovering
-                 never triggers a load. -->
-            {#each mountedPreviews as entry (entry.id)}
-                <div
-                        class={cn(
-                            "pointer-events-none absolute z-10 overflow-hidden rounded-full border-2 bg-background shadow-lg",
-                            (lens === null || entry.id !== currentEmailId) && "invisible",
-                        )}
-                        style:width="{LENS_RADIUS * 2}px"
-                        style:height="{LENS_RADIUS * 2}px"
-                        style:left="{(lens?.panelX ?? 0) - LENS_RADIUS}px"
-                        style:top="{(lens?.panelY ?? 0) - LENS_RADIUS}px"
-                >
-                    <div
-                            class="absolute"
-                            style:left="{LENS_RADIUS - (lens?.contentX ?? 0) * LENS_MAGNIFICATION}px"
-                            style:top="{LENS_RADIUS - (lens?.contentY ?? 0) * LENS_MAGNIFICATION}px"
-                    >
-                        {#if entry.body.html}
-                            <div style:zoom={previewZoom * LENS_MAGNIFICATION} style:width="{PREVIEW_DESIGN_WIDTH}px">
-                                <EmailHtmlBody html={entry.body.html}/>
-                            </div>
-                        {:else if entry.body.text}
-                            <pre
-                                    class="whitespace-pre-wrap font-sans text-xs"
-                                    style:zoom={LENS_MAGNIFICATION}
-                                    style:width="{previewWidth - 2 * PREVIEW_PADDING}px"
-                            >{entry.body.text}</pre>
-                        {/if}
-                    </div>
-                </div>
+                <EmailBodyPreview
+                        body={entry.body}
+                        active={entry.id === currentEmailId}
+                        class={cn("absolute inset-0", entry.id !== currentEmailId && "invisible")}
+                />
             {/each}
         </div>
     {/if}

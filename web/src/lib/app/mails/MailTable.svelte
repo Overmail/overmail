@@ -19,6 +19,7 @@
     import {MailListViewModel} from "./MailListViewModel.svelte";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
+    import MailRowPreview from "./MailRowPreview.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
     /**
@@ -51,6 +52,9 @@
     let allMails = $state(false);
 
     $effect(() => list.setScope(allMails ? "all" : "unarchived"));
+
+    /** The table's one preview, driven by the rows below; see MailRowPreview. */
+    let rowPreview: ReturnType<typeof MailRowPreview> | undefined = $state();
 
     /** The box the rows sit in, measured to know where the list starts on the page. */
     let listElement = $state<HTMLDivElement | null>(null);
@@ -230,7 +234,14 @@
                     {:else if modelRow}
                         <!-- No line between rows: what separates them is the row height and the
                              hover, which is enough for one clipped line per mail. -->
-                        <Table.Row aria-rowindex={item.index + 1} class={cn("h-10 border-0")}>
+                        <!-- mousemove rather than mouseenter: the preview follows the cursor
+                             along the row, and the wait for it runs from the first move on. -->
+                        <Table.Row
+                                aria-rowindex={item.index + 1}
+                                class={cn("h-10 border-0")}
+                                onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
+                                onmouseleave={() => rowPreview?.leave()}
+                        >
                             {#each modelRow.getAllCells() as cell (cell.id)}
                                 <Table.Cell class="h-10 overflow-hidden py-0">
                                     <FlexRender {cell}/>
@@ -269,6 +280,8 @@
             </Table.Body>
         </Table.Root>
     </div>
+
+    <MailRowPreview bind:this={rowPreview}/>
 
     {#if list.failed}
         <div class="flex items-center gap-3">

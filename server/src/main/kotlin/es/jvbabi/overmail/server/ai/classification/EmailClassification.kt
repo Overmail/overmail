@@ -154,7 +154,7 @@ class EmailClassification(
                 }
             }
             // Out of the mailbox now, so whoever shows or counts it has to ask again.
-            mailNotifier.notifyMailChanged(user.id.value, email.id.value)
+            mailNotifier.notifyMailChanged(user.id.value, email.id.value, movedListings = true)
             return
         }
 
@@ -277,7 +277,10 @@ class EmailClassification(
             }
             // Notified after the transaction committed, so subscribers never see a label that
             // could still be rolled back.
-            attachedLabel?.let { mailNotifier.notifyMailChanged(user.id.value, email.id.value) }
+            // A label changes what a row shows, not where it sits.
+            attachedLabel?.let {
+                mailNotifier.notifyMailChanged(user.id.value, email.id.value, movedListings = false)
+            }
             log(
                 "Label '$requestedName': " +
                         (if (existing) "reused existing label '$resolvedName'" else "created new label") +

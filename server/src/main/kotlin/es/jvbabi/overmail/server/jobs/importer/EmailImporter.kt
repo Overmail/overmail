@@ -175,7 +175,8 @@ class EmailImporter(
             println("Imported: $subject")
             emailClassificationQueue.enqueue(storedId)
             // The mail is in the mailbox now, so anything showing or counting it is stale.
-            mailNotifier.notifyMailChanged(account.userId, storedId)
+            // A mail that was not there before: every listing is one longer and one row further down.
+            mailNotifier.notifyMailChanged(account.userId, storedId, movedListings = true)
         }
     }
 

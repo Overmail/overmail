@@ -80,7 +80,7 @@ class HomeSocketTest {
         assertEquals(3, socket.nextCount())
 
         archive(mails[0], EmailArchiveAction.Archive)
-        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random(), movedListings = true)
 
         assertEquals(2, socket.nextCount())
         socket.close()
@@ -98,7 +98,7 @@ class HomeSocketTest {
         // Archiving what is already archived: the count is the same, so the socket stays quiet.
         // Well past the debounce, or this would pass without proving anything.
         archive(mails[0], EmailArchiveAction.Archive)
-        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random(), movedListings = true)
 
         assertNull(withTimeoutOrNull(2_000) { socket.nextCountOrNull() })
         socket.close()
@@ -192,7 +192,7 @@ class HomeSocketTest {
         socket.nextGraph()
 
         addMail(LocalDate(2020, 6, 15).atStartOfDayIn(TimeZone.currentSystemDefault()), "Another old mail")
-        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random())
+        mailNotifier.notifyMailChanged(signedIn.id.value, Uuid.random(), movedListings = true)
 
         // Both years are re-read, so the one that changed comes back -- for 2020 that is the day
         // count, for the current year nothing changed and nothing is sent.

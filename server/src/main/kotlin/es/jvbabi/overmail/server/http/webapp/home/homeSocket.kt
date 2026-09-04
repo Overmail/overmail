@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.http.webapp.home
 
 import es.jvbabi.overmail.server.auth.user
+import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
@@ -16,6 +17,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -169,12 +171,18 @@ fun Route.homeSocket() {
             // event is buffered and the collector below reads again.
             launch {
                 mailNotifier.subscribe(user.id.value)
+                    // Before the filter: `onSubscription` is what the shared flow offers, and it
+                    // is the subscription itself that has to be up before the first read.
                     .onSubscription {
                         sending.withLock {
                             sendMailboxCount()
                             sendMailGraph(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year)
                         }
                     }
+                    // What is counted here is where mails sit: how many are in the mailbox, and
+                    // how many arrived on a day. A mail that is only read differently changes
+                    // neither, and re-reading both for it is two queries for the same answer.
+                    .filter { event -> event !is MailEvent.Changed || event.movedListings }
                     .collectLatest {
                         delay(REFRESH_DEBOUNCE)
                         sending.withLock {

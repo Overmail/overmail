@@ -164,7 +164,7 @@ fun Route.stackSocket() {
                                         )
                             }) { it[Emails.isRead] = true } > 0
                         }
-                        if (markedRead) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
+                        if (markedRead) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = false)
                     }
                     is StackClientMessage.ArchiveEmail -> {
                         // Reports whether a row was written, so nothing is announced for a
@@ -182,7 +182,7 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (archived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
+                        if (archived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
                     }
                     is StackClientMessage.UnarchiveEmail -> {
                         val unarchived = database.query {
@@ -196,7 +196,7 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (unarchived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId)
+                        if (unarchived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
                     }
                 }
             }

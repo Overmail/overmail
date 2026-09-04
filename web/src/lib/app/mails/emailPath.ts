@@ -2,22 +2,57 @@
 const SUBJECT_LIMIT = 64;
 
 /**
- * Where a mail lives on its own page -- the one place that spells the route out.
+ * How a mail is spelled in a url: the beginning of its subject, then the id without its hyphens.
  *
- * The id goes in without its hyphens: it is a uuid, and the bare hex is the shorter, tidier url
- * for something a user sees and copies. Whoever reads the parameter puts them back.
+ * The id is a uuid, and the bare hex is the shorter, tidier form for something a user sees and
+ * copies. [subject] is what makes it readable, and it is what a caller knows about the mail;
+ * without it -- a mail this client has never seen -- it is the id alone, which is the part that
+ * identifies the mail anyway. [parseEmailId] reads it back.
  *
- * [subject] is what makes the link readable, and it is what a caller knows about the mail: the
- * beginning of it goes in front of the id, spaces as hyphens. Without it -- a mail this client
- * has never seen -- the url is the id alone, which is the part that identifies the mail anyway.
+ * This is the form for a query parameter, where the encoding is the writer's business:
+ * `URLSearchParams` encodes what it is handed, and handing it something encoded would come out
+ * twice over. [emailPath] is the same slug for a path segment, where it does its own.
  */
-export function emailPath(id: string, subject?: string | null): string {
-	const bare = id.replaceAll("-", "");
+export function emailSlug(id: string, subject?: string | null): string {
+	const bare = bareId(id);
 	const slug = subjectSlug(subject);
 
-	return slug === "" ? `/email/${bare}` : `/email/${slug}-${bare}`;
+	return slug === "" ? bare : `${slug}-${bare}`;
 }
 
+/** Where a mail lives on its own page -- the one place that spells the route out. */
+export function emailPath(id: string, subject?: string | null): string {
+	const bare = bareId(id);
+	const slug = subjectSlug(subject);
+
+	return slug === "" ? `/email/${bare}` : `/email/${encodeURIComponent(slug)}-${bare}`;
+}
+
+/**
+ * The mail a slug or a path segment is about, as the uuid the repository knows.
+ *
+ * Only the id at the end of it is read: the subject in front is there for the reader, and a url
+ * that was edited by hand -- or one whose subject happens to end in hex -- still says which mail
+ * it means. Null when there is no id in it at all.
+ */
+export function parseEmailId(value: string | null | undefined): string | null {
+	if (!value) return null;
+
+	const bare = value.slice(-32).toLowerCase();
+	if (!/^[0-9a-f]{32}$/.test(bare)) return null;
+
+	return [
+		bare.slice(0, 8),
+		bare.slice(8, 12),
+		bare.slice(12, 16),
+		bare.slice(16, 20),
+		bare.slice(20)
+	].join("-");
+}
+
+const bareId = (id: string) => id.replaceAll("-", "");
+
+/** The readable part: the beginning of the subject as one word, spaces as hyphens, unencoded. */
 function subjectSlug(subject: string | null | undefined): string {
 	if (!subject) return "";
 
@@ -25,7 +60,5 @@ function subjectSlug(subject: string | null | undefined): string {
 	// a lone surrogate is not something encodeURIComponent can encode at all.
 	const beginning = Array.from(subject).slice(0, SUBJECT_LIMIT).join("").trim();
 
-	// Everything that is not a space is left to the encoder; a hyphen survives it untouched,
-	// which is what makes the run of them the readable part of the url.
-	return encodeURIComponent(beginning.replaceAll(/\s+/g, "-")).replaceAll(/^-+|-+$/g, "");
+	return beginning.replaceAll(/\s+/g, "-").replaceAll(/^-+|-+$/g, "");
 }

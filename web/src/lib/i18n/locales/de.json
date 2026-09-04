@@ -65,6 +65,19 @@
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",
     "noSubject": "(kein Betreff)",
+    "panel": {
+      "previous": "Vorherige E-Mail",
+      "next": "Nächste E-Mail",
+      "openInNewTab": "In neuem Tab öffnen",
+      "close": "Mail schließen",
+      "missing": "Diese E-Mail ist nicht verfügbar.",
+      "markRead": "Als gelesen markieren",
+      "markUnread": "Als ungelesen markieren",
+      "archive": "Mail archivieren",
+      "unarchive": "Zurück ins Postfach",
+      "more": "Weitere Aktionen",
+      "markSpam": "Als Spam markieren"
+    },
     "preview": {
       "noContent": "Kein Inhalt verfügbar"
     }

@@ -8,6 +8,9 @@
 <script lang="ts">
     import {FlexRender, createTable} from "@tanstack/svelte-table";
     import {_} from "svelte-i18n";
+    import {untrack} from "svelte";
+    import {page} from "$app/state";
+    import {goto} from "$app/navigation";
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
     import {Toggle} from "$lib/components/ui/toggle";
@@ -16,9 +19,11 @@
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
-    import {MailListViewModel} from "./MailListViewModel.svelte";
+    import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
+    import {emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
+    import MailDetailPanel from "./MailDetailPanel.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
@@ -52,6 +57,86 @@
     let allMails = $state(false);
 
     $effect(() => list.setScope(allMails ? "all" : "unarchived"));
+
+    // An empty mailbox holds no rows and would therefore subscribe to nothing, which is when the
+    // announcement below matters most: this keeps the socket up for as long as the table is here.
+    $effect(() => mails.watchMoves());
+
+    // What the listing holds are positions, and a mail arriving or being archived moves them --
+    // including the ones of mails nobody has subscribed to, which is why this comes off the
+    // content socket as an announcement rather than as metadata (see EmailRepository.revision).
+    $effect(() => {
+        // Zero is "nothing announced yet": on mount there is nothing to read again.
+        if (mails.revision === 0) return;
+
+        // Untracked, and this is not optional: refreshing reads the listing to know what to ask
+        // for again, and what it asks for is then written into the very same state. Tracked,
+        // every answer would re-run this effect, refresh again, and ask again -- a listing that
+        // re-reads itself for as long as the tab is open.
+        untrack(() => list.refresh());
+    });
+
+    /**
+     * Which mail is open in the panel, which is what `?email=` says and nothing else -- so a
+     * reload, a link and the back button all land on the same mail, and there is no second copy
+     * of it to keep in step.
+     */
+    const openId = $derived(parseEmailId(page.url.searchParams.get("email")));
+
+    /**
+     * Opens a mail beside the list.
+     *
+     * Through [goto] rather than through shallow routing: `pushState` changes the address bar and
+     * `page.state`, but it leaves `page.url` on the last navigation -- and the url is what says
+     * which mail is open here, so the panel would not have noticed a switch or a close. Nothing
+     * loads from it either way: no load function of this route reads the query.
+     *
+     * A row that was clicked pushes, so the back button closes the panel again; stepping and
+     * closing replace, or a walk down the list would be a walk back up through the history.
+     */
+    function showEmail(id: string, history: "push" | "replace") {
+        // Clicking the row that is already open is not another entry in the history.
+        if (id === openId) return;
+
+        const url = new URL(page.url);
+        url.searchParams.set("email", emailSlug(id, mails.peek(id).value?.subject));
+
+        void navigate(url, history);
+    }
+
+    function closeEmail() {
+        const url = new URL(page.url);
+        url.searchParams.delete("email");
+
+        void navigate(url, "replace");
+    }
+
+    // Neither the scroll position nor the focus is the router's business here: what changes is a
+    // panel beside a list somebody is in the middle of, not the page.
+    const navigate = (url: URL, history: "push" | "replace") =>
+        goto(url, {noScroll: true, keepFocus: true, replaceState: history === "replace"});
+
+    /**
+     * One mail up or down, as the table has them ordered -- that is what makes the buttons
+     * predictable, and it is why the listing answers this rather than the panel.
+     *
+     * Nothing happens when the page that mail sits on is not here yet; the step asked for it, so
+     * the next click on the same button goes through.
+     */
+    function stepEmail(step: MailStep) {
+        if (openId === null) return;
+
+        const next = list.step(openId, step);
+        if (next === undefined) return;
+
+        showEmail(next, "replace");
+
+        // Stepping onto a row that is not on screen scrolls it into view; a highlighted row
+        // nobody can see is the panel and the table saying different things.
+        const index = list.indexOf(next);
+        const row = index === undefined ? undefined : list.layout.rowOf(index);
+        if (row !== undefined) virtualizer.virtualizer.scrollToIndex(row, {align: "auto"});
+    }
 
     /** The table's one preview, driven by the rows below; see MailRowPreview. */
     let rowPreview: ReturnType<typeof MailRowPreview> | undefined = $state();
@@ -236,11 +321,18 @@
                              hover, which is enough for one clipped line per mail. -->
                         <!-- mousemove rather than mouseenter: the preview follows the cursor
                              along the row, and the wait for it runs from the first move on. -->
+                        <!-- A click opens the mail beside the list, a double click opens its own
+                             page in a new tab -- the click that came first has opened the panel
+                             by then, which is where the mail is either way. -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <Table.Row
                                 aria-rowindex={item.index + 1}
-                                class={cn("h-10 border-0")}
+                                data-state={modelRow.id === openId ? "selected" : undefined}
+                                class={cn("h-10 cursor-pointer border-0")}
                                 onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
                                 onmouseleave={() => rowPreview?.leave()}
+                                onclick={() => showEmail(modelRow.id, "push")}
+                                ondblclick={() => window.open(emailPath(modelRow.id, row?.mail.subject), "_blank")}
                         >
                             {#each modelRow.getAllCells() as cell (cell.id)}
                                 <Table.Cell class="h-10 overflow-hidden py-0">
@@ -282,6 +374,18 @@
     </div>
 
     <MailRowPreview bind:this={rowPreview}/>
+
+    {#if openId !== null}
+        <!-- Not keyed on the mail: a step hands the panel another id, it does not slide a second
+             one in over the first. -->
+        <MailDetailPanel
+                id={openId}
+                canStepUp={list.canStep(openId, -1)}
+                canStepDown={list.canStep(openId, 1)}
+                onStep={stepEmail}
+                onClose={closeEmail}
+        />
+    {/if}
 
     {#if list.failed}
         <div class="flex items-center gap-3">

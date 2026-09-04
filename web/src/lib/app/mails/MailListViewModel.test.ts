@@ -249,3 +249,98 @@ test("letting go releases every row", async () => {
     list.dispose();
     expect(held.size).toBe(0);
 });
+
+test("stepping is the row above and the row below, and asks for a page it does not hold", async () => {
+    mailbox({
+        unarchived: [{key: day(0), count: 150}],
+        all: [{key: day(0), count: 2}],
+    });
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 20);
+    await settle();
+
+    expect(list.indexOf("unarchived-5")).toBe(5);
+    expect(list.step("unarchived-5", -1)).toBe("unarchived-4");
+    expect(list.step("unarchived-5", 1)).toBe("unarchived-6");
+
+    // Either end of the listing.
+    expect(list.canStep("unarchived-0", -1)).toBe(false);
+    expect(list.step("unarchived-0", -1)).toBeUndefined();
+    expect(list.canStep("unarchived-0", 1)).toBe(true);
+    expect(list.canStep("unarchived-149", 1)).toBe(false);
+
+    // A mail of the other scope is not in this listing at all.
+    expect(list.indexOf("all-0")).toBeUndefined();
+    expect(list.canStep("all-0", 1)).toBe(false);
+
+    // Past the first page: nothing to hand out yet, but that page is on its way and the same
+    // step answers once it landed.
+    expect(list.canStep("unarchived-99", 1)).toBe(true);
+    expect(list.step("unarchived-99", 1)).toBeUndefined();
+    await settle();
+    expect(list.step("unarchived-99", 1)).toBe("unarchived-100");
+});
+
+test("a mail arriving is read again: the length, the days and the rows on screen", async () => {
+    // The fixture is read per request, so growing this array is a mail arriving.
+    const days = [{key: day(0), count: 3}];
+    mailbox({unarchived: days, all: [{key: day(0), count: 1}]});
+    const {repository: mails, held} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 20);
+    await settle();
+
+    expect(list.total).toBe(3);
+    // A header and three mails.
+    expect(list.layout.length).toBe(4);
+
+    days[0] = {key: day(0), count: 4};
+    list.refresh();
+
+    // Nothing goes blank in between: the shape and the rows stand until the answer is here, so a
+    // table does not collapse under a cursor while the mailbox is being re-read.
+    expect(list.total).toBe(3);
+    expect(list.idAt(0)).toBe("unarchived-0");
+
+    await settle();
+
+    expect(list.total).toBe(4);
+    expect(list.layout.length).toBe(5);
+    expect(list.idAt(3)).toBe("unarchived-3");
+    expect(held.has("unarchived-3")).toBe(false);
+
+    // The rows on screen are subscribed again as they are read, which is what a table asking for
+    // its window does; here nothing asked, so the new row is only in the listing.
+    list.window(0, 20);
+    await settle();
+    expect(held.has("unarchived-3")).toBe(true);
+});
+
+test("the scope that was not on screen is read again when it is", async () => {
+    const all = [{key: day(0), count: 2}];
+    mailbox({unarchived: [{key: day(0), count: 2}], all});
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 20);
+    await settle();
+    list.setScope("all");
+    list.window(0, 20);
+    await settle();
+    expect(list.total).toBe(2);
+
+    // Two arrive while the other scope is on screen.
+    list.setScope("unarchived");
+    all[0] = {key: day(0), count: 4};
+    list.refresh();
+    await settle();
+
+    list.setScope("all");
+    list.window(0, 20);
+    await settle();
+    expect(list.total).toBe(4);
+    expect(list.idAt(3)).toBe("all-3");
+});

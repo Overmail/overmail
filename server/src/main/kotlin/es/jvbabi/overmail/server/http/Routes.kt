@@ -1,8 +1,11 @@
 package es.jvbabi.overmail.server.http
 
+import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
+import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
+import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
@@ -84,6 +87,28 @@ internal fun Application.configureRouting() {
 
                     route("/classify") {
                         classifyEmailRequest()
+                    }
+
+                    // One route per state rather than a body that names it: they are separate
+                    // actions to a reader, and this keeps them separate in the api too.
+                    route("/read") {
+                        setEmailRead(isRead = true)
+                    }
+
+                    route("/unread") {
+                        setEmailRead(isRead = false)
+                    }
+
+                    route("/archive") {
+                        setEmailArchiveState(EmailArchiveAction.Archive)
+                    }
+
+                    route("/unarchive") {
+                        setEmailArchiveState(EmailArchiveAction.Unarchive)
+                    }
+
+                    route("/spam") {
+                        setEmailArchiveState(EmailArchiveAction.Spam)
                     }
                 }
             }

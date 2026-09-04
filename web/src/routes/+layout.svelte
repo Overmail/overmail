@@ -64,7 +64,15 @@
 {:else if isAuthRoute || session}
 	{#if session}
 
-		<Sidebar.Provider style="--panel-width: {panel.width}px;">
+		<!-- Three variables, for everything that has to live with the panel: its width, how much
+		     of the window's inline end it takes right now (nothing while it is closed), and how
+		     long a change of the two may take -- nothing at all while it is being dragged, or
+		     whatever follows the width would trail a fifth of a second behind the pointer. -->
+		<Sidebar.Provider
+				style="--panel-width: {panel.width}px;
+				       --panel-offset: {panel.open ? panel.width : 0}px;
+				       --panel-duration: {panel.isResizing ? 0 : 200}ms;"
+		>
 			<AppNavbar />
 			<!-- Renders the <main> and stretches to the wrapper's min-h-svh, so pages can size
 			     their content with flex-1 instead of a percentage height that has nothing to
@@ -82,23 +90,17 @@
 			     those 200ms instead of jumping to the new width in one frame. The panel itself is
 			     fixed and slides in over the box, which also keeps it in place when the page
 			     behind it scrolls. -->
-			<div
-					class={[
-						"shrink-0",
-						// The panel follows the pointer during a drag; animating the box next to it
-						// would leave the page a fifth of a second behind the edge being dragged.
-						panel.isResizing ? "" : "transition-[width] duration-200 ease-linear",
-						panel.open ? "w-(--panel-width)" : "w-0",
-					]}
-			></div>
+			<!-- The box in the flow is the offset, so the two cannot drift apart. -->
+			<div class="w-(--panel-offset) shrink-0 transition-[width] duration-(--panel-duration) ease-linear"></div>
 			<div
 					bind:this={panelElement}
 					class={[
-						// Above the header's z-30 rather than below it: the panel's own z is the
-						// stacking context the grip lives in, and it reaches a few pixels into the
-						// page, where the header would otherwise paint over its top.
-						"fixed inset-y-0 z-40 flex w-(--panel-width) flex-col border-s bg-background",
-						panel.isResizing ? "" : "transition-[left,right] duration-200 ease-linear",
+						// Over everything the page puts up, the mail panel included: while this one
+						// slides in, the page moves aside under it, and a panel out there that
+						// paints over it would show through the edge. Its own z is also the
+						// stacking context the grip lives in, which has to reach over the header.
+						"fixed inset-y-0 z-50 flex w-(--panel-width) flex-col border-s bg-background",
+						"transition-[left,right] duration-(--panel-duration) ease-linear",
 						panel.open ? "inset-e-0" : "-inset-e-(--panel-width)",
 					]}
 			>

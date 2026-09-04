@@ -17,9 +17,9 @@ import java.util.concurrent.ConcurrentHashMap
  * announce it after the transaction committed, or a reader reacting to it reads the state from
  * before the write.
  *
- * The event carries the mail it happened to and nothing else. What a reader shows is a query (a
- * count over an event log, a row's labels), so it re-reads what it needs; a delta here would mean
- * keeping that logic in a second place and drifting from it.
+ * The event carries the mail it happened to and whether the change moved anything -- nothing
+ * else. What a reader shows is a query (a count over an event log, a row's labels), so it re-reads
+ * what it needs; a delta here would mean keeping that logic in a second place and drifting from it.
  *
  * Keyed by user, not by mail: one channel per socket instead of one per row on screen, so a
  * listing of a thousand mails is one subscription and there is nothing per-mail to clean up.
@@ -35,8 +35,14 @@ class MailNotifier {
         }
     }
 
-    fun notifyMailChanged(userId: User.Id, emailId: Email.Id) {
-        channels[userId]?.tryEmit(MailEvent.Changed(emailId))
+    /**
+     * [movedListings] separates the readers: everybody showing the mail re-reads it either way,
+     * but only a change that moved mails concerns whoever holds positions -- see
+     * [MailEvent.Changed]. Stated at every call site rather than defaulted, because getting it
+     * wrong is either a stale screen or a listing that re-reads itself for nothing.
+     */
+    fun notifyMailChanged(userId: User.Id, emailId: Email.Id, movedListings: Boolean) {
+        channels[userId]?.tryEmit(MailEvent.Changed(emailId, movedListings))
     }
 
     /**
@@ -50,8 +56,15 @@ class MailNotifier {
 }
 
 sealed class MailEvent {
-    /** [emailId] moved somehow; ask again for what you show of it. */
-    data class Changed(val emailId: Email.Id) : MailEvent()
+    /**
+     * [emailId] changed somehow; ask again for what you show of it.
+     *
+     * [movedListings] says whether it also changed *where* mails sit: one arriving, being
+     * archived, unarchived or filed as spam. A flag on the read state or a label does not -- every
+     * listing still holds the same mails in the same order, and a count over the mailbox comes out
+     * the same. Whoever holds positions listens for this and lets the rest pass.
+     */
+    data class Changed(val emailId: Email.Id, val movedListings: Boolean) : MailEvent()
 
     /** Every mail from [senderId] now reads differently; ask again for the ones you show. */
     data class SenderChanged(val senderId: EmailUser.Id) : MailEvent()

@@ -14,9 +14,13 @@ import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
+import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
+import io.ktor.client.request.post
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -126,7 +130,7 @@ class ContentSocketTest {
 
         label(mails[0], "Studium")
         archive(mails[0], EmailArchiveAction.Archive)
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0])
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = true)
 
         val mail = socket.nextEmails().single().jsonObject
         assertEquals("archive", mail["archive_state"]!!.jsonPrimitive.content)
@@ -144,11 +148,60 @@ class ContentSocketTest {
         socket.subscribe(mails[0], mails[1])
         assertEquals(2, socket.nextEmails().size)
 
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0])
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[1])
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = true)
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[1], movedListings = true)
 
         // Both within the debounce window, so the burst is one answer rather than two.
         assertEquals(2, socket.nextEmails().size)
+        socket.close()
+    }
+
+    @Test
+    fun `a mail that moved is announced, one that only reads differently is not`() = testApplication {
+        val mails = setUp()
+        installRoute()
+
+        val socket = openSocket()
+        socket.subscribe(mails[0])
+        socket.nextEmails()
+
+        // A flag on the mail: every listing still holds the same mails in the same order, so
+        // there is nothing for one to re-read.
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = false)
+        socket.nextEmails()
+        assertNull(withTimeoutOrNull(1_500) { socket.nextMessageOrNull("update.mails.moved") })
+
+        // Archiving takes it out of the mailbox, and no client can know that from a mail it
+        // never subscribed to -- which is what the announcement is for.
+        archive(mails[0], EmailArchiveAction.Archive)
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = true)
+        assertEquals("update.mails.moved", socket.next("update.mails.moved")["type"]!!.jsonPrimitive.content)
+        socket.close()
+    }
+
+    @Test
+    fun `reading a mail sends it again and announces nothing`() = testApplication {
+        val mails = setUp()
+        installRoute()
+        val client = createClient { install(ClientWebSockets) }
+
+        val socket = openSocket()
+        socket.subscribe(mails[0])
+        assertEquals(false, socket.nextEmails().single().jsonObject["is_read"]!!.jsonPrimitive.content.toBoolean())
+
+        // What the panel does when it opens a mail.
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/read").status)
+        assertEquals(true, socket.nextEmails().single().jsonObject["is_read"]!!.jsonPrimitive.content.toBoolean())
+
+        // And the way back. Neither moved a mail, so no listing has anything to re-read: past
+        // the debounce of the announcement, nothing has been announced.
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/unread").status)
+        assertEquals(false, socket.nextEmails().single().jsonObject["is_read"]!!.jsonPrimitive.content.toBoolean())
+        assertNull(withTimeoutOrNull(1_500) { socket.nextMessageOrNull("update.mails.moved") })
+
+        // Archiving does move it, and that is what an announcement is for.
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/archive").status)
+        assertEquals("update.mails.moved", socket.next("update.mails.moved")["type"]!!.jsonPrimitive.content)
         socket.close()
     }
 
@@ -167,7 +220,7 @@ class ContentSocketTest {
         socket.subscribe(mails[1])
         socket.nextEmails()
 
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0])
+        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = true)
 
         assertNull(withTimeoutOrNull(2_000) { socket.nextMessageOrNull("data.emails") })
         socket.close()
@@ -365,6 +418,13 @@ class ContentSocketTest {
             }
             routing {
                 route("/api/webapp/content/socket") { contentSocket() }
+                // The write a reader makes, on the socket that has to answer for it: the two
+                // ends of one click.
+                route("/api/emails/{emailId}") {
+                    route("/read") { setEmailRead(isRead = true) }
+                    route("/unread") { setEmailRead(isRead = false) }
+                    route("/archive") { setEmailArchiveState(EmailArchiveAction.Archive) }
+                }
             }
         }
     }

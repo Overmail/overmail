@@ -169,6 +169,23 @@ export class MailLayout {
         return {kind: "mail", index: stretch.mailStart + offset - header};
     }
 
+    /**
+     * The other way round: which row the mail at [index] of the mailbox sits in, headers
+     * included. Undefined for an index outside the listing.
+     *
+     * What a caller wants when it holds a mail rather than a row -- scrolling to the one that is
+     * open, say, which is a position in the table and not in the mailbox.
+     */
+    rowOf(index: number): number | undefined {
+        if (index < 0 || index >= this.mailCount) return undefined;
+
+        const stretch = this.stretchOfMail(index);
+        if (stretch === undefined) return undefined;
+
+        const header = stretch.label === null ? 0 : 1;
+        return stretch.layoutStart + header + (index - stretch.mailStart);
+    }
+
     /** The last stretch that starts at or before [index]. */
     private stretchAt(index: number): Stretch | undefined {
         let low = 0;
@@ -180,6 +197,27 @@ export class MailLayout {
             const stretch = this.stretches[middle];
 
             if (stretch.layoutStart <= index) {
+                found = stretch;
+                low = middle + 1;
+            } else {
+                high = middle - 1;
+            }
+        }
+
+        return found;
+    }
+
+    /** The same by mail position rather than by row: the stretch the mail at [index] is in. */
+    private stretchOfMail(index: number): Stretch | undefined {
+        let low = 0;
+        let high = this.stretches.length - 1;
+        let found: Stretch | undefined;
+
+        while (low <= high) {
+            const middle = (low + high) >> 1;
+            const stretch = this.stretches[middle];
+
+            if (stretch.mailStart <= index) {
                 found = stretch;
                 low = middle + 1;
             } else {

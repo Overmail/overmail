@@ -30,6 +30,10 @@ class FakeSocket implements SocketLike {
     deliverUnknown(ids: string[]) {
         this.onmessage?.({data: JSON.stringify({type: "data.emails.unknown", ids})});
     }
+
+    deliverMoved() {
+        this.onmessage?.({data: JSON.stringify({type: "update.mails.moved"})});
+    }
 }
 
 function wireMail(id: string, subject = "Invoice 42") {
@@ -244,4 +248,83 @@ test("merge takes what another feed already knows", () => {
         value: expect.objectContaining({subject: "From a listing"}),
         isLoading: false,
     });
+});
+
+test("an announcement that the mail moved is counted, not looked up", async () => {
+    const {repo, latest} = repository();
+
+    repo.subscribe("m-1");
+    await settle();
+    expect(repo.revision).toBe(0);
+
+    latest().deliverMoved();
+    latest().deliverMoved();
+
+    // Nothing about a mail: what moved is where the mails sit, which is a listing's business.
+    expect(repo.revision).toBe(2);
+    expect(repo.peek("m-1")).toEqual({value: null, isLoading: true});
+});
+
+test("watching for moves keeps the socket up on its own", async () => {
+    const {repo, latest, opened} = repository();
+
+    const stop = repo.watchMoves();
+    await settle();
+    expect(opened.length).toBe(1);
+    // No mail is on screen, so there is nothing to ask the server for.
+    expect(latest().sent).toEqual([]);
+
+    // A mail that comes and goes does not take the connection with it while this is held.
+    repo.subscribe("m-1")();
+    await settle();
+    expect(latest().closed).toBe(false);
+
+    stop();
+    await settle();
+    expect(latest().closed).toBe(true);
+});
+
+test("a write goes out as it was asked for, and the mail is read again after it", async () => {
+    const {repo, latest} = repository();
+    const requests: {url: string; method: string | undefined}[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: {method?: string}) => {
+        requests.push({url: String(url), method: init?.method});
+        return new Response(null, {status: 204});
+    }) as unknown as typeof fetch;
+
+    try {
+        repo.subscribe("m-1");
+        await settle();
+
+        await repo.setRead("m-1", true);
+        expect(requests).toEqual([{url: "/api/emails/m-1/read", method: "POST"}]);
+
+        // And the mail is asked for again: what it looks like now is the server's answer, not a
+        // guess made here, and the screen that wrote it must not wait for an announcement it
+        // might have missed.
+        expect(latest().sent.at(-1)).toEqual({type: "subscribe.emails", ids: ["m-1"]});
+
+        // Every state is the name of the route that puts a mail into it.
+        latest().deliver([{...wireMail("m-1"), is_read: true}]);
+        await repo.setRead("m-1", false);
+        expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/unread", method: "POST"});
+        await repo.setArchiveStateTo("m-1", "archive");
+        expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/archive", method: "POST"});
+        await repo.setArchiveStateTo("m-1", "spam");
+        expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/spam", method: "POST"});
+
+        // Asked for where it already is: still a request, because what is known here can be
+        // behind and a click that does nothing is worse than one that writes nothing.
+        await repo.setArchiveStateTo("m-1", "unarchive");
+        expect(requests.at(-1)).toEqual({url: "/api/emails/m-1/unarchive", method: "POST"});
+
+        // A mail nothing is watching is not asked for again -- that would subscribe it.
+        const sent = latest().sent.length;
+        await repo.setRead("m-2", true);
+        expect(requests.at(-1)).toEqual({url: "/api/emails/m-2/read", method: "POST"});
+        expect(latest().sent.length).toBe(sent);
+    } finally {
+        globalThis.fetch = original;
+    }
 });

@@ -38,6 +38,7 @@
     import EmailBodyPreview from "$lib/app/mails/EmailBodyPreview.svelte";
     import MailLabelBadges from "$lib/app/mails/table/MailLabelBadges.svelte";
     import {emailPath} from "$lib/app/mails/emailPath";
+    import {displayName} from "$lib/app/mails/participants";
     import {OvermailCircularAvatar} from "$lib/components/avatar";
     import RelativeTime from "$lib/components/time/RelativeTime.svelte";
     import {Spinner} from "$lib/components/ui/spinner";
@@ -92,7 +93,7 @@
     const subject = $derived(mail.subject.trim());
 
     /** Only a name if the mail's header carried one; the address stands in for it. */
-    const senderName = $derived(mail.sender.name ?? mail.sender.address);
+    const senderName = $derived(displayName(mail.sender));
 
     /** Unix seconds off the wire. */
     const sentAt = $derived(new Date(mail.sent * 1000));

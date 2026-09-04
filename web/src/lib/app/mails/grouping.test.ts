@@ -111,3 +111,20 @@ test("a row is found in a long layout", () => {
     });
     expect(layout.rowAt(300 * 11 + 1)).toEqual({kind: "mail", index: 3000});
 });
+
+test("a mail is found by its place in the mailbox", () => {
+    const layout = new MailLayout([
+        {label: {kind: "today"}, count: 2},
+        {label: {kind: "yesterday"}, count: 1},
+    ]);
+
+    // The inverse of rowAt, for every mail there is.
+    expect(layout.rowOf(0)).toBe(1);
+    expect(layout.rowOf(1)).toBe(2);
+    expect(layout.rowOf(2)).toBe(4);
+    expect(layout.rowOf(3)).toBeUndefined();
+    expect(layout.rowOf(-1)).toBeUndefined();
+
+    // A stretch without a header takes no row for one.
+    expect(MailLayout.flat(3).rowOf(2)).toBe(2);
+});

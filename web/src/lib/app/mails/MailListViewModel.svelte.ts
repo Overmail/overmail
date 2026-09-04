@@ -12,6 +12,9 @@ const PAGE_SIZE = 100;
 /** Which mails a listing is about, as the server names them. */
 export type MailScope = "unarchived" | "all";
 
+/** One mail along the listing: -1 is up the table, which is the newer one. */
+export type MailStep = -1 | 1;
+
 /** Where a page carries on: a send time in whole seconds, and the mail that sat at it. */
 type Cursor = {before: number; beforeId?: string};
 
@@ -33,6 +36,19 @@ type Listing = {
 
     /** The days the server counted, or null while they are on their way. */
     groupCounts: MailGroupCount[] | null;
+
+    /**
+     * Bumped every time the mailbox moved -- see [MailListViewModel.refresh]. What was read
+     * before that was read of another listing, so an answer from an older one is dropped rather
+     * than filed at a position it no longer holds.
+     */
+    generation: number;
+
+    /** Which generation [entries] were read at. Behind [generation] means: read them again. */
+    entriesGeneration: number;
+
+    /** The same for [groupCounts], which are re-read on their own once per move. */
+    daysGeneration: number;
 };
 
 const emptyListing = (): Listing => ({
@@ -41,6 +57,9 @@ const emptyListing = (): Listing => ({
     total: 0,
     initialized: false,
     groupCounts: null,
+    generation: 0,
+    entriesGeneration: 0,
+    daysGeneration: 0,
 });
 
 /** The days of a scope with the row each of them starts at. */
@@ -82,6 +101,9 @@ export class MailListViewModel {
     /** The rows this holds a subscription for, by id. Kept across a scope switch. */
     private readonly subscribed = new Map<string, () => void>();
 
+    /** The last range a table asked for, so a move can read exactly that one again. */
+    private lastWindow: {fromRow: number; toRow: number} | null = null;
+
     constructor(
         private readonly mails: EmailRepository,
         private readonly grouping: MailGrouping = "date",
@@ -120,6 +142,51 @@ export class MailListViewModel {
     }
 
     /**
+     * Where [id] sits in the current scope. Undefined for a mail this listing does not hold: one
+     * of another scope, or one whose page has been let go of.
+     *
+     * A scan over what is loaded rather than a reverse index: what is held are the pages that
+     * have been scrolled to, and this is asked when the open mail changes, not per frame.
+     */
+    indexOf(id: string): number | undefined {
+        for (const [index, entry] of Object.entries(this.listing.entries)) {
+            if (entry === id) return Number(index);
+        }
+
+        return undefined;
+    }
+
+    /**
+     * The mail one step from [id], as the table has them ordered -- up is the row above.
+     *
+     * Undefined at either end of the listing, and undefined while the page that mail sits on is
+     * not here; asking for that page is what this does in that case, so the same call once it
+     * landed answers. Only the ends are worth telling a user about, which is [canStep].
+     */
+    step(id: string, step: MailStep): string | undefined {
+        const index = this.indexOf(id);
+        if (index === undefined) return undefined;
+
+        const next = index + step;
+        if (!this.holds(next)) return undefined;
+
+        const nextId = this.listing.entries[next];
+        if (nextId === undefined) void this.load(next);
+
+        return nextId;
+    }
+
+    /** Whether a step leads anywhere at all -- what greys a button out rather than doing nothing. */
+    canStep(id: string, step: MailStep): boolean {
+        const index = this.indexOf(id);
+        return index !== undefined && this.holds(index + step);
+    }
+
+    private holds(index: number): boolean {
+        return index >= 0 && index < this.total;
+    }
+
+    /**
      * Switches which mails the list is about. Nothing is thrown away: the other scope keeps its
      * pages and its days, and the rows on screen keep their subscriptions -- what a mail is does
      * not change with the scope it is listed in.
@@ -134,6 +201,7 @@ export class MailListViewModel {
      * what is missing and nothing else.
      */
     window(fromRow: number, toRow: number) {
+        this.lastWindow = {fromRow, toRow};
         void this.loadDays();
 
         const layout = this.layout;
@@ -155,10 +223,42 @@ export class MailListViewModel {
             return;
         }
 
-        const gap = wanted.find((index) => this.listing.entries[index] === undefined);
-        if (gap !== undefined) void this.load(gap);
+        // Rows from before a move are asked for again even though they are filled: they are
+        // positions, and the answer is what replaces the lot of them (see [load]).
+        const listing = this.listing;
+        const stale = listing.entriesGeneration !== listing.generation;
+        const gap = wanted.find((index) => listing.entries[index] === undefined);
+
+        if (stale) void this.load(wanted[0]);
+        else if (gap !== undefined) void this.load(gap);
 
         this.subscribeRange(wanted);
+    }
+
+    /**
+     * Says that the mailbox moved: a mail arrived, or one left a listing by being archived or
+     * filed. What this holds are positions, and every one of them may mean another mail now.
+     *
+     * The shape stays up while it is re-read. The length and the days are what a windowed table
+     * lays itself out from, and dropping them would collapse a listing somebody is scrolled deep
+     * into to eight ghost rows and throw the scroll position away with it. What goes right away
+     * are the cursors: they say where a position carries on, so after a move they point one mail
+     * beside it -- the rows are read from the day boundaries again instead, and the first page
+     * back replaces every row in one go rather than one flashing skeleton at a time.
+     *
+     * Both scopes, because a mail arriving is in both. The one that is not on screen is read
+     * again the next time it is, rather than shown as it was before the move.
+     */
+    refresh() {
+        for (const listing of Object.values(this.listings)) {
+            listing.generation++;
+            listing.cursors = {};
+        }
+
+        // Nothing has been asked for yet: whatever a table asks for first reads the new listing
+        // anyway.
+        const last = this.lastWindow;
+        if (last !== null) this.window(last.fromRow, last.toRow);
     }
 
     /** Asks again after a failure -- what the retry button does. */
@@ -242,11 +342,15 @@ export class MailListViewModel {
         const anchor = this.cursorFor(index);
         if (anchor === null) return;
 
-        const key = `${this.scope}:${anchor.row}`;
+        const scope = this.scope;
+        const listing = this.listings[scope];
+        const generation = listing.generation;
+
+        // The generation is part of the key: a request that was cut for the listing as it stood
+        // before a move must not stand in the way of the one that reads it again.
+        const key = `${scope}:${generation}:${anchor.row}`;
         if (this.inFlight.has(key)) return;
         this.inFlight.add(key);
-
-        const scope = this.scope;
 
         try {
             const query = new URLSearchParams({scope, limit: String(PAGE_SIZE)});
@@ -266,7 +370,19 @@ export class MailListViewModel {
                 next: {before: number; before_id: string} | null;
             };
 
-            const listing = this.listings[scope];
+            // Cut for a listing that has moved on since: what came back says which mail sits at
+            // which position, and that is what the move invalidated.
+            if (listing.generation !== generation) return;
+
+            // The first page of a new generation replaces what is here rather than being filed
+            // into it: the rows it does not cover would otherwise stay as they were read before
+            // the move, with nothing left to correct them.
+            if (listing.entriesGeneration !== generation) {
+                listing.entries = {};
+                listing.cursors = {};
+                listing.entriesGeneration = generation;
+            }
+
             listing.total = page.total;
             page.ids.forEach((id, offset) => (listing.entries[anchor.row + offset] = id));
             if (page.next !== null) {
@@ -288,14 +404,19 @@ export class MailListViewModel {
     }
 
     /**
-     * The days of this scope, once. They are the shape of the list, not its contents -- a mail
-     * arriving changes them, and asking again is what a reload or [retry] is for.
+     * The days of this scope: how long the listing is and where its headers sit.
+     *
+     * Once per generation. They are the shape of the list, not its contents, so they are read
+     * again when the mailbox moved -- and swapped for the new ones only when those are here, so
+     * a table keeps its headers and its scroll position while they are on their way.
      */
     private async loadDays() {
         const scope = this.scope;
-        if (this.listings[scope].groupCounts !== null) return;
+        const listing = this.listings[scope];
+        const generation = listing.generation;
+        if (listing.groupCounts !== null && listing.daysGeneration === generation) return;
 
-        const key = `${scope}:days`;
+        const key = `${scope}:${generation}:days`;
         if (this.inFlight.has(key)) return;
         this.inFlight.add(key);
 
@@ -308,12 +429,17 @@ export class MailListViewModel {
             // missing array would come out as an empty mailbox rather than as a failure.
             if (!Array.isArray(answer.groups)) throw new Error("The mailbox shape has no stretches");
 
-            this.listings[scope].groupCounts = answer.groups;
+            if (listing.generation !== generation) return;
+
+            listing.groupCounts = answer.groups;
+            listing.daysGeneration = generation;
         } catch (error) {
             console.error(error);
-            // Left unset: the list stays flat, which is a listing without headers rather than no
-            // listing at all.
-            this.inFlight.delete(key);
+            // Left unset, and the key stays: the list carries on flat -- a listing without
+            // headers rather than no listing at all -- and this is not asked for again until
+            // something says it is worth another try. A table asks for its window on every
+            // scroll frame, so a retry here would be a request per frame for as long as the
+            // days cannot be read. [retry] clears the keys, and a move is a new generation.
         }
     }
 }

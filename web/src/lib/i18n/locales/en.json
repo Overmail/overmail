@@ -65,6 +65,19 @@
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",
     "noSubject": "(no subject)",
+    "panel": {
+      "previous": "Previous mail",
+      "next": "Next mail",
+      "openInNewTab": "Open in a new tab",
+      "close": "Close the mail",
+      "missing": "This mail is not available.",
+      "markRead": "Mark as read",
+      "markUnread": "Mark as unread",
+      "archive": "Archive the mail",
+      "unarchive": "Move back to the mailbox",
+      "more": "More actions",
+      "markSpam": "Mark as spam"
+    },
     "preview": {
       "noContent": "No content available"
     }

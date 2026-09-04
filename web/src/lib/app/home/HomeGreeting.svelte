@@ -27,7 +27,7 @@
 </script>
 
 {#if user}
-    <h1 class="text-3xl">{$_(`home.greeting.${greeting}`, {values: {name: user.firstname}})}</h1>
+    <h1 class="text-3xl font-display">{$_(`home.greeting.${greeting}`, {values: {name: user.firstname}})}</h1>
 {:else}
     <!-- The name is one cached request away, so this is a blink, not a state to design for. -->
     <Skeleton class="h-9 w-72"/>

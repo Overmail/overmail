@@ -5,7 +5,8 @@
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
     import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
-    import type {EmailLabel, EmailParticipant} from "$lib/repository/EmailRepository.svelte";
+    import type {EmailLabel} from "$lib/repository/EmailRepository.svelte";
+    import {displayName, spelledOut} from "$lib/app/mails/participants";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
     import {getStackFocus} from "$lib/app/my-stack/stackFocus";
@@ -67,10 +68,6 @@
         {key: "myStack.email.bcc", participants: bcc},
     ].filter((field) => field.participants.length > 0));
 
-    function formatParticipant(participant: EmailParticipant): string {
-        return participant.name ? `${participant.name} (${participant.address})` : participant.address;
-    }
-
 </script>
 
 <!-- `class` goes last, so the caller can place and rotate the card in the stack. The width comes
@@ -83,12 +80,12 @@
         <div class="flex min-w-0 flex-row gap-4 items-center">
             <OvermailAvatar
                     url={sender.avatarUrl}
-                    name={sender.name ?? sender.address}
+                    name={displayName(sender)}
                     class="size-12"
                     fallbackClass="text-base"
             />
             <div class="flex min-w-0 flex-col">
-                <span class="truncate font-medium text-lg">{sender.name ?? sender.address}</span>
+                <span class="truncate font-medium text-lg">{displayName(sender)}</span>
                 {#if sender.name}
                     <span class="truncate font-light text-base">{sender.address}</span>
                 {/if}
@@ -142,7 +139,7 @@
         {#each fields as field (field.key)}
             <div class="flex min-w-0 flex-row items-center gap-1">
                 <span class="font-bold text-muted-foreground px-1 py-0.5 rounded-sm w-16 shrink-0">{$_(field.key)}</span>
-                <span class="min-w-0 wrap-anywhere">{field.participants.map(formatParticipant).join(", ")}</span>
+                <span class="min-w-0 wrap-anywhere">{field.participants.map(spelledOut).join(", ")}</span>
             </div>
         {/each}
     </div>

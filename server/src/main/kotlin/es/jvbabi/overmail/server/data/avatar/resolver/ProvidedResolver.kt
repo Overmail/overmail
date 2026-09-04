@@ -32,6 +32,7 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
          */
         val addresses = mapOf(
             "email.openai.com" to "https://svgl.app/library/openai.svg",
+            "tm.openai.com" to "https://svgl.app/library/openai.svg",
             "*.myhpi.de" to "https://hpi.de/_assets/7b3ba8bb3871137dffa4d9cccacf730f/Images/FavAndTouchIcons/apple-touch-icon.png",
             "kontakt@manos-dresden.lernsax.de" to "https://manos-dresden.de/wp-content/uploads/2026/07/M-1.svg",
             "github.com" to "https://github.githubassets.com/favicons/favicon.svg",
@@ -89,6 +90,11 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "e-mails.microsoft.com" to "https://svgl.app/library/microsoft.svg",
             "mail.threads.net" to "https://svgl.app/library/threads.svg",
             "reddit.com" to "https://svgl.app/library/reddit.svg",
+            "notion.com" to "https://svgl.app/library/notion.svg",
+            "updates.notion.so" to "https://svgl.app/library/notion.svg",
+            "gopass.travel" to "https://production-brandfetch-assets.s3.amazonaws.com/id4sWmjd2t/idGLMNmDO3.png?AWSAccessKeyId=ASIAXC6OOL7LD664Y3OZ&Expires=1788513873&Signature=RRCcKlZySDy8DYc0n3mO7EAp%2FKI%3D&X-Amzn-Trace-Id=Root%3D1-6a9a8e14-3fac5d130031d1ae68897d0c%3BParent%3D716cd11668e5095a%3BSampled%3D0%3BLineage%3D2%3A85acc70c%3A0&response-content-disposition=attachment%3B%20filename%20%3D%22idR7bpBfnp_logos.png%22&response-expires=Fri%2C%2004%20Sep%202026%2009%3A24%3A33%20GMT&x-amz-security-token=IQoJb3JpZ2luX2VjECkaCXVzLWVhc3QtMSJHMEUCIQDm6iSQv9LzDuKHmXz4zSkp8TxmyyV3yKmwkS00T1TSyQIgF%2FiR6hRb5ruCn%2FIrrMKhPFYHVLBR%2FxY5Cv5gTLXZpmgqkAQI8v%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARADGgw0ODczNzQ4NzI1MzQiDErd2cvik6oaKYk3xSrkA5jRtfjD7d74s7zDhTZb6%2BU6PtPW%2BzBZhm7uCPgWQQ2SlY7oxMvkhsXttugr4zJaa%2FacPNv6%2F%2FJvVPzd%2B4tyz2Upend%2Fu8Ghr%2BNXJ3hGGqeOSgQAEwhjG%2FxWQLQiMkQoscx5%2Fzu0S%2B1P5JTDW3RutHr2xy6cOQm2LpR%2F2jWlz%2BTMZZqUYC%2BXxQf7d%2B1JmJ0PVP0HtZuavSSrbBbYyYAY0hFwGWP40yOtoMKTdXeIZuvXm%2FTNYAW%2FP%2F2OxEOpi8Ozg6Q69fKiCUz7hWPi4OMdVV8pBhaqBgD4i4oj4dDBYhhvPuOu%2BsVSz1IugJqupk0CjAE1%2FiyAQReHKsu5vmPZf3MRDV3MG4BpnAqL5Ng2YLpq5hCuCHhbuT1czhL%2FuuPQnRobiZsnB%2BS5%2BgGYAnPUimMSs0EHuaSRTy1FvVuTvNgeb8YnXPvJTxpICZ%2BPwMIz6qHEofVfH13DJU2WCrLCMKu2YaxBVFsGfoPoS8KoTfIHC6lD8seKSuFUC%2FYFTVTTQ39uXVYu0zFLkpSJ1BhmBAd1ZjDEfmu3r%2FoC4kWN79Sa%2F1NGrDYNv8N76VRhCvM9vQncXFpAYw2xef87Cik9pnohkNRKKBfc9WPmHKgvbOaHtNCtva4tJ8xuOq1ks7H4UrUowDAw2Ivq1AY6ogG%2BFx8g%2FWKB54KN1mnqh3yKViiM0IrneMq1sMVgrAKuYM8HyIyw3ndQgmS49kr1WBwoLVbvZE5%2ByZcwnk9bBQSUmwEZQhJ1nXaq8ftI9uYQgQvoDK%2FgBVMWk0BkB9qHoXdCtnX36rPzR5i9ZzPy1XSJO%2FnyOGGriVqs8%2FJMLlo5s35RdPkw04%2Fe7JbO3lNjzfWOMaDpHd6UjTZmtC9J5PY976k%3D",
+            "zap-hosting.com" to "https://zap-hosting.biz/download/763/?tmstv=1692119072",
+            "commerzbank.com" to "https://companieslogo.com/img/orig/CBK.F-b8815dc3.svg?t=1747071979&download=true",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

@@ -55,7 +55,7 @@ export const columns = columnHelper.columns([
 export const COLUMN_WIDTHS: Record<string, string | undefined> = {
     sender: "18rem",
     subject: undefined,
-    sent: "11rem",
+    sent: "4rem",
 };
 
 /**

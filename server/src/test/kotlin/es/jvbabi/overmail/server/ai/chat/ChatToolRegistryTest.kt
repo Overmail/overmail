@@ -3,8 +3,12 @@ package es.jvbabi.overmail.server.ai.chat
 import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
 import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -168,10 +172,82 @@ class ChatToolRegistryTest {
         assertTrue(stream.snapshot().content.isEmpty())
     }
 
+    @Test
+    fun `what the agent writes down is found again and shows up in the answer`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        val registry = registry(fixture.userId, stream)
+
+        val write = registry.tools.filterIsInstance<WriteKnowledgeTool>().single()
+        val search = registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
+        val read = registry.tools.filterIsInstance<ReadKnowledgeTool>().single()
+
+        val written = write.execute(
+            WriteKnowledgeTool.Args(
+                name = "Stromvertrag",
+                description = "Bei Rheinenergie, Abschlag 89 EUR.",
+                keywords = listOf("Rheinenergie", "Strom"),
+                relevantOn = "2026-11-01",
+            )
+        )
+        assertTrue(written is WriteKnowledgeTool.Result.Written)
+        assertTrue(!written.replaced)
+
+        // Found by a word out of a subject line, and read in full by the id the search handed out.
+        val hits = search.execute(SearchKnowledgeTool.Args(query = "rheinenergie rechnung")).entries
+        assertEquals(listOf("Stromvertrag"), hits.map { it.name })
+        assertEquals("2026-11-01", hits.single().relevantOn)
+
+        val entry = read.execute(ReadKnowledgeTool.Args(knowledgeId = hits.single().knowledgeId))
+        assertTrue(entry is ReadKnowledgeTool.Result.Knowledge)
+        assertEquals("Bei Rheinenergie, Abschlag 89 EUR.", entry.description)
+
+        // Every one of the three left its line in the answer, in the order they ran.
+        assertEquals(
+            listOf(
+                """<toolcall-write-knowledge name="Stromvertrag" replaced="false"></toolcall-write-knowledge>""",
+                """<toolcall-search-knowledge query="rheinenergie rechnung"></toolcall-search-knowledge>""",
+                """<toolcall-read-knowledge name="Stromvertrag"></toolcall-read-knowledge>""",
+            ),
+            stream.snapshot().content.split("\n\n"),
+        )
+    }
+
+    @Test
+    fun `knowledge of somebody else is not read`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+
+        val stranger = database.query {
+            User.new {
+                username = "stranger-${Uuid.random()}"
+                email = "stranger-${Uuid.random()}@example.com"
+                firstname = "Some"
+                lastname = "One"
+            }.id.value
+        }
+        val theirs = KnowledgeStore(database).write(
+            userId = stranger,
+            name = "Nicht deins",
+            description = "Geheim.",
+            keywords = listOf("geheim"),
+            relevantOn = null,
+            byAgent = true,
+        )
+
+        val registry = registry(fixture.userId, stream)
+        assertTrue(registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
+            .execute(SearchKnowledgeTool.Args(query = "geheim")).entries.isEmpty())
+        assertTrue(registry.tools.filterIsInstance<ReadKnowledgeTool>().single()
+            .execute(ReadKnowledgeTool.Args(knowledgeId = theirs.entry.id.toString()))
+                is ReadKnowledgeTool.Result.NotFound)
+    }
+
     private fun registry(userId: User.Id, stream: AiChatMessageStream) = chatToolRegistry(
         userId = userId,
         database = database,
         mailNotifier = MailNotifier(),
+        knowledgeStore = KnowledgeStore(database),
         stream = stream,
     )
 

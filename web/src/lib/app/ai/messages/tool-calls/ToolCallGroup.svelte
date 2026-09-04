@@ -9,6 +9,7 @@
     import {fly, slide} from "svelte/transition";
     import ThinkingOrb from "$lib/components/orb/ThinkingOrb.svelte";
     import ToolCallCreateLabel from "$lib/app/ai/messages/tool-calls/ToolCallCreateLabel.svelte";
+    import ToolCallKnowledge from "$lib/app/ai/messages/tool-calls/ToolCallKnowledge.svelte";
     import ToolCallLabelEmail from "$lib/app/ai/messages/tool-calls/ToolCallLabelEmail.svelte";
     import ToolCallReadEmail from "$lib/app/ai/messages/tool-calls/ToolCallReadEmail.svelte";
     import ToolCallSearchEmails from "$lib/app/ai/messages/tool-calls/ToolCallSearchEmails.svelte";
@@ -35,6 +36,9 @@
         "create-label": "working",
         "label-email": "working",
         "unlabel-email": "working",
+        "search-knowledge": "searching",
+        "read-knowledge": "working",
+        "write-knowledge": "working",
         thinking: "breathing",
     };
 
@@ -44,6 +48,9 @@
         "create-label": "ai.chat.messages.createLabel",
         "label-email": "ai.chat.messages.labelEmail",
         "unlabel-email": "ai.chat.messages.unlabelEmail",
+        "search-knowledge": "ai.chat.messages.searchKnowledge",
+        "read-knowledge": "ai.chat.messages.readKnowledge",
+        "write-knowledge": "ai.chat.messages.writeKnowledge",
         thinking: "ai.chat.messages.thinking",
     };
 
@@ -108,6 +115,12 @@
                         <ToolCallLabelEmail attributes={call.attributes}/>
                     {:else if call.kind === "unlabel-email"}
                         <ToolCallLabelEmail attributes={call.attributes} detached/>
+                    {:else if call.kind === "search-knowledge"}
+                        <ToolCallKnowledge kind="search" attributes={call.attributes}/>
+                    {:else if call.kind === "read-knowledge"}
+                        <ToolCallKnowledge kind="read" attributes={call.attributes}/>
+                    {:else if call.kind === "write-knowledge"}
+                        <ToolCallKnowledge kind="write" attributes={call.attributes}/>
                     {/if}
                 </li>
             {/each}

@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.EmailConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.DatabaseConfig
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -230,6 +231,7 @@ class StackSocketTest {
                             model = testModel,
                             overmailDatabase = database,
                             mailNotifier = mailNotifier,
+                            knowledgeStore = KnowledgeStore(database),
                         ),
                         database = database,
                     )

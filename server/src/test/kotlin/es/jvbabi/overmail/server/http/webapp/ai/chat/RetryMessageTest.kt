@@ -6,6 +6,7 @@ import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.ChatAgent
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.config.ApplicationConfig
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
@@ -115,6 +116,7 @@ class RetryMessageTest {
                         streamNotifier = resolve(),
                         chatNotifier = AiChatNotifier(),
                         mailNotifier = MailNotifier(),
+                        knowledgeStore = KnowledgeStore(resolve()),
                     )
                 }
                 // No consumer in the test: the run is queued and stays there.

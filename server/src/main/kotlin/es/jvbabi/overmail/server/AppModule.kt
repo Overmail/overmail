@@ -13,6 +13,7 @@ import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
@@ -107,6 +108,7 @@ private fun Application.configureDependencies() {
                 model = resolve(),
                 overmailDatabase = resolve(),
                 mailNotifier = resolve(),
+                knowledgeStore = resolve(),
             )
         }
 
@@ -117,6 +119,10 @@ private fun Application.configureDependencies() {
             )
         }
 
+        // One store for what the assistant knows: the chat agent reads and writes it through
+        // its tools, the classification reads it into its prompt and writes back what it learned.
+        provide<KnowledgeStore> { KnowledgeStore(database = resolve()) }
+
         provide {
             ChatAgent(
                 config = resolve<ApplicationConfig.AiConfig>(),
@@ -125,6 +131,7 @@ private fun Application.configureDependencies() {
                 streamNotifier = resolve(),
                 chatNotifier = resolve(),
                 mailNotifier = resolve(),
+                knowledgeStore = resolve(),
             )
         }
 

@@ -9,6 +9,7 @@ import ai.koog.prompt.executor.model.executeStructured
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.structure.StructuredResponse
 import es.jvbabi.overmail.server.config.ApplicationConfig
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -21,6 +22,7 @@ import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.util.HtmlToText
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
@@ -34,6 +36,8 @@ class EmailClassification(
     private val model: LLModel,
     private val overmailDatabase: OvermailDatabase,
     private val mailNotifier: MailNotifier,
+    /** The same knowledge the chat agent reads and writes; see [KnowledgeStore]. */
+    private val knowledgeStore: KnowledgeStore,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -96,6 +100,18 @@ class EmailClassification(
         recordUsage: (StructuredResponse<*>) -> Unit,
         log: (String) -> Unit,
     ) {
+        // Searched with what the mail itself offers -- who it is from, what it is about -- rather
+        // than loaded whole: a mailbox collects hundreds of entries and only the ones this mail
+        // touches belong in the prompt.
+        val knowledge = knowledgeStore.search(
+            userId = user.id.value,
+            query = overmailDatabase.query {
+                listOfNotNull(email.sender.address, email.senderName, email.subject).joinToString(" ")
+            },
+            limit = MAX_KNOWLEDGE_IN_PROMPT,
+        )
+        log("Knowledge for this mail: ${knowledge.map { it.name }}")
+
         val basePrompt = overmailDatabase.query {
             // Some mails ship no text/plain part (or only a "view this mail in your browser"
             // stub); without the fallback the model would classify the literal string "null".
@@ -112,6 +128,19 @@ class EmailClassification(
                     Text content: $textContent
                 """.trimIndent()
                 )
+
+                // What is already known about this user, as far as it touches this mail: written
+                // by an earlier run or in a chat, never by the mail in front of us.
+                if (knowledge.isNotEmpty()) {
+                    system(
+                        "What you already know about this user:\n" +
+                                knowledge.joinToString("\n\n") { entry ->
+                                    "- ${entry.name}" +
+                                            (entry.relevantOn?.let { " (relevant on $it)" } ?: "") +
+                                            "\n  ${entry.description}"
+                                }
+                    )
+                }
             }
         }
 
@@ -288,6 +317,47 @@ class EmailClassification(
                         " (reason: ${label.reason})"
             )
         }
+
+        // What this run wants to keep. Only reached for a mail that was found trustworthy -- the
+        // guard above returns before this -- so an untrustworthy mail cannot write itself into
+        // what the assistant knows about the user.
+        finalizedClassification.data.knowledge.orEmpty().forEach { entry ->
+            val name = entry.name.trim()
+            if (name.isEmpty() || entry.description.isBlank()) {
+                log("Skipping knowledge without a name or description")
+                return@forEach
+            }
+
+            val relevantOn = entry.relevantOn?.trim()?.takeIf { it.isNotEmpty() }?.let { date ->
+                runCatching { LocalDate.parse(date) }.getOrNull()
+                    ?: log("Knowledge '$name': ignoring relevant_on '$date', expected YYYY-MM-DD").let { null }
+            }
+
+            val written = knowledgeStore.write(
+                userId = user.id.value,
+                name = name,
+                description = entry.description,
+                keywords = entry.keywords,
+                relevantOn = relevantOn,
+                byAgent = true,
+            )
+
+            log(
+                "Knowledge '${written.entry.name}': " +
+                        (if (written.existed) "rewrote the existing entry" else "new entry") +
+                        ", keywords ${written.entry.keywords}" +
+                        (written.entry.relevantOn?.let { ", relevant on $it" } ?: "")
+            )
+        }
+    }
+
+    companion object {
+        /**
+         * How many entries of what is known go into a classification prompt. Enough for the
+         * senders and matters one mail touches, and a ceiling either way: the prompt has a mail
+         * to classify in it as well.
+         */
+        private const val MAX_KNOWLEDGE_IN_PROMPT = 6
     }
 }
 
@@ -446,7 +516,19 @@ data class EmailClassificationFinalized(
             - If no useful label can be determined, set this to an empty list.
         """
     )
-    val labels: List<EmailClassificationFinalized.Label>
+    val labels: List<EmailClassificationFinalized.Label>,
+
+    @SerialName("knowledge")
+    @property:LLMDescription(
+        """
+            What you learned about the USER from this email and want to keep -- not what this email says.
+
+            Write an entry only when it will still be worth knowing next week and when it would change how a later email is handled: how this user wants a kind of mail treated, who writes to them and in what role, a contract or subscription they have, a date they will be asked about again (a deadline, a move, an appointment). Most emails teach nothing of the sort; then leave this out entirely. Never write down what the email itself contains -- the email is stored anyway -- and never anything about other people that the user did not say themselves.
+
+            Writing a name that already exists replaces that entry. Use it when this email adds to something you already know from the context above, and repeat the part that still holds.
+        """
+    )
+    val knowledge: List<EmailClassificationFinalized.Knowledge>? = null,
 ) {
     @SerialName("Label")
     @Serializable
@@ -474,5 +556,38 @@ data class EmailClassificationFinalized(
             """
         )
         val reason: String
+    )
+
+    @SerialName("Knowledge")
+    @Serializable
+    @LLMDescription("Something about the user that is worth keeping beyond this email.")
+    data class Knowledge(
+        @SerialName("name")
+        @property:LLMDescription(
+            "What the entry is about, in a few words, in the user's language. This is also its " +
+                "handle: writing the same name again replaces that entry."
+        )
+        val name: String,
+
+        @SerialName("description")
+        @property:LLMDescription(
+            "What you learned, in full sentences, written for whoever reads it next -- another " +
+                "classification run or the assistant in a chat."
+        )
+        val description: String,
+
+        @SerialName("keywords")
+        @property:LLMDescription(
+            "The words to find this entry by: names, addresses, order numbers, the subject it " +
+                "comes up under. Without them the entry is hard to find again."
+        )
+        val keywords: List<String> = emptyList(),
+
+        @SerialName("relevant_on")
+        @property:LLMDescription(
+            "The day this is about as YYYY-MM-DD, for a deadline, an appointment or a change " +
+                "that takes effect. Leave it out when the entry is not tied to a day."
+        )
+        val relevantOn: String? = null,
     )
 }

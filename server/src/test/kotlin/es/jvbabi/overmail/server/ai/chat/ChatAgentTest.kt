@@ -4,6 +4,7 @@ import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.config.ApplicationConfig
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
@@ -41,6 +42,7 @@ class ChatAgentTest {
             streamNotifier = streamNotifier,
             chatNotifier = AiChatNotifier(),
             mailNotifier = MailNotifier(),
+            knowledgeStore = KnowledgeStore(database),
         )
 
         val messageId = database.query {

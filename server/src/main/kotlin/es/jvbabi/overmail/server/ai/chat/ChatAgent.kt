@@ -24,6 +24,9 @@ import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
+import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
@@ -32,6 +35,7 @@ import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
@@ -66,6 +70,8 @@ class ChatAgent(
     private val chatNotifier: AiChatNotifier,
     /** Handed to the tools that write: what they change has to reach the screens showing it. */
     private val mailNotifier: MailNotifier,
+    /** What the assistant knows about this user, shared with the classification. */
+    private val knowledgeStore: KnowledgeStore,
 ) {
 
     private val promptExecutor = MultiLLMPromptExecutor(
@@ -180,6 +186,7 @@ class ChatAgent(
                 userId = turn.userId,
                 database = database,
                 mailNotifier = mailNotifier,
+                knowledgeStore = knowledgeStore,
                 stream = stream,
             ),
         )
@@ -376,6 +383,14 @@ class ChatAgent(
                 "Use `${SearchEmailsTool.NAME}` to find emails; it answers with metadata only, so " +
                 "read the ones whose content you need. Say what you searched for when nothing " +
                 "was found, rather than claiming there is no such email.\n" +
+                "You keep what you learn about this user: `${SearchKnowledgeTool.NAME}` looks it " +
+                "up by keyword and `${ReadKnowledgeTool.NAME}` reads an entry in full. Look " +
+                "before you answer anything about how this user works, who writes to them, or a " +
+                "date they mentioned before -- it is cheaper than asking them again. Write with " +
+                "`${WriteKnowledgeTool.NAME}` when something will still be worth knowing next " +
+                "week, and give it the words you would search for; the content of one email is " +
+                "not worth an entry, a decision the user made is. Do not write down what you " +
+                "were only asked to do once, and never write what the user has not told you.\n" +
                 "Labels are the user's own vocabulary for their mailbox, and the tools that write " +
                 "them change what the user sees right away. Only use them when the user asked for " +
                 "it. `${CreateLabelTool.NAME}` makes one -- and answers with the existing label " +
@@ -487,6 +502,7 @@ internal fun chatToolRegistry(
     userId: User.Id,
     database: OvermailDatabase,
     mailNotifier: MailNotifier,
+    knowledgeStore: KnowledgeStore,
     stream: AiChatMessageStream,
 ): ToolRegistry {
     // Its own block in the answer: the client renders the element, and markdown only treats it as
@@ -516,6 +532,9 @@ internal fun chatToolRegistry(
                 onLabelDetached = ::writeBlock,
             )
         )
+        .tool(SearchKnowledgeTool(userId = userId, store = knowledgeStore, onSearch = ::writeBlock))
+        .tool(ReadKnowledgeTool(userId = userId, store = knowledgeStore, onRead = ::writeBlock))
+        .tool(WriteKnowledgeTool(userId = userId, store = knowledgeStore, onWrite = ::writeBlock))
         .build()
 }
 

@@ -7,9 +7,7 @@
     import {useRepositories} from "$lib/repository/repositories";
     import Head from "./Head.svelte";
     import type {MailStep} from "$lib/app/mails/MailListViewModel.svelte.js";
-    import Content from "$lib/app/mails/detail_panel/Content.svelte";
-    import Labels from "$lib/app/mails/detail_panel/Labels.svelte";
-    import Participants from "$lib/app/home/Participants.svelte";
+    import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
 
     /** Short and hard out of the gate: the panel is a step in a list, not a page turning. */
     const DURATION_MS = 150;
@@ -198,30 +196,10 @@
             <div class="grid grid-cols-1 grid-rows-1 *:col-start-1 *:row-start-1">
                 {#key mail.id}
                     <div
-                            class="flex flex-col gap-6"
                             in:fly={{y: shift, duration: SWAP_IN_MS, easing: cubicOut}}
                             out:fly={{y: -shift, duration: SWAP_OUT_MS, easing: cubicOut}}
                     >
-                        <div class="px-6 font-display text-2xl text-pretty">
-                            {mail.subject}
-                        </div>
-
-                        <Participants
-                                from={mail.sender}
-                                to={mail.to}
-                                cc={mail.cc}
-                                bcc={mail.bcc}
-                                sentAt={new Date(mail.sent * 1000)}
-                        />
-
-                        <Labels
-                                labels={mail.labels}
-                                onAddLabel={(label) => mails.attachLabel(mail.id, label.id)}
-                                onCreateLabel={(name) => mails.createLabelOn(mail.id, name)}
-                                onRemoveLabel={(label) => mails.detachLabel(mail.id, label.id)}
-                        />
-
-                        <Content id={mail.id}/>
+                        <Detail {mail}/>
                     </div>
                 {/key}
             </div>

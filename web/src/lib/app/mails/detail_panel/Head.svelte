@@ -23,18 +23,19 @@
     import {_} from "svelte-i18n";
     import {scale, slide} from "svelte/transition";
     import {cubicOut} from "svelte/easing";
-    import {emailSlug} from "$lib/app/mails/emailPath";
+    import {emailPath} from "$lib/app/mails/emailPath";
     import {page} from "$app/state";
     import {cn} from "$lib/utils";
 
     let {
         mail,
-        hasNextMail,
-        hasPreviousMail,
+        hasNextMail = false,
+        hasPreviousMail = false,
 
         onClose,
         onNextMail,
         onPreviousMail,
+        showOpenInNewTab = true,
         onChangeArchiveState,
         onShareMail,
         onChangeReadState,
@@ -42,12 +43,19 @@
         class: propsClass,
     }: {
         mail: EmailMeta,
-        hasNextMail: boolean,
-        hasPreviousMail: boolean,
+        /** Only meaningful next to [onNextMail]: without one there is nothing to step to. */
+        hasNextMail?: boolean,
+        hasPreviousMail?: boolean,
 
-        onClose: () => void;
-        onNextMail: () => void;
-        onPreviousMail: () => void;
+        /**
+         * The three the mail's own page has no use for: there is no list to step through there,
+         * nothing to close, and the page is where "open in a new tab" would lead. Leave them out
+         * and the buttons are not in the bar at all.
+         */
+        onClose?: () => void;
+        onNextMail?: () => void;
+        onPreviousMail?: () => void;
+        showOpenInNewTab?: boolean;
         onChangeArchiveState: (newState: EmailMeta["archiveState"]) => Promise<void>;
         onShareMail: () => void;
         onChangeReadState: (isRead: boolean) => Promise<void>;
@@ -64,7 +72,9 @@
     const SWAP_MS = 140;
     const swap = {duration: SWAP_MS, start: 0.4, opacity: 0, easing: cubicOut};
 
-    const emailPageUrl = $derived(page.url.origin + "/emails/" + emailSlug(mail.id, mail.subject));
+    // Through emailPath rather than spelled out again: that function is where the route of a
+    // mail lives, and the copy button hands out an address, so it needs the origin in front.
+    const emailPageUrl = $derived(page.url.origin + emailPath(mail.id, mail.subject));
 
     /** Anything but the mailbox: archived, or filed as spam. Neither can be filed again. */
     const isFiled = $derived(mail.archiveState !== "unarchive");
@@ -85,45 +95,47 @@
 
 <div class={cn("flex flex-row items-center justify-between w-full px-4", propsClass)}>
     <div class="flex flex-row items-center">
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!hasPreviousMail}
-                        onclick={onPreviousMail}
-                >
-                    <CaretUpIcon />
-                </Button>
-            </Tooltip.Trigger>
+        {#if onPreviousMail !== undefined && onNextMail !== undefined}
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={!hasPreviousMail}
+                            onclick={onPreviousMail}
+                    >
+                        <CaretUpIcon />
+                    </Button>
+                </Tooltip.Trigger>
 
-            <Tooltip.Content>
-                Vorige E-Mail
-                <Kbd.Group>
-                    <Kbd.Root>,</Kbd.Root>
-                </Kbd.Group>
-            </Tooltip.Content>
-        </Tooltip.Root>
+                <Tooltip.Content>
+                    Vorige E-Mail
+                    <Kbd.Group>
+                        <Kbd.Root>,</Kbd.Root>
+                    </Kbd.Group>
+                </Tooltip.Content>
+            </Tooltip.Root>
 
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!hasNextMail}
-                        onclick={onNextMail}
-                >
-                    <CaretDownIcon />
-                </Button>
-            </Tooltip.Trigger>
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={!hasNextMail}
+                            onclick={onNextMail}
+                    >
+                        <CaretDownIcon />
+                    </Button>
+                </Tooltip.Trigger>
 
-            <Tooltip.Content>
-                Nächste E-Mail
-                <Kbd.Group>
-                    <Kbd.Root>.</Kbd.Root>
-                </Kbd.Group>
-            </Tooltip.Content>
-        </Tooltip.Root>
+                <Tooltip.Content>
+                    Nächste E-Mail
+                    <Kbd.Group>
+                        <Kbd.Root>.</Kbd.Root>
+                    </Kbd.Group>
+                </Tooltip.Content>
+            </Tooltip.Root>
+        {/if}
     </div>
 
     <div class="flex flex-row items-center">
@@ -264,22 +276,24 @@
             </Tooltip.Content>
         </Tooltip.Root>
 
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button
-                        variant="ghost"
-                        size="icon"
-                        href={emailPageUrl}
-                        target="_blank"
-                >
-                    <ArrowSquareUpRightIcon />
-                </Button>
-            </Tooltip.Trigger>
+        {#if showOpenInNewTab}
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button
+                            variant="ghost"
+                            size="icon"
+                            href={emailPageUrl}
+                            target="_blank"
+                    >
+                        <ArrowSquareUpRightIcon />
+                    </Button>
+                </Tooltip.Trigger>
 
-            <Tooltip.Content>
-                In neuem Tab öffnen
-            </Tooltip.Content>
-        </Tooltip.Root>
+                <Tooltip.Content>
+                    In neuem Tab öffnen
+                </Tooltip.Content>
+            </Tooltip.Root>
+        {/if}
 
         <!-- What is not worth a button of its own. No tooltip on the trigger: it opens a menu
              that would sit under it, and the menu says what it does. -->
@@ -301,24 +315,26 @@
             </DropdownMenu.Content>
         </DropdownMenu.Root>
 
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button
-                        class="mr-1"
-                        variant="ghost"
-                        size="icon"
-                        onclick={onClose}
-                >
-                    <XIcon />
-                </Button>
-            </Tooltip.Trigger>
+        {#if onClose !== undefined}
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button
+                            class="mr-1"
+                            variant="ghost"
+                            size="icon"
+                            onclick={onClose}
+                    >
+                        <XIcon />
+                    </Button>
+                </Tooltip.Trigger>
 
-            <Tooltip.Content>
-                Schließen
-                <Kbd.Group>
-                    <Kbd.Root>Esc</Kbd.Root>
-                </Kbd.Group>
-            </Tooltip.Content>
-        </Tooltip.Root>
+                <Tooltip.Content>
+                    Schließen
+                    <Kbd.Group>
+                        <Kbd.Root>Esc</Kbd.Root>
+                    </Kbd.Group>
+                </Tooltip.Content>
+            </Tooltip.Root>
+        {/if}
     </div>
 </div>

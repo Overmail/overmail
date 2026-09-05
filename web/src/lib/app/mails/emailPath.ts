@@ -25,7 +25,7 @@ export function emailPath(id: string, subject?: string | null): string {
 	const bare = bareId(id);
 	const slug = subjectSlug(subject);
 
-	return slug === "" ? `/email/${bare}` : `/email/${encodeURIComponent(slug)}-${bare}`;
+	return slug === "" ? `/emails/${bare}` : `/emails/${encodeURIComponent(slug)}-${bare}`;
 }
 
 /**

@@ -15,6 +15,7 @@
 	import SidePanelResizer from "$lib/app/shell/SidePanelResizer.svelte";
 	import {fade} from 'svelte/transition';
 	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
+	import SettingsDialog from "$lib/app/settings/SettingsDialog.svelte";
 
 	let { children } = $props();
 
@@ -144,3 +145,5 @@
 		{@render children()}
 	{/if}
 {/if}
+
+<SettingsDialog />

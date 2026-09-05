@@ -12,6 +12,7 @@
     import type {CurrentUser} from "$lib/repository/CurrentUserRepository";
     import {onMount} from "svelte";
     import {initials} from "$lib/utils.ts";
+    import {goto} from "$app/navigation";
 
     let {
         header,
@@ -76,7 +77,11 @@
                     <Button
                             size="icon-sm"
                             variant="ghost"
-                            onclick={() => {}}
+                            onclick={() => {
+                                const url = new URL(page.url);
+                                url.searchParams.set("settings", "");
+                                goto(url, {replaceState: true, noScroll: true});
+                            }}
                     >
                         <Avatar.Root size="sm">
                             <Avatar.Fallback>{initials(user.firstname + " " + user.lastname)}</Avatar.Fallback>

@@ -2,6 +2,7 @@ import {getContext, setContext} from "svelte";
 import {AuthRepository} from "$lib/repository/AuthRepository";
 import {CurrentUserRepository} from "$lib/repository/CurrentUserRepository";
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
+import {InboxSetupRepository} from "$lib/repository/InboxSetupRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
 import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import {HomeScreenRepository} from "$lib/repository/HomeScreenRepository.svelte";
@@ -27,6 +28,8 @@ export type Repositories = {
     mails: EmailRepository;
     currentUser: CurrentUserRepository;
     emailBody: EmailBodyRepository;
+    /** The checks the "new inbox" dialog runs while the form is being filled in. */
+    inboxSetup: InboxSetupRepository;
     home: HomeScreenRepository;
     chatHistory: ChatHistoryRepository;
     emails: EntityRepository<CachedEmail>;
@@ -40,6 +43,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     mails: () => new EmailRepository(),
     currentUser: () => new CurrentUserRepository(),
     emailBody: () => new EmailBodyRepository(),
+    inboxSetup: () => new InboxSetupRepository(),
     chatHistory: () => new ChatHistoryRepository(),
     home: () => new HomeScreenRepository(),
     emails: createEmailRepository,

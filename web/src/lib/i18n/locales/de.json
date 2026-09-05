@@ -65,6 +65,18 @@
     "loadFailed": "Weitere Mails konnten nicht geladen werden.",
     "retry": "Erneut versuchen",
     "noSubject": "(kein Betreff)",
+    "participants": {
+      "to": "An",
+      "cc": "Cc",
+      "bcc": "Bcc",
+      "you": "dich"
+    },
+    "content": {
+      "html": "HTML",
+      "text": "Nur Text",
+      "empty": "Diese Mail hat keinen lesbaren Inhalt.",
+      "failed": "Der Inhalt konnte nicht geladen werden."
+    },
     "panel": {
       "previous": "Vorherige E-Mail",
       "next": "Nächste E-Mail",

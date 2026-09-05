@@ -18,12 +18,14 @@
         XIcon
     } from "phosphor-svelte";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+    import * as Kbd from "$lib/components/ui/kbd";
     import * as Tooltip from "$lib/components/ui/tooltip";
     import {_} from "svelte-i18n";
     import {scale, slide} from "svelte/transition";
     import {cubicOut} from "svelte/easing";
     import {emailSlug} from "$lib/app/mails/emailPath";
     import {page} from "$app/state";
+    import {cn} from "$lib/utils";
 
     let {
         mail,
@@ -37,6 +39,7 @@
         onShareMail,
         onChangeReadState,
         onReclassify,
+        class: propsClass,
     }: {
         mail: EmailMeta,
         hasNextMail: boolean,
@@ -50,6 +53,7 @@
         onChangeReadState: (isRead: boolean) => Promise<void>;
         /** Hands the mail back to the classification agent; see the menu at the end of the bar. */
         onReclassify: () => void;
+        class?: string;
     } = $props();
 
     /**
@@ -79,25 +83,8 @@
     }
 </script>
 
-<div class="flex flex-row items-center justify-between w-full px-4">
+<div class={cn("flex flex-row items-center justify-between w-full px-4", propsClass)}>
     <div class="flex flex-row items-center">
-        <Tooltip.Root>
-            <Tooltip.Trigger>
-                <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!hasNextMail}
-                        onclick={onNextMail}
-                >
-                    <CaretDownIcon />
-                </Button>
-            </Tooltip.Trigger>
-
-            <Tooltip.Content>
-                Nächste E-Mail
-            </Tooltip.Content>
-        </Tooltip.Root>
-
         <Tooltip.Root>
             <Tooltip.Trigger>
                 <Button
@@ -112,6 +99,29 @@
 
             <Tooltip.Content>
                 Vorige E-Mail
+                <Kbd.Group>
+                    <Kbd.Root>,</Kbd.Root>
+                </Kbd.Group>
+            </Tooltip.Content>
+        </Tooltip.Root>
+
+        <Tooltip.Root>
+            <Tooltip.Trigger>
+                <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={!hasNextMail}
+                        onclick={onNextMail}
+                >
+                    <CaretDownIcon />
+                </Button>
+            </Tooltip.Trigger>
+
+            <Tooltip.Content>
+                Nächste E-Mail
+                <Kbd.Group>
+                    <Kbd.Root>.</Kbd.Root>
+                </Kbd.Group>
             </Tooltip.Content>
         </Tooltip.Root>
     </div>
@@ -176,6 +186,9 @@
 
                         <Tooltip.Content>
                             Zurück ins Postfach verschieben
+                            <Kbd.Group>
+                                <Kbd.Root>A</Kbd.Root>
+                            </Kbd.Group>
                         </Tooltip.Content>
                     </Tooltip.Root>
                 </div>
@@ -194,6 +207,9 @@
 
                         <Tooltip.Content>
                             Archivieren
+                            <Kbd.Group>
+                                <Kbd.Root>A</Kbd.Root>
+                            </Kbd.Group>
                         </Tooltip.Content>
                     </Tooltip.Root>
                 </div>
@@ -251,7 +267,6 @@
         <Tooltip.Root>
             <Tooltip.Trigger>
                 <Button
-                        class="mr-1"
                         variant="ghost"
                         size="icon"
                         href={emailPageUrl}
@@ -271,7 +286,7 @@
         <DropdownMenu.Root>
             <DropdownMenu.Trigger>
                 {#snippet child({props})}
-                    <Button {...props} class="mr-1" variant="ghost" size="icon">
+                    <Button {...props} variant="ghost" size="icon">
                         <DotsThreeVerticalIcon />
                         <span class="sr-only">{$_('mails.panel.more')}</span>
                     </Button>
@@ -300,6 +315,9 @@
 
             <Tooltip.Content>
                 Schließen
+                <Kbd.Group>
+                    <Kbd.Root>Esc</Kbd.Root>
+                </Kbd.Group>
             </Tooltip.Content>
         </Tooltip.Root>
     </div>

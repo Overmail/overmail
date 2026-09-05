@@ -3,12 +3,20 @@ export type CurrentUser = {
     id: string;
     firstname: string;
     lastname: string;
+    /** The address of their account, as they wrote it. */
+    address: string;
+    /**
+     * Every address they receive mail under, lowercase -- the account's own and the mail
+     * accounts theirs comes in through. What a screen compares the participants of a mail
+     * against to find the reader among them; see `isSelf`.
+     */
+    addresses: string[];
 };
 
 const ENDPOINT = "/api/users/me";
 
 /**
- * The signed-in user: their id and what to call them.
+ * The signed-in user: their id, what to call them, and their address.
  *
  * Asked once and then kept, and calls that come in while the first one is still on its way share
  * it instead of starting a second request. The server marks the answer `private, max-age=...` on
@@ -44,6 +52,8 @@ export class CurrentUserRepository {
             id: body.id as string,
             firstname: body.firstname as string,
             lastname: body.lastname as string,
+            address: body.email as string,
+            addresses: body.addresses as string[],
         };
         return this.user;
     }

@@ -47,6 +47,16 @@
     } = $props();
 </script>
 
+<!--
+    Keyed on the picture, and that is not cosmetic: the avatar primitive keeps one loading state
+    per root, its loader returns early once that state is `loaded`, and the fallback is hidden for
+    as long as it says so. A root that lives on while its `url` changes therefore keeps painting
+    the picture it loaded first -- and shows an empty box for a correspondent who has none, because
+    the initials stay hidden behind a state that was left over from somebody else. A different
+    picture is a different avatar; the same one (the next mail from the same sender) is not keyed
+    again and does not flicker.
+-->
+{#key url}
 <!-- rounded-none: the shadcn root is a circle, and this one is not. -->
 <Avatar.Root
         {size}
@@ -82,3 +92,4 @@
         </span>
     {/snippet}
 </Avatar.Root>
+{/key}

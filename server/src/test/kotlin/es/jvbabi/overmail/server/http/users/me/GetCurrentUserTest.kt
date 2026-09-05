@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.http.users.me
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -14,12 +15,14 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -48,11 +51,46 @@ class GetCurrentUserTest {
         assertEquals(user.id.value.toString(), body["id"]!!.jsonPrimitive.content)
         assertEquals("Julius", body["firstname"]!!.jsonPrimitive.content)
         assertEquals("Babies", body["lastname"]!!.jsonPrimitive.content)
+        assertEquals(user.email, body["email"]!!.jsonPrimitive.content)
+        // The account's own address, and nothing else while there is no mail account.
+        assertEquals(
+            listOf(user.email.lowercase()),
+            body["addresses"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
 
         val cacheControl = response.headers[HttpHeaders.CacheControl]!!
         // Private: the answer is one user's name, so no proxy may hand it to the next request.
         assertTrue(cacheControl.contains("private"), cacheControl)
         assertTrue(cacheControl.contains("max-age=300"), cacheControl)
+    }
+
+    @Test
+    fun `every address the user receives mail under is reported`() = testApplication {
+        val user = setUpUser()
+        database.query {
+            // Most imap logins are the address; the ones that are not are not addresses.
+            ImapAccount.new {
+                this.user = user
+                host = "imap.example.com"
+                port = 993
+                username = "Julius@Example.com"
+                password = "secret"
+            }
+            ImapAccount.new {
+                this.user = user
+                host = "imap.example.com"
+                port = 993
+                username = "p12345"
+                password = "secret"
+            }
+        }
+        installRoute()
+
+        val body = Json.parseToJsonElement(client.get("/api/users/me").bodyAsText()).jsonObject
+        val addresses = body["addresses"]!!.jsonArray.map { it.jsonPrimitive.content }
+
+        // Lowercase and deduplicated: this list is compared against the recipients of a mail.
+        assertEquals(listOf(user.email.lowercase(), "julius@example.com"), addresses)
     }
 
     @Test
@@ -80,6 +118,7 @@ class GetCurrentUserTest {
         application {
             install(ContentNegotiation) { json() }
             install(Authentication) { session() }
+            dependencies { provide<OvermailDatabase> { database } }
             routing {
                 route("/api/users/me") { getCurrentUser() }
             }

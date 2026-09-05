@@ -7,10 +7,24 @@ function answering(status: number, body: unknown = null) {
     return fetcher;
 }
 
-const JULIUS = {id: "u-1", firstname: "Julius", lastname: "Babies"};
+/** What the server sends, and what the repository makes of it: `email` there, `address` here. */
+const WIRE = {
+    id: "u-1",
+    firstname: "Julius",
+    lastname: "Babies",
+    email: "julius@example.com",
+    addresses: ["julius@example.com", "julius@work.example"],
+};
+const JULIUS = {
+    id: "u-1",
+    firstname: "Julius",
+    lastname: "Babies",
+    address: "julius@example.com",
+    addresses: ["julius@example.com", "julius@work.example"],
+};
 
 test("asks once, no matter how many callers there are", async () => {
-    const fetcher = answering(200, JULIUS);
+    const fetcher = answering(200, WIRE);
     const repository = new CurrentUserRepository();
 
     // Two callers before the first answer is in, one after.
@@ -25,7 +39,7 @@ test("asks once, no matter how many callers there are", async () => {
 });
 
 test("forget sends the next caller back to the server", async () => {
-    const fetcher = answering(200, JULIUS);
+    const fetcher = answering(200, WIRE);
     const repository = new CurrentUserRepository();
 
     await repository.get();
@@ -41,7 +55,7 @@ test("signed out is null, and is not remembered", async () => {
 
     expect(await repository.get()).toBeNull();
 
-    const fetcher = answering(200, JULIUS);
+    const fetcher = answering(200, WIRE);
     expect(await repository.get()).toEqual(JULIUS);
     expect(fetcher).toHaveBeenCalledTimes(1);
 });
@@ -52,7 +66,7 @@ test("a broken answer throws and is not remembered", async () => {
 
     await expect(repository.get()).rejects.toThrow("500");
 
-    const fetcher = answering(200, JULIUS);
+    const fetcher = answering(200, WIRE);
     expect(await repository.get()).toEqual(JULIUS);
     expect(fetcher).toHaveBeenCalledTimes(1);
 });

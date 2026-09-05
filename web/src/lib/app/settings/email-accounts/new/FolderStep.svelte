@@ -1,11 +1,10 @@
 <script lang="ts">
     import * as Table from "$lib/components/ui/table";
-    import * as Select from "$lib/components/ui/select";
     import {Checkbox} from "$lib/components/ui/checkbox";
-    import {Input} from "$lib/components/ui/input";
     import {Spinner} from "$lib/components/ui/spinner/index.ts";
     import SetupStatusLine from "./SetupStatusLine.svelte";
-    import type {AiProcessingMode, FolderRow, NewEmailAccountViewModel} from "./NewEmailAccountViewModel.svelte.ts";
+    import type {FolderRow, NewEmailAccountViewModel} from "./NewEmailAccountViewModel.svelte.ts";
+    import AiProcessingControl from "./AiProcessingControl.svelte";
     import {CaretDownIcon, CaretRightIcon, WarningCircleIcon} from "phosphor-svelte";
     import {locale, _} from "svelte-i18n";
 
@@ -32,20 +31,6 @@
         return row.mailCount.toLocaleString($locale ?? undefined);
     }
 
-    /** The mode as the select holds it -- the value it carries lives in the field next to it. */
-    function changeMode(row: FolderRow, type: string) {
-        const mode: AiProcessingMode =
-            type === "newest"
-                ? {type: "newest", count: row.aiProcessing.type === "newest" ? row.aiProcessing.count : 100}
-                : type === "since"
-                  ? {type: "since", date: row.aiProcessing.type === "since" ? row.aiProcessing.date : today()}
-                  : type === "all"
-                    ? {type: "all"}
-                    : {type: "new_only"};
-        viewModel.setAiProcessing(row.fullName, mode);
-    }
-
-    const today = () => new Date().toISOString().slice(0, 10);
 </script>
 
 <div class="flex flex-col gap-3">
@@ -79,7 +64,7 @@
 
     {#if viewModel.folders.length > 0}
         <div class="max-h-80 overflow-y-auto rounded-2xl border">
-            <Table.Root class="text-sm">
+            <Table.Root class="table-fixed text-sm">
                 <Table.Header>
                     <Table.Row>
                         <Table.Head class="w-10"></Table.Head>
@@ -91,11 +76,11 @@
                             {$_("settings.emailAccounts.new.folders.columns.oldest")}
                         </Table.Head>
                         <!--
-                          Wide enough for the select plus the widest value field, and fixed: the
-                          column would otherwise grow the moment one row switches to a mode that
-                          carries a date, shifting every other row sideways.
+                          Fixed, and only as wide as the control: it carries its own value, so
+                          there is no field beside it to reserve room for. A column that grew when
+                          one row switched to a date would shift every other row sideways.
                         -->
-                        <Table.Head class="w-[21rem]">
+                        <Table.Head class="w-56">
                             {$_("settings.emailAccounts.new.folders.columns.ai")}
                         </Table.Head>
                     </Table.Row>
@@ -142,67 +127,11 @@
                             <Table.Cell class="whitespace-nowrap">{formatOldest(row)}</Table.Cell>
 
                             <Table.Cell>
-                                <div class="flex flex-row items-center gap-2">
-                                    <Select.Root
-                                            type="single"
-                                            value={row.aiProcessing.type}
-                                            onValueChange={(type) => changeMode(row, type)}
-                                            disabled={!row.enabled}
-                                    >
-                                        <Select.Trigger size="sm" class="w-40 shrink-0">
-                                            {$_(`settings.emailAccounts.new.folders.aiMode.${row.aiProcessing.type}`)}
-                                        </Select.Trigger>
-                                        <Select.Content>
-                                            <Select.Item value="new_only">
-                                                {$_("settings.emailAccounts.new.folders.aiMode.new_only")}
-                                            </Select.Item>
-                                            <Select.Item value="newest">
-                                                {$_("settings.emailAccounts.new.folders.aiMode.newest")}
-                                            </Select.Item>
-                                            <Select.Item value="since">
-                                                {$_("settings.emailAccounts.new.folders.aiMode.since")}
-                                            </Select.Item>
-                                            <Select.Item value="all">
-                                                {$_("settings.emailAccounts.new.folders.aiMode.all")}
-                                            </Select.Item>
-                                        </Select.Content>
-                                    </Select.Root>
-
-                                    <!--
-                                      The slot is always here, so a row on "only new mail" is as
-                                      wide as one carrying a date. Only its content changes.
-                                    -->
-                                    <div class="w-36 shrink-0">
-                                    {#if row.aiProcessing.type === "newest"}
-                                        <Input
-                                                type="number"
-                                                min="1"
-                                                class="h-8 w-full"
-                                                disabled={!row.enabled}
-                                                aria-label={$_("settings.emailAccounts.new.folders.aiMode.countLabel")}
-                                                value={row.aiProcessing.count}
-                                                oninput={(event) =>
-                                                    viewModel.setAiProcessing(row.fullName, {
-                                                        type: "newest",
-                                                        count: Number(event.currentTarget.value),
-                                                    })}
-                                        />
-                                    {:else if row.aiProcessing.type === "since"}
-                                        <Input
-                                                type="date"
-                                                class="h-8 w-full"
-                                                disabled={!row.enabled}
-                                                aria-label={$_("settings.emailAccounts.new.folders.aiMode.dateLabel")}
-                                                value={row.aiProcessing.date}
-                                                oninput={(event) =>
-                                                    viewModel.setAiProcessing(row.fullName, {
-                                                        type: "since",
-                                                        date: event.currentTarget.value,
-                                                    })}
-                                        />
-                                    {/if}
-                                    </div>
-                                </div>
+                                <AiProcessingControl
+                                        mode={row.aiProcessing}
+                                        disabled={!row.enabled}
+                                        onChange={(mode) => viewModel.setAiProcessing(row.fullName, mode)}
+                                />
                             </Table.Cell>
                         </Table.Row>
                     {/each}

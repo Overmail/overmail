@@ -195,7 +195,9 @@
             "since": "Alles ab",
             "all": "Alles",
             "countLabel": "Wie viele E-Mails",
-            "dateLabel": "Lesen ab diesem Datum"
+            "dateLabel": "Lesen ab diesem Datum",
+            "triggerNewest": "Neueste {count}",
+            "triggerSince": "Ab {date}"
           }
         }
       }

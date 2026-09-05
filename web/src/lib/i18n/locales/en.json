@@ -195,7 +195,9 @@
             "since": "Everything from",
             "all": "Everything",
             "countLabel": "How many mails",
-            "dateLabel": "Read from this date"
+            "dateLabel": "Read from this date",
+            "triggerNewest": "Newest {count}",
+            "triggerSince": "From {date}"
           }
         }
       }

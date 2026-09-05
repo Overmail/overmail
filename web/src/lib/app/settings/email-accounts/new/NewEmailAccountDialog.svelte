@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type {Component} from "svelte";
     import * as Dialog from "$lib/components/ui/dialog";
     import * as Field from "$lib/components/ui/field";
     import {Button} from "$lib/components/ui/button";
@@ -10,6 +11,7 @@
     import {Spinner} from "$lib/components/ui/spinner/index.ts";
     import {useRepositories} from "$lib/repository/repositories";
     import {CheckCircleIcon, WarningCircleIcon, WarningIcon} from "phosphor-svelte";
+    import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
 
     let {
@@ -49,6 +51,18 @@
     );
 </script>
 
+<!--
+  The icon sits on the first line rather than in the middle of the message: a reason that wraps
+  would otherwise pull it half a line down, out of the row the eye reads it in. `mt-0.5` is what
+  centres a 16px icon on a 20px line.
+-->
+{#snippet status(Icon: Component<{class?: string}>, message: string, tone: string)}
+    <div class={cn("flex flex-row items-start gap-2 text-sm", tone)}>
+        <Icon class="mt-0.5 size-4 shrink-0" />
+        <span>{message}</span>
+    </div>
+{/snippet}
+
 <Dialog.Root bind:open>
     <Dialog.Content>
         <Dialog.Header>
@@ -56,86 +70,57 @@
             <Dialog.Description>{$_("settings.emailAccounts.new.description")}</Dialog.Description>
         </Dialog.Header>
 
-        <div class="flex flex-col flex-1">
-            <form>
-                <Field.Group>
-                    <Field.Set>
-                        <Field.Legend>{$_("settings.emailAccounts.new.provider.legend")}</Field.Legend>
-                        <Field.Description>
-                            {$_("settings.emailAccounts.new.provider.description")}<br />
-                            {$_("settings.emailAccounts.new.provider.tlsHint")}
-                        </Field.Description>
+        <form class="flex flex-col gap-2">
+            <div class="flex flex-row gap-3">
+                <Field.Field>
+                    <Field.Label for={"imap-host-" + id}>
+                        {$_("settings.emailAccounts.new.host")}
+                    </Field.Label>
+                    <Input
+                            id={"imap-host-" + id}
+                            type="text"
+                            placeholder="imap.example.com"
+                            bind:value={
+                                () => viewModel.host,
+                                (host: string) => viewModel.setHost(host)
+                            }
+                    />
+                </Field.Field>
 
-                        <Field.Group class="flex flex-row gap-4">
-                            <Field.Field>
-                                <Field.Label for={"imap-host-" + id}>
-                                    {$_("settings.emailAccounts.new.provider.host")}
-                                </Field.Label>
-                                <Input
-                                        id={"imap-host-" + id}
-                                        type="text"
-                                        placeholder="imap.example.com"
-                                        aria-invalid={test.type === "unreachable"}
-                                        bind:value={
-                                            () => viewModel.host,
-                                            (host: string) => viewModel.setHost(host)
-                                        }
-                                />
-                            </Field.Field>
+                <Field.Field class="w-24">
+                    <Field.Label for={"imap-port-" + id}>
+                        {$_("settings.emailAccounts.new.port")}
+                    </Field.Label>
+                    <Input
+                            id={"imap-port-" + id}
+                            type="number"
+                            placeholder={String(DEFAULT_IMAP_PORT)}
+                            bind:value={
+                                () => viewModel.port,
+                                (port: number) => viewModel.setPort(port)
+                            }
+                    />
+                </Field.Field>
+            </div>
 
-                            <Field.Field class="w-24">
-                                <Field.Label for={"imap-port-" + id}>
-                                    {$_("settings.emailAccounts.new.provider.port")}
-                                </Field.Label>
-                                <Input
-                                        id={"imap-port-" + id}
-                                        type="number"
-                                        placeholder={String(DEFAULT_IMAP_PORT)}
-                                        bind:value={
-                                            () => viewModel.port,
-                                            (port: number) => viewModel.setPort(port)
-                                        }
-                                />
-                            </Field.Field>
-                        </Field.Group>
-                    </Field.Set>
-
-                    <!-- Below both fields, not on one of them: the answer is about the pair. -->
-                    <div aria-live="polite">
-                        {#if test.type === "testing"}
-                            <div class="flex flex-row items-center gap-2">
-                                <Spinner class="h-4 w-4" />
-                                <span class="text-muted-foreground text-sm">
-                                    {$_("settings.emailAccounts.new.test.testing")}
-                                </span>
-                            </div>
-                        {:else if test.type === "reachable" && loginDisabled}
-                            <div class="flex flex-row items-center gap-2">
-                                <WarningIcon class="h-4 w-4 shrink-0" />
-                                <span class="text-sm">{$_("settings.emailAccounts.new.test.loginDisabled")}</span>
-                            </div>
-                        {:else if test.type === "reachable"}
-                            <div class="flex flex-row items-center gap-2">
-                                <CheckCircleIcon class="h-4 w-4 shrink-0" weight="fill" />
-                                <span class="text-sm">{$_("settings.emailAccounts.new.test.reachable")}</span>
-                            </div>
-                        {:else if test.type === "unreachable"}
-                            <div class="flex flex-row items-center gap-2 text-destructive">
-                                <WarningCircleIcon class="h-4 w-4 shrink-0" weight="fill" />
-                                <span class="text-sm">{unreachableReason}</span>
-                            </div>
-                        {:else if test.type === "failed"}
-                            <div class="flex flex-row items-center gap-2">
-                                <WarningIcon class="h-4 w-4 shrink-0" />
-                                <span class="text-muted-foreground text-sm">
-                                    {$_("settings.emailAccounts.new.test.failed")}
-                                </span>
-                            </div>
-                        {/if}
-                    </div>
-                </Field.Group>
-            </form>
-        </div>
+            <!--
+              Under both fields, because the answer is about the pair, and the height of one line is
+              held free so the dialog does not resize under the pointer on every verdict.
+            -->
+            <div aria-live="polite" class="min-h-5">
+                {#if test.type === "testing"}
+                    {@render status(Spinner, $_("settings.emailAccounts.new.test.testing"), "text-muted-foreground")}
+                {:else if loginDisabled}
+                    {@render status(WarningIcon, $_("settings.emailAccounts.new.test.loginDisabled"), "")}
+                {:else if test.type === "reachable"}
+                    {@render status(CheckCircleIcon, $_("settings.emailAccounts.new.test.reachable"), "")}
+                {:else if test.type === "unreachable"}
+                    {@render status(WarningCircleIcon, unreachableReason ?? "", "text-destructive")}
+                {:else if test.type === "failed"}
+                    {@render status(WarningIcon, $_("settings.emailAccounts.new.test.failed"), "text-muted-foreground")}
+                {/if}
+            </div>
+        </form>
 
         <Dialog.Footer>
             <Button

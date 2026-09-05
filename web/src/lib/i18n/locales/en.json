@@ -133,27 +133,22 @@
       "add": "Add a new inbox",
       "new": {
         "title": "New inbox",
-        "description": "Connect your email provider to load mail into Overmail.",
+        "description": "Connect your email provider. They have the imap details.",
         "cancel": "Cancel",
-        "provider": {
-          "legend": "Email provider",
-          "description": "The imap connection details. Your provider has them.",
-          "tlsHint": "Note: Overmail needs a TLS connection.",
-          "host": "IMAP server",
-          "port": "Port"
-        },
+        "host": "IMAP server",
+        "port": "Port",
         "test": {
-          "testing": "Connecting to the imap server…",
-          "reachable": "The imap server answered.",
-          "loginDisabled": "The server answered, but it does not allow signing in with a username and password.",
-          "failed": "The check could not be run. Check your own connection.",
+          "testing": "Connecting…",
+          "reachable": "Server reachable",
+          "loginDisabled": "Reachable, but no password sign-in",
+          "failed": "Could not run the check",
           "outcome": {
-            "host_not_found": "There is no server under this address.",
-            "connection_failed": "Nothing answers on this port.",
-            "tls_failed": "This port does not speak TLS. Imap over TLS is usually port 993.",
-            "no_imap_server": "Something answers here, but it is not an imap server.",
-            "timeout": "The server did not answer in time.",
-            "unknown": "No connection to this server."
+            "host_not_found": "No server under this address",
+            "connection_failed": "Nothing answers on this port",
+            "tls_failed": "No TLS on this port — usually 993",
+            "no_imap_server": "Not an imap server",
+            "timeout": "No answer from the server",
+            "unknown": "No connection"
           }
         }
       }

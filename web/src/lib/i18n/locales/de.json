@@ -133,27 +133,22 @@
       "add": "Neues Postfach hinzufügen",
       "new": {
         "title": "Neues Postfach",
-        "description": "Verbinde deinen E-Mail-Anbieter, um E-Mails in Overmail zu laden.",
+        "description": "Verbinde deinen E-Mail-Anbieter. Die IMAP-Daten bekommst du dort.",
         "cancel": "Abbrechen",
-        "provider": {
-          "legend": "E-Mail-Anbieter",
-          "description": "Informationen zur IMAP-Verbindung. Diese bekommst du bei deinem Anbieter.",
-          "tlsHint": "Hinweis: Overmail benötigt eine TLS-Verbindung.",
-          "host": "IMAP-Server",
-          "port": "Port"
-        },
+        "host": "IMAP-Server",
+        "port": "Port",
         "test": {
-          "testing": "Verbinde mit IMAP-Server…",
-          "reachable": "Der IMAP-Server hat geantwortet.",
-          "loginDisabled": "Der Server hat geantwortet, erlaubt aber keine Anmeldung mit Benutzername und Passwort.",
-          "failed": "Die Prüfung konnte nicht ausgeführt werden. Prüfe deine eigene Verbindung.",
+          "testing": "Verbinde…",
+          "reachable": "Server erreichbar",
+          "loginDisabled": "Erreichbar, aber ohne Passwort-Anmeldung",
+          "failed": "Prüfung nicht möglich",
           "outcome": {
-            "host_not_found": "Unter dieser Adresse gibt es keinen Server.",
-            "connection_failed": "Auf diesem Port antwortet nichts.",
-            "tls_failed": "Dieser Port spricht kein TLS. IMAP über TLS läuft meist auf Port 993.",
-            "no_imap_server": "Hier antwortet etwas, aber kein IMAP-Server.",
-            "timeout": "Der Server hat nicht rechtzeitig geantwortet.",
-            "unknown": "Keine Verbindung zu diesem Server."
+            "host_not_found": "Diesen Server gibt es nicht",
+            "connection_failed": "Auf diesem Port antwortet nichts",
+            "tls_failed": "Kein TLS auf diesem Port – meist ist es 993",
+            "no_imap_server": "Hier antwortet kein IMAP-Server",
+            "timeout": "Keine Antwort vom Server",
+            "unknown": "Keine Verbindung"
           }
         }
       }

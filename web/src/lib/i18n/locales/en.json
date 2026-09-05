@@ -128,6 +128,37 @@
     "search": "Search labels",
     "add": "Add a label"
   },
+  "settings": {
+    "emailAccounts": {
+      "add": "Add a new inbox",
+      "new": {
+        "title": "New inbox",
+        "description": "Connect your email provider to load mail into Overmail.",
+        "cancel": "Cancel",
+        "provider": {
+          "legend": "Email provider",
+          "description": "The imap connection details. Your provider has them.",
+          "tlsHint": "Note: Overmail needs a TLS connection.",
+          "host": "IMAP server",
+          "port": "Port"
+        },
+        "test": {
+          "testing": "Connecting to the imap server…",
+          "reachable": "The imap server answered.",
+          "loginDisabled": "The server answered, but it does not allow signing in with a username and password.",
+          "failed": "The check could not be run. Check your own connection.",
+          "outcome": {
+            "host_not_found": "There is no server under this address.",
+            "connection_failed": "Nothing answers on this port.",
+            "tls_failed": "This port does not speak TLS. Imap over TLS is usually port 993.",
+            "no_imap_server": "Something answers here, but it is not an imap server.",
+            "timeout": "The server did not answer in time.",
+            "unknown": "No connection to this server."
+          }
+        }
+      }
+    }
+  },
   "ai": {
     "title": "Overmail AI",
     "chat": {

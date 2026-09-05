@@ -4,8 +4,8 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {Button} from "$lib/components/ui/button";
     import {EnvelopeSimpleIcon} from "phosphor-svelte";
+    import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
 
@@ -84,10 +84,10 @@
                         </Breadcrumb.Root>
                     </div>
                 </header>
-                <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-                    {#each Array.from({ length: 10 }) as _, i (i)}
-                        <div class="aspect-video max-w-3xl rounded-xl bg-muted/50"></div>
-                    {/each}
+                <div class="flex flex-1 flex-col gap-4 overflow-y-auto py-5 px-4">
+                    {#if currentNavItem.key === "email-accounts"}
+                        <EmailAccountsSettings />
+                    {/if}
                 </div>
             </main>
         </Sidebar.Provider>

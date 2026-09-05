@@ -57,6 +57,9 @@ export class NewEmailAccountViewModel {
     /** Called when the dialog closes, so a pending test does not outlive it. */
     dispose() {
         this.#cancelPendingTest();
+        // A verdict already reached still holds and is kept, but a test that was cut off never
+        // reached one -- left as `testing` it would greet the next opening with a stuck spinner.
+        if (this.imapServerTest.type === "testing") this.imapServerTest = {type: "idle"};
     }
 
     #cancelPendingTest() {

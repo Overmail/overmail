@@ -84,6 +84,25 @@ test("a request that does not happen is not a verdict about the host", async () 
     expect(viewModel.imapServerTest).toEqual({type: "failed"});
 });
 
+test("closing the dialog mid-test leaves no spinner behind for the next one", async () => {
+    const {repository} = testing(async () => {
+        await tick(200);
+        return REACHABLE;
+    });
+    const viewModel = new NewEmailAccountViewModel(repository);
+
+    viewModel.setHost("imap.example.com");
+    await tick(600);
+    expect(viewModel.imapServerTest).toEqual({type: "testing"});
+
+    viewModel.dispose();
+    expect(viewModel.imapServerTest).toEqual({type: "idle"});
+
+    // And the answer that was already on its way does not arrive late either.
+    await tick(400);
+    expect(viewModel.imapServerTest).toEqual({type: "idle"});
+});
+
 test("closing the dialog cancels a test that was scheduled", async () => {
     const {repository, probe} = testing(async () => REACHABLE);
     const viewModel = new NewEmailAccountViewModel(repository);

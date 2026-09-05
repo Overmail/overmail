@@ -1,0 +1,306 @@
+name: Deploy
+
+# run-name only has the github, inputs and vars contexts, so it cannot use the
+# build tag from the setup job. It names the trigger and the thing being shipped,
+# which is what tells two runs apart in the Actions list.
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && (inputs.draft
+          && format('Rehearsal (draft) · {0} · @{1}', github.ref_name, github.actor)
+          || format('Manual release · {0} · @{1}', github.ref_name, github.actor))
+      || format('Release · {0}', github.event.head_commit.message) }}
+
+on:
+  push:
+    branches:
+      - main
+  # Manual runs exist to rehearse a release without publishing anything:
+  # they can produce a draft and never push the Docker image.
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the release as a draft
+        type: boolean
+        default: true
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      build_tag: ${{ steps.vars.outputs.build_tag }}
+      build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
+      date_formatted: ${{ steps.vars.outputs.date_formatted }}
+      build_app: ${{ steps.scope.outputs.app }}
+      build_server: ${{ steps.scope.outputs.server }}
+    steps:
+      - name: Generate vars
+        id: vars
+        run: |
+          TIMESTAMP=$(date +%s)
+          TAG=$(date -d @$TIMESTAMP '+%Y%m%d_%H%M')
+          DATE_FORMATTED=$(date -d @$TIMESTAMP '+%d.%m.%Y %H:%M')
+          echo "build_timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "build_tag=$TAG" >> $GITHUB_OUTPUT
+          echo "date_formatted=$DATE_FORMATTED" >> $GITHUB_OUTPUT
+
+      # A push to main is a merged pull request, and that pull request declares
+      # which parts of the system it touches through its project:* labels. The
+      # release only builds what the change actually needs.
+      # Manual runs and pushes without a pull request carry no labels, so they
+      # fall back to building everything rather than silently shipping nothing.
+      - name: Determine affected projects
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ALL=$'project:app\nproject:server\nproject:webapp'
+          if [ "${{ github.event_name }}" = 'workflow_dispatch' ]; then
+            echo "Manual run: building every project."
+            LABELS="$ALL"
+          else
+            LABELS=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+              --jq '[.[].labels[].name] | unique | .[]')
+            if [ -z "$LABELS" ]; then
+              echo "::notice::No pull request labels found for ${{ github.sha }}, building every project."
+              LABELS="$ALL"
+            fi
+          fi
+          printf 'Labels:\n%s\n' "$LABELS"
+
+          has() { printf '%s\n' "$LABELS" | grep -qxF "$1"; }
+
+          APP=false
+          SERVER=false
+          has 'project:app' && APP=true
+          # The image carries the Ktor server and the SvelteKit app, so either one rebuilds it.
+          { has 'project:server' || has 'project:webapp'; } && SERVER=true
+
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          echo "server=$SERVER" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Build scope"
+            echo "- App: \`$APP\`"
+            echo "- Server: \`$SERVER\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-server:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    if: needs.setup.outputs.build_server == 'true'
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          # :server compiles against the JDK 26 toolchain, see server/build.gradle.kts.
+          java-version: '26'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build with Gradle
+        run: ./gradlew :server:buildFatJar
+
+      # The jar the Dockerfile expects at the context root; the name comes from ktor.fatJar.
+      - name: Move artifact
+        run: mv server/build/libs/server-all.jar server-all.jar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: server-all.jar
+          name: server_build.jar
+          if-no-files-found: error
+          retention-days: 4
+
+  build-web:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    if: needs.setup.outputs.build_server == 'true'
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web
+        run: bun run build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: web/build
+          name: web_build
+          if-no-files-found: error
+          retention-days: 4
+
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: [setup, build-server, build-web]
+    if: needs.setup.outputs.build_server == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+
+      - name: Download server artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: server_build.jar
+          path: ./
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: web_build
+          path: web_build/
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          # A draft run still builds the image to prove it builds, but does not
+          # overwrite :latest. On a push to main there is no input, so this is true.
+          push: ${{ !inputs.draft }}
+          tags: ghcr.io/overmail/overmail:latest
+
+  build-android:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    if: needs.setup.outputs.build_app == 'true'
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+
+      - uses: ./.github/actions/setup-android-project
+        name: Setup Project
+        with:
+          keystore_file: ${{ secrets.KEYSTORE_FILE }}
+          keystore_password: ${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Build Android APK
+        env:
+          BUILD_TIMESTAMP: ${{ needs.setup.outputs.build_timestamp }}
+          BUILD_TAG: ${{ needs.setup.outputs.build_tag }}
+        run: ./gradlew :app:android:assembleRelease
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apks
+          path: app/android/build/outputs/apk/release/
+          compression-level: 0
+          if-no-files-found: error
+
+  create_release:
+    runs-on: ubuntu-latest
+    needs: [setup, build-docker, build-android]
+    # A release is the app's delivery vehicle: it carries the APKs and the
+    # changelog the app reads, so a server-only change produces none. Its
+    # changelog entries are not lost — the changelog is generated from the
+    # commits since the last release, so they land in the next app release.
+    # A skipped docker build is fine here, a failed one is not.
+    if: >-
+      !cancelled()
+      && needs.build-android.result == 'success'
+      && needs.build-docker.result != 'failure'
+    permissions:
+      packages: write
+      contents: write
+      issues: read
+    env:
+      KOTLIN_VERSION: '2.4.10'
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+        with:
+          # The changelog is built from the commits since the last release,
+          # which needs the history and the tags, not just the tip.
+          fetch-depth: 0
+
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # The runner image ships no kotlinc, so pin the compiler instead of
+      # depending on a third party action.
+      - name: Cache Kotlin compiler
+        uses: actions/cache@v4
+        with:
+          path: ~/.kotlin-compiler
+          key: kotlin-compiler-${{ env.KOTLIN_VERSION }}
+
+      - name: Set up Kotlin
+        run: |
+          if [ ! -x "$HOME/.kotlin-compiler/kotlinc/bin/kotlin" ]; then
+            curl -sSLf -o /tmp/kotlin-compiler.zip \
+              "https://github.com/JetBrains/kotlin/releases/download/v$KOTLIN_VERSION/kotlin-compiler-$KOTLIN_VERSION.zip"
+            mkdir -p "$HOME/.kotlin-compiler"
+            unzip -q /tmp/kotlin-compiler.zip -d "$HOME/.kotlin-compiler"
+          fi
+          echo "$HOME/.kotlin-compiler/kotlinc/bin" >> "$GITHUB_PATH"
+
+      - name: Cache changelog script dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: changelog-script-${{ hashFiles('.github/generate_changelog.main.kts') }}
+          restore-keys: changelog-script-
+
+      - name: Generate changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NAME: v${{ needs.setup.outputs.build_tag }}
+        run: kotlin .github/generate_changelog.main.kts
+
+      - name: Download Android APK artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: android-apks
+          path: apks/
+
+      - name: Rename APK artifacts for release
+        run: |
+          for apk in apks/*.apk; do
+            base=$(basename "$apk")
+            mv "$apk" "apks/Overmail ${{ needs.setup.outputs.build_tag }} ${base}"
+          done
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apks/Overmail*
+            build/changelog/changelog*.json
+          body_path: build/changelog/CHANGELOG.md
+          draft: ${{ inputs.draft || false }}
+          prerelease: false
+          make_latest: ${{ !inputs.draft }}
+          name: Overmail (${{ needs.setup.outputs.date_formatted }})
+          fail_on_unmatched_files: true
+          tag_name: v${{ needs.setup.outputs.build_tag }}

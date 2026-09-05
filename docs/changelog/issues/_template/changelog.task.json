@@ -1,0 +1,8 @@
+{
+  "description": "INTERNATIONAL ONE LINE DESCRIPTION, OPTIONAL FOR TASKS",
+  "localized": {
+    "de": {
+      "description": "DEUTSCHE EINZEILIGE BESCHREIBUNG, BEI TASKS OPTIONAL"
+    }
+  }
+}

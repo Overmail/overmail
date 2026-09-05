@@ -1,0 +1,7 @@
+# The image's own reverse proxy: the three processes share one port, and the split between Ktor
+# and SvelteKit is the same as the one deploy/Caddyfile makes locally.
+:80 {
+    log
+    reverse_proxy /api* localhost:30137
+    reverse_proxy * localhost:3000
+}

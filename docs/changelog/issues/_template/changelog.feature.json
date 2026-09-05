@@ -1,0 +1,10 @@
+{
+  "title": "INTERNATIONAL TITLE",
+  "description": "INTERNATIONAL DESCRIPTION",
+  "localized": {
+    "de": {
+      "title": "DEUTSCHER TITEL",
+      "description": "DEUTSCHE BESCHREIBUNG"
+    }
+  }
+}

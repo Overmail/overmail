@@ -1,8 +1,9 @@
 # AGENTS.md
 
-Kotlin/JVM mail server. Gradle multi-project, currently one module: `server`.
-Exposed 1.4 DAO on JDBC/Postgres; every query runs in a suspending transaction on
-`Dispatchers.IO`.
+Kotlin/JVM mail server with a SvelteKit web app and a Compose Multiplatform app.
+Gradle multi-project: `server`, `app:shared`, `app:android`; the web app is bun/vite
+in `web/` and outside Gradle. Exposed 1.4 DAO on JDBC/Postgres; every query runs in
+a suspending transaction on `Dispatchers.IO`.
 
 ## Layout
 
@@ -15,7 +16,65 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   http/                Ktor engine, config and routes
   http/api/            what every route needs: the current user, url resources, errors
   jobs/                background work (IMAP import)
+
+app/
+  shared/              Compose Multiplatform: everything the app is, Android + iOS
+  android/             the Android application: MainApplication, MainActivity, manifest, icons
+  ios/                 the Xcode project; it builds the ComposeApp framework from :app:shared
 ```
+
+## App
+
+`app:shared` holds the app itself and is the only place features are written; the two platform
+modules are entry points and nothing else.
+
+- **DI is Koin**, started from the platform entry point (`MainApplication` on Android,
+  `MainViewController` on iOS) so it can pass in what only that platform knows. `di/koin.kt`
+  declares everything shared; `platformModule()` is for dependencies whose interface *and*
+  implementation are platform-specific.
+- **Navigation is Navigation3**: the back stack is a `SnapshotStateList<Screen>` in `App.kt`,
+  pushing navigates and popping goes back. `Screen` is a serializable sealed class.
+- **Platform glue** is `expect`/`actual` on top-level functions in `App.kt` (`openUrl`,
+  `shareUrl`, `getClipboardText`, `dynamicTheme`) rather than an interface per platform.
+- **Build-time values come from BuildKonfig** (`app/shared/build.gradle.kts`): `SERVER_URL`,
+  the werkbank token and `CURRENT_VERSION`. The version is defined once in the root build script
+  and shared with `versionCode`/`versionName` in `:app:android`.
+- `local.properties` holds everything machine-specific: `sdk.dir`, `werkbank.access_token`,
+  `app.server_url` and the `signing.default.*` keystore entries. Gitignored, never commit it.
+- The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
+  jlink newer than the compile SDK, and `:server` needs JDK 26.
+
+## Release pipeline
+
+A merge to `main` runs [deploy.yaml](.github/workflows/deploy.yaml), which builds only what the
+merged pull request's `project:*` labels say it touches:
+
+| Label                               | Effect on a merge to `main`                  |
+|-------------------------------------|----------------------------------------------|
+| `project:app`                       | builds the APKs and publishes a GitHub release |
+| `project:server` / `project:webapp` | builds and pushes `ghcr.io/overmail/overmail:latest` |
+| none                                | builds everything, with a notice               |
+
+Labelling the issue or the pull request is enough:
+[sync-labels.yaml](.github/workflows/sync-labels.yaml) copies every `project:*` label between the
+two in both directions.
+
+The image runs all three processes behind one port — the Ktor jar, the SvelteKit server and a
+Caddy with the same `/api*` split as locally, see `deploy/production/`. It reads `/data/config.json`,
+which is why `OVERMAIL_STORAGE_DIRECTORY` exists (`config/StorageDirectory.kt`).
+
+### Changelog
+
+Every feature branch needs a changelog entry for the issue it closes, in
+`docs/changelog/issues/<issue ID>/changelog.<type>.json` — copy the matching file from
+`docs/changelog/issues/_template/`. `<type>` is the GitHub issue type: `feature` (needs `title`
+and `description`), `bug` or `task` (`description` only, no `title`). Texts are English at the
+top level, German under `localized.de`.
+
+`.github/check_changelog.main.kts` checks this on every pull request;
+`.github/generate_changelog.main.kts` renders the release body from the entries of every issue
+referenced by the commits since the last release. **Only issues labelled `project:app` make it
+into the changelog** — a release ships the app, and the app is what reads the changelog.
 
 ## Configuration
 
@@ -201,6 +260,14 @@ importer, because `EmailUser.new` would throw on the unique index instead.
 ./gradlew :server:runServer     # creates the schema, talks to the shared dev DB
 curl localhost:8080/api/health
 curl localhost:8080/api/swagger/documentation.json
+```
+
+For the app:
+
+```
+./gradlew :app:android:assembleDebug              # Android
+./gradlew :app:shared:compileKotlinIosSimulatorArm64   # iOS, without Xcode
+./gradlew :server:buildFatJar                     # what the Docker image runs
 ```
 
 To exercise only the HTTP layer, run a throwaway main that starts `embeddedServer(Netty, ...) {

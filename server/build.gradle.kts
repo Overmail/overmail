@@ -4,7 +4,16 @@ plugins {
     alias(libs.plugins.ktor)
 }
 
+application {
+    mainClass.set("es.jvbabi.overmail.server.MainKt")
+}
+
 ktor {
+    // `buildFatJar` assembles this, which is what the Docker image runs -- see Dockerfile.
+    fatJar {
+        archiveFileName.set("server-all.jar")
+    }
+
     // Compiler plugin: feeds route metadata (types, KDoc) into the runtime, which is what lets
     // the spec be assembled from the routing tree instead of a hand-written openapi file.
     openApi {

@@ -1,0 +1,9 @@
+<!--
+  Compose draws the whole app, so this only decides what the window looks like before the first
+  frame. Matching the color scheme's background (ui/theme/Color.kt) keeps the launch from flashing.
+-->
+<resources>
+    <style name="Theme.Overmail" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

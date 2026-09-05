@@ -1,0 +1,8 @@
+{
+  "description": "INTERNATIONAL ONE LINE DESCRIPTION",
+  "localized": {
+    "de": {
+      "description": "DEUTSCHE EINZEILIGE BESCHREIBUNG"
+    }
+  }
+}

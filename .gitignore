@@ -3,6 +3,12 @@ build/
 
 ### Runtime state and secrets
 /data/
+### Docker build context, assembled by the deploy workflow
+/web_build/
+/server-all.jar
+local.properties
+*.jks
+*.keystore
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -44,6 +50,12 @@ bin/
 
 ### VS Code ###
 .vscode/
+
+### Xcode ###
+xcuserdata/
+*.xcuserdatad/
+DerivedData/
+*.xcworkspace/xcshareddata/
 
 ### Mac OS ###
 .DS_Store

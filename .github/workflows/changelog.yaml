@@ -1,0 +1,59 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened, edited ]
+
+jobs:
+  check_changelog:
+    name: Check changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # write, because the report is posted as a self-updating pull request comment.
+      pull-requests: write
+      issues: read
+    env:
+      KOTLIN_VERSION: '2.4.10'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # The runner image ships no kotlinc, so pin the compiler instead of
+      # depending on a third party action.
+      - name: Cache Kotlin compiler
+        uses: actions/cache@v4
+        with:
+          path: ~/.kotlin-compiler
+          key: kotlin-compiler-${{ env.KOTLIN_VERSION }}
+
+      - name: Set up Kotlin
+        run: |
+          if [ ! -x "$HOME/.kotlin-compiler/kotlinc/bin/kotlin" ]; then
+            curl -sSLf -o /tmp/kotlin-compiler.zip \
+              "https://github.com/JetBrains/kotlin/releases/download/v$KOTLIN_VERSION/kotlin-compiler-$KOTLIN_VERSION.zip"
+            mkdir -p "$HOME/.kotlin-compiler"
+            unzip -q /tmp/kotlin-compiler.zip -d "$HOME/.kotlin-compiler"
+          fi
+          echo "$HOME/.kotlin-compiler/kotlinc/bin" >> "$GITHUB_PATH"
+
+      # @file:DependsOn resolves through Maven on every run otherwise.
+      - name: Cache script dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: changelog-script-${{ hashFiles('.github/check_changelog.main.kts') }}
+          restore-keys: changelog-script-
+
+      - name: Check changelog for the linked issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: kotlin .github/check_changelog.main.kts

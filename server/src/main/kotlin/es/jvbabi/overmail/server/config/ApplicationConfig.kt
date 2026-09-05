@@ -6,7 +6,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
-private const val DEFAULT_STORAGE_DIRECTORY = "./data"
 private const val CONFIG_FILE_NAME = "config.json"
 
 /**
@@ -26,7 +25,7 @@ data class ApplicationConfig(
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun load(storageDirectory: String = DEFAULT_STORAGE_DIRECTORY): ApplicationConfig {
+        fun load(storageDirectory: String = defaultStorageDirectory): ApplicationConfig {
             val file = File(storageDirectory).resolve(CONFIG_FILE_NAME)
             require(file.isFile) { "Missing config file at ${file.absolutePath}" }
 

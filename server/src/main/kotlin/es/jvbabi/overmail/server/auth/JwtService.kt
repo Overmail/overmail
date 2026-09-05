@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import es.jvbabi.overmail.server.config.defaultStorageDirectory
 import java.io.File
 import java.security.SecureRandom
 import java.util.Date
@@ -22,7 +23,7 @@ private const val SECRET_FILE_NAME = "jwt-secret.key"
  * configured: it is machine state, not something anyone should have to invent by hand. Deleting
  * the file signs everybody out, which is the whole recovery procedure.
  */
-class JwtService(storageDirectory: String = "./data") {
+class JwtService(storageDirectory: String = defaultStorageDirectory) {
 
     private val algorithm = Algorithm.HMAC256(loadOrCreateSecret(storageDirectory))
 

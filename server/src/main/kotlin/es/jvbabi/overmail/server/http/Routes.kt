@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
@@ -140,6 +141,18 @@ internal fun Application.configureRouting() {
             route("/users") {
                 route("/me") {
                     getCurrentUser()
+
+                    route("/inboxes") {
+                        route("/create") {
+                            // What the "new inbox" dialog checks a half-filled form against, before
+                            // there is an inbox to create.
+                            route("/test") {
+                                route("/imap-host") {
+                                    testImapHost()
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

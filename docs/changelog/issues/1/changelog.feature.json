@@ -1,0 +1,10 @@
+{
+  "title": "Add icons",
+  "description": "Adds the Overmail icon to the app",
+  "localized": {
+    "de": {
+      "title": "Icons hinzufügen",
+      "description": "Fügt der App das Overmail-Icon hinzu"
+    }
+  }
+}

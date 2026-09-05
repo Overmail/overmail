@@ -88,7 +88,12 @@
                         <Table.Head class="w-28">
                             {$_("settings.emailAccounts.new.folders.columns.oldest")}
                         </Table.Head>
-                        <Table.Head class="w-64">
+                        <!--
+                          Wide enough for the select plus the widest value field, and fixed: the
+                          column would otherwise grow the moment one row switches to a mode that
+                          carries a date, shifting every other row sideways.
+                        -->
+                        <Table.Head class="w-[21rem]">
                             {$_("settings.emailAccounts.new.folders.columns.ai")}
                         </Table.Head>
                     </Table.Row>
@@ -142,7 +147,7 @@
                                             onValueChange={(type) => changeMode(row, type)}
                                             disabled={!row.enabled}
                                     >
-                                        <Select.Trigger size="sm" class="w-40">
+                                        <Select.Trigger size="sm" class="w-40 shrink-0">
                                             {$_(`settings.emailAccounts.new.folders.aiMode.${row.aiProcessing.type}`)}
                                         </Select.Trigger>
                                         <Select.Content>
@@ -158,12 +163,16 @@
                                         </Select.Content>
                                     </Select.Root>
 
-                                    <!-- Only the two modes that carry a value show a field for it. -->
+                                    <!--
+                                      The slot is always here, so a row on "only new mail" is as
+                                      wide as one carrying a date. Only its content changes.
+                                    -->
+                                    <div class="w-36 shrink-0">
                                     {#if row.aiProcessing.type === "newest"}
                                         <Input
                                                 type="number"
                                                 min="1"
-                                                class="h-8 w-20"
+                                                class="h-8 w-full"
                                                 disabled={!row.enabled}
                                                 aria-label={$_("settings.emailAccounts.new.folders.aiMode.countLabel")}
                                                 value={row.aiProcessing.count}
@@ -176,7 +185,7 @@
                                     {:else if row.aiProcessing.type === "since"}
                                         <Input
                                                 type="date"
-                                                class="h-8 w-36"
+                                                class="h-8 w-full"
                                                 disabled={!row.enabled}
                                                 aria-label={$_("settings.emailAccounts.new.folders.aiMode.dateLabel")}
                                                 value={row.aiProcessing.date}
@@ -187,6 +196,7 @@
                                                     })}
                                         />
                                     {/if}
+                                    </div>
                                 </div>
                             </Table.Cell>
                         </Table.Row>

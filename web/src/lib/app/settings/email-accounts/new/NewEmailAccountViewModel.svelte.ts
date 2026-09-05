@@ -124,6 +124,10 @@ export class NewEmailAccountViewModel {
     #loginRunning: AbortController | null = null;
     #scanRunning: AbortController | null = null;
 
+    /** What the debounce above is waiting to run, kept so [submit] can run it straight away. */
+    #hostPending: (() => void) | null = null;
+    #loginPending: (() => void) | null = null;
+
     constructor(private readonly inboxSetup: InboxSetupRepository) {}
 
     /** The host answered, so the credentials step has something to log in to. */
@@ -188,6 +192,51 @@ export class NewEmailAccountViewModel {
         if (next) this.goTo(next);
     }
 
+    /**
+     * What the Enter key does: whatever the primary button would.
+     *
+     * And when that button is not ready yet, the thing that makes it ready sooner -- a check
+     * still sitting out its debounce runs now. Enter right after typing a host would otherwise do
+     * nothing at all for half a second, which reads as a key that only sometimes works. It never
+     * navigates on its own once the answer arrives: that would move the form under a user who has
+     * already started typing somewhere else.
+     */
+    submit() {
+        const next = SETUP_STEPS[SETUP_STEPS.indexOf(this.step) + 1];
+        if (!next) return;
+
+        if (this.canEnter(next)) {
+            this.goTo(next);
+            return;
+        }
+
+        if (this.step === "server") this.#fireHostTestNow();
+        else this.#fireLoginTestNow();
+    }
+
+    /**
+     * Runs the scheduled host check now, if one is waiting.
+     *
+     * Per check rather than "whatever the current step is waiting on": the two debounces run
+     * independently of where the form is standing -- a login check is scheduled the moment both
+     * credential fields are filled, which can happen while the server step is still showing.
+     */
+    #fireHostTestNow() {
+        const pending = this.#hostPending;
+        if (this.#hostDebounce !== null) clearTimeout(this.#hostDebounce);
+        this.#hostDebounce = null;
+        this.#hostPending = null;
+        pending?.();
+    }
+
+    #fireLoginTestNow() {
+        const pending = this.#loginPending;
+        if (this.#loginDebounce !== null) clearTimeout(this.#loginDebounce);
+        this.#loginDebounce = null;
+        this.#loginPending = null;
+        pending?.();
+    }
+
     toggleFolder(fullName: string) {
         const folder = this.folders.find((row) => row.fullName === fullName);
         if (folder) folder.enabled = !folder.enabled;
@@ -234,6 +283,7 @@ export class NewEmailAccountViewModel {
     #cancelHostTest() {
         if (this.#hostDebounce !== null) clearTimeout(this.#hostDebounce);
         this.#hostDebounce = null;
+        this.#hostPending = null;
         this.#hostRunning?.abort();
         this.#hostRunning = null;
     }
@@ -241,6 +291,7 @@ export class NewEmailAccountViewModel {
     #cancelLoginTest() {
         if (this.#loginDebounce !== null) clearTimeout(this.#loginDebounce);
         this.#loginDebounce = null;
+        this.#loginPending = null;
         this.#loginRunning?.abort();
         this.#loginRunning = null;
     }
@@ -256,11 +307,11 @@ export class NewEmailAccountViewModel {
             return;
         }
 
-        this.#hostDebounce = setTimeout(() => void this.#testImapServer(host, port), HOST_DEBOUNCE_MS);
+        this.#hostPending = () => void this.#testImapServer(host, port);
+        this.#hostDebounce = setTimeout(() => this.#fireHostTestNow(), HOST_DEBOUNCE_MS);
     }
 
     async #testImapServer(host: string, port: number) {
-        this.#hostDebounce = null;
         const running = new AbortController();
         this.#hostRunning = running;
         this.imapServerTest = {type: "testing"};
@@ -290,14 +341,11 @@ export class NewEmailAccountViewModel {
             return;
         }
 
-        this.#loginDebounce = setTimeout(
-            () => void this.#testImapLogin(this.host.trim(), this.port, username, password),
-            LOGIN_DEBOUNCE_MS,
-        );
+        this.#loginPending = () => void this.#testImapLogin(this.host.trim(), this.port, username, password);
+        this.#loginDebounce = setTimeout(() => this.#fireLoginTestNow(), LOGIN_DEBOUNCE_MS);
     }
 
     async #testImapLogin(host: string, port: number, username: string, password: string) {
-        this.#loginDebounce = null;
         const running = new AbortController();
         this.#loginRunning = running;
         this.imapLoginTest = {type: "testing"};

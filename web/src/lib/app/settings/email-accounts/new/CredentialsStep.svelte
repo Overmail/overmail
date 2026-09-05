@@ -20,7 +20,14 @@
     );
 </script>
 
-<div class="flex flex-col gap-2">
+<!-- A form, so Enter in any field means "go on" -- the same thing the footer button does. -->
+<form
+        class="flex flex-col gap-2"
+        onsubmit={(event) => {
+            event.preventDefault();
+            viewModel.submit();
+        }}
+>
     <div class="flex flex-col gap-3">
         <Field.Field>
             <Field.Label for={"imap-username-" + id}>
@@ -30,7 +37,7 @@
                     id={"imap-username-" + id}
                     type="text"
                     autocomplete="username"
-                    placeholder="julius@example.com"
+                    placeholder="josh.smith@example.com"
                     bind:value={() => viewModel.username, (username: string) => viewModel.setUsername(username)}
             />
         </Field.Field>
@@ -70,4 +77,11 @@
             />
         {/if}
     </div>
-</div>
+
+    <!--
+      What makes Enter submit at all: a form only does so implicitly when it owns a submit button,
+      and the visible one lives in the dialog footer, disabled for exactly as long as the step has
+      not checked out -- which is when Enter still has something to do, see `submit`.
+    -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
+</form>

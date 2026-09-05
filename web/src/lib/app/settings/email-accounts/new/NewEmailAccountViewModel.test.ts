@@ -339,3 +339,76 @@ test("the scan runs once on arriving at the step, not on every visit", async () 
     await tick(50);
     expect(streamFolders).toHaveBeenCalledTimes(1);
 });
+
+test("enter goes on when the step has checked out", async () => {
+    const {repository} = walkingThrough();
+    const viewModel = new NewEmailAccountViewModel(repository);
+
+    viewModel.setHost("imap.example.com");
+    await tick(600);
+
+    viewModel.submit();
+    expect(viewModel.step).toBe("credentials");
+});
+
+test("enter runs a check that is still sitting out its debounce", async () => {
+    const {repository} = walkingThrough();
+    const hostProbe = (repository as any).testImapHost;
+    const viewModel = new NewEmailAccountViewModel(repository);
+
+    viewModel.setHost("imap.example.com");
+    // Well inside the 500ms debounce: nothing has been asked yet.
+    await tick(50);
+    expect(hostProbe).toHaveBeenCalledTimes(0);
+
+    viewModel.submit();
+    await tick(50);
+
+    // Enter is the user saying they are done typing, so the answer comes now, not at 500ms.
+    expect(hostProbe).toHaveBeenCalledTimes(1);
+    expect(viewModel.imapServerTest).toEqual({type: "reachable", capabilities: ["IMAP4rev1"]});
+    // And it did not navigate on its own once the answer landed.
+    expect(viewModel.step).toBe("server");
+});
+
+test("enter on a step that did not check out does not go on", async () => {
+    const {repository} = walkingThrough({
+        login: async () => ({authenticated: false, outcome: "invalid_credentials"}),
+    });
+    const viewModel = new NewEmailAccountViewModel(repository);
+
+    viewModel.setHost("imap.example.com");
+    await tick(600);
+    viewModel.goToNextStep();
+    viewModel.setUsername("julius");
+    viewModel.setPassword("wrong");
+    await tick(1100);
+
+    viewModel.submit();
+    expect(viewModel.step).toBe("credentials");
+});
+
+test("enter on the last step does nothing", async () => {
+    const {repository} = walkingThrough({
+        folders: async function* () {
+            yield TREE;
+            yield {type: "done"};
+        },
+    });
+
+    const viewModel = await atFolderStep(repository);
+    viewModel.submit();
+
+    expect(viewModel.step).toBe("folders");
+});
+
+test("the debounce still fires on its own when enter is not pressed", async () => {
+    const {repository} = walkingThrough();
+    const hostProbe = (repository as any).testImapHost;
+    const viewModel = new NewEmailAccountViewModel(repository);
+
+    viewModel.setHost("imap.example.com");
+    await tick(600);
+
+    expect(hostProbe).toHaveBeenCalledTimes(1);
+});

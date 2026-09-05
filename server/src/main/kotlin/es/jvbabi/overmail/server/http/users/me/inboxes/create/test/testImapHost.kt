@@ -21,6 +21,7 @@ import java.nio.channels.UnresolvedAddressException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
@@ -134,8 +135,12 @@ private suspend fun openAndGreet(
     }
 
     phase.reached = ImapProbePhase.HANDSHAKE
+    // The handler matters as much as the supervisor: a supervisor propagates a child's failure
+    // nowhere, so without one it reaches the thread's default handler, which prints it and --
+    // under the test dispatcher -- fails whichever test runs next. A broken handshake is an
+    // expected answer here, not an error to report.
     val socket = try {
-        tcpSocket.tls(Dispatchers.IO + connectionJob)
+        tcpSocket.tls(Dispatchers.IO + connectionJob + CoroutineExceptionHandler { _, _ -> })
     } catch (e: CancellationException) {
         // The probe timeout, which is not the handshake's fault.
         tcpSocket.close()

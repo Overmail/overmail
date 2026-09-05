@@ -1,0 +1,69 @@
+[versions]
+kotlin = "2.4.10"
+ktor = "3.5.2"
+exposed = "1.5.0"
+kotlinx-datetime = "0.8.0"
+kotlinx-serialization = "1.11.0"
+kotlinx-coroutines = "1.10.2"
+postgresql = "42.7.13"
+dnsjava = "3.6.5"
+authentikt = "0.4.5"
+java-jwt = "4.6.0"
+angus-mail = "2.0.5"
+logback = "1.5.38"
+kamel = "0.5.4"
+jsoup = "1.21.1"
+batik = "1.19"
+twelvemonkeys = "3.12.0"
+koog = "1.2.0"
+h2 = "2.4.240"
+
+[libraries]
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
+exposed-json = { module = "org.jetbrains.exposed:exposed-json", version.ref = "exposed" }
+exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
+
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+dnsjava = { module = "dnsjava:dnsjava", version.ref = "dnsjava" }
+
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-server-routing-openapi = { module = "io.ktor:ktor-server-routing-openapi", version.ref = "ktor" }
+ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
+ktor-server-di = { module = "io.ktor:ktor-server-di", version.ref = "ktor" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+
+authentikt-core = { module = "es.jvbabi.authentikt:core", version.ref = "authentikt" }
+java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
+angus-mail = { module = "org.eclipse.angus:jakarta.mail", version.ref = "angus-mail" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+kamel = { module = "es.jvbabi.overmail:kamel", version.ref = "kamel" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+
+batik-transcoder = { module = "org.apache.xmlgraphics:batik-transcoder", version.ref = "batik" }
+batik-codec = { module = "org.apache.xmlgraphics:batik-codec", version.ref = "batik" }
+imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
+imageio-bmp = { module = "com.twelvemonkeys.imageio:imageio-bmp", version.ref = "twelvemonkeys" }
+
+koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
+
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ktor = { id = "io.ktor.plugin", version.ref = "ktor" }

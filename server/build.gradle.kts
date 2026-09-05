@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization") version "2.4.10"
-    id("io.ktor.plugin") version "3.5.2"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ktor)
 }
 
 ktor {
@@ -21,69 +21,69 @@ repositories {
 
 dependencies {
 
-    implementation("org.jetbrains.exposed:exposed-core:1.5.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:1.5.0")
+    implementation(libs.exposed.core)
+    implementation(libs.exposed.jdbc)
     // The DAO entities. JDBC only -- this is what the driver below is here for.
-    implementation("org.jetbrains.exposed:exposed-dao:1.5.0")
-    implementation("org.jetbrains.exposed:exposed-json:1.5.0")
-    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:1.5.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
-    implementation("org.postgresql:postgresql:42.7.13")
+    implementation(libs.exposed.dao)
+    implementation(libs.exposed.json)
+    implementation(libs.exposed.kotlin.datetime)
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.postgresql)
 
     // BIMI records are DNS TXT lookups, which the JDK offers no supported API for.
-    implementation("dnsjava:dnsjava:3.6.5")
+    implementation(libs.dnsjava)
 
-    implementation("io.ktor:ktor-server-core:3.5.2")
-    implementation("io.ktor:ktor-server-netty:3.5.2")
-    implementation("io.ktor:ktor-server-websockets:3.5.2")
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.websockets)
     // Chat answers stream to the browser over EventSource, not over the chat socket.
-    implementation("io.ktor:ktor-server-sse:3.5.2")
-    implementation("io.ktor:ktor-server-auth:3.5.2")
-    implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
-    implementation("io.ktor:ktor-server-swagger:3.5.2")
-    implementation("io.ktor:ktor-server-di:3.5.2")
+    implementation(libs.ktor.server.sse)
+    implementation(libs.ktor.server.auth)
+    implementation(libs.ktor.server.routing.openapi)
+    implementation(libs.ktor.server.swagger)
+    implementation(libs.ktor.server.di)
     // One error shape for the whole api, see http/api/ApiErrorHandling.kt.
-    implementation("io.ktor:ktor-server-status-pages:3.5.2")
+    implementation(libs.ktor.server.status.pages)
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
-    implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
 
     // Downloading avatars. CIO is the engine authentikt already pulls in, so no second one ends
     // up on the classpath.
-    implementation("io.ktor:ktor-client-core:3.5.2")
-    implementation("io.ktor:ktor-client-cio:3.5.2")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
 
-    implementation("es.jvbabi.authentikt:core:0.4.5")
-    implementation("com.auth0:java-jwt:4.6.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.authentikt.core)
+    implementation(libs.java.jwt)
+    implementation(libs.kotlinx.serialization.json)
     // Eclipse Angus, the Jakarta Mail implementation. Kamel already pulls it, but only at
     // runtime scope, so it has to be declared here to compile against jakarta.mail.
-    implementation("org.eclipse.angus:jakarta.mail:2.0.5")
+    implementation(libs.angus.mail)
     // Ktor logs through slf4j; without a binding it stays silent and warns on startup.
-    implementation("ch.qos.logback:logback-classic:1.5.38")
+    implementation(libs.logback.classic)
 
-    implementation("es.jvbabi.overmail:kamel:0.5.4")
+    implementation(libs.kamel)
 
     // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
-    implementation("org.jsoup:jsoup:1.21.1")
+    implementation(libs.jsoup)
 
     // Rasterising an avatar to decide whether it survives a circle, see CircleFit. Batik is for
     // the SVGs, which is what BIMI serves and most of the hand-kept logos are; the two ImageIO
     // plugins add the formats the JDK has no reader for -- webp, and the .ico favicons.
-    implementation("org.apache.xmlgraphics:batik-transcoder:1.19")
+    implementation(libs.batik.transcoder)
     // The image codecs Batik needs for an SVG that embeds a raster image.
-    implementation("org.apache.xmlgraphics:batik-codec:1.19")
-    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
-    implementation("com.twelvemonkeys.imageio:imageio-bmp:3.12.0")
+    implementation(libs.batik.codec)
+    implementation(libs.imageio.webp)
+    implementation(libs.imageio.bmp)
 
     testImplementation(kotlin("test"))
     // Drives routes through the real plugin pipeline without binding a port.
-    testImplementation("io.ktor:ktor-server-test-host:3.5.2")
+    testImplementation(libs.ktor.server.test.host)
     // In-memory database for tests that need real rows; the schema is created per test class.
-    testImplementation("com.h2database:h2:2.4.240")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(libs.h2)
+    testImplementation(libs.kotlinx.coroutines.test)
 
-    implementation("ai.koog:koog-agents:1.2.0")
+    implementation(libs.koog.agents)
 }
 
 kotlin {

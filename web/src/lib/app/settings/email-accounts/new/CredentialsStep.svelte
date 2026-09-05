@@ -12,6 +12,28 @@
     const id = $props.id();
     const test = $derived(viewModel.imapLoginTest);
 
+    /**
+     * The field a step opens on.
+     *
+     * Set here rather than left to the dialog: its own focus management only runs when the dialog
+     * opens, and lands on the first field by accident of tab order. On a step *change* nothing
+     * runs at all -- the field that had focus is unmounted with the step it belonged to, so focus
+     * falls back to the body and the keyboard flow stops. This effect runs on mount, which is
+     * exactly "this step became the one showing".
+     */
+    let firstField: HTMLInputElement | null = $state(null);
+    $effect(() => {
+        const field = firstField;
+        if (!field) return;
+        // After a frame, not right away: the field that had focus is unmounted with the step it
+        // belonged to, and the dialog's focus trap notices and pulls focus to the first tabbable
+        // thing it finds -- a breadcrumb button. That recovery runs after this effect, so
+        // focusing synchronously here is undone a moment later.
+        const frame = requestAnimationFrame(() => field.focus());
+        return () => cancelAnimationFrame(frame);
+    });
+
+
     const KNOWN = ["invalid_credentials", "connection_failed", "timeout"];
     const reason = $derived(
         test.type !== "rejected"
@@ -34,6 +56,7 @@
                 {$_("settings.emailAccounts.new.credentials.username")}
             </Field.Label>
             <Input
+                    bind:ref={firstField}
                     id={"imap-username-" + id}
                     type="text"
                     autocomplete="username"

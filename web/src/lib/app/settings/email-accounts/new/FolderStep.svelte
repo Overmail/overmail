@@ -39,7 +39,9 @@
                 ? {type: "newest", count: row.aiProcessing.type === "newest" ? row.aiProcessing.count : 100}
                 : type === "since"
                   ? {type: "since", date: row.aiProcessing.type === "since" ? row.aiProcessing.date : today()}
-                  : {type: "new_only"};
+                  : type === "all"
+                    ? {type: "all"}
+                    : {type: "new_only"};
         viewModel.setAiProcessing(row.fullName, mode);
     }
 
@@ -159,6 +161,9 @@
                                             </Select.Item>
                                             <Select.Item value="since">
                                                 {$_("settings.emailAccounts.new.folders.aiMode.since")}
+                                            </Select.Item>
+                                            <Select.Item value="all">
+                                                {$_("settings.emailAccounts.new.folders.aiMode.all")}
                                             </Select.Item>
                                         </Select.Content>
                                     </Select.Root>

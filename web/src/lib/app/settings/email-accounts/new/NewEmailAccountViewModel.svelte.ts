@@ -64,7 +64,9 @@ export type AiProcessingMode =
     /** The newest [count] mails, and then whatever arrives. */
     | {type: "newest"; count: number}
     /** Everything sent on or after [date] (`yyyy-mm-dd`). */
-    | {type: "since"; date: string};
+    | {type: "since"; date: string}
+    /** The whole folder, however far back it goes. */
+    | {type: "all"};
 
 /** One row of the folder table. */
 export type FolderRow = {

@@ -13,6 +13,28 @@
     const test = $derived(viewModel.imapServerTest);
 
     /**
+     * The field a step opens on.
+     *
+     * Set here rather than left to the dialog: its own focus management only runs when the dialog
+     * opens, and lands on the first field by accident of tab order. On a step *change* nothing
+     * runs at all -- the field that had focus is unmounted with the step it belonged to, so focus
+     * falls back to the body and the keyboard flow stops. This effect runs on mount, which is
+     * exactly "this step became the one showing".
+     */
+    let firstField: HTMLInputElement | null = $state(null);
+    $effect(() => {
+        const field = firstField;
+        if (!field) return;
+        // After a frame, not right away: the field that had focus is unmounted with the step it
+        // belonged to, and the dialog's focus trap notices and pulls focus to the first tabbable
+        // thing it finds -- a breadcrumb button. That recovery runs after this effect, so
+        // focusing synchronously here is undone a moment later.
+        const frame = requestAnimationFrame(() => field.focus());
+        return () => cancelAnimationFrame(frame);
+    });
+
+
+    /**
      * A server that answered but advertises LOGINDISABLED takes no password over this connection,
      * which the next step is about. Reachable, but not usable, so it is worth saying now.
      */
@@ -41,6 +63,7 @@
         <Field.Field>
             <Field.Label for={"imap-host-" + id}>{$_("settings.emailAccounts.new.server.host")}</Field.Label>
             <Input
+                    bind:ref={firstField}
                     id={"imap-host-" + id}
                     type="text"
                     placeholder="imap.example.com"

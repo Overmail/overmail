@@ -193,6 +193,7 @@
             "new_only": "Only new mail",
             "newest": "Newest",
             "since": "Everything from",
+            "all": "Everything",
             "countLabel": "How many mails",
             "dateLabel": "Read from this date"
           }

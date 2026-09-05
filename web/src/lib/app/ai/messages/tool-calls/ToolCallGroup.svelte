@@ -12,6 +12,7 @@
     import ToolCallKnowledge from "$lib/app/ai/messages/tool-calls/ToolCallKnowledge.svelte";
     import ToolCallLabelEmail from "$lib/app/ai/messages/tool-calls/ToolCallLabelEmail.svelte";
     import ToolCallReadEmail from "$lib/app/ai/messages/tool-calls/ToolCallReadEmail.svelte";
+    import ToolCallRenameChat from "$lib/app/ai/messages/tool-calls/ToolCallRenameChat.svelte";
     import ToolCallSearchEmails from "$lib/app/ai/messages/tool-calls/ToolCallSearchEmails.svelte";
     import ToolCallThinking from "$lib/app/ai/messages/tool-calls/ToolCallThinking.svelte";
     import type {ToolCall} from "$lib/app/ai/messages/agentBlocks";
@@ -39,6 +40,7 @@
         "search-knowledge": "searching",
         "read-knowledge": "working",
         "write-knowledge": "working",
+        "rename-chat": "working",
         thinking: "breathing",
     };
 
@@ -51,6 +53,7 @@
         "search-knowledge": "ai.chat.messages.searchKnowledge",
         "read-knowledge": "ai.chat.messages.readKnowledge",
         "write-knowledge": "ai.chat.messages.writeKnowledge",
+        "rename-chat": "ai.chat.messages.renameChat",
         thinking: "ai.chat.messages.thinking",
     };
 
@@ -121,6 +124,8 @@
                         <ToolCallKnowledge kind="read" attributes={call.attributes}/>
                     {:else if call.kind === "write-knowledge"}
                         <ToolCallKnowledge kind="write" attributes={call.attributes}/>
+                    {:else if call.kind === "rename-chat"}
+                        <ToolCallRenameChat attributes={call.attributes}/>
                     {/if}
                 </li>
             {/each}

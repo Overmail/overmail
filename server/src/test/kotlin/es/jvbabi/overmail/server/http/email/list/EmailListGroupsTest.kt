@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -207,6 +208,7 @@ class EmailListGroupsTest {
     private fun ApplicationTestBuilder.installRoute() {
         application {
             install(ContentNegotiation) { json() }
+            installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
             dependencies { provide<OvermailDatabase> { database } }
             routing {

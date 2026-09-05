@@ -1,16 +1,21 @@
 package es.jvbabi.overmail.server.http.webapp.ai
 
-import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.AiChatEvent
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChats
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.server.auth.*
+import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,10 +27,6 @@ import org.jetbrains.exposed.v1.core.min
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Clock
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /** Chats per page, for the first one and for every `request.chats.more` after it. */
 private const val CHAT_PAGE_SIZE = 30
@@ -41,7 +42,7 @@ fun Route.aiSocket() {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val chatNotifier = application.dependencies.resolve<AiChatNotifier>()
 
-            val user = call.user
+            val user = call.requireAuthenticatedUser()
 
             /**
              * Everything created after this is above the window the client holds, no matter how

@@ -42,6 +42,8 @@ dependencies {
     implementation("io.ktor:ktor-server-routing-openapi:3.5.2")
     implementation("io.ktor:ktor-server-swagger:3.5.2")
     implementation("io.ktor:ktor-server-di:3.5.2")
+    // One error shape for the whole api, see http/api/ApiErrorHandling.kt.
+    implementation("io.ktor:ktor-server-status-pages:3.5.2")
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
     implementation("io.ktor:ktor-server-content-negotiation:3.5.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.2")

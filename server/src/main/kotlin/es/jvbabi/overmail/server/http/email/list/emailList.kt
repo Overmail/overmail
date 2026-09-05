@@ -1,16 +1,17 @@
 package es.jvbabi.overmail.server.http.email.list
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
-import io.ktor.http.HttpStatusCode
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.instantQueryParameter
+import es.jvbabi.overmail.server.http.api.intQueryParameter
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import es.jvbabi.overmail.server.http.api.uuidQueryParameter
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -20,8 +21,6 @@ import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /** What one request may ask for. A windowed table asks for a screen and some overscan. */
 private const val MAX_LIMIT = 500
@@ -51,22 +50,14 @@ private const val DEFAULT_LIMIT = 100
 fun Route.emailList() {
     authenticate {
         get {
-            val scope = call.mailScope() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_LIMIT)
-                .coerceIn(1, MAX_LIMIT)
+            val scope = call.mailScope()
+            val limit = call.intQueryParameter("limit", default = DEFAULT_LIMIT, range = 1..MAX_LIMIT)
+            val before = call.instantQueryParameter("before")
+            val beforeId = call.uuidQueryParameter("before_id")
 
-            val before = call.request.queryParameters["before"]?.let { seconds ->
-                seconds.toLongOrNull()?.let(Instant::fromEpochSeconds)
-                    ?: return@get call.respond(HttpStatusCode.BadRequest)
-            }
-            val beforeId = call.request.queryParameters["before_id"]?.let { id ->
-                Uuid.parseOrNull(id) ?: return@get call.respond(HttpStatusCode.BadRequest)
-            }
+            val userId = call.requireAuthenticatedUserId()
 
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val userId = call.user.id.value
-
-            val answer = database.query {
+            val answer = call.database().query {
                 val mailbox = Emails
                     .leftJoin(ImapAccounts)
                     .select(Emails.id, Emails.sent)

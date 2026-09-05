@@ -1,22 +1,20 @@
 package es.jvbabi.overmail.server.http.users.me
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.CacheControl
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.cacheControl
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
-import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.select
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.select
 
 /**
  * Private, and short: this is asked on every page load, so it should not go to the server for
@@ -34,8 +32,7 @@ private val CURRENT_USER_CACHE_DURATION = 5.minutes
 fun Route.getCurrentUser() {
     authenticate {
         get {
-            val user = call.user
-            val database = application.dependencies.resolve<OvermailDatabase>()
+            val user = call.requireAuthenticatedUser()
 
             /**
              * Every address this user is known under: the one their account carries, and the
@@ -46,7 +43,7 @@ fun Route.getCurrentUser() {
              * exists to be compared against the recipients of a mail; the name to show is
              * `email`, which keeps its spelling.
              */
-            val addresses = (listOf(user.email) + database.query {
+            val addresses = (listOf(user.email) + call.database().query {
                 ImapAccounts
                     .select(ImapAccounts.username)
                     .where { ImapAccounts.user eq user.id }

@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.users.me
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
@@ -117,6 +118,7 @@ class GetCurrentUserTest {
     private fun ApplicationTestBuilder.installRoute() {
         application {
             install(ContentNegotiation) { json() }
+            installApiErrorHandling()
             install(Authentication) { session() }
             dependencies { provide<OvermailDatabase> { database } }
             routing {

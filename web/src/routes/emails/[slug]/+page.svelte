@@ -5,10 +5,13 @@
 <script lang="ts">
     import {untrack} from "svelte";
     import {page} from "$app/state";
+    import {afterNavigate, goto} from "$app/navigation";
     import {_} from "svelte-i18n";
+    import {ArrowLeftIcon} from "phosphor-svelte";
+    import {Button} from "$lib/components/ui/button";
     import {Skeleton} from "$lib/components/ui/skeleton";
     import {useRepositories} from "$lib/repository/repositories";
-    import {parseEmailId} from "$lib/app/mails/emailPath";
+    import {FROM_MAIL_LIST, FROM_PARAM, parseEmailId} from "$lib/app/mails/emailPath";
     import Head from "$lib/app/mails/detail_panel/Head.svelte";
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
 
@@ -36,6 +39,30 @@
         untrack(() => void mails.setRead(opened, true));
     });
 
+    /**
+     * Whether the listing sent the reader here -- that is what the query says, and it is the one
+     * case where this page has somewhere to go back to.
+     */
+    const cameFromMailList = $derived(page.url.searchParams.get(FROM_PARAM) === FROM_MAIL_LIST);
+
+    /**
+     * Whether there is an entry of this app behind this one. A navigation from within the app has
+     * a [from]; opening the url straight -- a pasted link, a new tab -- has none, and stepping
+     * back there would leave the app.
+     */
+    let hasEntryBehind = $state(false);
+    afterNavigate((navigation) => hasEntryBehind = navigation.from !== null);
+
+    /**
+     * One step back, which is the list with this mail open beside it, and with the scroll position
+     * the reader left it at -- neither of which a goto to the listing would bring back. Only when
+     * there is such a step; without one the mailbox is where this mail came from.
+     */
+    function goBack() {
+        if (hasEntryBehind) history.back();
+        else void goto("/");
+    }
+
     const entry = $derived(id === null ? null : mails.peek(id));
     const mail = $derived(entry?.value ?? null);
 
@@ -49,6 +76,17 @@
 <svelte:head><title>{title}</title></svelte:head>
 
 <div class="flex w-full min-w-0 flex-col gap-6 py-4">
+    <!-- Above everything, whether the mail is here yet or not: a page that was opened out of the
+         list is one the reader means to leave again. -->
+    {#if cameFromMailList}
+        <div class="px-6">
+            <Button variant="ghost" size="sm" class="-ml-2 gap-2" onclick={goBack}>
+                <ArrowLeftIcon/>
+                {$_("mails.page.back")}
+            </Button>
+        </div>
+    {/if}
+
     {#if mail !== null}
         <!-- The subject is the heading of this page, and the tools belong to the same mail: one
              line, with the space between them rather than under them. min-w-0 so a long subject

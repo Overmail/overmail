@@ -77,6 +77,9 @@
       "empty": "Diese Mail hat keinen lesbaren Inhalt.",
       "failed": "Der Inhalt konnte nicht geladen werden."
     },
+    "page": {
+      "back": "Zurück zur Liste"
+    },
     "panel": {
       "previous": "Vorherige E-Mail",
       "next": "Nächste E-Mail",
@@ -168,6 +171,7 @@
         "readKnowledge": "Wissen gelesen zu",
         "writeKnowledge": "Gemerkt",
         "updateKnowledge": "Wissen aktualisiert zu",
+        "renameChat": "Chat umbenannt",
         "tokensOutput": "{count, plural, one {# Token Ausgabe} other {# Tokens Ausgabe}}",
         "searchEmails": "Suche Mails",
         "searchSubject": "Betreff: {query}",

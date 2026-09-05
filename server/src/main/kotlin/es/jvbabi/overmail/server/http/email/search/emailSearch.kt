@@ -1,18 +1,19 @@
 package es.jvbabi.overmail.server.http.email.search
 
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.queryParameter
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.FuzzyMatchResult
 import es.jvbabi.overmail.server.util.detailedFuzzyContains
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.principal
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.Op
@@ -27,8 +28,6 @@ import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 private const val MAX_RESULTS = 10
 
@@ -137,11 +136,10 @@ private fun matchable(text: String, ranges: List<IntRange>) = EmailSearchRespons
 fun Route.emailSearch() {
     authenticate {
         get {
-            val db = application.dependencies.resolve<OvermailDatabase>()
-            val user = call.principal<User>()!!
-            val query = call.request.queryParameters["query"]?.trim() ?: ""
+            val userId = call.requireAuthenticatedUserId()
+            val query = call.queryParameter("query").orEmpty()
 
-            val emails = db.query {
+            val emails = call.database().query {
                 // Selected column by column instead of through the Email entity: that one reads
                 // raw_content with every row, which is the whole mail source.
                 val candidates = Emails
@@ -157,7 +155,7 @@ fun Route.emailSearch() {
                         EmailUsers.avatar,
                         EmailAvatars.circlePadding,
                     )
-                    .where { ImapAccounts.user eq user.id.value }
+                    .where { ImapAccounts.user eq userId }
                     .andWhere { emailIsNotSpam() }
                     .orderBy(Emails.sent, SortOrder.DESC)
                     .let { if (query.isBlank()) it.limit(MAX_RESULTS) else it }

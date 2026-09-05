@@ -1,20 +1,14 @@
 package es.jvbabi.overmail.server.http.avatar.item
 
-import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.models.EmailAvatar
+import es.jvbabi.overmail.server.http.api.requireAvatarFromUrl
 import es.jvbabi.overmail.server.util.imageContentType
 import io.ktor.http.CacheControl
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.cacheControl
-import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
 import kotlin.time.Duration.Companion.days
-import kotlin.uuid.Uuid
 
 /**
  * A year, and private on top: a picture is never rewritten in place, a refreshed one is a new id
@@ -30,12 +24,7 @@ private val AVATAR_CACHE_DURATION = 365.days
 fun Route.getAvatar() {
     authenticate {
         get {
-            val avatarId = call.parameters["avatarId"]?.let { Uuid.parseOrNull(it) }
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
-
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val image = database.query { EmailAvatar.findById(avatarId)?.data }
-                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val image = call.requireAvatarFromUrl().data
 
             call.response.cacheControl(
                 CacheControl.MaxAge(

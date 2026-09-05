@@ -2,13 +2,14 @@ package es.jvbabi.overmail.server.http
 
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
-import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
+import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
+import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.labels.detachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
-import es.jvbabi.overmail.server.http.email.emailsByIds
+import es.jvbabi.overmail.server.http.email.item.shares.newShare
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.search.emailSearch
@@ -20,13 +21,13 @@ import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
-import es.jvbabi.overmail.server.http.webapp.content.contentSocket
-import es.jvbabi.overmail.server.http.webapp.home.homeSocket
-import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
 import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
+import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
+import es.jvbabi.overmail.server.http.webapp.content.contentSocket
+import es.jvbabi.overmail.server.http.webapp.home.homeSocket
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
@@ -90,6 +91,10 @@ internal fun Application.configureRouting() {
 
                     route("/classify") {
                         classifyEmailRequest()
+                    }
+
+                    route("/shares") {
+                        newShare()
                     }
 
                     // One route per state rather than a body that names it: they are separate

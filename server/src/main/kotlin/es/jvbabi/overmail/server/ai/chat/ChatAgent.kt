@@ -29,6 +29,7 @@ import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.RenameChatTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
 import es.jvbabi.overmail.server.config.ApplicationConfig
@@ -184,8 +185,10 @@ class ChatAgent(
             // so there is nothing the model could say to reach another user's data.
             toolRegistry = chatToolRegistry(
                 userId = turn.userId,
+                chatId = turn.chatId,
                 database = database,
                 mailNotifier = mailNotifier,
+                chatNotifier = chatNotifier,
                 knowledgeStore = knowledgeStore,
                 stream = stream,
             ),
@@ -273,7 +276,7 @@ class ChatAgent(
             promptExecutor.execute(
                 prompt = prompt("overmail-chat-name") {
                     system(NAME_PROMPT)
-                    user("Message:\n${turn.request}\n\nAnswer:\n$answer")
+                    user(chatNamingInput(request = turn.request, answer = answer))
                 },
                 model = model,
             ).textContent()
@@ -398,6 +401,11 @@ class ChatAgent(
                 "`${LabelEmailTool.NAME}` and `${UnlabelEmailTool.NAME}` attach and detach one " +
                 "email at a time. Prefer a label the user already has over a new one, and say " +
                 "which labels you changed.\n" +
+                "The chat you are in carries a name, and `${RenameChatTool.NAME}` changes it: use " +
+                "it when what the chat is about has moved away from its name, or when the user " +
+                "asks for a name -- once per answer at most, and never on a name the user wrote " +
+                "themselves unless they ask. A chat that has no name yet is named on its own " +
+                "when your answer is done, so leave that one be.\n" +
                 "When you mention an email, a label or a person in your answer, write it as the " +
                 "element `<email id=\"...\"></email>`, `<label id=\"...\"></label>` or " +
                 "`<person id=\"...\"></person>` with the id the tool result or the user's " +
@@ -413,27 +421,6 @@ class ChatAgent(
                 "When the user asks for something you have no tool for, say in one sentence that " +
                 "you cannot do it, and stop there: never promise it, never ask what to set up, " +
                 "never say it is done or under way, and do not offer to do it later."
-
-        const val NAME_PROMPT =
-            "Name the chat below after what the user wants, in their language. Answer with the " +
-                "name alone: keep it compact. But give it a descriptive name, the user might have many chats and needs to tell them apart. Do not use the user's name or email address in the title unless it is part of the subject or the user's request. Do not use quotes around the title."
-
-        /** The column holds 255 characters, and a title that long is not a title. */
-        const val MAX_CHAT_NAME_LENGTH = 60
-
-        /**
-         * Models like to wrap a title in quotes or add a line about it, so only the first line is
-         * kept. Null when nothing usable is left.
-         */
-        fun cleanChatName(name: String): String? = name
-            .trim()
-            .lineSequence()
-            .firstOrNull { line -> line.isNotBlank() }
-            ?.trim()
-            ?.trim('"', '\'', '“', '”', '„', '`')
-            ?.trim()
-            ?.take(MAX_CHAT_NAME_LENGTH)
-            ?.takeIf { it.isNotBlank() }
     }
 }
 
@@ -500,8 +487,10 @@ internal class ChatToolCallRecorder {
  */
 internal fun chatToolRegistry(
     userId: User.Id,
+    chatId: AiChat.Id,
     database: OvermailDatabase,
     mailNotifier: MailNotifier,
+    chatNotifier: AiChatNotifier,
     knowledgeStore: KnowledgeStore,
     stream: AiChatMessageStream,
 ): ToolRegistry {
@@ -535,6 +524,15 @@ internal fun chatToolRegistry(
         .tool(SearchKnowledgeTool(userId = userId, store = knowledgeStore, onSearch = ::writeBlock))
         .tool(ReadKnowledgeTool(userId = userId, store = knowledgeStore, onRead = ::writeBlock))
         .tool(WriteKnowledgeTool(userId = userId, store = knowledgeStore, onWrite = ::writeBlock))
+        .tool(
+            RenameChatTool(
+                userId = userId,
+                chatId = chatId,
+                database = database,
+                chatNotifier = chatNotifier,
+                onRenamed = ::writeBlock,
+            )
+        )
         .build()
 }
 

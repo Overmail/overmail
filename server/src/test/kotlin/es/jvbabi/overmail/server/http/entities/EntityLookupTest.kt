@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.senders.sendersByIds
@@ -145,6 +146,7 @@ class EntityLookupTest {
     private fun ApplicationTestBuilder.installRoutes() {
         application {
             install(ContentNegotiation) { json() }
+            installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
             dependencies { provide<OvermailDatabase> { database } }
             routing {

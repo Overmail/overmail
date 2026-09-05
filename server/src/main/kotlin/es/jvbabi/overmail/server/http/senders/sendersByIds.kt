@@ -1,20 +1,19 @@
 package es.jvbabi.overmail.server.http.senders
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requestedIds
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
-import es.jvbabi.overmail.server.http.entities.requestedIds
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.JoinType
@@ -23,7 +22,6 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.uuid.Uuid
 
 /**
  * Who the addresses behind a list of ids are: `GET /api/senders?ids=a,b,c`.
@@ -37,10 +35,9 @@ fun Route.sendersByIds() {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(SendersResponse(emptyList()))
 
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val userId = call.user.id.value
+            val userId = call.requireAuthenticatedUserId()
 
-            val senders = database.query {
+            val senders = call.database().query {
                 val rows = EmailUsers
                     .leftJoin(EmailAvatars)
                     .select(EmailUsers.id, EmailUsers.address, EmailUsers.avatar, EmailAvatars.circlePadding)

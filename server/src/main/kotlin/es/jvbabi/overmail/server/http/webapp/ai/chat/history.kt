@@ -9,13 +9,16 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import es.jvbabi.overmail.server.http.api.requireOwnedChatFromUrl
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.JoinType
@@ -26,7 +29,6 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
-import kotlin.uuid.Uuid
 
 /**
  * Every message of one chat, oldest first. The client loads this on opening a chat and then
@@ -35,10 +37,10 @@ import kotlin.uuid.Uuid
 fun Route.chatHistory() {
     authenticate {
         get {
-            val chat = call.resolveChatWithOwnerCheck() ?: return@get call.respond(HttpStatusCode.NotFound)
-            val database = call.overmailDatabase()
+            val chat = call.requireOwnedChatFromUrl()
+            val userId = call.requireAuthenticatedUserId()
 
-            val messages = database.query {
+            val messages = call.database().query {
                 // The DAO's `chat.messages` has no order, and the client renders the list as it
                 // arrives.
                 val stored = AiChatMessage
@@ -48,7 +50,7 @@ fun Route.chatHistory() {
 
                 // Resolved once for the whole chat rather than per segment: the same mail or label
                 // shows up in message after message.
-                val references = resolveReferences(stored, chat.user.id.value)
+                val references = resolveReferences(stored, userId)
 
                 stored.map { message ->
                     // The sender column says who a message belongs to, its content says what

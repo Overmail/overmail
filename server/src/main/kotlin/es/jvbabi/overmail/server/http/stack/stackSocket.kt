@@ -1,7 +1,6 @@
 package es.jvbabi.overmail.server.http.stack
 
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
-import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -11,6 +10,7 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.emailIsNotArchived
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
@@ -19,6 +19,9 @@ import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -36,9 +39,6 @@ import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 private const val STACK_SIZE = 10
 
@@ -70,7 +70,7 @@ fun Route.stackSocket() {
             val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
 
-            val user = call.user
+            val user = call.requireAuthenticatedUser()
 
             /**
              * How far the pile has been handed out. The next batch includes this second again, so

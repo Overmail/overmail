@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
@@ -45,6 +46,8 @@ fun Application.overmail() {
     configureDependencies()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
+    // Before the routes, so everything they throw comes out as the api's error payload.
+    installApiErrorHandling()
     install(Authentication) { overmailSession() }
     install(SSE)
     install(WebSockets) {

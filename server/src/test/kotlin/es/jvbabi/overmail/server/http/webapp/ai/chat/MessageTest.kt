@@ -16,6 +16,7 @@ import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessageSender
 import es.jvbabi.overmail.server.database.models.AiChatMessages
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -115,7 +116,7 @@ class MessageTest {
             setBody(body(chatId = foreignChat.toString(), text = "hi"))
         }
 
-        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        assertEquals(HttpStatusCode.Forbidden, response.status)
         // Nothing was written into the foreign chat.
         assertNull(database.query { AiChatMessage.find { AiChatMessages.chatId eq foreignChat }.firstOrNull() })
     }
@@ -150,6 +151,7 @@ class MessageTest {
     private fun ApplicationTestBuilder.installRoute() {
         application {
             install(ContentNegotiation) { json() }
+            installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
             dependencies {
                 provide<OvermailDatabase> { database }

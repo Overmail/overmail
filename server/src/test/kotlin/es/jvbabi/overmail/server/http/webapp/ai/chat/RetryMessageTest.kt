@@ -15,6 +15,7 @@ import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessageSender
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.post
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.install
@@ -80,8 +81,9 @@ class RetryMessageTest {
         val fixture = setUpFixture()
         installRoute()
 
+        // It exists and is the caller's -- it is just not an answer, which is a conflict, not a miss.
         val response = client.post("/api/webapp/ai/chat/${fixture.chatId}/message/${fixture.questionId}/retry")
-        assertEquals(HttpStatusCode.NotFound, response.status)
+        assertEquals(HttpStatusCode.Conflict, response.status)
     }
 
     @Test
@@ -98,11 +100,12 @@ class RetryMessageTest {
         }
 
         val response = client.post("/api/webapp/ai/chat/${fixture.chatId}/message/${fixture.answerId}/retry")
-        assertEquals(HttpStatusCode.NotFound, response.status)
+        assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 
     private fun io.ktor.server.testing.ApplicationTestBuilder.installRoute() {
         application {
+            installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
             dependencies {
                 provide<OvermailDatabase> { database }

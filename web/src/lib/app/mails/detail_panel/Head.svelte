@@ -7,6 +7,7 @@
         CaretDownIcon,
         CaretUpIcon,
         CheckIcon,
+        CornersOutIcon,
         DotsThreeVerticalIcon,
         EnvelopeSimpleIcon,
         EnvelopeSimpleOpenIcon,
@@ -75,6 +76,11 @@
     // Through emailPath rather than spelled out again: that function is where the route of a
     // mail lives, and the copy button hands out an address, so it needs the origin in front.
     const emailPageUrl = $derived(page.url.origin + emailPath(mail.id, mail.subject));
+    const emailPageUrlInSameTab = $derived.by(() => {
+        const url = new URL(emailPageUrl);
+        url.searchParams.set("from", "mail-list");
+        return url.toString();
+    });
 
     /** Anything but the mailbox: archived, or filed as spam. Neither can be filed again. */
     const isFiled = $derived(mail.archiveState !== "unarchive");
@@ -258,7 +264,7 @@
                      next frame: both in the one grid cell, and the button centres them the way
                      it centres a single icon -- `grid` is the only thing it takes over from it. -->
                 <Button
-                        class="mr-1 grid *:col-start-1 *:row-start-1"
+                        class="grid *:col-start-1 *:row-start-1"
                         variant="ghost"
                         size="icon"
                         onclick={copyLinkToClipboard}
@@ -277,6 +283,22 @@
         </Tooltip.Root>
 
         {#if showOpenInNewTab}
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <Button
+                            variant="ghost"
+                            size="icon"
+                            href={emailPageUrlInSameTab}
+                    >
+                        <CornersOutIcon />
+                    </Button>
+                </Tooltip.Trigger>
+
+                <Tooltip.Content>
+                    In diesem Tab öffnen
+                </Tooltip.Content>
+            </Tooltip.Root>
+
             <Tooltip.Root>
                 <Tooltip.Trigger>
                     <Button
@@ -319,7 +341,6 @@
             <Tooltip.Root>
                 <Tooltip.Trigger>
                     <Button
-                            class="mr-1"
                             variant="ghost"
                             size="icon"
                             onclick={onClose}

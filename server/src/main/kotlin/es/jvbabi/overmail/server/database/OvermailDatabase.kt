@@ -42,6 +42,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailArchives)
             SchemaUtils.create(AiChats, AiChatMessages)
             SchemaUtils.create(Knowledges)
+            SchemaUtils.create(Shares)
         }
     }
 

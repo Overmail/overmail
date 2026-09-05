@@ -62,3 +62,13 @@ function subjectSlug(subject: string | null | undefined): string {
 
 	return beginning.replaceAll(/\s+/g, "-").replaceAll(/^-+|-+$/g, "");
 }
+
+/**
+ * How a mail page is told that the listing sent the reader there: the query the table puts on the
+ * url, and the one thing that page reads to decide whether it shows a way back.
+ *
+ * Here rather than spelled out twice, next to the route it belongs to -- the writer and the reader
+ * of it are two different components.
+ */
+export const FROM_PARAM = "from";
+export const FROM_MAIL_LIST = "mail-list";

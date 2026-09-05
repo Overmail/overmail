@@ -1,12 +1,14 @@
 package es.jvbabi.overmail.server.http.labels.search
 
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.queryParameter
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.util.fuzzyContains
-import io.ktor.server.auth.*
-import io.ktor.server.plugins.di.*
+import io.ktor.server.auth.authenticate
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.Count
@@ -15,25 +17,22 @@ import org.jetbrains.exposed.v1.core.alias
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.uuid.Uuid
 
 fun Route.labelSearch() {
     authenticate {
         get {
-            val db = application.dependencies.resolve<OvermailDatabase>()
+            val userId = call.requireAuthenticatedUserId()
+            val query = call.queryParameter("query").orEmpty()
 
-            val user = call.principal<User>()!!
-            val query = call.request.queryParameters["query"]?.trim() ?: ""
-
-            val labels = db.query {
+            val labels = call.database().query {
                 val count = Count(EmailLabels.id).alias("email_count")
                 Labels
                     .leftJoin(EmailLabels)
                     .leftJoin(Emails)
                     .leftJoin(ImapAccounts)
                     .select(Labels.columns + count)
-                    .where { Labels.owner eq user.id.value }
-                    .andWhere { ImapAccounts.user eq user.id.value }
+                    .where { Labels.owner eq userId }
+                    .andWhere { ImapAccounts.user eq userId }
                     .groupBy(Labels.id)
                     .orderBy(count, SortOrder.DESC)
                     .let {

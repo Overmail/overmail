@@ -1,12 +1,12 @@
 package es.jvbabi.overmail.server.http.webapp.home
 
-import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.emailIsNotArchived
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
@@ -15,6 +15,8 @@ import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -38,8 +40,6 @@ import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.datetime.Date
 import org.jetbrains.exposed.v1.datetime.Year
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * One import cycle inserts mail after mail and announces each one, so what is on screen is read
@@ -76,7 +76,7 @@ fun Route.homeSocket() {
         webSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
-            val user = call.user
+            val user = call.requireAuthenticatedUser()
 
             // Two coroutines write here: the loop below, when a year is asked for, and the
             // subscription, when something moved. The lock keeps one from sending a year the

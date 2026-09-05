@@ -1,22 +1,20 @@
 package es.jvbabi.overmail.server.http.labels
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Labels
-import es.jvbabi.overmail.server.http.entities.requestedIds
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requestedIds
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.uuid.Uuid
 
 /**
  * What the labels behind a list of ids are called: `GET /api/labels?ids=a,b,c`.
@@ -30,10 +28,9 @@ fun Route.labelsByIds() {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(LabelsResponse(emptyList()))
 
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val userId = call.user.id.value
+            val userId = call.requireAuthenticatedUserId()
 
-            val labels = database.query {
+            val labels = call.database().query {
                 Labels
                     .select(Labels.id, Labels.name, Labels.color)
                     .where { (Labels.id inList ids) and (Labels.owner eq userId) }

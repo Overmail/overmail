@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.http.entities
+package es.jvbabi.overmail.server.http.api
 
 import io.ktor.server.application.ApplicationCall
 import kotlin.uuid.Uuid

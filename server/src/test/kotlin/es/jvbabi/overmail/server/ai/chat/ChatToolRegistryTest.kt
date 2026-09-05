@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.ai.chat
 import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
 import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.RenameChatTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
@@ -10,8 +11,10 @@ import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
 import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
 import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
+import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailLabel
 import es.jvbabi.overmail.server.database.models.EmailLabels
@@ -47,7 +50,7 @@ class ChatToolRegistryTest {
         val stream = AiChatMessageStream()
         stream.append("Ich schaue nach.")
 
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
         val tool = registry.tools.filterIsInstance<ReadEmailTool>().single()
 
         tool.execute(ReadEmailTool.Args(emailId = fixture.emailId.toString()))
@@ -64,7 +67,7 @@ class ChatToolRegistryTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
 
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
         val tool = registry.tools.filterIsInstance<SearchEmailsTool>().single()
 
         tool.execute(SearchEmailsTool.Args(subject = "Invoice"))
@@ -80,7 +83,7 @@ class ChatToolRegistryTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
 
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
         val tool = registry.tools.filterIsInstance<ReadEmailTool>().single()
 
         tool.execute(ReadEmailTool.Args(emailId = Uuid.random().toString()))
@@ -92,7 +95,7 @@ class ChatToolRegistryTest {
     fun `a label the agent makes is written into the stream, and the one that was there is not`() = runTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
-        val tool = registry(fixture.userId, stream).tools.filterIsInstance<CreateLabelTool>().single()
+        val tool = registry(fixture, stream).tools.filterIsInstance<CreateLabelTool>().single()
 
         val created = tool.execute(CreateLabelTool.Args(name = "  Uni   Kram ")) as CreateLabelTool.Result.Label
         // Normalized, coloured here, and announced in the answer.
@@ -113,7 +116,7 @@ class ChatToolRegistryTest {
     fun `a label goes on a mail and comes off again`() = runTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
         val attach = registry.tools.filterIsInstance<LabelEmailTool>().single()
         val detach = registry.tools.filterIsInstance<UnlabelEmailTool>().single()
         val labelId = labelOfSignedIn(fixture.userId)
@@ -145,7 +148,7 @@ class ChatToolRegistryTest {
     fun `a label of somebody else is not put on a mail`() = runTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
-        val tool = registry(fixture.userId, stream).tools.filterIsInstance<LabelEmailTool>().single()
+        val tool = registry(fixture, stream).tools.filterIsInstance<LabelEmailTool>().single()
 
         val foreign = database.query {
             val stranger = User.new {
@@ -176,7 +179,7 @@ class ChatToolRegistryTest {
     fun `what the agent writes down is found again and shows up in the answer`() = runTest {
         val fixture = setUp()
         val stream = AiChatMessageStream()
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
 
         val write = registry.tools.filterIsInstance<WriteKnowledgeTool>().single()
         val search = registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
@@ -235,7 +238,7 @@ class ChatToolRegistryTest {
             byAgent = true,
         )
 
-        val registry = registry(fixture.userId, stream)
+        val registry = registry(fixture, stream)
         assertTrue(registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
             .execute(SearchKnowledgeTool.Args(query = "geheim")).entries.isEmpty())
         assertTrue(registry.tools.filterIsInstance<ReadKnowledgeTool>().single()
@@ -243,10 +246,54 @@ class ChatToolRegistryTest {
                 is ReadKnowledgeTool.Result.NotFound)
     }
 
-    private fun registry(userId: User.Id, stream: AiChatMessageStream) = chatToolRegistry(
-        userId = userId,
+    @Test
+    fun `the agent may rename its chat once, and the rename shows in the answer`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        stream.append("Ich benenne den Chat um.")
+
+        val tool = registry(fixture, stream).tools.filterIsInstance<RenameChatTool>().single()
+
+        val renamed = tool.execute(RenameChatTool.Args(name = "\"Umzug nach Potsdam\""))
+
+        assertEquals(RenameChatTool.Result.Renamed(name = "Umzug nach Potsdam", alreadyNamed = false), renamed)
+        assertEquals("Umzug nach Potsdam", database.query { AiChat.findById(fixture.chatId)?.name })
+        assertEquals(
+            "Ich benenne den Chat um.\n\n"
+                + """<toolcall-rename-chat name="Umzug nach Potsdam"></toolcall-rename-chat>""",
+            stream.snapshot().content,
+        )
+
+        // A second one in the same answer is refused: the run gets one rename, not a hobby.
+        assertTrue(tool.execute(RenameChatTool.Args(name = "Doch etwas anderes")) is RenameChatTool.Result.InvalidArgument)
+        assertEquals("Umzug nach Potsdam", database.query { AiChat.findById(fixture.chatId)?.name })
+    }
+
+    @Test
+    fun `a name that is nothing but markup is refused and costs no rename`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+
+        val tool = registry(fixture, stream).tools.filterIsInstance<RenameChatTool>().single()
+
+        assertTrue(tool.execute(RenameChatTool.Args(name = " \"\" ")) is RenameChatTool.Result.InvalidArgument)
+        assertEquals("Rechnungen", database.query { AiChat.findById(fixture.chatId)?.name })
+        assertEquals("", stream.snapshot().content)
+
+        // The refused call did not use up the one rename the run has.
+        assertTrue(tool.execute(RenameChatTool.Args(name = "Offene Rechnungen")) is RenameChatTool.Result.Renamed)
+    }
+
+    private fun registry(
+        fixture: Fixture,
+        stream: AiChatMessageStream,
+        chatNotifier: AiChatNotifier = AiChatNotifier(),
+    ) = chatToolRegistry(
+        userId = fixture.userId,
+        chatId = fixture.chatId,
         database = database,
         mailNotifier = MailNotifier(),
+        chatNotifier = chatNotifier,
         knowledgeStore = KnowledgeStore(database),
         stream = stream,
     )
@@ -264,7 +311,7 @@ class ChatToolRegistryTest {
         EmailLabel.find { (EmailLabels.email eq emailId) and (EmailLabels.label eq labelId) }.count().toInt()
     }
 
-    private data class Fixture(val userId: User.Id, val emailId: Email.Id)
+    private data class Fixture(val userId: User.Id, val emailId: Email.Id, val chatId: AiChat.Id)
 
     private suspend fun setUp(): Fixture {
         database.init()
@@ -296,7 +343,14 @@ class ChatToolRegistryTest {
                 textContent = "Please pay."
             }
 
-            Fixture(userId = user.id.value, emailId = email.id.value)
+            val chat = AiChat.new {
+                this.user = user
+                this.name = "Rechnungen"
+                this.nameSetByUser = false
+                this.createdAt = Clock.System.now()
+            }
+
+            Fixture(userId = user.id.value, emailId = email.id.value, chatId = chat.id.value)
         }
     }
 }

@@ -1,9 +1,9 @@
 package es.jvbabi.overmail.server.http.webapp.content
 
-import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -13,6 +13,9 @@ import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -23,9 +26,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.uuid.Uuid
 
 /**
  * How long a change waits for the ones behind it. A classification run touches a mail several
@@ -76,7 +76,7 @@ fun Route.contentSocket() {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
             val avatarQueue = application.dependencies.resolve<AvatarQueue>()
-            val user = call.user
+            val user = call.requireAuthenticatedUser()
 
             /** The ids this socket keeps up to date. Guarded by [lock]. */
             val subscribed = mutableSetOf<Uuid>()

@@ -77,6 +77,9 @@
       "empty": "This mail has no readable content.",
       "failed": "Could not load what this mail says."
     },
+    "page": {
+      "back": "Back to the list"
+    },
     "panel": {
       "previous": "Previous mail",
       "next": "Next mail",
@@ -168,6 +171,7 @@
         "readKnowledge": "Read what I know about",
         "writeKnowledge": "Noted",
         "updateKnowledge": "Updated what I know about",
+        "renameChat": "Chat renamed",
         "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}",
         "searchEmails": "Searching emails",
         "searchSubject": "Subject: {query}",

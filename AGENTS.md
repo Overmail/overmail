@@ -13,6 +13,7 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   database/            connection and config; query { } is the only way in
   database/models/     one file per table: the UuidTable object and its UuidEntity
   http/                Ktor engine, config and routes
+  http/api/            what every route needs: the current user, url resources, errors
   jobs/                background work (IMAP import)
 ```
 
@@ -72,21 +73,60 @@ to the mailbox. It ends in a JWT in the `overmail_session` cookie, issued and ve
 `JwtService` with a secret generated into `data/jwt-secret.key`.
 
 Everything after sign-in goes through the Ktor auth provider in `auth/SessionAuthentication.kt`,
-installed unnamed in `AppModule`:
+installed unnamed in `AppModule`. Every route function wraps its handlers in `authenticate { }`
+itself; a handler then asks the call who is there:
 
 ```kotlin
-authenticate {
-    get("/mails") { call.user }   // the User entity, resolved from the token
+fun Route.setEmailRead() {
+    authenticate {
+        post { val user = call.requireAuthenticatedUser() }
+    }
 }
 ```
 
 - The token is read from the session cookie or an `Authorization: Bearer` header, verified, and
   the user loaded — no route unpacks a cookie or touches `JwtService` itself.
-- `call.user` throws outside a non-optional `authenticate { }`; there is no null case to handle.
+- `requireAuthenticatedUser()` either answers or ends the request with 401, so no handler carries
+  a null case. Ask as often as you like: the user is resolved once per request and kept on
+  `call.attributes` (`auth/CurrentUser.kt`), the provider's principal included.
+- It also resolves the token on its own, so it still works in a route mounted outside
+  `authenticate { }` — which is what makes the 401 above reachable at all.
 - It is a DAO entity from a transaction that is already over: `username`, `email` and `id` are
   readable, everything else needs `query { }` — see [DAO entities](#dao-entities).
-- A missing or bad token is a bare 401, no `WWW-Authenticate`: the frontend redirects to /auth,
-  a browser credential prompt would be wrong here.
+- 401 and no `WWW-Authenticate`: the frontend redirects to /auth on that status, and a browser
+  credential prompt would be wrong here. 403 means something else — see below.
+
+## The api layer
+
+`http/api/` holds what every route needs, so a handler is its query and its answer and nothing
+else. Reach for these before writing the check by hand:
+
+- **`requireAuthenticatedUser()` / `requireAuthenticatedUserId()`** — who is calling, or 401.
+- **`require<Resource>FromUrl()`** — the resource a path parameter points at, or 404. A malformed
+  id, an unknown one and a deleted one are the same miss.
+- **`requireOwned<Resource>FromUrl()`** — that one, and 403 when it belongs to somebody else.
+  Existence and owner come out of one query, and both are cached on the call, so a handler that
+  asks twice pays once. `requireOwnedEmailIdFromUrl()` is the columns-only variant for writes that
+  touch one flag — the entity reads `Emails.rawContent` with it.
+- **`queryParameter` / `intQueryParameter` / `instantQueryParameter` / `uuidQueryParameter`** —
+  `?name=value`, or 400 naming the parameter.
+- **`database()` / `dependency<T>()`** — out of the DI container, per call.
+
+Errors all leave as the same json, `ApiErrorBody`:
+
+```json
+{"error": {"status": 403, "code": "forbidden", "message": "...", "details": {"resource": "email"}}}
+```
+
+`ApiException` (thrown through `notFound()`, `forbidden()`, `invalidRequest()`, `conflict()`,
+`unauthenticated()`) is turned into that by `installApiErrorHandling()`, which also covers
+unmatched routes, unreadable bodies and anything that escapes a handler. A test that mounts a
+route on its own `testApplication` installs it too, or an `ApiException` shows up as a bare 500.
+
+Two things the OpenAPI compiler plugin forces on this package, both of them build failures rather
+than warnings when ignored: nothing a route handler reaches may be **generic**, and a helper it
+reaches must not be called several times from the same handler. That is why the resolvers are
+written out per resource instead of sharing one lookup.
 
 ## Database access
 
@@ -95,8 +135,7 @@ interface between a route, a job and the tables -- a handler opens a transaction
 own query.
 
 ```kotlin
-val database = application.dependencies.resolve<OvermailDatabase>()
-val mails = database.query { Email.find { Emails.imapAccount eq accountId }.toList() }
+val mails = call.database().query { Email.find { Emails.imapAccount eq accountId }.toList() }
 ```
 
 - `OvermailDatabase.query { }` is the only entry point. It runs `suspendTransaction` on

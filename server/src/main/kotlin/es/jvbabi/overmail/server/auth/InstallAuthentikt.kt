@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.Users
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.Cookie
 import io.ktor.http.CookieEncoding
 import io.ktor.http.HttpStatusCode
@@ -110,7 +111,7 @@ fun Application.installOvermailAuthentikt() {
                  * before rendering anything.
                  */
                 get("/session") {
-                    val user = call.user
+                    val user = call.requireAuthenticatedUser()
                     call.respond(SessionResponse(user.id.value.toString(), user.username, user.email))
                 }
             }

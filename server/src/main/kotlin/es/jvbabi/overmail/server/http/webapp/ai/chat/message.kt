@@ -3,33 +3,41 @@ package es.jvbabi.overmail.server.http.webapp.ai.chat
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessageSender
-import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.database.models.AiChats
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
+import es.jvbabi.overmail.server.http.api.forbidden
+import es.jvbabi.overmail.server.http.api.notFound
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.principal
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.post
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+/**
+ * A question to the assistant: `POST /api/webapp/ai/chat`.
+ *
+ * Without a `chat_id` this opens a new chat, with one it continues that chat. The answer comes
+ * back as three ids -- the chat, the question, and the still-empty message the answer is being
+ * written into, which the client follows over the message stream.
+ */
 fun Route.message() {
     authenticate {
         post {
-            val db = application.dependencies.resolve<OvermailDatabase>()
-            val aiChatNotifier = application.dependencies.resolve<AiChatNotifier>()
-            val chatAgentQueue = application.dependencies.resolve<ChatAgentQueue>()
-            val model = application.dependencies.resolve<LLModel>()
+            val db = call.database()
+            val aiChatNotifier = call.dependency<AiChatNotifier>()
+            val chatAgentQueue = call.dependency<ChatAgentQueue>()
+            val model = call.dependency<LLModel>()
 
-            val user = call.principal<User>()!!
+            val user = call.requireAuthenticatedUser()
             val request = call.receive<Message>()
 
             val chat = if (request.chatId == null) {
@@ -47,13 +55,14 @@ fun Route.message() {
                     }
                 }
             } else {
-                val (chat, ownerId) = db.query {
-                    val c = AiChat.findById(request.chatId) ?: error("Chat not found")
-                    c to c.user.id.value
-                }
+                // The chat is named in the body, not in the url, so it cannot go through
+                // `requireOwnedChatFromUrl` -- the checks are the same ones though.
+                val chat = db.query { AiChat.findById(request.chatId) }
+                    ?: notFound("chat", request.chatId.toString())
 
-                if (ownerId != user.id.value) {
-                    error("Chat does not belong to user")
+                // The owner column came with the row, so this needs no second transaction.
+                if (chat.readValues[AiChats.userId].value != user.id.value) {
+                    forbidden("chat", request.chatId.toString())
                 }
 
                 chat

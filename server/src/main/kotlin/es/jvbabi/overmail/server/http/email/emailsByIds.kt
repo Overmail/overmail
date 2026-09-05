@@ -1,20 +1,19 @@
 package es.jvbabi.overmail.server.http.email
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailAvatars
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requestedIds
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
-import es.jvbabi.overmail.server.http.entities.requestedIds
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.JoinType
@@ -22,14 +21,14 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.uuid.Uuid
 
 /**
  * What the mails behind a list of ids are called: `GET /api/emails?ids=a,b,c`.
  *
  * The counterpart of a client-side cache -- it asks for the ids it does not know yet and gets
  * back what exists and belongs to the signed-in user. Everything else is silently missing from
- * the answer rather than an error.
+ * the answer rather than an error: a lookup is not addressed at one mail, and a single unknown id
+ * must not cost the caller the rest.
  */
 fun Route.emailsByIds() {
     authenticate {
@@ -37,10 +36,9 @@ fun Route.emailsByIds() {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(EmailsResponse(emptyList()))
 
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val userId = call.user.id.value
+            val userId = call.requireAuthenticatedUserId()
 
-            val emails = database.query {
+            val emails = call.database().query {
                 // Columns, not the entity: loading an Email reads its raw source with it.
                 Emails
                     .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)

@@ -4,8 +4,10 @@ import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamEvent
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.database.models.AiChatMessage
+import es.jvbabi.overmail.server.http.api.ApiException
+import es.jvbabi.overmail.server.http.api.dependency
+import es.jvbabi.overmail.server.http.api.requireOwnedChatMessageFromUrl
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.ServerSSESession
 import io.ktor.server.sse.sse
@@ -15,7 +17,6 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.uuid.Uuid
 
 private val json = Json { encodeDefaults = true }
 
@@ -30,20 +31,23 @@ private val json = Json { encodeDefaults = true }
 fun Route.chatMessageStream() {
     authenticate {
         sse {
-            val message = resolveMessage()
-            if (message == null) {
-                // Closing without `done` would leave the client reconnecting every second, so an
-                // unknown message is reported as finished like any other.
+            // The api's error payload has nowhere to go once an EventSource is open, and closing
+            // without `done` leaves the client reconnecting every second -- so a message it may not
+            // see is reported as finished, like every other message it cannot follow.
+            val message = try {
+                call.requireOwnedChatMessageFromUrl()
+            } catch (_: ApiException) {
                 send(StreamEvent.Done)
                 return@sse
             }
 
-            val stream = call.application.dependencies
-                .resolve<AiChatStreamNotifier>()
-                .of(message.id)
+            // Only an agent message has text to stream; a user message has nothing to follow. Both
+            // columns came with the row, so reading them needs no transaction.
+            val written = message.content as? AiChatMessage.MessageContent.AgentMessageContent
 
+            val stream = call.dependency<AiChatStreamNotifier>().of(message.id.value)
             if (stream == null) {
-                send(StreamEvent.Snapshot(content = message.content, tokensOutput = message.tokensOutput))
+                send(StreamEvent.Snapshot(written?.text.orEmpty(), written?.tokensOutput ?: 0))
                 send(StreamEvent.Done)
                 return@sse
             }
@@ -111,32 +115,6 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
         }
         .collect { event -> send(event) }
 }
-
-/**
- * The message the path points at, or null when the signed-in user may not see it. Checked
- * through the chat: the message id alone says nothing about who owns it.
- */
-private suspend fun ServerSSESession.resolveMessage(): StreamedMessage? {
-    val chat = call.resolveChatWithOwnerCheck() ?: return null
-    val messageId = call.parameters["messageId"]?.let(Uuid::parseOrNull) ?: return null
-
-    return call.overmailDatabase().query {
-        val message = AiChatMessage.findById(messageId)?.takeIf { it.chat.id == chat.id } ?: return@query null
-        // Only an agent message has text to stream; a user message has nothing to follow.
-        val content = message.content as? AiChatMessage.MessageContent.AgentMessageContent
-        StreamedMessage(
-            id = message.id.value,
-            content = content?.text.orEmpty(),
-            tokensOutput = content?.tokensOutput ?: 0,
-        )
-    }
-}
-
-private data class StreamedMessage(
-    val id: AiChatMessage.Id,
-    val content: String,
-    val tokensOutput: Int,
-)
 
 private suspend fun ServerSSESession.send(event: StreamEvent) =
     send(ServerSentEvent(data = json.encodeToString<StreamEvent>(event)))

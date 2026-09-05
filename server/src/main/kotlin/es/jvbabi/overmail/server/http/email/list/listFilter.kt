@@ -2,6 +2,8 @@ package es.jvbabi.overmail.server.http.email.list
 
 import es.jvbabi.overmail.server.database.models.emailIsNotArchived
 import es.jvbabi.overmail.server.database.models.emailIsNotSpam
+import es.jvbabi.overmail.server.http.api.invalidRequest
+import es.jvbabi.overmail.server.http.api.queryParameter
 import io.ktor.server.application.ApplicationCall
 import org.jetbrains.exposed.v1.core.Op
 
@@ -16,10 +18,11 @@ enum class MailScope(val wire: String) {
     ALL("all"),
 }
 
-/** What `?scope=` asks for. The mailbox as it stands unless something else is named. */
-internal fun ApplicationCall.mailScope(): MailScope? {
-    val requested = request.queryParameters["scope"] ?: return MailScope.UNARCHIVED
+/** What `?scope=` asks for, or 400. The mailbox as it stands unless something else is named. */
+internal fun ApplicationCall.mailScope(): MailScope {
+    val requested = queryParameter("scope") ?: return MailScope.UNARCHIVED
     return MailScope.entries.firstOrNull { it.wire == requested }
+        ?: invalidRequest("scope", "is not one of unarchived, all", requested)
 }
 
 /**

@@ -20,10 +20,11 @@
     import {useRepositories} from "$lib/repository/repositories";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
-    import {emailPath, emailSlug, parseEmailId} from "./emailPath";
+    import {FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
-    import MailDetailPanel from "./detail_panel/MailDetailPanel.svelte";
+    import MailDetailPanel, {PANEL_COVER} from "./detail_panel/MailDetailPanel.svelte";
+    import {coverHeaderEnd} from "$lib/app/shell/pageHeader.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
@@ -83,6 +84,12 @@
      */
     const openId = $derived(parseEmailId(page.url.searchParams.get("email")));
 
+    // The panel is fixed and pinned to the same edge the header's controls sit at, so it covers
+    // them. Declared from here rather than from the panel itself: this runs the moment the mail
+    // is opened or closed, and the header then moves along with the panel sliding rather than
+    // after it has finished.
+    coverHeaderEnd(PANEL_COVER, () => openId !== null);
+
     /**
      * Opens a mail beside the list.
      *
@@ -102,6 +109,20 @@
         url.searchParams.set("email", emailSlug(id, mails.peek(id).value?.subject));
 
         void navigate(url, history);
+    }
+
+    /**
+     * Leaves the list for the mail's own page, in this tab and as an entry of its own in the
+     * history -- so the back button of the browser, and the one that page shows because of the
+     * query, both land back on the list.
+     */
+    function openEmailPage(id: string, subject: string | null | undefined) {
+        const url = new URL(emailPath(id, subject), page.url);
+        url.searchParams.set(FROM_PARAM, FROM_MAIL_LIST);
+
+        // Through goto with its defaults, not through [navigate]: this one is a page change, so
+        // the scroll position and the focus are the router's business after all.
+        void goto(url);
     }
 
     function closeEmail() {
@@ -321,9 +342,10 @@
                              hover, which is enough for one clipped line per mail. -->
                         <!-- mousemove rather than mouseenter: the preview follows the cursor
                              along the row, and the wait for it runs from the first move on. -->
-                        <!-- A click opens the mail beside the list, a double click opens its own
-                             page in a new tab -- the click that came first has opened the panel
-                             by then, which is where the mail is either way. -->
+                        <!-- A click opens the mail beside the list, a double click goes to its own
+                             page -- here, not in a new tab: the click that came first has pushed
+                             the panel into the history, so the page's back button leads to the
+                             list with that mail still open. The query is what puts it there. -->
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <Table.Row
                                 aria-rowindex={item.index + 1}
@@ -332,7 +354,7 @@
                                 onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
                                 onmouseleave={() => rowPreview?.leave()}
                                 onclick={() => showEmail(modelRow.id, "push")}
-                                ondblclick={() => window.open(emailPath(modelRow.id, row?.mail.subject), "_blank")}
+                                ondblclick={() => openEmailPage(modelRow.id, row?.mail.subject)}
                         >
                             {#each modelRow.getAllCells() as cell (cell.id)}
                                 <Table.Cell class="h-10 overflow-hidden py-0">

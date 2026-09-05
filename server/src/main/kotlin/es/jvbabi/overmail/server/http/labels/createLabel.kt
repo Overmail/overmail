@@ -1,21 +1,22 @@
 package es.jvbabi.overmail.server.http.labels
 
-import es.jvbabi.overmail.server.auth.user
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.attachLabelToEmail
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
+import es.jvbabi.overmail.server.http.api.invalidRequest
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.post
+import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
@@ -23,7 +24,6 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.lowerCase
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlin.uuid.Uuid
 
 /** `#rrggbb`, which is what the column holds and what a stylesheet can be handed. */
 private val COLOR = Regex("^#[0-9a-fA-F]{6}$")
@@ -46,25 +46,18 @@ private val COLOR = Regex("^#[0-9a-fA-F]{6}$")
 fun Route.createLabel() {
     authenticate {
         post {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val mailNotifier = application.dependencies.resolve<MailNotifier>()
-            val user = call.user
+            val mailNotifier = call.dependency<MailNotifier>()
+            val user = call.requireAuthenticatedUser()
 
             val request = call.receive<CreateLabelRequest>()
 
             val name = Label.normalizeName(request.name)
-            if (name.isEmpty()) {
-                call.respond(HttpStatusCode.BadRequest, "A label needs a name")
-                return@post
-            }
+            if (name.isEmpty()) invalidRequest("name", "a label needs a name")
 
             val color = request.color
-            if (color != null && !COLOR.matches(color)) {
-                call.respond(HttpStatusCode.BadRequest, "A colour is #rrggbb")
-                return@post
-            }
+            if (color != null && !COLOR.matches(color)) invalidRequest("color", "is not #rrggbb", color)
 
-            val (label, attachedTo) = database.query {
+            val (label, attachedTo) = call.database().query {
                 val existing = Label
                     .find { (Labels.owner eq user.id) and (Labels.name.lowerCase() eq name.lowercase()) }
                     .firstOrNull()

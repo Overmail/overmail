@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.labels.createLabel
 import io.ktor.client.request.delete
 import io.ktor.client.request.post
@@ -108,11 +109,11 @@ class EmailLabelsTest {
             mailOfTheirs to labelOfTheirs
         }
 
-        // Told apart nowhere: a mail of theirs, a label of theirs and an id that is nothing.
-        assertEquals(HttpStatusCode.NotFound, client.post("/api/emails/${foreign.first}/labels/$label").status)
-        assertEquals(HttpStatusCode.NotFound, client.post("/api/emails/$mail/labels/${foreign.second}").status)
+        // Somebody else's is a 403, something that is not there at all a 404.
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/emails/${foreign.first}/labels/$label").status)
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/emails/$mail/labels/${foreign.second}").status)
         assertEquals(HttpStatusCode.NotFound, client.post("/api/emails/$mail/labels/${Uuid.random()}").status)
-        assertEquals(HttpStatusCode.NotFound, client.delete("/api/emails/${foreign.first}/labels/$label").status)
+        assertEquals(HttpStatusCode.Forbidden, client.delete("/api/emails/${foreign.first}/labels/$label").status)
         assertTrue(!attached(foreign.first, label))
     }
 
@@ -271,6 +272,7 @@ class EmailLabelsTest {
     private fun ApplicationTestBuilder.installRoute() {
         application {
             install(ContentNegotiation) { json() }
+            installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
             dependencies {
                 provide<OvermailDatabase> { database }

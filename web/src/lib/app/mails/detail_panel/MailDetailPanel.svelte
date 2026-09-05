@@ -1,16 +1,29 @@
+<script module lang="ts">
+    import {quintOut} from "svelte/easing";
+
+    /**
+     * What the panel takes up, and how it gets there: its width in pixels, and the slide it
+     * comes in and goes out on. Short and hard out of the gate -- the panel is a step in a list,
+     * not a page turning.
+     *
+     * One description for both, because the header steps its own controls out from under the
+     * panel and has to move *with* it rather than merely at the same time: run against the
+     * closest curve CSS has a name for, this one is a hundred pixels ahead of it halfway
+     * through.
+     */
+    export const PANEL_COVER = {width: 672, motion: {durationMs: 150, easing: quintOut}};
+</script>
+
 <script lang="ts">
     import {untrack} from "svelte";
     import {cn} from "$lib/utils";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {fly} from "svelte/transition";
-    import {cubicOut, quintOut} from "svelte/easing";
+    import {cubicOut} from "svelte/easing";
     import {useRepositories} from "$lib/repository/repositories";
     import Head from "./Head.svelte";
     import type {MailStep} from "$lib/app/mails/MailListViewModel.svelte.js";
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
-
-    /** Short and hard out of the gate: the panel is a step in a list, not a page turning. */
-    const DURATION_MS = 150;
 
     /**
      * How far the content moves when the mail changes, and for how long.
@@ -151,15 +164,16 @@
         const sign = getComputedStyle(node).direction === "rtl" ? -1 : 1;
 
         return {
-            duration: DURATION_MS,
-            easing: quintOut,
+            duration: PANEL_COVER.motion.durationMs,
+            easing: PANEL_COVER.motion.easing,
             css: (_t: number, u: number) => `transform: translateX(${sign * u * 100}%)`,
         };
     }
 </script>
 
 <div
-        class="fixed inset-y-0 inset-e-(--panel-offset) z-40 flex w-2xl flex-col border-s bg-background
+        style:width="{PANEL_COVER.width}px"
+        class="fixed inset-y-0 inset-e-(--panel-offset) z-40 flex flex-col border-s bg-background
                shadow-[-8px_0_24px_-8px_rgb(0_0_0/0.18)]
                transition-[left,right] duration-(--panel-duration) ease-linear"
         transition:slide

@@ -1,15 +1,15 @@
 package es.jvbabi.overmail.server.http.email.list
 
-import es.jvbabi.overmail.server.auth.user
-import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
-import io.ktor.http.HttpStatusCode
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.invalidRequest
+import es.jvbabi.overmail.server.http.api.queryParameter
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.application
 import io.ktor.server.routing.get
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -40,15 +40,11 @@ import org.jetbrains.exposed.v1.jdbc.select
 fun Route.emailListGroups() {
     authenticate {
         get {
-            val requested = call.request.queryParameters["by"] ?: EmailGrouping.NONE.wire
-            val grouping = EmailGrouping.entries.firstOrNull { it.wire == requested }
-                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val grouping = call.emailGrouping()
+            val scope = call.mailScope()
+            val userId = call.requireAuthenticatedUserId()
 
-            val database = call.application.dependencies.resolve<OvermailDatabase>()
-            val userId = call.user.id.value
-            val scope = call.mailScope() ?: return@get call.respond(HttpStatusCode.BadRequest)
-
-            val groups = database.query {
+            val groups = call.database().query {
                 val mails = Emails.id.count()
 
                 when (grouping) {
@@ -92,6 +88,13 @@ fun Route.emailListGroups() {
 private enum class EmailGrouping(val wire: String) {
     NONE("none"),
     DATE("date"),
+}
+
+/** What `?by=` asks for, or 400. One stretch over everything unless a cut is named. */
+private fun ApplicationCall.emailGrouping(): EmailGrouping {
+    val requested = queryParameter("by") ?: return EmailGrouping.NONE
+    return EmailGrouping.entries.firstOrNull { it.wire == requested }
+        ?: invalidRequest("by", "is not one of none, date", requested)
 }
 
 @Serializable

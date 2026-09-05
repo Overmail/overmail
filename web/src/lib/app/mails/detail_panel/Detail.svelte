@@ -11,7 +11,7 @@
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import Participants from "$lib/app/home/Participants.svelte";
-    import Labels from "$lib/app/mails/detail_panel/Labels.svelte";
+    import Labels from "$lib/app/labels/Labels.svelte";
     import Content from "$lib/app/mails/detail_panel/Content.svelte";
     import {MAIL_DETAIL_TRANSITION} from "$lib/app/mails/mailViewTransition";
 
@@ -36,6 +36,7 @@
 
         <Labels
                 labels={mail.labels}
+                class="px-6"
                 onAddLabel={(label) => mails.attachLabel(mail.id, label.id)}
                 onCreateLabel={(name) => mails.createLabelOn(mail.id, name)}
                 onRemoveLabel={(label) => mails.detachLabel(mail.id, label.id)}

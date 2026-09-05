@@ -116,7 +116,8 @@
       "noContent": "No content",
       "menu": {
         "ai": "Overmail AI",
-        "reclassify": "Reclassify"
+        "reclassify": "Reclassify",
+        "view": "View"
       }
     }
   },

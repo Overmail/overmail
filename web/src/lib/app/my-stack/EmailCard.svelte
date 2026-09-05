@@ -1,19 +1,22 @@
 <script lang="ts">
     import {OvermailAvatar} from "$lib/components/avatar";
-    import * as Tooltip from "$lib/components/ui/tooltip";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
     import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
-    import type {EmailLabel} from "$lib/repository/EmailRepository.svelte";
+    import Labels from "$lib/app/labels/Labels.svelte";
+    import {useRepositories} from "$lib/repository/repositories";
     import {displayName, spelledOut} from "$lib/app/mails/participants";
     import {Button} from "$lib/components/ui/button";
     import { DotsThreeVerticalIcon } from "phosphor-svelte";
     import {getStackFocus} from "$lib/app/my-stack/stackFocus";
     import {_} from "svelte-i18n";
     import {onMount} from "svelte";
+    import {goto} from "$app/navigation";
+    import {emailSlug} from "$lib/app/mails/emailPath";
 
     let {
+        id,
         sent,
         sender,
         to,
@@ -33,6 +36,20 @@
     } = $props();
 
     const stackFocus = getStackFocus();
+    const {mails} = useRepositories();
+
+    /**
+     * Sorting the mail from the card itself. Straight to the repository rather than through the
+     * stack: what a mail is labelled is the mail's, not the pile's -- the stack only says which
+     * one is in front -- and the card is told what it did over the same socket as everywhere else.
+     *
+     * The keyboard goes back to the stack afterwards, the same as it does when the card's menu
+     * closes: whatever was pressed here would otherwise hold it, and the pile is worked through
+     * with single keys that only count while the stack has the focus.
+     */
+    function afterLabelChange() {
+        stackFocus?.restore();
+    }
 
     /**
      * How long a body gets to lay itself out before the card is shown anyway. Whoever is waiting
@@ -130,6 +147,14 @@
                             {$_('myStack.email.menu.reclassify')}
                         </DropdownMenu.Item>
                     </DropdownMenu.Group>
+
+                    <DropdownMenu.Group>
+                        <DropdownMenu.Item onclick={() => {
+                            goto(`/emails/${emailSlug(id, subject)}`);
+                        }}>
+                            {$_('myStack.email.menu.view')}
+                        </DropdownMenu.Item>
+                    </DropdownMenu.Group>
                 </DropdownMenu.Content>
             </DropdownMenu.Root>
         </div>
@@ -148,42 +173,17 @@
         {subject}
     </div>
 
-    <!-- Chips carry the label color as a dot and a subtle tint; the text keeps the theme's
-         foreground color so any label color stays readable in light and dark mode. -->
-    {#snippet chip(label: EmailLabel, props: Record<string, unknown> = {})}
-        <span
-                {...props}
-                class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                style={`background-color: color-mix(in srgb, ${label.color} 12%, transparent); border-color: color-mix(in srgb, ${label.color} 35%, transparent);`}
-        >
-            <span class="size-1.5 shrink-0 rounded-full" style={`background-color: ${label.color};`}></span>
-            {label.name}
-        </span>
-    {/snippet}
-
-    <div class="px-4 pt-3 flex flex-row flex-wrap items-center gap-1.5 sm:px-8">
-        {#each labels as label (label.id)}
-            {#if label.description || label.assignmentReason}
-                <Tooltip.Root>
-                    <Tooltip.Trigger>
-                        {#snippet child({props})}
-                            {@render chip(label, props)}
-                        {/snippet}
-                    </Tooltip.Trigger>
-                    <Tooltip.Content side="bottom" class="flex-col items-start gap-0.5">
-                        {#if label.description}
-                            <p>{label.description}</p>
-                        {/if}
-                        {#if label.assignmentReason}
-                            <p class="text-background/70">{label.assignmentReason}</p>
-                        {/if}
-                    </Tooltip.Content>
-                </Tooltip.Root>
-            {:else}
-                {@render chip(label)}
-            {/if}
-        {/each}
-    </div>
+    <Labels
+            {labels}
+            class="px-4 pt-3 sm:px-8"
+            onAddLabel={(label) => mails.attachLabel(id, label.id)}
+            onCreateLabel={(name) => mails.createLabelOn(id, name)}
+            onRemoveLabel={(label) => {
+                void mails.detachLabel(id, label.id);
+                afterLabelChange();
+            }}
+            onRestoreFocus={afterLabelChange}
+    />
 
     <div class="mx-4 my-4 h-px bg-accent"></div>
 

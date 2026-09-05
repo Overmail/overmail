@@ -300,14 +300,14 @@ test("the inbox is on by default and nothing else is", async () => {
 
     // Trash off by default: importing it would pull in exactly what was thrown away.
     expect(viewModel.folders.filter((f) => f.enabled).map((f) => f.fullName)).toEqual(["INBOX"]);
-    expect(viewModel.folders.every((f) => f.importMode.type === "new_only")).toBe(true);
+    expect(viewModel.folders.every((f) => f.aiProcessing.type === "new_only")).toBe(true);
 
     viewModel.toggleFolder("Archiv.Newsletter");
-    viewModel.setImportMode("Archiv.Newsletter", {type: "last_n", count: 50});
+    viewModel.setAiProcessing("Archiv.Newsletter", {type: "newest", count: 50});
 
     const newsletter = viewModel.folders.find((f) => f.fullName === "Archiv.Newsletter")!;
     expect(newsletter.enabled).toBe(true);
-    expect(newsletter.importMode).toEqual({type: "last_n", count: 50});
+    expect(newsletter.aiProcessing).toEqual({type: "newest", count: 50});
 });
 
 test("a mailbox that could not be opened is a failed scan, not an empty one", async () => {

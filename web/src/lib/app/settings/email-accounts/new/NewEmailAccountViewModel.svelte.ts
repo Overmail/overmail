@@ -52,12 +52,17 @@ export type FolderScanState =
     | {type: "done"}
     | {type: "failed"; outcome: string | null};
 
-/** What the importer should pull out of a folder. Per folder, because a Sent is not an INBOX. */
-export type ImportMode =
+/**
+ * How far back the assistant reads in a folder. Not what is imported -- every mail of an enabled
+ * folder is; this is only how much of it the ai is put through, which is the part that costs.
+ *
+ * Per folder, because a Sent is not an INBOX.
+ */
+export type AiProcessingMode =
     /** Only what arrives from now on. */
     | {type: "new_only"}
     /** The newest [count] mails, and then whatever arrives. */
-    | {type: "last_n"; count: number}
+    | {type: "newest"; count: number}
     /** Everything sent on or after [date] (`yyyy-mm-dd`). */
     | {type: "since"; date: string};
 
@@ -80,7 +85,7 @@ export type FolderRow = {
     oldestMailAt: string | null;
     /** Whether the numbers above are in, so a row can show a placeholder until they are. */
     counted: boolean;
-    importMode: ImportMode;
+    aiProcessing: AiProcessingMode;
 };
 
 /**
@@ -194,9 +199,9 @@ export class NewEmailAccountViewModel {
             : [...this.collapsed, fullName];
     }
 
-    setImportMode(fullName: string, mode: ImportMode) {
+    setAiProcessing(fullName: string, mode: AiProcessingMode) {
         const folder = this.folders.find((row) => row.fullName === fullName);
-        if (folder) folder.importMode = mode;
+        if (folder) folder.aiProcessing = mode;
     }
 
     /** Called when the dialog closes, so no check and no scan outlives it. */
@@ -402,6 +407,6 @@ function toRows(folders: FolderNode[]): FolderRow[] {
         mailCount: null,
         oldestMailAt: null,
         counted: false,
-        importMode: {type: "new_only"},
+        aiProcessing: {type: "new_only"},
     }));
 }

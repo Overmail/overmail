@@ -133,22 +133,68 @@
       "add": "Neues Postfach hinzufügen",
       "new": {
         "title": "Neues Postfach",
-        "description": "Verbinde deinen E-Mail-Anbieter. Die IMAP-Daten bekommst du dort.",
         "cancel": "Abbrechen",
-        "host": "IMAP-Server",
-        "port": "Port",
-        "test": {
-          "testing": "Verbinde…",
-          "reachable": "Server erreichbar",
-          "loginDisabled": "Erreichbar, aber ohne Passwort-Anmeldung",
-          "failed": "Prüfung nicht möglich",
-          "outcome": {
-            "host_not_found": "Diesen Server gibt es nicht",
-            "connection_failed": "Auf diesem Port antwortet nichts",
-            "tls_failed": "Kein TLS auf diesem Port – meist ist es 993",
-            "no_imap_server": "Hier antwortet kein IMAP-Server",
-            "timeout": "Keine Antwort vom Server",
-            "unknown": "Keine Verbindung"
+        "next": "Weiter",
+        "steps": {
+          "server": "Server",
+          "credentials": "Anmeldung",
+          "folders": "Ordner"
+        },
+        "server": {
+          "description": "Verbinde deinen E-Mail-Anbieter. Die IMAP-Daten bekommst du dort.",
+          "host": "IMAP-Server",
+          "port": "Port",
+          "test": {
+            "testing": "Verbinde…",
+            "reachable": "Server erreichbar",
+            "loginDisabled": "Erreichbar, aber ohne Passwort-Anmeldung",
+            "failed": "Prüfung nicht möglich",
+            "outcome": {
+              "host_not_found": "Diesen Server gibt es nicht",
+              "connection_failed": "Auf diesem Port antwortet nichts",
+              "tls_failed": "Kein TLS auf diesem Port – meist ist es 993",
+              "no_imap_server": "Hier antwortet kein IMAP-Server",
+              "timeout": "Keine Antwort vom Server",
+              "unknown": "Keine Verbindung"
+            }
+          }
+        },
+        "credentials": {
+          "description": "Deine Anmeldung für {host}. Oft die Adresse selbst.",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "test": {
+            "testing": "Melde an…",
+            "authenticated": "Anmeldung funktioniert",
+            "failed": "Prüfung nicht möglich",
+            "outcome": {
+              "invalid_credentials": "Der Server lehnt diese Zugangsdaten ab",
+              "connection_failed": "Der Server antwortet nicht mehr",
+              "timeout": "Keine Antwort vom Server",
+              "unknown": "Anmeldung hat nicht geklappt"
+            }
+          }
+        },
+        "folders": {
+          "description": "Wähle die Ordner und wie weit der Assistent darin zurücklesen soll.",
+          "listing": "Schaue im Postfach nach…",
+          "counting": "Zähle Ordner… {counted} von {total}",
+          "failed": "Das Postfach konnte nicht gelesen werden.",
+          "empty": "Dieses Postfach hat keine Ordner.",
+          "columns": {
+            "folder": "Ordner",
+            "mails": "E-Mails",
+            "oldest": "Älteste",
+            "ai": "Assistent liest"
+          },
+          "pending": "…",
+          "unknown": "—",
+          "aiMode": {
+            "new_only": "Nur neue E-Mails",
+            "newest": "Neueste",
+            "since": "Alles ab",
+            "countLabel": "Wie viele E-Mails",
+            "dateLabel": "Lesen ab diesem Datum"
           }
         }
       }

@@ -133,22 +133,68 @@
       "add": "Add a new inbox",
       "new": {
         "title": "New inbox",
-        "description": "Connect your email provider. They have the imap details.",
         "cancel": "Cancel",
-        "host": "IMAP server",
-        "port": "Port",
-        "test": {
-          "testing": "Connecting…",
-          "reachable": "Server reachable",
-          "loginDisabled": "Reachable, but no password sign-in",
-          "failed": "Could not run the check",
-          "outcome": {
-            "host_not_found": "No server under this address",
-            "connection_failed": "Nothing answers on this port",
-            "tls_failed": "No TLS on this port — usually 993",
-            "no_imap_server": "Not an imap server",
-            "timeout": "No answer from the server",
-            "unknown": "No connection"
+        "next": "Next",
+        "steps": {
+          "server": "Server",
+          "credentials": "Sign-in",
+          "folders": "Folders"
+        },
+        "server": {
+          "description": "Connect your email provider. They have the imap details.",
+          "host": "IMAP server",
+          "port": "Port",
+          "test": {
+            "testing": "Connecting…",
+            "reachable": "Server reachable",
+            "loginDisabled": "Reachable, but no password sign-in",
+            "failed": "Could not run the check",
+            "outcome": {
+              "host_not_found": "No server under this address",
+              "connection_failed": "Nothing answers on this port",
+              "tls_failed": "No TLS on this port — usually 993",
+              "no_imap_server": "Not an imap server",
+              "timeout": "No answer from the server",
+              "unknown": "No connection"
+            }
+          }
+        },
+        "credentials": {
+          "description": "Your sign-in for {host}. Often the address itself.",
+          "username": "Username",
+          "password": "Password",
+          "test": {
+            "testing": "Signing in…",
+            "authenticated": "Sign-in works",
+            "failed": "Could not run the check",
+            "outcome": {
+              "invalid_credentials": "The server rejected these credentials",
+              "connection_failed": "The server is no longer answering",
+              "timeout": "No answer from the server",
+              "unknown": "Sign-in did not work"
+            }
+          }
+        },
+        "folders": {
+          "description": "Pick the folders to sync, and how far back the assistant should read.",
+          "listing": "Looking through the mailbox…",
+          "counting": "Counting folders… {counted} of {total}",
+          "failed": "The mailbox could not be read.",
+          "empty": "This mailbox has no folders.",
+          "columns": {
+            "folder": "Folder",
+            "mails": "Mails",
+            "oldest": "Oldest",
+            "ai": "Assistant reads"
+          },
+          "pending": "…",
+          "unknown": "—",
+          "aiMode": {
+            "new_only": "Only new mail",
+            "newest": "Newest",
+            "since": "Everything from",
+            "countLabel": "How many mails",
+            "dateLabel": "Read from this date"
           }
         }
       }

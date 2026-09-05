@@ -1,5 +1,6 @@
 <!--
-  The brand's ochre, the same one the web favicon sits on (web/src/lib/assets/favicon.svg).
+  Debug builds only: a green icon is what tells a development build apart on the
+  launcher, the same way it does in Trails. Everything else about the icon is shared.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -8,5 +9,5 @@
     android:viewportHeight="108">
     <path
         android:pathData="M0,0h108v108h-108z"
-        android:fillColor="#E6E3DA" />
+        android:fillColor="#43B600" />
 </vector>

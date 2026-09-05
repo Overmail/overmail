@@ -412,3 +412,45 @@ test("the debounce still fires on its own when enter is not pressed", async () =
 
     expect(hostProbe).toHaveBeenCalledTimes(1);
 });
+
+test("collapsing a folder hides its grandchildren too", async () => {
+    // Three levels, as a real mailbox has them: Spam > Test2 > Test.
+    const {repository} = walkingThrough({
+        folders: async function* () {
+            yield {
+                type: "folders",
+                folders: [
+                    {path: ["INBOX"], fullName: "INBOX", name: "INBOX", delimiter: "/", specialType: "INBOX"},
+                    {path: ["Spam"], fullName: "Spam", name: "Spam", delimiter: "/", specialType: "SPAM"},
+                    {path: ["Spam", "Test2"], fullName: "Spam/Test2", name: "Test2", delimiter: "/", specialType: null},
+                    {
+                        path: ["Spam", "Test2", "Test"],
+                        fullName: "Spam/Test2/Test",
+                        name: "Test",
+                        delimiter: "/",
+                        specialType: null,
+                    },
+                ],
+            };
+            yield {type: "done"};
+        },
+    });
+
+    const viewModel = await atFolderStep(repository);
+
+    expect(viewModel.folders.map((f) => [f.name, f.depth, f.hasChildren])).toEqual([
+        ["INBOX", 0, false],
+        ["Spam", 0, true],
+        ["Test2", 1, true],
+        ["Test", 2, false],
+    ]);
+
+    // Collapsing the top of the branch takes the whole branch, not just one level of it.
+    viewModel.toggleCollapsed("Spam");
+    expect(viewModel.visibleFolders.map((f) => f.fullName)).toEqual(["INBOX", "Spam"]);
+
+    // And collapsing the middle leaves the middle visible under its parent.
+    viewModel.toggleCollapsed("Spam");
+    viewModel.toggleCollapsed("Spam/Test2");
+    expect(viewModel.visibleFolders.map((f) => f.fullName)).toEqual(["INBOX", "Spam", "Spam/Test2"]);
+});

@@ -20,7 +20,7 @@
     import {useRepositories} from "$lib/repository/repositories";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
-    import {FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
+    import {EMAIL_PARAM, FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
     import MailDetailPanel, {PANEL_COVER} from "./detail_panel/MailDetailPanel.svelte";
@@ -82,7 +82,7 @@
      * reload, a link and the back button all land on the same mail, and there is no second copy
      * of it to keep in step.
      */
-    const openId = $derived(parseEmailId(page.url.searchParams.get("email")));
+    const openId = $derived(parseEmailId(page.url.searchParams.get(EMAIL_PARAM)));
 
     // The panel is fixed and pinned to the same edge the header's controls sit at, so it covers
     // them. Declared from here rather than from the panel itself: this runs the moment the mail
@@ -106,7 +106,7 @@
         if (id === openId) return;
 
         const url = new URL(page.url);
-        url.searchParams.set("email", emailSlug(id, mails.peek(id).value?.subject));
+        url.searchParams.set(EMAIL_PARAM, emailSlug(id, mails.peek(id).value?.subject));
 
         void navigate(url, history);
     }
@@ -127,7 +127,7 @@
 
     function closeEmail() {
         const url = new URL(page.url);
-        url.searchParams.delete("email");
+        url.searchParams.delete(EMAIL_PARAM);
 
         void navigate(url, "replace");
     }

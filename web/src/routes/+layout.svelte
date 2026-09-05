@@ -2,7 +2,7 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import {page} from '$app/state';
-	import {goto} from '$app/navigation';
+	import {goto, onNavigate} from '$app/navigation';
 	import {type Session} from '$lib/repository/AuthRepository';
 	import {provideRepositories} from '$lib/repository/repositories';
 	import * as Sidebar from "$lib/components/ui/sidebar";
@@ -14,8 +14,36 @@
 	import {SidePanelState} from "$lib/app/shell/sidePanel.svelte";
 	import SidePanelResizer from "$lib/app/shell/SidePanelResizer.svelte";
 	import {fade} from 'svelte/transition';
+	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
 
 	let { children } = $props();
+
+	/**
+	 * The browser's view transitions, for the one navigation that has two views of the same mail at
+	 * its ends: the panel beside the list and the mail's own page. See mailViewTransition, which
+	 * says which navigation that is and which elements are the same thing at both ends.
+	 *
+	 * Everything else navigates the way it did. Returning nothing here is the plain swap, and it is
+	 * also what a browser without the API and a reader who asked for less motion get.
+	 */
+	onNavigate((navigation) => {
+		if (!morphsBetweenPanelAndPage(navigation.from?.url, navigation.to?.url)) return;
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+		// The contract of onNavigate: SvelteKit waits for what this returns before it touches the
+		// DOM. Resolving inside the update callback is what puts the navigation between the two
+		// snapshots the browser takes -- the old one is already captured when it runs, the new one
+		// is taken once the page it awaits is rendered.
+		return new Promise((resolve) => {
+			const transition = startMorph(async () => {
+				resolve();
+				await navigation.complete;
+			});
+
+			// No view transitions here: the plain swap, right away.
+			if (transition === null) resolve();
+		});
+	});
 
 	// Set up here rather than in the header: the header is a sibling of the page, and only a
 	// context from above the page reaches it.

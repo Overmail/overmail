@@ -131,3 +131,130 @@
 		@apply font-sans;
 	}
 }
+
+/*
+ * The morph between the mail beside the list and the mail on its own page. Which navigation that
+ * is and which elements carry these names is in lib/app/mails/mailViewTransition.ts; this is only
+ * how the two snapshots the browser took of each are animated into each other.
+ *
+ * Every part changes width a lot -- a panel pinned to the edge becoming a column -- so no snapshot
+ * of *content* is stretched into the shape it is heading for: each keeps its own size, anchored at
+ * the corner its content hangs from, and the group animating around it clips. That reads as things
+ * moving to where they will be rather than as pictures being pulled apart. The box underneath is
+ * the one exception, see below.
+ */
+::view-transition-group(root),
+::view-transition-group(mail-box),
+::view-transition-group(mail-subject),
+::view-transition-group(mail-detail),
+::view-transition-group(mail-tools) {
+	animation-duration: 300ms;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(mail-box),
+::view-transition-new(mail-box) {
+	animation-duration: 300ms;
+}
+
+::view-transition-image-pair(mail-box),
+::view-transition-image-pair(mail-subject),
+::view-transition-image-pair(mail-detail),
+::view-transition-image-pair(mail-tools) {
+	overflow: clip;
+}
+
+/*
+ * `auto` rather than the browser's `100%`: a snapshot is a replaced element, and at its own size it
+ * cannot be pulled out of shape however the group around it moves. That holds in every browser
+ * with view transitions; `object-fit: none` would say the same, but not everywhere -- with the
+ * width and height both at 100% and object-fit ignored, the mail was squashed to the panel's
+ * height and stretched to the page's width halfway through.
+ */
+::view-transition-old(mail-subject),
+::view-transition-new(mail-subject),
+::view-transition-old(mail-detail),
+::view-transition-new(mail-detail),
+::view-transition-old(mail-tools),
+::view-transition-new(mail-tools) {
+	width: auto;
+	height: auto;
+	object-fit: none;
+	object-position: top left;
+}
+
+/*
+ * The box's snapshots keep their size like everything else -- stretched to the group, the back
+ * button on the page's would be squashed to the panel's height at the start and the panel's edge
+ * pulled wide at the end. What makes that safe is the group itself being painted: cut out means
+ * cut out, so where the mail and the tools were, both snapshots are holes, and neither snapshot
+ * fills a group that is wider than it. The group's own background is the one thing under the
+ * whole morph that is never a picture with holes in it -- without it the list behind would show
+ * through right where its dates are.
+ */
+::view-transition-group(mail-box) {
+	background-color: var(--background);
+}
+
+::view-transition-old(mail-box),
+::view-transition-new(mail-box) {
+	width: auto;
+	height: auto;
+	object-fit: none;
+	object-position: top left;
+}
+
+/* The tools sit at the end of their bar at both ends, and the bars differ in height -- the panel's
+   has padding around the buttons, the page's is the buttons -- so the snapshot is pinned to the
+   end edge and the middle of the group instead of its start corner. */
+::view-transition-old(mail-tools),
+::view-transition-new(mail-tools) {
+	inset-inline-start: auto;
+	inset-inline-end: 0;
+	inset-block-start: 50%;
+	transform: translateY(-50%);
+}
+
+/*
+ * No cross-fade for what is the same at both ends -- the words of the subject, the mail -- and
+ * none for the tools either: the panel's bar has buttons the page's has not (step, close), so a
+ * fade would slide one row of icons across the other. One snapshot is shown alone, from the first
+ * frame, and simply travels: the arriving one.
+ *
+ * The box too: its two snapshots hold the mail's body, and a fade between them is the body twice,
+ * a line apart. The one arriving is shown from the start, body and all, once it is there.
+ *
+ * Which is only safe because none of these changes size while the morph runs. A new snapshot is
+ * live, and Firefox keeps it at the size it had when the morph began -- anything that grows
+ * afterwards is squashed into that. The box is as tall as the page from the first paint (see
+ * MailPage), and the mail's body, which does grow, is in no named block of its own; see Detail.
+ */
+::view-transition-old(mail-subject),
+::view-transition-old(mail-detail),
+::view-transition-old(mail-tools),
+::view-transition-old(mail-box) {
+	animation: none;
+	opacity: 0;
+}
+
+::view-transition-new(mail-subject),
+::view-transition-new(mail-detail),
+::view-transition-new(mail-tools),
+::view-transition-new(mail-box) {
+	animation: none;
+	opacity: 1;
+}
+
+/*
+ * Asked for less motion, given none: the hook in +layout.svelte does not start a transition then,
+ * and this is the same answer for a transition somebody starts later.
+ */
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none !important;
+	}
+}

@@ -24,7 +24,8 @@
     import {_} from "svelte-i18n";
     import {scale, slide} from "svelte/transition";
     import {cubicOut} from "svelte/easing";
-    import {emailPath} from "$lib/app/mails/emailPath";
+    import {FROM_MAIL_LIST, FROM_PARAM, emailPath} from "$lib/app/mails/emailPath";
+    import {MAIL_TOOLS_TRANSITION} from "$lib/app/mails/mailViewTransition";
     import {page} from "$app/state";
     import {cn} from "$lib/utils";
 
@@ -76,9 +77,14 @@
     // Through emailPath rather than spelled out again: that function is where the route of a
     // mail lives, and the copy button hands out an address, so it needs the origin in front.
     const emailPageUrl = $derived(page.url.origin + emailPath(mail.id, mail.subject));
+    /**
+     * The same address with the query that says where the reader came from: it is what puts the
+     * back button on that page, and what the layout reads to morph the panel into it rather than
+     * swap one view for the other. See mailViewTransition.
+     */
     const emailPageUrlInSameTab = $derived.by(() => {
         const url = new URL(emailPageUrl);
-        url.searchParams.set("from", "mail-list");
+        url.searchParams.set(FROM_PARAM, FROM_MAIL_LIST);
         return url.toString();
     });
 
@@ -99,7 +105,13 @@
     }
 </script>
 
-<div class={cn("flex flex-row items-center justify-between w-full px-4", propsClass)}>
+<!-- Named, because the panel and the page both have this bar: across the navigation between them
+     the browser moves the one into the other, anchored at the end where the tools are. See
+     mailViewTransition. -->
+<div
+        style:view-transition-name={MAIL_TOOLS_TRANSITION}
+        class={cn("flex flex-row items-center justify-between w-full px-4", propsClass)}
+>
     <div class="flex flex-row items-center">
         {#if onPreviousMail !== undefined && onNextMail !== undefined}
             <Tooltip.Root>

@@ -24,6 +24,7 @@
     import Head from "./Head.svelte";
     import type {MailStep} from "$lib/app/mails/MailListViewModel.svelte.js";
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
+    import {MAIL_BOX_TRANSITION, MAIL_SUBJECT_TRANSITION, isMorphing} from "$lib/app/mails/mailViewTransition";
 
     /**
      * How far the content moves when the mail changes, and for how long.
@@ -161,6 +162,11 @@
      * this is the inline end in both.
      */
     function slide(node: HTMLElement) {
+        // Not while the browser is morphing this panel into the mail's page: the slide would keep
+        // it in the DOM, and with it a second element of the page's name. Without a duration
+        // Svelte removes the node on the spot, and the morph is the only movement.
+        if (isMorphing()) return {duration: 0};
+
         const sign = getComputedStyle(node).direction === "rtl" ? -1 : 1;
 
         return {
@@ -171,12 +177,23 @@
     }
 </script>
 
+<!--
+    The box the browser morphs into the mail's own page, and back: the same name is on the column
+    of that page, and a name that moves from one element to another across a navigation is what a
+    view transition animates. See mailViewTransition.
+
+    Its slide is `|local`, so it plays when the panel itself opens and closes and not when the
+    route around it goes away; and it is skipped outright while a morph runs (see slide), because
+    an outro would leave two elements carrying that name at once, which is not a thing the browser
+    can morph -- it drops the transition and throws.
+-->
 <div
         style:width="{PANEL_COVER.width}px"
+        style:view-transition-name={MAIL_BOX_TRANSITION}
         class="fixed inset-y-0 inset-e-(--panel-offset) z-40 flex flex-col border-s bg-background
                shadow-[-8px_0_24px_-8px_rgb(0_0_0/0.18)]
                transition-[left,right] duration-(--panel-duration) ease-linear"
-        transition:slide
+        transition:slide|local
 >
     {#if mail}
         <Head
@@ -212,7 +229,23 @@
                     <div
                             in:fly={{y: shift, duration: SWAP_IN_MS, easing: cubicOut}}
                             out:fly={{y: -shift, duration: SWAP_OUT_MS, easing: cubicOut}}
+                            class="flex flex-col gap-6"
                     >
+                        <!-- The subject above the mail, and not part of it: the page has it in the
+                             line with the tools, and the browser carries the words from here to
+                             there. Detail then begins with the same line at both ends, so the mail
+                             does not travel through its own heading on the way. The name is on the
+                             text, inside the padding, so the snapshot starts where the heading's
+                             does. See mailViewTransition. -->
+                        <div class="px-6">
+                            <div
+                                    style:view-transition-name={MAIL_SUBJECT_TRANSITION}
+                                    class="font-display text-2xl text-pretty"
+                            >
+                                {mail.subject}
+                            </div>
+                        </div>
+
                         <Detail {mail}/>
                     </div>
                 {/key}

@@ -64,6 +64,12 @@ function subjectSlug(subject: string | null | undefined): string {
 }
 
 /**
+ * Where the listing keeps the mail it has open beside it: `/?email=<slug>`, which is what makes an
+ * open mail something you can link to, reload and step back out of.
+ */
+export const EMAIL_PARAM = "email";
+
+/**
  * How a mail page is told that the listing sent the reader there: the query the table puts on the
  * url, and the one thing that page reads to decide whether it shows a way back.
  *

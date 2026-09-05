@@ -28,6 +28,56 @@ export type ImapHostTest = {
 };
 
 const TEST_IMAP_HOST_ENDPOINT = "/api/users/me/inboxes/create/test/imap-host";
+const TEST_IMAP_LOGIN_ENDPOINT = "/api/users/me/inboxes/create/test/imap-login";
+const FOLDER_STREAM_ENDPOINT = "/api/users/me/inboxes/create/folders/stream";
+
+/** Why a login did not work, or `authenticated` when it did. Mirrors `ImapLoginTestOutcome`. */
+export type ImapLoginOutcome =
+    | "authenticated"
+    /** The server read the credentials and said no. */
+    | "invalid_credentials"
+    /** The host answered a step ago and does not anymore. */
+    | "connection_failed"
+    | "timeout"
+    | (string & {});
+
+/** What `POST .../test/imap-login` answers. */
+export type ImapLoginTest = {
+    authenticated: boolean;
+    outcome: ImapLoginOutcome;
+};
+
+/** One folder as the server's single `LIST` reports it, before anything has been counted. */
+export type FolderNode = {
+    /** The segments of the name. What the tree is built from; its length is the depth. */
+    path: string[];
+    /** [path] joined by [delimiter]. The id a [FolderStats] refers back to. */
+    fullName: string;
+    /** The last segment -- what a row shows. */
+    name: string;
+    delimiter: string;
+    /** `INBOX`, `SENT`, `SPAM`, `TRASH`, `DRAFTS`, or null for an ordinary folder. */
+    specialType: string | null;
+};
+
+/** What is in one folder. Nulls mean it could not be read; the folder still exists. */
+export type FolderStats = {
+    fullName: string;
+    mailCount: number | null;
+    /** ISO-8601, or null for an empty folder and for one that could not be read. */
+    oldestMailAt: string | null;
+};
+
+/** What comes out of [InboxSetupRepository.streamFolders], in the order the server sends it. */
+export type FolderStreamEvent =
+    /** The whole tree by name, once, before any counting. The table is drawn from this. */
+    | {type: "folders"; folders: FolderNode[]}
+    /** One folder's numbers, as it is counted. */
+    | {type: "stats"; stats: FolderStats}
+    /** Every folder has been counted. */
+    | {type: "done"}
+    /** The mailbox could not be opened. Nothing follows this. */
+    | {type: "error"; outcome: string};
 
 /**
  * The checks the "new inbox" dialog runs against a form nobody has submitted yet.
@@ -58,5 +108,125 @@ export class InboxSetupRepository {
             outcome: body.outcome as ImapHostOutcome,
             capabilities: (body.capabilities ?? []) as string[],
         };
+    }
+
+    /**
+     * Whether these credentials open that mailbox. Answers for every outcome; only a request
+     * that did not happen at all throws.
+     */
+    async testImapLogin(
+        host: string,
+        port: number,
+        username: string,
+        password: string,
+        signal?: AbortSignal,
+    ): Promise<ImapLoginTest> {
+        const response = await fetch(TEST_IMAP_LOGIN_ENDPOINT, {
+            method: "POST",
+            credentials: "include",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify({host, port, username, password}),
+            signal,
+        });
+        if (!response.ok) throw new Error(`Could not test the imap login: ${response.status}`);
+
+        const body = await response.json();
+        return {
+            authenticated: body.authenticated as boolean,
+            outcome: body.outcome as ImapLoginOutcome,
+        };
+    }
+
+    /**
+     * Every folder of the mailbox and what is in it, as the server works through them.
+     *
+     * A POST that answers with an event stream, read here off the response body. `EventSource`
+     * is not an option: it can only issue a GET, and these credentials must not end up in a
+     * query string. Which also means no automatic reconnect -- correctly, since a resumed scan
+     * would start the whole count over.
+     *
+     * Yields until `done` or `error`; abort [signal] to hang up early.
+     */
+    async *streamFolders(
+        host: string,
+        port: number,
+        username: string,
+        password: string,
+        signal?: AbortSignal,
+    ): AsyncGenerator<FolderStreamEvent> {
+        const response = await fetch(FOLDER_STREAM_ENDPOINT, {
+            method: "POST",
+            credentials: "include",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify({host, port, username, password}),
+            signal,
+        });
+        if (!response.ok || !response.body) {
+            throw new Error(`Could not read the folders: ${response.status}`);
+        }
+
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buffer = "";
+        try {
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                buffer += value;
+
+                // A frame is whatever stands before a blank line; anything after it is the
+                // beginning of the next one and stays in the buffer.
+                let boundary: number;
+                while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+                    const frame = buffer.slice(0, boundary);
+                    buffer = buffer.slice(boundary + 2);
+                    const event = parseFrame(frame);
+                    if (event) yield event;
+                }
+            }
+        } finally {
+            // Releasing the lock is not enough -- without the cancel the connection stays open
+            // when a caller stops iterating early.
+            await reader.cancel().catch(() => {});
+        }
+    }
+}
+
+/** One `data:` frame to an event, or null for the keep-alives and comments SSE allows. */
+function parseFrame(frame: string): FolderStreamEvent | null {
+    const data = frame
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice("data:".length).trimStart())
+        .join("\n");
+    if (!data) return null;
+
+    const body = JSON.parse(data);
+    switch (body.type) {
+        case "folders":
+            return {
+                type: "folders",
+                folders: (body.folders as any[]).map((folder) => ({
+                    path: folder.path as string[],
+                    fullName: folder.full_name as string,
+                    name: folder.name as string,
+                    delimiter: folder.delimiter as string,
+                    specialType: (folder.special_type ?? null) as string | null,
+                })),
+            };
+        case "stats":
+            return {
+                type: "stats",
+                stats: {
+                    fullName: body.full_name as string,
+                    mailCount: (body.mail_count ?? null) as number | null,
+                    oldestMailAt: (body.oldest_mail_at ?? null) as string | null,
+                },
+            };
+        case "done":
+            return {type: "done"};
+        case "error":
+            return {type: "error", outcome: body.outcome as string};
+        default:
+            return null;
     }
 }

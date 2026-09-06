@@ -36,8 +36,14 @@
             }
         }}
 >
+    <!--
+      Every step keeps the gap to the window edge: a plain `max-w-*` here overrides the
+      `max-w-[calc(100%-2rem)]` the dialog comes with, and between 1024px and 1088px wide that
+      left the dialog running edge to edge with no margin at all.
+    -->
     <Dialog.Content
-            class="overflow-hidden p-0 md:max-h-150 md:max-w-200 lg:max-w-[68rem] xl:max-w-[80rem]"
+            class="overflow-hidden p-0 md:max-h-150 md:max-w-[min(50rem,calc(100%_-_2rem))]
+                   lg:max-w-[min(68rem,calc(100%_-_2rem))] xl:max-w-[min(80rem,calc(100%_-_2rem))]"
             trapFocus={false}
     >
         <Dialog.Title class="sr-only">Settings</Dialog.Title>

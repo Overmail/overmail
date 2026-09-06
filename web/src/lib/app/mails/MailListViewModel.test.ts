@@ -4,6 +4,12 @@ import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 
 type Request = {scope: string; before: string | null; beforeId: string | null; limit: string | null};
 
+/** What was asked of `GET /api/emails/list/ids`: a scope and the send times a stretch spans. */
+type StretchRequest = {scope: string; from: string | null; to: string | null};
+
+/** Reset by [mailbox], so a test reads the ones its own mailbox answered. */
+let stretchRequests: StretchRequest[] = [];
+
 /** `yyyy-mm-dd` of a day, [daysBack] days ago in local time -- the zone the server cuts days in. */
 function day(daysBack: number): string {
     const date = new Date();
@@ -16,12 +22,18 @@ const startOfDayAfter = (key: string) => {
     return new Date(year, month - 1, dayOfMonth + 1).getTime() / 1000;
 };
 
+const startOfDay = (key: string) => {
+    const [year, month, dayOfMonth] = key.split("-").map(Number);
+    return new Date(year, month - 1, dayOfMonth).getTime() / 1000;
+};
+
 /**
  * A mailbox of days, per scope. Ids are `<scope>-<row>`, so a test can see which listing a row
  * came out of, and a page starts wherever its cursor says.
  */
 function mailbox(scopes: Record<MailScope, {key: string; count: number}[]>) {
     const requests: Request[] = [];
+    stretchRequests = [];
 
     /** Every mail of a scope in row order, with the day it sits in. */
     const rows = (scope: MailScope) =>
@@ -37,6 +49,21 @@ function mailbox(scopes: Record<MailScope, {key: string; count: number}[]>) {
 
         if (target.pathname.endsWith("/groups")) {
             return new Response(JSON.stringify({grouping: "date", groups: days}), {status: 200});
+        }
+
+        // Every mail of a range of send times, which is what picking a whole stretch asks for.
+        if (target.pathname.endsWith("/ids")) {
+            const from = target.searchParams.get("from");
+            const to = target.searchParams.get("to");
+            stretchRequests.push({scope, from, to});
+
+            const ids = all
+                .map((row, index) => ({row, id: `${scope}-${index}`}))
+                .filter(({row}) => from === null || startOfDay(row.day) >= Number(from))
+                .filter(({row}) => to === null || startOfDayAfter(row.day) <= Number(to))
+                .map(({id}) => id);
+
+            return new Response(JSON.stringify({total: ids.length, ids}), {status: 200});
         }
 
         const before = target.searchParams.get("before");
@@ -366,4 +393,81 @@ test("a stretch answers with the mails it holds, not with the ones it has not as
 
     // The next stretch is its own mails and stops where it ends.
     expect(list.idsIn(150, 2)).toEqual(["unarchived-150", "unarchived-151"]);
+});
+
+test("a stretch is one request, and it names the mails no page of the listing has", async () => {
+    // 150 mails today, so the first page is 100 of them and the rest of the day is still a gap.
+    mailbox({unarchived: [{key: day(0), count: 150}, {key: day(1), count: 2}], all: []});
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 5);
+    await settle();
+    expect(list.idsIn(0, 150).length).toBe(100);
+
+    const today = await list.idsOfStretch(0, 150);
+
+    expect(today.length).toBe(150);
+    expect(today.at(-1)).toBe("unarchived-149");
+    // The day the stretch spans, as the boundaries the server counted its days by.
+    expect(stretchRequests).toEqual([
+        {scope: "unarchived", from: String(startOfDay(day(0))), to: String(startOfDayAfter(day(0)))},
+    ]);
+
+    // Taking the stretch back again waits on the answer that is already here.
+    await list.idsOfStretch(0, 150);
+    expect(stretchRequests.length).toBe(1);
+
+    // A move means other mails sit at those positions, so it is asked again.
+    list.refresh();
+    await settle();
+    await list.idsOfStretch(0, 150);
+    expect(stretchRequests.length).toBe(2);
+});
+
+test("a stretch of several days spans all of them, and stops at its own boundaries", async () => {
+    mailbox({
+        unarchived: [
+            {key: day(0), count: 2},
+            {key: day(1), count: 1},
+            {key: day(2), count: 3},
+        ],
+        all: [],
+    });
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 20);
+    await settle();
+
+    // The two older days as one stretch: rows 2 and 3 of the mailbox, three mails.
+    const older = await list.idsOfStretch(2, 4);
+
+    expect(older).toEqual(["unarchived-2", "unarchived-3", "unarchived-4", "unarchived-5"]);
+    expect(stretchRequests).toEqual([
+        {scope: "unarchived", from: String(startOfDay(day(2))), to: String(startOfDayAfter(day(1)))},
+    ]);
+});
+
+test("a stretch that cannot be read falls back to the mails the listing holds", async () => {
+    mailbox({unarchived: [{key: day(0), count: 150}], all: []});
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 5);
+    await settle();
+
+    const fetching = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+        if (new URL(url, "http://localhost").pathname.endsWith("/ids")) {
+            return new Response("no", {status: 500});
+        }
+        return fetching(url as unknown as Request as never);
+    }) as unknown as typeof fetch;
+
+    const today = await list.idsOfStretch(0, 150);
+
+    // The pages that are here, and the failure on the bar the listing reports through.
+    expect(today.length).toBe(100);
+    expect(list.failed).toBe(true);
 });

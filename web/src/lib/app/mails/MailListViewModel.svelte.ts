@@ -98,6 +98,13 @@ export class MailListViewModel {
     /** Requests on their way, by the row they start at, so nothing is asked for twice. */
     private readonly inFlight = new Set<string>();
 
+    /**
+     * The ids of a stretch as the server named them, by scope, generation and stretch -- so
+     * ticking one and taking it back again is one request, not two. Promises rather than
+     * answers: a second click while the first is on its way waits for the same one.
+     */
+    private readonly stretches = new Map<string, Promise<string[]>>();
+
     /** The rows this holds a subscription for, by id. Kept across a scope switch. */
     private readonly subscribed = new Map<string, () => void>();
 
@@ -158,6 +165,74 @@ export class MailListViewModel {
         }
 
         return ids;
+    }
+
+    /**
+     * Every mail of a stretch -- [count] positions from [from] -- including the ones no page of
+     * this listing has been asked for.
+     *
+     * Which is what picking a whole stretch needs, and why it is one request rather than a walk
+     * down its pages: the table holds what somebody scrolled through, and ticking only that would
+     * quietly leave the rest of the day out of whatever is done with the selection next.
+     *
+     * The stretch is turned into the send times it spans -- the day boundaries the server counted
+     * its days by -- because that is what the api pages and cuts by; see `GET
+     * /api/emails/list/ids`. A listing whose days are not here yet has no stretches to ask about,
+     * and answers with what it holds.
+     */
+    async idsOfStretch(from: number, count: number): Promise<string[]> {
+        const scope = this.scope;
+        const listing = this.listings[scope];
+        const generation = listing.generation;
+
+        // Newest first, like everything else here, so the first of them ends the range and the
+        // last one starts it.
+        const days = this.days().filter(
+            (day) => day.key !== null && day.start < from + count && day.start + day.count > from
+        );
+
+        const newest = days[0]?.key;
+        const oldest = days.at(-1)?.key;
+        if (newest == null || oldest == null) return this.idsIn(from, count);
+
+        const key = `${scope}:${generation}:${oldest}:${newest}`;
+        const held = this.stretches.get(key);
+        if (held !== undefined) return held;
+
+        const query = new URLSearchParams({
+            scope,
+            from: String(startOfDay(oldest)),
+            to: String(startOfDayAfter(newest)),
+        });
+
+        const request = (async () => {
+            const response = await fetch(`/api/emails/list/ids?${query}`);
+            if (!response.ok) throw new Error(`Could not read the stretch: ${response.status}`);
+
+            const answer = (await response.json()) as {ids: string[]};
+            if (!Array.isArray(answer.ids)) throw new Error("The stretch has no ids");
+
+            this.failed = false;
+            return answer.ids;
+        })().catch((error) => {
+            console.error(error);
+            this.failed = true;
+            this.stretches.delete(key);
+
+            // What the listing holds of it, so the click does something rather than nothing. The
+            // failure itself is on screen: it is the same bar the pages report through.
+            const entries = listing.entries;
+            const known: string[] = [];
+            for (let index = from; index < from + count; index++) {
+                const id = entries[index];
+                if (id !== undefined) known.push(id);
+            }
+
+            return known;
+        });
+
+        this.stretches.set(key, request);
+        return request;
     }
 
     /**
@@ -269,6 +344,9 @@ export class MailListViewModel {
      * again the next time it is, rather than shown as it was before the move.
      */
     refresh() {
+        // A stretch is a set of positions, and a move is what makes them mean other mails.
+        this.stretches.clear();
+
         for (const listing of Object.values(this.listings)) {
             listing.generation++;
             listing.cursors = {};
@@ -285,6 +363,7 @@ export class MailListViewModel {
         this.failed = false;
         this.listings[this.scope] = emptyListing();
         this.inFlight.clear();
+        this.stretches.clear();
         void this.loadDays();
         void this.load(0);
     }
@@ -461,6 +540,16 @@ export class MailListViewModel {
             // days cannot be read. [retry] clears the keys, and a move is a new generation.
         }
     }
+}
+
+/**
+ * Midnight of the day [key] -- `yyyy-mm-dd` -- in epoch seconds, and the same local zone as
+ * [startOfDayAfter]. Where a stretch begins: the oldest mail of its oldest day was sent at or
+ * after this.
+ */
+function startOfDay(key: string): number {
+    const [year, month, day] = key.split("-").map(Number);
+    return new Date(year, month - 1, day).getTime() / 1000;
 }
 
 /**

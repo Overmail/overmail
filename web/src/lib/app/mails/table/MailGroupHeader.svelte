@@ -1,4 +1,5 @@
 <script lang="ts">
+    import {untrack} from "svelte";
     import {locale, _} from "svelte-i18n";
     import {Checkbox} from "$lib/components/ui/checkbox";
     import {cn} from "$lib/utils";
@@ -41,19 +42,47 @@
     });
 
     /**
-     * The mails of this stretch the listing can name -- everything of it that has been paged in.
-     *
-     * Which is what the box here is about: a stretch nobody has scrolled through yet is longer
-     * than this, and a mail whose page is not here has no id to tick. So the count beside the
-     * label counts the stretch, and the box counts what the table holds of it.
+     * The whole stretch, as the server named it when the box was last clicked. Null until then,
+     * and what the box counts against in the meantime is what the listing holds of the stretch --
+     * the rows the table has, which is what a reader can see the state of anyway.
      */
-    const ids = $derived(list.idsIn(start, count));
+    let named = $state<string[] | null>(null);
+
+    const ids = $derived(named ?? list.idsIn(start, count));
+
+    // A stretch that moved holds other mails: what the server named was about the mailbox as it
+    // stood, so it is dropped and asked for again on the next click.
+    $effect(() => {
+        void start;
+        void count;
+        untrack(() => (named = null));
+    });
 
     const picked = $derived(selection?.countOf(ids) ?? 0);
     const all = $derived(ids.length > 0 && picked === ids.length);
 
     /** Some of the stretch, not all of it -- the third state of the box. */
     const some = $derived(picked > 0 && !all);
+
+    /**
+     * Picks the stretch, or takes it back.
+     *
+     * In two steps, and both of them matter: the mails the table holds are ticked on the spot, so
+     * the click answers at once, and the rest of the stretch follows when the server has named
+     * it. A stretch is a day or a month of mail, and only a fraction of it has ever been paged in.
+     *
+     * Not guarded against a second click: the ids are asked for once and both clicks wait on the
+     * same answer, so the last one is what the stretch ends up as.
+     */
+    async function pick(selected: boolean) {
+        if (selection === null) return;
+
+        selection.setAll(ids, selected);
+
+        const stretch = await list.idsOfStretch(start, count);
+        named = stretch;
+        selection.setAll(stretch, selected);
+    }
 </script>
 
 <!-- The space above is what sets one stretch off from the one before it. Its whole box is
@@ -65,17 +94,15 @@
              head of their column. Held open whether the box is in it or not: a header whose text
              shifts sideways under the cursor is the list moving while it is being read. -->
         <div class="grid h-4 w-5 shrink-0 place-items-center">
-            {#if ids.length > 0}
-                <!-- The third state is read off the selection like the other two, so what the
-                     checkbox itself makes of a click on it is answered by the tick that click
-                     causes -- hence the setter that keeps its own counsel. -->
-                <Checkbox
-                        aria-label={$_("mails.selection.selectGroup", {values: {group: text}})}
-                        bind:checked={() => all, (value) => selection.setAll(ids, value)}
-                        bind:indeterminate={() => some, () => {}}
-                        class={cn(CHECKBOX_REVEAL, picked > 0 && SHOWN)}
-                />
-            {/if}
+            <!-- The third state is read off the selection like the other two, so what the
+                 checkbox itself makes of a click on it is answered by the ticks that click
+                 causes -- hence the setter that keeps its own counsel. -->
+            <Checkbox
+                    aria-label={$_("mails.selection.selectGroup", {values: {group: text}})}
+                    bind:checked={() => all, (value) => void pick(value)}
+                    bind:indeterminate={() => some, () => {}}
+                    class={cn(CHECKBOX_REVEAL, picked > 0 && SHOWN)}
+            />
         </div>
     {/if}
 

@@ -130,6 +130,10 @@
         "saving": "Saving…",
         "failed": "The share could not be saved."
       },
+      "edit": {
+        "title": "Edit share",
+        "description": "The link stays the same; what it shows and how long it lasts is what changes."
+      },
       "list": {
         "title": "Existing shares",
         "loading": "Reading the shares…",

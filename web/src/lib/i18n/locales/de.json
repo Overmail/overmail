@@ -130,6 +130,10 @@
         "saving": "Wird gespeichert…",
         "failed": "Die Freigabe konnte nicht gespeichert werden."
       },
+      "edit": {
+        "title": "Freigabe bearbeiten",
+        "description": "Der Link bleibt derselbe — was er zeigt und wie lange, ändert sich."
+      },
       "list": {
         "title": "Bestehende Freigaben",
         "loading": "Freigaben werden geladen…",

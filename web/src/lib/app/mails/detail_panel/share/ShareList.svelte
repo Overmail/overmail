@@ -9,13 +9,15 @@
     import {Spinner} from "$lib/components/ui/spinner";
     import {
         CheckIcon,
-        CopyIcon,
+        LinkSimpleIcon,
         LockSimpleIcon,
         PencilSimpleIcon,
         TagIcon,
         TrashIcon,
         WarningCircleIcon,
     } from "phosphor-svelte";
+    import {scale} from "svelte/transition";
+    import {cubicOut} from "svelte/easing";
     import {_, locale} from "svelte-i18n";
     import type {Share} from "$lib/repository/ShareRepository";
     import type {ShareDialogViewModel} from "$lib/app/mails/detail_panel/share/ShareDialogViewModel.svelte";
@@ -32,6 +34,13 @@
         /** The clipboard is the browser's to refuse, and the message for it sits in the dialog. */
         onCopyFailed?: (failed: boolean) => void,
     } = $props();
+
+    /**
+     * Zoom and fade, the same swap the mail toolbar uses for its copy button: the icon going out
+     * and the one coming in overlap, so the button reads as one thing changing rather than two
+     * swapping. Short, because it says "that worked" and nothing more.
+     */
+    const swap = {duration: 140, start: 0.4, opacity: 0, easing: cubicOut};
 
     /** Read once per render: what counts as expired only has to be right when the list is drawn. */
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -94,7 +103,12 @@
                     </div>
 
                     <div class="ms-auto flex flex-row items-center gap-1">
+                        <!-- The checkmark grows out of the link rather than taking its place in
+                             the next frame: both in the one grid cell, and the button centres
+                             them the way it centres a single icon -- `grid` is the only thing it
+                             takes over from it. Same as the toolbar's copy button, see Head. -->
                         <Button
+                                class="grid *:col-start-1 *:row-start-1"
                                 variant="ghost"
                                 size="icon"
                                 title={$_("mails.share.list.copy")}
@@ -102,9 +116,9 @@
                                 onclick={() => void copy(share)}
                         >
                             {#if viewModel.copied === share.id}
-                                <CheckIcon />
+                                <span transition:scale={swap}><CheckIcon /></span>
                             {:else}
-                                <CopyIcon />
+                                <span transition:scale={swap}><LinkSimpleIcon /></span>
                             {/if}
                         </Button>
 
@@ -113,7 +127,7 @@
                                 size="icon"
                                 title={$_("mails.share.list.edit")}
                                 aria-label={$_("mails.share.list.edit")}
-                                onclick={() => viewModel.startEdit(share)}
+                                onclick={() => (viewModel.editing = share)}
                         >
                             <PencilSimpleIcon />
                         </Button>

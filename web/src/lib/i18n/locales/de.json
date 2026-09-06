@@ -143,7 +143,21 @@
         },
         "failed": "Die Postfächer konnten nicht gelesen werden.",
         "loading": "Postfächer werden geladen…",
-        "noFolders": "Keine"
+        "noFolders": "Keine",
+        "actions": {
+          "edit": "Verbindung bearbeiten",
+          "delete": "Verbindung löschen"
+        },
+        "delete": {
+          "title": "Verbindung löschen?",
+          "description": "{username} bei {host} wird getrennt.",
+          "emails": "{count, plural, =0 {Es sind keine importierten E-Mails betroffen.} one {# importierte E-Mail wird mitgelöscht.} other {# importierte E-Mails werden mitgelöscht.}}",
+          "irreversible": "Die E-Mails bleiben im Postfach beim Anbieter; nur die Kopien in Overmail werden gelöscht.",
+          "confirm": "Löschen",
+          "cancel": "Abbrechen",
+          "deleting": "Wird gelöscht…",
+          "failed": "Die Verbindung konnte nicht gelöscht werden."
+        }
       },
       "new": {
         "title": "Neues Postfach",

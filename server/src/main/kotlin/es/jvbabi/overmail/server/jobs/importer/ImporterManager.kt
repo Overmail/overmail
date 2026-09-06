@@ -48,6 +48,17 @@ class ImporterManager(
         importer[accountId] = startImporter(account)
     }
 
+    /**
+     * Stops the importer for [accountId] and forgets it.
+     *
+     * What a mailbox being deleted goes through, before the row is gone: awaited (see
+     * [EmailImporter.stop]), so a mail halfway through being written is finished and nothing is
+     * still inserting into an account that is about to disappear.
+     */
+    suspend fun stop(accountId: Uuid) {
+        importer.remove(accountId)?.stop()
+    }
+
     private suspend fun reconcile(accounts: List<ImapConnection>) {
         val currentIds = accounts.map { it.id }.toSet()
         importer.keys.filterNot { it in currentIds }.toList().forEach { removedId ->

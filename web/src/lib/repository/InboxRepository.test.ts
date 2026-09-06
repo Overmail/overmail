@@ -16,6 +16,7 @@ test("reads the mailboxes and their folders", async () => {
                 port: 993,
                 username: "julius@example.com",
                 folders: ["Archiv/Newsletter", "INBOX"],
+                email_count: 2649,
             },
         ],
     });
@@ -27,15 +28,33 @@ test("reads the mailboxes and their folders", async () => {
             port: 993,
             username: "julius@example.com",
             folders: ["Archiv/Newsletter", "INBOX"],
+            emailCount: 2649,
         },
     ]);
     expect((fetcher as any).mock.calls[0][0]).toBe("/api/users/me/inboxes");
 });
 
-test("a mailbox without folders is still a mailbox", async () => {
+test("a mailbox without folders or mail is still a mailbox", async () => {
     answering(200, {inboxes: [{id: "a", host: "h", port: 993, username: "u"}]});
 
-    expect((await new InboxRepository().list())[0].folders).toEqual([]);
+    const inbox = (await new InboxRepository().list())[0];
+    expect(inbox.folders).toEqual([]);
+    expect(inbox.emailCount).toBe(0);
+});
+
+test("deleting answers with how many mails went with the mailbox", async () => {
+    const fetcher = mock(async () => new Response(JSON.stringify({deleted_emails: 2649}), {status: 200}));
+    globalThis.fetch = fetcher as unknown as typeof fetch;
+
+    expect(await new InboxRepository().remove("acc-1")).toBe(2649);
+    expect((fetcher as any).mock.calls[0][0]).toBe("/api/users/me/inboxes/acc-1");
+    expect((fetcher as any).mock.calls[0][1].method).toBe("DELETE");
+});
+
+test("a delete that did not happen throws, so the row is not removed from the table", async () => {
+    answering(500);
+
+    expect(new InboxRepository().remove("acc-1")).rejects.toThrow();
 });
 
 test("nothing connected is an empty list", async () => {

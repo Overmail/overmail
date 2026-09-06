@@ -43,7 +43,7 @@
             await wait(300);
             connected = [
                 ...connected,
-                {id: "acc-2", host: "imap.mail.de", port: 993, username: "new@example.com", folders: ["INBOX"]},
+                {id: "acc-2", host: "imap.mail.de", port: 993, username: "new@example.com", folders: ["INBOX"], emailCount: 0},
             ];
             return {type: "created", id: "acc-2"} as const;
         },
@@ -70,13 +70,19 @@
 
     /** Grows when the dialog reports a creation, which is what the reload callback is for. */
     let connected: Inbox[] = [
-        {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: ["INBOX", "Sent"]},
+        {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: ["INBOX", "Sent"], emailCount: 2649},
     ];
 
     const inboxes = {
         list: async () => {
             await wait(200);
             return [...connected];
+        },
+        remove: async (id: string) => {
+            await wait(400);
+            const gone = connected.find((inbox) => inbox.id === id);
+            connected = connected.filter((inbox) => inbox.id !== id);
+            return gone?.emailCount ?? 0;
         },
     } as unknown as InboxRepository;
 

@@ -143,7 +143,21 @@
         },
         "failed": "The mailboxes could not be read.",
         "loading": "Loading mailboxes…",
-        "noFolders": "None"
+        "noFolders": "None",
+        "actions": {
+          "edit": "Edit connection",
+          "delete": "Delete connection"
+        },
+        "delete": {
+          "title": "Delete connection?",
+          "description": "{username} at {host} will be disconnected.",
+          "emails": "{count, plural, =0 {No imported mail is affected.} one {# imported mail will be deleted with it.} other {# imported mails will be deleted with it.}}",
+          "irreversible": "The mails stay in your mailbox at the provider; only Overmail's copies go.",
+          "confirm": "Delete",
+          "cancel": "Cancel",
+          "deleting": "Deleting…",
+          "failed": "The connection could not be deleted."
+        }
       },
       "new": {
         "title": "New inbox",

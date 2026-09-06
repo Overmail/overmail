@@ -4,8 +4,9 @@
     import * as Empty from "$lib/components/ui/empty";
     import * as Table from "$lib/components/ui/table";
     import {Spinner} from "$lib/components/ui/spinner/index.ts";
-    import {EnvelopeSimpleIcon, PlusIcon, WarningCircleIcon} from "phosphor-svelte";
+    import {EnvelopeSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon, WarningCircleIcon} from "phosphor-svelte";
     import NewEmailAccountDialog from "$lib/app/settings/email-accounts/new/NewEmailAccountDialog.svelte";
+    import DeleteInboxDialog from "$lib/app/settings/email-accounts/DeleteInboxDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
     import {_} from "svelte-i18n";
@@ -13,6 +14,8 @@
     const {inboxes: inboxRepository} = useRepositories();
 
     let showNewEmailAccountDialog = $state(false);
+    /** The mailbox the delete dialog is asking about; null while it is closed. */
+    let inboxToDelete: Inbox | null = $state(null);
 
     let inboxes: {type: "loading"} | {type: "loaded"; rows: Inbox[]} | {type: "failed"} = $state({
         type: "loading",
@@ -66,7 +69,7 @@
                     </Table.Header>
                     <Table.Body>
                         {#each inboxes.rows as inbox (inbox.id)}
-                            <Table.Row>
+                            <Table.Row class="group/row">
                                 <Table.Cell class="font-medium">{inbox.username}</Table.Cell>
                                 <!--
                                   The port belongs with the host: two accounts on one provider
@@ -76,18 +79,59 @@
                                 <Table.Cell class="text-muted-foreground whitespace-nowrap">
                                     {inbox.host}:{inbox.port}
                                 </Table.Cell>
-                                <Table.Cell>
-                                    {#if inbox.folders.length === 0}
-                                        <span class="text-muted-foreground">
-                                            {$_("settings.emailAccounts.list.noFolders")}
-                                        </span>
-                                    {:else}
-                                        <div class="flex flex-row flex-wrap gap-1">
-                                            {#each inbox.folders as folder (folder)}
-                                                <Badge variant="secondary">{folder}</Badge>
-                                            {/each}
-                                        </div>
-                                    {/if}
+                                <!--
+                                  The actions sit on the row's right edge, which is inside this
+                                  cell -- a `<div>` directly under a `<tr>` is not valid markup and
+                                  browsers move it out of the table.
+                                -->
+                                <Table.Cell class="relative">
+                                    <!--
+                                      Masked rather than hidden: only the strip the buttons cover
+                                      fades, so the folders on the left stay readable while the
+                                      pointer is on the row.
+                                    -->
+                                    <div
+                                            class="group-hover/row:[mask-image:linear-gradient(to_left,transparent_0,black_7rem)]"
+                                    >
+                                        {#if inbox.folders.length === 0}
+                                            <span class="text-muted-foreground">
+                                                {$_("settings.emailAccounts.list.noFolders")}
+                                            </span>
+                                        {:else}
+                                            <div class="flex flex-row flex-wrap gap-1">
+                                                {#each inbox.folders as folder (folder)}
+                                                    <Badge variant="secondary">{folder}</Badge>
+                                                {/each}
+                                            </div>
+                                        {/if}
+                                    </div>
+
+                                    <div
+                                            class="absolute inset-y-0 right-0 flex flex-row items-center gap-1 pr-3
+                                                   opacity-0 transition-opacity
+                                                   group-hover/row:opacity-100 focus-within:opacity-100"
+                                    >
+                                        <!-- TODO: no editing screen yet, see the note in the PR. -->
+                                        <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                disabled
+                                                aria-label={$_("settings.emailAccounts.list.actions.edit")}
+                                                title={$_("settings.emailAccounts.list.actions.edit")}
+                                        >
+                                            <PencilSimpleIcon />
+                                        </Button>
+                                        <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                class="text-destructive hover:text-destructive"
+                                                aria-label={$_("settings.emailAccounts.list.actions.delete")}
+                                                title={$_("settings.emailAccounts.list.actions.delete")}
+                                                onclick={() => (inboxToDelete = inbox)}
+                                        >
+                                            <TrashIcon />
+                                        </Button>
+                                    </div>
                                 </Table.Cell>
                             </Table.Row>
                         {/each}
@@ -120,5 +164,6 @@
     {/if}
 </div>
 
-<!-- The dialog does not know about this list, so it says it created something and this re-reads. -->
+<!-- Neither dialog knows about this list, so each says what it did and this re-reads. -->
 <NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} />
+<DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} />

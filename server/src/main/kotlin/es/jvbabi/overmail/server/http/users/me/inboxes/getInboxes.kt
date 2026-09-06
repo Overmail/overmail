@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes
 
+import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
@@ -13,6 +14,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -38,6 +40,15 @@ fun Route.getInboxes() {
                         Triple(row[ImapAccounts.id].value, row[ImapAccounts.host] to row[ImapAccounts.port], row[ImapAccounts.username])
                     }
 
+                // One query for every account's mails rather than one per account, same as the
+                // folders below: the number of queries should not depend on how many mailboxes
+                // somebody has. The count is what a delete has to warn about.
+                val mailsByAccount = if (accounts.isEmpty()) emptyMap() else Emails
+                    .select(Emails.imapAccount, Emails.id.count())
+                    .where { Emails.imapAccount inList accounts.map { it.first } }
+                    .groupBy(Emails.imapAccount)
+                    .associate { it[Emails.imapAccount].value to it[Emails.id.count()] }
+
                 // One query for every account's folders rather than one per account: the list is
                 // short, but the number of queries should not depend on how many mailboxes
                 // somebody has.
@@ -54,6 +65,7 @@ fun Route.getInboxes() {
                         port = hostAndPort.second,
                         username = username,
                         folders = foldersByAccount[id].orEmpty(),
+                        emailCount = mailsByAccount[id] ?: 0L,
                     )
                 }
             }
@@ -76,5 +88,7 @@ private data class InboxesResponse(
         @SerialName("username") val username: String,
         /** The folders being synced, by name, alphabetically. */
         @SerialName("folders") val folders: List<String>,
+        /** How many mails were imported through it -- what deleting it would take with it. */
+        @SerialName("email_count") val emailCount: Long,
     )
 }

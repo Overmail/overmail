@@ -16,8 +16,10 @@
 
 <style>
     .loader {
-        --color-1: var(--accent);
-        --color-2: var(--accent-foreground);
+        /* Neutral, not accent: this is the first thing the app shows, and it says "wait", not
+           "look here". */
+        --color-1: var(--muted);
+        --color-2: var(--foreground);
         --size: 1px;
 
         width: calc(160 * var(--size));

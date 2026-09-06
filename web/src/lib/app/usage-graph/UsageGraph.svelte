@@ -28,7 +28,7 @@
 	let {
 		year,
 		state: usage,
-		color = 'var(--primary)',
+		color = 'var(--chart-1)',
 		label = `Usage per day in ${year}`,
 		tooltip
 	}: {
@@ -37,6 +37,10 @@
 		/**
 		 * What a busy day is drawn in, as any CSS colour. It is mixed into the empty card rather
 		 * than used as a fill, so a colour that knows nothing about the theme still reads in both.
+		 *
+		 * `--chart-1` is the accent hue at a lightness that reads on the card in either theme;
+		 * `--accent` itself is a surface and sits a hair away from the empty card, so a grid drawn
+		 * in it would have nothing to show.
 		 */
 		color?: string;
 		/**
@@ -334,7 +338,7 @@
 		*/
 		background-color: color-mix(
 			in oklab,
-			var(--usage-tint, var(--primary)) var(--tint-share, 0%),
+			var(--usage-tint, var(--chart-1)) var(--tint-share, 0%),
 			var(--muted)
 		);
 		/*
@@ -373,7 +377,7 @@
 	.ahead {
 		background-color: color-mix(
 			in oklab,
-			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--muted))
+			color-mix(in oklab, var(--usage-tint, var(--chart-1)) var(--tint-share, 0%), var(--muted))
 				30%,
 			transparent
 		);

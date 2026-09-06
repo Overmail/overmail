@@ -1,0 +1,10 @@
+{
+  "title": "Download emails",
+  "description": "You can download emails as an .eml file now.",
+  "localized": {
+    "de": {
+      "title": "E-Mails herunterladen",
+      "description": "Du kannst E-Mails jetzt als .eml-Datei herunterladen."
+    }
+  }
+}

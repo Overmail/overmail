@@ -21,6 +21,8 @@ import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
+import es.jvbabi.overmail.server.http.share.getShare
+import es.jvbabi.overmail.server.http.share.openShare
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
@@ -155,6 +157,16 @@ internal fun Application.configureRouting() {
                         attachEmailLabel()
                         detachEmailLabel()
                     }
+                }
+            }
+
+            // What a share link resolves to. No session anywhere below here: holding the link
+            // is the whole authorization, see `getShare`.
+            route("/shares/{shareId}") {
+                getShare()
+
+                route("/open") {
+                    openShare()
                 }
             }
 

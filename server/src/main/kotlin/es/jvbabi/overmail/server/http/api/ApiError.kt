@@ -43,6 +43,9 @@ enum class ApiErrorCode(val wire: String) {
     /** The resource is not in a state this request can be applied to. */
     CONFLICT("conflict"),
 
+    /** It was there and is not any more -- a share link that ran out, and nothing else so far. */
+    GONE("gone"),
+
     /** Anything that got out of a handler unhandled. */
     INTERNAL("internal"),
 }

@@ -83,11 +83,15 @@ function bestHit(entry: KnowledgeEntry, term: string): number {
 }
 
 /**
- * The entries that account for [query], the ones carrying most of it first.
+ * The entries that account for [query], the best hits first.
  *
- * An entry counts when it carries any of the typed words, as on the server -- a second word
- * narrows the order, not the result. Ties keep the order [entries] came in, which is the list's
- * own order: what was written last stays on top.
+ * Every typed word has to be somewhere in the entry. That is stricter than the server's own
+ * lookup, which ranks by how many words an entry carries and hands the agent the best of them --
+ * but this is a filter over a table somebody is looking at, and there a second word means "and
+ * this too". A search that grew the list as you typed would be a search nobody trusts.
+ *
+ * Ranked by where the words were found (see [WEIGHT]); ties keep the order [entries] came in,
+ * which is the list's own: what was written last stays on top.
  *
  * A blank query is not an empty answer: it is the list, untouched.
  */
@@ -97,7 +101,7 @@ export function searchKnowledge(entries: KnowledgeEntry[], query: string): Knowl
 
     return entries
         .map((entry, index) => ({entry, index, ...score(entry, terms)}))
-        .filter((hit) => hit.matched > 0)
-        .sort((a, b) => b.matched - a.matched || b.weight - a.weight || a.index - b.index)
+        .filter((hit) => hit.matched === terms.length)
+        .sort((a, b) => b.weight - a.weight || a.index - b.index)
         .map((hit) => hit.entry);
 }

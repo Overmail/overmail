@@ -44,9 +44,11 @@ test("a name hit ranks above a description hit", () => {
     expect(ids("abschlag")).toEqual(["k-4", "k-1"]);
 });
 
-test("carrying more of the query ranks above carrying it better", () => {
-    // k-1 has both words, one of them only in its description; k-4 has "abschlag" in its name.
-    expect(ids("abschlag rheinenergie")).toEqual(["k-1", "k-4"]);
+test("a second word narrows the list rather than widening it", () => {
+    // k-4 carries "abschlag" in its name but nothing of "rheinenergie", so it drops out: a filter
+    // that grew as you typed would be one nobody trusts. k-1 has both.
+    expect(ids("abschlag rheinenergie")).toEqual(["k-1"]);
+    expect(ids("abschlag wasser")).toEqual(["k-4"]);
 });
 
 test("capitals and umlauts are not part of the query", () => {

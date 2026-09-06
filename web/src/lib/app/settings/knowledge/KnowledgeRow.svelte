@@ -10,12 +10,18 @@
     import {_, locale} from "svelte-i18n";
 
     let {
+        ref = $bindable(null),
+        index = undefined,
         entry,
         pinned = false,
         onedit,
         ondelete,
         onchanged,
     }: {
+        /** The row element, so a virtualized table can measure what this row actually takes. */
+        ref?: HTMLTableRowElement | null,
+        /** Its place in the list; a virtualizer reads it back off the element as `data-index`. */
+        index?: number,
         entry: KnowledgeEntry,
         /** Whether anything is hidden past the left edge, which is what the name column marks. */
         pinned?: boolean,
@@ -42,7 +48,7 @@
         });
 </script>
 
-<Table.Row class="group/row hover:bg-muted align-top">
+<Table.Row bind:ref data-index={index} class="group/row hover:bg-muted align-top">
     <!--
       Pinned while the rest scrolls sideways, like the username in the mailbox table: the name is
       what says which row is which, and a row identified by nothing is not a row.

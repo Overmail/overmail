@@ -3,6 +3,7 @@
     import {Badge} from "$lib/components/ui/badge";
     import * as Empty from "$lib/components/ui/empty";
     import * as Table from "$lib/components/ui/table";
+    import * as Tooltip from "$lib/components/ui/tooltip";
     import {Spinner} from "$lib/components/ui/spinner/index.ts";
     import {
         BrainIcon,
@@ -104,10 +105,18 @@
                                                   one of those is a different act than correcting
                                                   something the user typed.
                                                 -->
-                                                <SparkleIcon
-                                                        class="text-muted-foreground size-3.5 shrink-0"
-                                                        aria-label={$_("settings.knowledge.list.learnedByAgent")}
-                                                />
+                                                <Tooltip.Root>
+                                                    <Tooltip.Trigger>
+                                                        <SparkleIcon
+                                                                class="text-muted-foreground size-3.5 shrink-0"
+                                                                aria-label={$_("settings.knowledge.list.learnedByAgent")}
+                                                        />
+                                                    </Tooltip.Trigger>
+
+                                                    <Tooltip.Content>
+                                                        <span>{$_("settings.knowledge.list.learnedByAgent")}</span>
+                                                    </Tooltip.Content>
+                                                </Tooltip.Root>
                                             {/if}
                                         </div>
                                         {#if entry.relevantOn}

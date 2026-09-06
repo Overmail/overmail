@@ -274,7 +274,7 @@
           "keywords": "Schlagwörter"
         },
         "noKeywords": "Keine Schlagwörter",
-        "learnedByAgent": "Vom Assistenten gelernt",
+        "learnedByAgent": "Der Agent hat dies über dich gelernt.",
         "actions": {
           "edit": "Eintrag bearbeiten",
           "delete": "Eintrag vergessen"

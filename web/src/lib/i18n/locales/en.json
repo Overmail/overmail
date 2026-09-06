@@ -98,6 +98,65 @@
       "copyLink": "Copy the mail’s link (only you can use it)",
       "openInThisTab": "Open in this tab"
     },
+    "share": {
+      "title": "Share email",
+      "description": "Give somebody else access to this email.",
+      "form": {
+        "name": "Share name",
+        "namePlaceholder": "Project group",
+        "nameHint": "The name is for you, to keep your own links apart.",
+        "password": "Password",
+        "passwordPlaceholder": "••••••",
+        "passwordHint": "Optional, leave empty if no password is needed.",
+        "passwordKeepHint": "Leave empty to keep the current password.",
+        "passwordTooShort": "The password needs at least {count} characters.",
+        "removePassword": "Remove password",
+        "metadata": "Show metadata without the password",
+        "labels": "Share the labels of this email",
+        "expiry": "Valid until",
+        "expiryOptions": {
+          "1d": "1 day",
+          "7d": "7 days",
+          "30d": "30 days",
+          "never": "No end date",
+          "custom": "Pick a date"
+        },
+        "expiresOn": "Date",
+        "expiryMissing": "Pick a date.",
+        "expiryPast": "That date has already passed.",
+        "create": "Create & copy link",
+        "save": "Save changes",
+        "cancel": "Cancel",
+        "saving": "Saving…",
+        "failed": "The share could not be saved."
+      },
+      "list": {
+        "title": "Existing shares",
+        "loading": "Reading the shares…",
+        "failed": "The shares could not be read.",
+        "empty": "This email has not been shared yet.",
+        "unnamed": "Unnamed",
+        "expiresAt": "Valid until {date}",
+        "expired": "Expired",
+        "noExpiry": "No end date",
+        "password": "Password protected",
+        "labels": "With labels",
+        "copy": "Copy link",
+        "copied": "Copied",
+        "copyFailed": "The link could not be copied.",
+        "edit": "Edit share",
+        "delete": "Delete share"
+      },
+      "delete": {
+        "title": "Delete share?",
+        "description": "The link to “{name}” will stop working.",
+        "irreversible": "This cannot be undone.",
+        "deleting": "Deleting…",
+        "failed": "The share could not be deleted.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    },
     "preview": {
       "noContent": "No content available"
     }

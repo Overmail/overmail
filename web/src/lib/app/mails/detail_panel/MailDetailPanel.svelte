@@ -25,6 +25,7 @@
     import type {MailStep} from "$lib/app/mails/MailListViewModel.svelte.js";
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
     import {MAIL_BOX_TRANSITION, MAIL_SUBJECT_TRANSITION, isMorphing} from "$lib/app/mails/mailViewTransition";
+    import ShareDialog from "$lib/app/mails/detail_panel/share/ShareDialog.svelte";
 
     /**
      * How far the content moves when the mail changes, and for how long.
@@ -175,6 +176,8 @@
             css: (_t: number, u: number) => `transform: translateX(${sign * u * 100}%)`,
         };
     }
+
+    let showShareDialog = $state(false);
 </script>
 
 <!--
@@ -207,7 +210,7 @@
                 onPreviousMail={() => stepTo(-1)}
                 onChangeArchiveState={(newState) => mails.setArchiveState(mail.id, newState)}
                 onDownloadMail={() => mails.downloadMail(mail.id)}
-                onShareMail={() => alert("Sharing is not yet supported. Note that sharing a mail is not the same as forwarding it.")}
+                onShareMail={() => showShareDialog = true}
                 onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
                 onReclassify={() => mails.requestClassification(mail.id)}
         />
@@ -254,3 +257,8 @@
         </div>
     {/if}
 </div>
+
+<!-- Mounted only while it is open, so each mail gets a dialog on its own links. -->
+{#if showShareDialog && mail}
+    <ShareDialog bind:open={showShareDialog} emailId={mail.id} />
+{/if}

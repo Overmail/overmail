@@ -98,6 +98,65 @@
       "copyLink": "E-Mail-Link kopieren (nur du kannst ihn verwenden)",
       "openInThisTab": "In diesem Tab öffnen"
     },
+    "share": {
+      "title": "E-Mail teilen",
+      "description": "Gib anderen Zugang zu dieser E-Mail.",
+      "form": {
+        "name": "Freigabename",
+        "namePlaceholder": "Projektgruppe",
+        "nameHint": "Der Freigabename ist für dich, um die Freigaben besser zu organisieren.",
+        "password": "Passwort",
+        "passwordPlaceholder": "••••••",
+        "passwordHint": "Optional, leer lassen, wenn kein Passwort benötigt wird.",
+        "passwordKeepHint": "Leer lassen, um das bestehende Passwort zu behalten.",
+        "passwordTooShort": "Das Passwort muss mindestens {count} Zeichen haben.",
+        "removePassword": "Passwort entfernen",
+        "metadata": "Metadaten ohne Passwort erlauben",
+        "labels": "Labels der E-Mail teilen",
+        "expiry": "Gültig bis",
+        "expiryOptions": {
+          "1d": "1 Tag",
+          "7d": "7 Tage",
+          "30d": "30 Tage",
+          "never": "Unbegrenzt",
+          "custom": "Eigenes Datum"
+        },
+        "expiresOn": "Datum",
+        "expiryMissing": "Wähle ein Datum aus.",
+        "expiryPast": "Das Datum liegt in der Vergangenheit.",
+        "create": "Erstellen & Link kopieren",
+        "save": "Änderungen speichern",
+        "cancel": "Abbrechen",
+        "saving": "Wird gespeichert…",
+        "failed": "Die Freigabe konnte nicht gespeichert werden."
+      },
+      "list": {
+        "title": "Bestehende Freigaben",
+        "loading": "Freigaben werden geladen…",
+        "failed": "Die Freigaben konnten nicht geladen werden.",
+        "empty": "Diese E-Mail ist noch nicht freigegeben.",
+        "unnamed": "Ohne Namen",
+        "expiresAt": "Gültig bis {date}",
+        "expired": "Abgelaufen",
+        "noExpiry": "Unbegrenzt gültig",
+        "password": "Passwortgeschützt",
+        "labels": "Mit Labels",
+        "copy": "Link kopieren",
+        "copied": "Kopiert",
+        "copyFailed": "Der Link konnte nicht kopiert werden.",
+        "edit": "Freigabe bearbeiten",
+        "delete": "Freigabe löschen"
+      },
+      "delete": {
+        "title": "Freigabe löschen?",
+        "description": "Der Link zu „{name}“ funktioniert danach nicht mehr.",
+        "irreversible": "Das lässt sich nicht rückgängig machen.",
+        "deleting": "Wird gelöscht…",
+        "failed": "Die Freigabe konnte nicht gelöscht werden.",
+        "cancel": "Abbrechen",
+        "confirm": "Löschen"
+      }
+    },
     "preview": {
       "noContent": "Kein Inhalt verfügbar"
     }

@@ -10,6 +10,9 @@ import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.labels.detachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
+import es.jvbabi.overmail.server.http.email.item.shares.getShares
+import es.jvbabi.overmail.server.http.email.item.shares.item.deleteShare
+import es.jvbabi.overmail.server.http.email.item.shares.item.updateShare
 import es.jvbabi.overmail.server.http.email.item.shares.newShare
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
@@ -115,7 +118,13 @@ internal fun Application.configureRouting() {
                     }
 
                     route("/shares") {
+                        getShares()
                         newShare()
+
+                        route("/{shareId}") {
+                            updateShare()
+                            deleteShare()
+                        }
                     }
 
                     // One route per state rather than a body that names it: they are separate

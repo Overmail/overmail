@@ -28,7 +28,7 @@
 	let {
 		year,
 		state: usage,
-		color = 'var(--primary)',
+		color = 'var(--accent-foreground)',
 		label = `Usage per day in ${year}`,
 		tooltip
 	}: {

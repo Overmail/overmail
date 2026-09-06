@@ -42,7 +42,12 @@
     >
         <Dialog.Title class="sr-only">Settings</Dialog.Title>
         <Dialog.Description class="sr-only">Customize your settings here.</Dialog.Description>
-        <Sidebar.Provider class="items-start">
+        <!--
+          `min-w-0` here too: this is a grid item of the dialog and defaults to `min-width: auto`,
+          so it grows to whatever is inside it. A wide table pushed it past the dialog, and the
+          page went with it.
+        -->
+        <Sidebar.Provider class="min-w-0 items-start">
             <Sidebar.Root collapsible="none" class="hidden md:flex pt-1">
                 <Sidebar.Content>
                     <Sidebar.Group>
@@ -66,7 +71,12 @@
                     </Sidebar.Group>
                 </Sidebar.Content>
             </Sidebar.Root>
-            <main class="flex h-145 flex-1 flex-col overflow-hidden pt-5">
+            <!--
+              `min-w-0`: a flex item defaults to `min-width: auto`, so it refuses to shrink below
+              its content and the `overflow-hidden` beside it never gets to clip anything. A wide
+              table in here pushed this past the dialog and took the page with it.
+            -->
+            <main class="flex h-145 min-w-0 flex-1 flex-col overflow-hidden pt-5">
                 <header
                         class="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
                 >

@@ -37,7 +37,8 @@
     });
 </script>
 
-<div class="flex flex-col flex-1 grow">
+<!-- `min-w-0` for the same reason as in SettingsDialog: the table must be allowed to scroll. -->
+<div class="flex min-w-0 flex-1 flex-col grow">
     {#if inboxes.type === "loading"}
         <div class="text-muted-foreground flex flex-row items-start gap-2 text-sm">
             <Spinner class="mt-0.5 size-4 shrink-0" />

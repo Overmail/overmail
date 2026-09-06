@@ -17,6 +17,8 @@ class Share(id: EntityID<Uuid>): UuidEntity(id) {
     var shareName by Shares.shareName
     var includeLabels by Shares.includeLabels
     var validUntil by Shares.validUntil
+    var passwordHash by Shares.passwordHash
+    var allowMetadataWithoutPassword by Shares.allowMetadataWithoutPassword
 }
 
 object Shares : UuidTable("shares") {
@@ -25,4 +27,20 @@ object Shares : UuidTable("shares") {
     val shareName = varchar("share_name", 255).nullable()
     val includeLabels = bool("include_labels")
     val validUntil = timestamp("valid_until").nullable()
+
+    /**
+     * What a visitor's password is checked against, or null when the link needs none.
+     *
+     * The encoded form of `SharePassword`, never the password itself -- a share link is handed to
+     * people outside this installation, and the row it points at is the only thing standing
+     * between them and the mail.
+     */
+    val passwordHash = varchar("password_hash", 255).nullable()
+
+    /**
+     * Whether subject, sender and date are shown before the password is entered.
+     *
+     * Only means anything with a [passwordHash] set; without one everything is open anyway.
+     */
+    val allowMetadataWithoutPassword = bool("allow_metadata_without_password").default(false)
 }

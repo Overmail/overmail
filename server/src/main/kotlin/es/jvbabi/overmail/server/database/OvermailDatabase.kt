@@ -52,6 +52,9 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(AiChats, AiChatMessages)
             SchemaUtils.create(Knowledges)
             SchemaUtils.create(Shares)
+            // Like `ImapAccounts` above: the password columns came after the table did, and
+            // `create` would not add them to a database that already has a `shares`.
+            SchemaUtils.createMissingTablesAndColumns(Shares)
         }
     }
 

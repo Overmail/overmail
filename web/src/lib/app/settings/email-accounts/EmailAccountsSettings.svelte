@@ -9,6 +9,7 @@
     import DeleteInboxDialog from "$lib/app/settings/email-accounts/DeleteInboxDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
+    import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
 
     const {inboxes: inboxRepository} = useRepositories();
@@ -34,6 +35,39 @@
 
     $effect(() => {
         void load();
+    });
+
+    /** The table itself; `Table.Root` puts it inside the wrapper that does the scrolling. */
+    let tableElement: HTMLTableElement | null = $state(null);
+    /** Whether anything is hidden past the left edge, and whether anything is left to the right. */
+    let scrolledFromStart = $state(false);
+    let scrolledToEnd = $state(true);
+
+    // A pinned column is only worth separating off while it is covering something. With the table
+    // sitting still there is nothing behind it, and a rule down the middle would be a line for no
+    // reason -- which is why this is measured rather than always drawn.
+    $effect(() => {
+        const table = tableElement;
+        const scroller = table?.parentElement;
+        if (!table || !scroller) return;
+
+        const update = () => {
+            scrolledFromStart = scroller.scrollLeft > 0;
+            scrolledToEnd = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 1;
+        };
+        update();
+
+        scroller.addEventListener("scroll", update, {passive: true});
+        // Both ends also change without anyone scrolling: the dialog resizes, and the table grows
+        // as folders arrive.
+        const observer = new ResizeObserver(update);
+        observer.observe(scroller);
+        observer.observe(table);
+
+        return () => {
+            scroller.removeEventListener("scroll", update);
+            observer.disconnect();
+        };
     });
 </script>
 
@@ -61,15 +95,15 @@
             
             <!-- `Table.Root` brings its own horizontally scrolling wrapper; this one only rounds it off. -->
             <div class="overflow-hidden rounded-2xl border">
-                <Table.Root class="text-sm">
+                <Table.Root class="text-sm" bind:ref={tableElement}>
                     <Table.Header>
                         <Table.Row>
                             <!--
                               Pinned while the rest scrolls sideways: the username is what says
                               which row is which, and a row identified by nothing is not a row.
                             -->
-                            <Table.Head class="bg-popover sticky left-0 z-20 pr-10">
-                                {$_("settings.emailAccounts.list.columns.username")}
+                            <Table.Head class="sticky left-0 z-20 pr-10">
+                                <div class="bg-popover pointer-events-none absolute inset-y-0 right-8 left-0"></div>
                                 <!--
                                   No rule down the table: the pinned column ends in its own
                                   background running out, so what scrolls under it disappears
@@ -82,6 +116,15 @@
                                         class="from-popover pointer-events-none absolute inset-y-0 right-0 w-8
                                                bg-linear-to-r to-transparent"
                                 ></div>
+                                <div
+                                        class={cn(
+                                            "bg-border pointer-events-none absolute inset-y-0 right-0 w-px transition-opacity",
+                                            scrolledFromStart ? "opacity-100" : "opacity-0",
+                                        )}
+                                ></div>
+                                <span class="relative">
+                                    {$_("settings.emailAccounts.list.columns.username")}
+                                </span>
                             </Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
@@ -114,6 +157,13 @@
                                             class="from-popover group-hover/row:from-muted pointer-events-none
                                                    absolute inset-y-0 right-0 w-8 bg-linear-to-r to-transparent
                                                    transition-colors"
+                                    ></div>
+                                    <div
+                                            class={cn(
+                                                "bg-border pointer-events-none absolute inset-y-0 right-0 w-px",
+                                                "transition-opacity",
+                                                scrolledFromStart ? "opacity-100" : "opacity-0",
+                                            )}
                                     ></div>
                                     <span class="relative">{inbox.username}</span>
                                 </Table.Cell>
@@ -158,14 +208,28 @@
                                   the folder list has been scrolled to.
                                 -->
                                 <Table.Cell class="sticky right-0 z-10 w-32 pl-10">
+                                    <!--
+                                      Only while the row is hovered: the buttons are what needs
+                                      covering up, and until then the folders may run the whole
+                                      width. `transition` rather than `transition-colors`, so the
+                                      fading in and the hover colour are the same 150ms.
+                                    -->
                                     <div
                                             class="to-popover group-hover/row:to-muted pointer-events-none absolute
-                                                   inset-y-0 left-0 w-8 bg-linear-to-r from-transparent
-                                                   transition-colors"
+                                                   inset-y-0 left-0 w-8 bg-linear-to-r from-transparent opacity-0
+                                                   transition group-hover/row:opacity-100"
                                     ></div>
                                     <div
                                             class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
-                                                   inset-y-0 right-0 left-8 transition-colors"
+                                                   inset-y-0 right-0 left-8 opacity-0 transition
+                                                   group-hover/row:opacity-100"
+                                    ></div>
+                                    <div
+                                            class={cn(
+                                                "bg-border pointer-events-none absolute inset-y-0 left-0 w-px opacity-0",
+                                                "transition-opacity",
+                                                scrolledToEnd ? "" : "group-hover/row:opacity-100",
+                                            )}
                                     ></div>
                                     <div
                                             class="relative flex flex-row items-center justify-end gap-1 opacity-0

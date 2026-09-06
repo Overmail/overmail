@@ -86,24 +86,36 @@
                             <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
                             <!-- The actions column; its header is empty on purpose. -->
-                            <Table.Head class="bg-popover sticky right-0 z-20 w-32 pl-10">
+                            <Table.Head class="sticky right-0 z-20 w-32 pl-10">
                                 <div
-                                        class="from-popover pointer-events-none absolute inset-y-0 left-0 w-8
-                                               bg-linear-to-l to-transparent"
+                                        class="to-popover pointer-events-none absolute inset-y-0 left-0 w-8
+                                               bg-linear-to-r from-transparent"
                                 ></div>
+                                <div class="bg-popover pointer-events-none absolute inset-y-0 right-0 left-8"></div>
                             </Table.Head>
                         </Table.Row>
                     </Table.Header>
                     <Table.Body>
                         {#each inboxes.rows as inbox (inbox.id)}
                             <Table.Row class="group/row hover:bg-muted">
-                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky left-0 z-10 pr-10 font-medium">
-                                    {inbox.username}
-                                    <!-- The run-out follows the row: same colour hovered or not. -->
+                                <!--
+                                  The cell carries no background of its own: an opaque cell would
+                                  cut what scrolls under it at a hard edge, and a gradient painted
+                                  on top of it changes nothing. So the background *is* the two
+                                  boxes below -- solid where the content sits, and running out over
+                                  the 2rem next to it.
+                                -->
+                                <Table.Cell class="sticky left-0 z-10 pr-10 font-medium">
+                                    <div
+                                            class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
+                                                   inset-y-0 right-8 left-0 transition-colors"
+                                    ></div>
                                     <div
                                             class="from-popover group-hover/row:from-muted pointer-events-none
-                                                   absolute inset-y-0 right-0 w-8 bg-linear-to-r to-transparent"
+                                                   absolute inset-y-0 right-0 w-8 bg-linear-to-r to-transparent
+                                                   transition-colors"
                                     ></div>
+                                    <span class="relative">{inbox.username}</span>
                                 </Table.Cell>
                                 <!--
                                   The port belongs with the host: two accounts on one provider
@@ -145,13 +157,18 @@
                                   the cell it sat in. Sticky, so the actions stay reachable wherever
                                   the folder list has been scrolled to.
                                 -->
-                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky right-0 z-10 w-32 pl-10">
+                                <Table.Cell class="sticky right-0 z-10 w-32 pl-10">
                                     <div
-                                            class="from-popover group-hover/row:from-muted pointer-events-none
-                                                   absolute inset-y-0 left-0 w-8 bg-linear-to-l to-transparent"
+                                            class="to-popover group-hover/row:to-muted pointer-events-none absolute
+                                                   inset-y-0 left-0 w-8 bg-linear-to-r from-transparent
+                                                   transition-colors"
                                     ></div>
                                     <div
-                                            class="flex flex-row items-center justify-end gap-1 opacity-0
+                                            class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
+                                                   inset-y-0 right-0 left-8 transition-colors"
+                                    ></div>
+                                    <div
+                                            class="relative flex flex-row items-center justify-end gap-1 opacity-0
                                                    transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
                                     >
                                         <!-- TODO: no editing screen yet, see the note in the PR. -->

@@ -92,7 +92,11 @@
       "unarchive": "Zurück ins Postfach",
       "more": "Weitere Aktionen",
       "markSpam": "Als Spam markieren",
-      "reclassify": "Neu klassifizieren"
+      "reclassify": "Neu klassifizieren",
+      "download": "E-Mail herunterladen",
+      "share": "E-Mail teilen",
+      "copyLink": "E-Mail-Link kopieren (nur du kannst ihn verwenden)",
+      "openInThisTab": "In diesem Tab öffnen"
     },
     "preview": {
       "noContent": "Kein Inhalt verfügbar"

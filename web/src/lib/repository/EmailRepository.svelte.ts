@@ -258,6 +258,37 @@ export class EmailRepository {
     }
 
     /**
+     * Saves the mail's own source as an `.eml`, the file a mail client can be handed.
+     *
+     * A fetch and an anchor rather than pointing the browser straight at the url: the answer only
+     * comes with the session cookie attached, and a failed one has to be an error here rather than
+     * a page of json where the reader expected a file.
+     */
+    async downloadMail(id: string): Promise<void> {
+        const response = await fetch(`/api/emails/${id}/download`, {method: "GET"});
+        if (!response.ok) {
+            throw new Error(`Could not download mail ${id}: ${response.status} ${response.statusText}`);
+        }
+
+        // The server names the file -- it is the end that knows the subject is safe to put in a
+        // filename. Its own copy of the subject only stands in when that header is missing.
+        const disposition = response.headers.get("content-disposition") ?? "";
+        const fromServer = /filename="([^"]*)"/.exec(disposition)?.[1];
+        const fileName = fromServer || `${this.peek(id).value?.subject || "email"}.eml`;
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        // Only after the click: revoking it first leaves the anchor pointing at nothing.
+        URL.revokeObjectURL(url);
+    }
+
+    /**
      * Hangs a label that exists on [id], or takes it off again.
      *
      * The pair of ids is the whole address of it -- see `EmailLabels` on the server -- so this

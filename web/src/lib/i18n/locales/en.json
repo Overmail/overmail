@@ -92,7 +92,11 @@
       "unarchive": "Move back to the mailbox",
       "more": "More actions",
       "markSpam": "Mark as spam",
-      "reclassify": "Classify again"
+      "reclassify": "Classify again",
+      "download": "Download the mail",
+      "share": "Share the mail",
+      "copyLink": "Copy the mail’s link (only you can use it)",
+      "openInThisTab": "Open in this tab"
     },
     "preview": {
       "noContent": "No content available"

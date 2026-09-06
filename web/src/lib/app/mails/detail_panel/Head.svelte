@@ -9,6 +9,7 @@
         CheckIcon,
         CornersOutIcon,
         DotsThreeVerticalIcon,
+        DownloadIcon,
         EnvelopeSimpleIcon,
         EnvelopeSimpleOpenIcon,
         LinkSimpleIcon,
@@ -40,6 +41,7 @@
         showOpenInNewTab = true,
         onChangeArchiveState,
         onShareMail,
+        onDownloadMail,
         onChangeReadState,
         onReclassify,
         class: propsClass,
@@ -60,6 +62,7 @@
         showOpenInNewTab?: boolean;
         onChangeArchiveState: (newState: EmailMeta["archiveState"]) => Promise<void>;
         onShareMail: () => void;
+        onDownloadMail: () => void;
         onChangeReadState: (isRead: boolean) => Promise<void>;
         /** Hands the mail back to the classification agent; see the menu at the end of the bar. */
         onReclassify: () => void;
@@ -127,7 +130,7 @@
                 </Tooltip.Trigger>
 
                 <Tooltip.Content>
-                    Vorige E-Mail
+                    {$_('mails.panel.previous')}
                     <Kbd.Group>
                         <Kbd.Root>,</Kbd.Root>
                     </Kbd.Group>
@@ -147,7 +150,7 @@
                 </Tooltip.Trigger>
 
                 <Tooltip.Content>
-                    Nächste E-Mail
+                    {$_('mails.panel.next')}
                     <Kbd.Group>
                         <Kbd.Root>.</Kbd.Root>
                     </Kbd.Group>
@@ -157,6 +160,22 @@
     </div>
 
     <div class="flex flex-row items-center">
+        <Tooltip.Root>
+            <Tooltip.Trigger>
+                <Button
+                        variant="ghost"
+                        size="icon"
+                        onclick={onDownloadMail}
+                >
+                    <DownloadIcon />
+                </Button>
+            </Tooltip.Trigger>
+
+            <Tooltip.Content>
+                {$_('mails.panel.download')}
+            </Tooltip.Content>
+        </Tooltip.Root>
+
         <Tooltip.Root>
             <Tooltip.Trigger>
                 <Button
@@ -174,9 +193,9 @@
 
             <Tooltip.Content>
                 {#if mail.isRead}
-                    E-Mail als ungelesen markieren
+                    {$_('mails.panel.markUnread')}
                 {:else}
-                    E-Mail als gelesen markieren
+                    {$_('mails.panel.markRead')}
                 {/if}
             </Tooltip.Content>
         </Tooltip.Root>
@@ -193,7 +212,7 @@
             </Tooltip.Trigger>
 
             <Tooltip.Content>
-                E-Mail teilen
+                {$_('mails.panel.share')}
             </Tooltip.Content>
         </Tooltip.Root>
 
@@ -215,7 +234,7 @@
                         </Tooltip.Trigger>
 
                         <Tooltip.Content>
-                            Zurück ins Postfach verschieben
+                            {$_('mails.panel.unarchive')}
                             <Kbd.Group>
                                 <Kbd.Root>A</Kbd.Root>
                             </Kbd.Group>
@@ -236,7 +255,7 @@
                         </Tooltip.Trigger>
 
                         <Tooltip.Content>
-                            Archivieren
+                            {$_('mails.panel.archive')}
                             <Kbd.Group>
                                 <Kbd.Root>A</Kbd.Root>
                             </Kbd.Group>
@@ -263,7 +282,7 @@
                         </Tooltip.Trigger>
 
                         <Tooltip.Content>
-                            Als Spam markieren
+                            {$_('mails.panel.markSpam')}
                         </Tooltip.Content>
                     </Tooltip.Root>
                 </div>
@@ -290,7 +309,7 @@
             </Tooltip.Trigger>
 
             <Tooltip.Content>
-                E-Mail URL kopieren (Nur du kannst ihn verwenden)
+                {$_('mails.panel.copyLink')}
             </Tooltip.Content>
         </Tooltip.Root>
 
@@ -307,7 +326,7 @@
                 </Tooltip.Trigger>
 
                 <Tooltip.Content>
-                    In diesem Tab öffnen
+                    {$_('mails.panel.openInThisTab')}
                 </Tooltip.Content>
             </Tooltip.Root>
 
@@ -324,7 +343,7 @@
                 </Tooltip.Trigger>
 
                 <Tooltip.Content>
-                    In neuem Tab öffnen
+                    {$_('mails.panel.openInNewTab')}
                 </Tooltip.Content>
             </Tooltip.Root>
         {/if}
@@ -362,7 +381,7 @@
                 </Tooltip.Trigger>
 
                 <Tooltip.Content>
-                    Schließen
+                    {$_('mails.panel.close')}
                     <Kbd.Group>
                         <Kbd.Root>Esc</Kbd.Root>
                     </Kbd.Group>

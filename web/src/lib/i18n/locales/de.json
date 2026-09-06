@@ -133,7 +133,10 @@
     "add": "Label hinzufügen"
   },
   "settings": {
+    "title": "Einstellungen",
+    "description": "Verwalte deine Einstellungen.",
     "emailAccounts": {
+      "title": "E-Mail-Konten",
       "add": "Neues Postfach hinzufügen",
       "list": {
         "columns": {
@@ -257,6 +260,88 @@
         "loadFailed": "Dieses Postfach konnte nicht gelesen werden.",
         "conflict": "Zu diesem Postfach hast du bereits eine Verbindung.",
         "failed": "Die Änderungen konnten nicht gespeichert werden."
+      }
+    },
+    "knowledge": {
+      "title": "Wissen",
+      "add": "Wissen hinzufügen",
+      "list": {
+        "loading": "Wissen wird geladen …",
+        "failed": "Das Wissen konnte nicht geladen werden.",
+        "columns": {
+          "name": "Name",
+          "description": "Was bekannt ist",
+          "keywords": "Schlagwörter"
+        },
+        "noKeywords": "Keine Schlagwörter",
+        "learnedByAgent": "Der Agent hat dies über dich gelernt.",
+        "actions": {
+          "edit": "Eintrag bearbeiten",
+          "delete": "Eintrag vergessen"
+        }
+      },
+      "empty": {
+        "title": "Kein Wissen",
+        "description": "Der Agent lernt über dich anhand deiner E-Mails, um sie besser zu verstehen."
+      },
+      "new": {
+        "title": "Wissen hinzufügen",
+        "description": "Etwas über dich, das der Assistent beim Lesen deiner E-Mails berücksichtigen soll.",
+        "saving": "Wird gespeichert …",
+        "failed": "Der Eintrag konnte nicht gespeichert werden.",
+        "submit": "Hinzufügen"
+      },
+      "form": {
+        "name": "Name",
+        "namePlaceholder": "Stromvertrag",
+        "nameTaken": "Es gibt bereits einen Eintrag mit diesem Namen.",
+        "text": "Was bekannt ist",
+        "textPlaceholder": "Ich bin bei Rheinenergie und zahle monatlich per Lastschrift.",
+        "textHint": "Schreib es so, wie du es jemandem erzählen würdest, der deine Post sortiert.",
+        "keywords": "Schlagwörter",
+        "keywordsPlaceholder": "Schlagwort eingeben und Enter drücken",
+        "keywordsHint": "Damit findet der Assistent diesen Eintrag beim Sortieren einer E-Mail wieder.",
+        "keywordsFull": "Mehr Schlagwörter behält ein Eintrag nicht.",
+        "removeKeyword": "Schlagwort {keyword} entfernen",
+        "relevantOn": "Relevant am",
+        "relevantOnHint": "Optional, für Einträge zu einem einzelnen Tag – eine Frist, ein Umzug.",
+        "cancel": "Abbrechen"
+      },
+      "edit": {
+        "title": "Wissen bearbeiten",
+        "description": "Korrigiere, was der Assistent weiß, oder ergänze es.",
+        "saving": "Wird gespeichert …",
+        "failed": "Die Änderungen konnten nicht gespeichert werden.",
+        "submit": "Speichern"
+      },
+      "delete": {
+        "title": "Eintrag vergessen?",
+        "description": "Der Assistent weiß „{name}“ beim Lesen deiner E-Mails nicht mehr.",
+        "irreversible": "Das lässt sich nicht rückgängig machen. Was damit bereits eingeordnet wurde, bleibt.",
+        "deleting": "Wird vergessen …",
+        "failed": "Der Eintrag konnte nicht gelöscht werden.",
+        "cancel": "Abbrechen",
+        "confirm": "Vergessen"
+      },
+      "search": {
+        "placeholder": "Wissen durchsuchen",
+        "clear": "Suche leeren",
+        "results": "{count, plural, one {# Eintrag} other {# Einträge}}",
+        "noResults": {
+          "title": "Kein Treffer",
+          "description": "Kein Eintrag passt zu „{query}“."
+        }
+      },
+      "inline": {
+        "editName": "Namen bearbeiten",
+        "editText": "Bearbeiten, was bekannt ist",
+        "hint": "Doppelklick zum Bearbeiten",
+        "apply": "Übernehmen",
+        "discard": "Verwerfen",
+        "addKeyword": "Schlagwort hinzufügen",
+        "newKeyword": "Neues Schlagwort",
+        "saving": "Wird gespeichert …",
+        "failed": "Die Änderung konnte nicht gespeichert werden."
       }
     }
   },

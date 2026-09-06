@@ -37,6 +37,9 @@
 		/**
 		 * What a busy day is drawn in, as any CSS colour. It is mixed into the empty card rather
 		 * than used as a fill, so a colour that knows nothing about the theme still reads in both.
+		 *
+		 * Neutral by default: the grid is a count, not a call to look at something, and the accent
+		 * is a surface anyway -- it sits a hair away from the empty card.
 		 */
 		color?: string;
 		/**
@@ -335,7 +338,7 @@
 		background-color: color-mix(
 			in oklab,
 			var(--usage-tint, var(--primary)) var(--tint-share, 0%),
-			var(--accent)
+			var(--muted)
 		);
 		/*
 			Short on purpose: switching a year is a colour change across the whole grid, and the
@@ -373,7 +376,7 @@
 	.ahead {
 		background-color: color-mix(
 			in oklab,
-			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--accent))
+			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--muted))
 				30%,
 			transparent
 		);

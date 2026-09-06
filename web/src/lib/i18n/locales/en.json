@@ -133,7 +133,10 @@
     "add": "Add a label"
   },
   "settings": {
+    "title": "Settings",
+    "description": "Manage your settings.",
     "emailAccounts": {
+      "title": "Email accounts",
       "add": "Add a new inbox",
       "list": {
         "columns": {
@@ -257,6 +260,88 @@
         "loadFailed": "This mailbox could not be read.",
         "conflict": "You already have a connection to that mailbox.",
         "failed": "The changes could not be saved."
+      }
+    },
+    "knowledge": {
+      "title": "Knowledge",
+      "add": "Add knowledge",
+      "list": {
+        "loading": "Reading what the assistant knows…",
+        "failed": "What the assistant knows could not be read.",
+        "columns": {
+          "name": "Name",
+          "description": "What is known",
+          "keywords": "Keywords"
+        },
+        "noKeywords": "No keywords",
+        "learnedByAgent": "Learned by the assistant",
+        "actions": {
+          "edit": "Edit entry",
+          "delete": "Forget entry"
+        }
+      },
+      "empty": {
+        "title": "No knowledge",
+        "description": "The agent learns from your emails to better understand them."
+      },
+      "new": {
+        "title": "Add knowledge",
+        "description": "Something about you the assistant should keep in mind while it reads your mail.",
+        "saving": "Saving…",
+        "failed": "The entry could not be saved.",
+        "submit": "Add"
+      },
+      "form": {
+        "name": "Name",
+        "namePlaceholder": "Electricity contract",
+        "nameTaken": "There is already an entry with this name.",
+        "text": "What is known",
+        "textPlaceholder": "I am with Rheinenergie and pay monthly by direct debit.",
+        "textHint": "Write it as you would tell it to somebody sorting your mail.",
+        "keywords": "Keywords",
+        "keywordsPlaceholder": "Type a keyword and press Enter",
+        "keywordsHint": "How the assistant finds this entry again while it sorts a mail.",
+        "keywordsFull": "That is as many keywords as an entry keeps.",
+        "removeKeyword": "Remove keyword {keyword}",
+        "relevantOn": "Relevant on",
+        "relevantOnHint": "Optional, for entries about a single day — a deadline, a move.",
+        "cancel": "Cancel"
+      },
+      "edit": {
+        "title": "Edit knowledge",
+        "description": "Correct what the assistant knows, or say more about it.",
+        "saving": "Saving…",
+        "failed": "The changes could not be saved.",
+        "submit": "Save"
+      },
+      "delete": {
+        "title": "Forget this entry?",
+        "description": "The assistant will no longer know “{name}” when it reads your mail.",
+        "irreversible": "This cannot be undone. What it already wrote into your mail stays.",
+        "deleting": "Forgetting…",
+        "failed": "The entry could not be deleted.",
+        "cancel": "Cancel",
+        "confirm": "Forget"
+      },
+      "search": {
+        "placeholder": "Search knowledge",
+        "clear": "Clear the search",
+        "results": "{count, plural, one {# entry} other {# entries}}",
+        "noResults": {
+          "title": "Nothing matches",
+          "description": "No entry matches “{query}”."
+        }
+      },
+      "inline": {
+        "editName": "Edit the name",
+        "editText": "Edit what is known",
+        "hint": "Double-click to edit",
+        "apply": "Apply",
+        "discard": "Discard",
+        "addKeyword": "Add a keyword",
+        "newKeyword": "New keyword",
+        "saving": "Saving…",
+        "failed": "The change could not be saved."
       }
     }
   },

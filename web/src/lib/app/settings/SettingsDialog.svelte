@@ -4,8 +4,10 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {EnvelopeSimpleIcon} from "phosphor-svelte";
+    import {BrainIcon, EnvelopeSimpleIcon} from "phosphor-svelte";
+    import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
+    import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
 
@@ -16,7 +18,8 @@
     }
 
     const nav = [
-        {name: "E-Mail-Konten", icon: EnvelopeSimpleIcon, key: "email-accounts"},
+        {name: $_("settings.emailAccounts.title"), icon: EnvelopeSimpleIcon, key: "email-accounts"},
+        {name: $_("settings.knowledge.title"), icon: BrainIcon, key: "knowledge"},
     ];
 
     const currentNavItem = $derived(nav.find((item) => item.key === page.url.searchParams.get("settings")) ?? nav[0]);
@@ -46,8 +49,8 @@
                    lg:max-w-[min(68rem,calc(100%_-_2rem))] xl:max-w-[min(80rem,calc(100%_-_2rem))]"
             trapFocus={false}
     >
-        <Dialog.Title class="sr-only">Settings</Dialog.Title>
-        <Dialog.Description class="sr-only">Customize your settings here.</Dialog.Description>
+        <Dialog.Title class="sr-only">{$_("settings.title")}</Dialog.Title>
+        <Dialog.Description class="sr-only">{$_("settings.description")}</Dialog.Description>
         <!--
           `min-w-0` here too: this is a grid item of the dialog and defaults to `min-width: auto`,
           so it grows to whatever is inside it. A wide table pushed it past the dialog, and the
@@ -90,7 +93,7 @@
                         <Breadcrumb.Root>
                             <Breadcrumb.List>
                                 <Breadcrumb.Item class="hidden md:block">
-                                    <Breadcrumb.Link href="##">Settings</Breadcrumb.Link>
+                                    <Breadcrumb.Link href="##">{$_("settings.title")}</Breadcrumb.Link>
                                 </Breadcrumb.Item>
                                 <Breadcrumb.Separator class="hidden md:block" />
                                 <Breadcrumb.Item>
@@ -103,6 +106,8 @@
                 <div class="flex flex-1 flex-col gap-4 overflow-y-auto py-5 px-4">
                     {#if currentNavItem.key === "email-accounts"}
                         <EmailAccountsSettings />
+                    {:else if currentNavItem.key === "knowledge"}
+                        <KnowledgeSettings />
                     {/if}
                 </div>
             </main>

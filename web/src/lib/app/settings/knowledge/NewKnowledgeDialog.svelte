@@ -60,14 +60,14 @@
         >
             <Field.Field>
                 <Field.Label for={"knowledge-name-" + id}>
-                    {$_("settings.knowledge.new.name")}
+                    {$_("settings.knowledge.form.name")}
                 </Field.Label>
                 <Input
                         id={"knowledge-name-" + id}
                         type="text"
                         disabled={viewModel.saving}
                         aria-invalid={saveState.type === "nameTaken"}
-                        placeholder={$_("settings.knowledge.new.namePlaceholder")}
+                        placeholder={$_("settings.knowledge.form.namePlaceholder")}
                         bind:value={() => viewModel.name, (name: string) => viewModel.setName(name)}
                 />
                 <!--
@@ -75,27 +75,27 @@
                   a reason the user can act on, and it is a rename, not a retry.
                 -->
                 {#if saveState.type === "nameTaken"}
-                    <Field.Error>{$_("settings.knowledge.new.nameTaken")}</Field.Error>
+                    <Field.Error>{$_("settings.knowledge.form.nameTaken")}</Field.Error>
                 {/if}
             </Field.Field>
 
             <Field.Field>
                 <Field.Label for={"knowledge-description-" + id}>
-                    {$_("settings.knowledge.new.text")}
+                    {$_("settings.knowledge.form.text")}
                 </Field.Label>
                 <Textarea
                         id={"knowledge-description-" + id}
                         rows={4}
                         disabled={viewModel.saving}
-                        placeholder={$_("settings.knowledge.new.textPlaceholder")}
+                        placeholder={$_("settings.knowledge.form.textPlaceholder")}
                         bind:value={viewModel.description}
                 />
-                <Field.Description>{$_("settings.knowledge.new.textHint")}</Field.Description>
+                <Field.Description>{$_("settings.knowledge.form.textHint")}</Field.Description>
             </Field.Field>
 
             <Field.Field>
                 <Field.Label for={"knowledge-keywords-" + id}>
-                    {$_("settings.knowledge.new.keywords")}
+                    {$_("settings.knowledge.form.keywords")}
                 </Field.Label>
                 <KeywordsInput
                         id={"knowledge-keywords-" + id}
@@ -103,7 +103,7 @@
                         bind:draft={viewModel.keywordDraft}
                         full={viewModel.keywordsFull}
                         disabled={viewModel.saving}
-                        placeholder={$_("settings.knowledge.new.keywordsPlaceholder")}
+                        placeholder={$_("settings.knowledge.form.keywordsPlaceholder")}
                         oncommit={() => viewModel.commitKeywords()}
                         onremove={(keyword) => viewModel.removeKeyword(keyword)}
                         oneditlast={() => viewModel.editLastKeyword()}
@@ -112,12 +112,12 @@
                   Worth saying out loud: these are what the assistant looks the entry up by while
                   it sorts a mail, so an entry nobody gave words to is one it will rarely find.
                 -->
-                <Field.Description>{$_("settings.knowledge.new.keywordsHint")}</Field.Description>
+                <Field.Description>{$_("settings.knowledge.form.keywordsHint")}</Field.Description>
             </Field.Field>
 
             <Field.Field>
                 <Field.Label for={"knowledge-relevant-on-" + id}>
-                    {$_("settings.knowledge.new.relevantOn")}
+                    {$_("settings.knowledge.form.relevantOn")}
                 </Field.Label>
                 <Input
                         id={"knowledge-relevant-on-" + id}
@@ -126,7 +126,7 @@
                         disabled={viewModel.saving}
                         bind:value={viewModel.relevantOn}
                 />
-                <Field.Description>{$_("settings.knowledge.new.relevantOnHint")}</Field.Description>
+                <Field.Description>{$_("settings.knowledge.form.relevantOnHint")}</Field.Description>
             </Field.Field>
 
             <div aria-live="polite" class="min-h-5 text-sm">
@@ -145,7 +145,7 @@
 
             <Dialog.Footer>
                 <Button type="button" variant="secondary" disabled={viewModel.saving} onclick={() => (open = false)}>
-                    {$_("settings.knowledge.new.cancel")}
+                    {$_("settings.knowledge.form.cancel")}
                 </Button>
                 <Button type="submit" disabled={!viewModel.canSubmit}>
                     {$_("settings.knowledge.new.submit")}

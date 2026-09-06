@@ -53,8 +53,8 @@
                     type="button"
                     {disabled}
                     class="hover:text-foreground text-muted-foreground rounded-full disabled:pointer-events-none"
-                    aria-label={$_("settings.knowledge.new.removeKeyword", {values: {keyword}})}
-                    title={$_("settings.knowledge.new.removeKeyword", {values: {keyword}})}
+                    aria-label={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
+                    title={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
                     onclick={() => onremove(keyword)}
             >
                 <XIcon class="size-3" />
@@ -90,5 +90,5 @@
 </div>
 
 {#if full}
-    <p class="text-muted-foreground text-xs">{$_("settings.knowledge.new.keywordsFull")}</p>
+    <p class="text-muted-foreground text-xs">{$_("settings.knowledge.form.keywordsFull")}</p>
 {/if}

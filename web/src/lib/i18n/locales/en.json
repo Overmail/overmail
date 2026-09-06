@@ -287,6 +287,11 @@
       "new": {
         "title": "Add knowledge",
         "description": "Something about you the assistant should keep in mind while it reads your mail.",
+        "saving": "Saving…",
+        "failed": "The entry could not be saved.",
+        "submit": "Add"
+      },
+      "form": {
         "name": "Name",
         "namePlaceholder": "Electricity contract",
         "nameTaken": "There is already an entry with this name.",
@@ -300,10 +305,43 @@
         "removeKeyword": "Remove keyword {keyword}",
         "relevantOn": "Relevant on",
         "relevantOnHint": "Optional, for entries about a single day — a deadline, a move.",
+        "cancel": "Cancel"
+      },
+      "edit": {
+        "title": "Edit knowledge",
+        "description": "Correct what the assistant knows, or say more about it.",
         "saving": "Saving…",
-        "failed": "The entry could not be saved.",
+        "failed": "The changes could not be saved.",
+        "submit": "Save"
+      },
+      "delete": {
+        "title": "Forget this entry?",
+        "description": "The assistant will no longer know “{name}” when it reads your mail.",
+        "irreversible": "This cannot be undone. What it already wrote into your mail stays.",
+        "deleting": "Forgetting…",
+        "failed": "The entry could not be deleted.",
         "cancel": "Cancel",
-        "submit": "Add"
+        "confirm": "Forget"
+      },
+      "search": {
+        "placeholder": "Search knowledge",
+        "clear": "Clear the search",
+        "results": "{count, plural, one {# entry} other {# entries}}",
+        "noResults": {
+          "title": "Nothing matches",
+          "description": "No entry matches “{query}”."
+        }
+      },
+      "inline": {
+        "editName": "Edit the name",
+        "editText": "Edit what is known",
+        "hint": "Double-click to edit",
+        "apply": "Apply",
+        "discard": "Discard",
+        "addKeyword": "Add a keyword",
+        "newKeyword": "New keyword",
+        "saving": "Saving…",
+        "failed": "The change could not be saved."
       }
     }
   },

@@ -13,6 +13,7 @@
 	import CheckingSession from "$lib/app/shell/CheckingSession.svelte";
 	import {SidePanelState} from "$lib/app/shell/sidePanel.svelte";
 	import SidePanelResizer from "$lib/app/shell/SidePanelResizer.svelte";
+	import {ModeWatcher} from "mode-watcher";
 	import {fade} from 'svelte/transition';
 	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
 	import SettingsDialog from "$lib/app/settings/SettingsDialog.svelte";
@@ -161,3 +162,5 @@
 {/if}
 
 <SettingsDialog />
+
+<ModeWatcher />

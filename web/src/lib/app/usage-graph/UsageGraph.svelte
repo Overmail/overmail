@@ -335,7 +335,7 @@
 		background-color: color-mix(
 			in oklab,
 			var(--usage-tint, var(--primary)) var(--tint-share, 0%),
-			var(--accent)
+			var(--muted)
 		);
 		/*
 			Short on purpose: switching a year is a colour change across the whole grid, and the
@@ -373,7 +373,7 @@
 	.ahead {
 		background-color: color-mix(
 			in oklab,
-			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--accent))
+			color-mix(in oklab, var(--usage-tint, var(--primary)) var(--tint-share, 0%), var(--muted))
 				30%,
 			transparent
 		);

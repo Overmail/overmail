@@ -37,6 +37,16 @@
         void load();
     });
 
+    /**
+     * How a pinned column ends: a hard rule, and a shadow falling over what scrolls under it.
+     *
+     * Only worth drawing while something is actually behind the column -- `*_ON` is added once the
+     * table is scrolled, and the `transition-shadow` on the cell fades it in.
+     */
+    const PINNED_LEFT_EDGE = "shadow-none";
+    const PINNED_LEFT_EDGE_ON = "shadow-[1px_0_0_0_var(--border),8px_0_12px_-8px_rgb(0_0_0/0.28)]";
+    const PINNED_RIGHT_EDGE_ON = "shadow-[-1px_0_0_0_var(--border),-8px_0_12px_-8px_rgb(0_0_0/0.28)]";
+
     /** The table itself; `Table.Root` puts it inside the wrapper that does the scrolling. */
     let tableElement: HTMLTableElement | null = $state(null);
     /** Whether anything is hidden past the left edge, and whether anything is left to the right. */
@@ -102,70 +112,31 @@
                               Pinned while the rest scrolls sideways: the username is what says
                               which row is which, and a row identified by nothing is not a row.
                             -->
-                            <Table.Head class="sticky left-0 z-20 pr-10">
-                                <div class="bg-popover pointer-events-none absolute inset-y-0 right-8 left-0"></div>
-                                <!--
-                                  No rule down the table: the pinned column ends in its own
-                                  background running out, so what scrolls under it disappears
-                                  instead of stopping at a line. The run-out sits inside the cell,
-                                  in padding kept free for it -- hung outside, it depended on the
-                                  neighbouring column being there and wide enough, which on a
-                                  narrow viewport it is not.
-                                -->
-                                <div
-                                        class="from-popover pointer-events-none absolute inset-y-0 right-0 w-8
-                                               bg-linear-to-r to-transparent"
-                                ></div>
-                                <div
-                                        class={cn(
-                                            "bg-border pointer-events-none absolute inset-y-0 right-0 w-px transition-opacity",
-                                            scrolledFromStart ? "opacity-100" : "opacity-0",
-                                        )}
-                                ></div>
-                                <span class="relative">
-                                    {$_("settings.emailAccounts.list.columns.username")}
-                                </span>
+                            <Table.Head class={cn("bg-popover sticky left-0 z-20 transition-shadow", PINNED_LEFT_EDGE, scrolledFromStart && PINNED_LEFT_EDGE_ON)}>
+                                {$_("settings.emailAccounts.list.columns.username")}
                             </Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
-                            <!-- The actions column; its header is empty on purpose. -->
-                            <Table.Head class="sticky right-0 z-20 w-32 pl-10">
-                                <div
-                                        class="to-popover pointer-events-none absolute inset-y-0 left-0 w-8
-                                               bg-linear-to-r from-transparent"
-                                ></div>
-                                <div class="bg-popover pointer-events-none absolute inset-y-0 right-0 left-8"></div>
-                            </Table.Head>
+                            <!--
+                              The actions column. Empty *and* transparent on purpose: the backdrop
+                              under the buttons belongs to a row being hovered, and a header is
+                              never hovered -- given one anyway it just sat there permanently.
+                            -->
+                            <Table.Head class="sticky right-0 z-20 w-24"></Table.Head>
                         </Table.Row>
                     </Table.Header>
                     <Table.Body>
                         {#each inboxes.rows as inbox (inbox.id)}
                             <Table.Row class="group/row hover:bg-muted">
-                                <!--
-                                  The cell carries no background of its own: an opaque cell would
-                                  cut what scrolls under it at a hard edge, and a gradient painted
-                                  on top of it changes nothing. So the background *is* the two
-                                  boxes below -- solid where the content sits, and running out over
-                                  the 2rem next to it.
-                                -->
-                                <Table.Cell class="sticky left-0 z-10 pr-10 font-medium">
-                                    <div
-                                            class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
-                                                   inset-y-0 right-8 left-0 transition-colors"
-                                    ></div>
-                                    <div
-                                            class="from-popover group-hover/row:from-muted pointer-events-none
-                                                   absolute inset-y-0 right-0 w-8 bg-linear-to-r to-transparent
-                                                   transition-colors"
-                                    ></div>
-                                    <div
-                                            class={cn(
-                                                "bg-border pointer-events-none absolute inset-y-0 right-0 w-px",
-                                                "transition-opacity",
-                                                scrolledFromStart ? "opacity-100" : "opacity-0",
-                                            )}
-                                    ></div>
-                                    <span class="relative">{inbox.username}</span>
+                                <Table.Cell
+                                        class={cn(
+                                            "bg-popover group-hover/row:bg-muted sticky left-0 z-10 font-medium",
+                                            "transition-[background-color,box-shadow]",
+                                            PINNED_LEFT_EDGE,
+                                            scrolledFromStart && PINNED_LEFT_EDGE_ON,
+                                        )}
+                                >
+                                    {inbox.username}
                                 </Table.Cell>
                                 <!--
                                   The port belongs with the host: two accounts on one provider
@@ -207,28 +178,17 @@
                                   the cell it sat in. Sticky, so the actions stay reachable wherever
                                   the folder list has been scrolled to.
                                 -->
-                                <Table.Cell class="sticky right-0 z-10 w-32 pl-10">
+                                <Table.Cell class="sticky right-0 z-10 w-24">
                                     <!--
-                                      Only while the row is hovered: the buttons are what needs
-                                      covering up, and until then the folders may run the whole
-                                      width. `transition` rather than `transition-colors`, so the
-                                      fading in and the hover colour are the same 150ms.
+                                      Backdrop and edge come in together with the buttons: they are
+                                      the only thing that needs covering, and until the row is
+                                      hovered the folders may run the full width.
                                     -->
                                     <div
-                                            class="to-popover group-hover/row:to-muted pointer-events-none absolute
-                                                   inset-y-0 left-0 w-8 bg-linear-to-r from-transparent opacity-0
-                                                   transition group-hover/row:opacity-100"
-                                    ></div>
-                                    <div
-                                            class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
-                                                   inset-y-0 right-0 left-8 opacity-0 transition
-                                                   group-hover/row:opacity-100"
-                                    ></div>
-                                    <div
                                             class={cn(
-                                                "bg-border pointer-events-none absolute inset-y-0 left-0 w-px opacity-0",
-                                                "transition-opacity",
-                                                scrolledToEnd ? "" : "group-hover/row:opacity-100",
+                                                "bg-popover group-hover/row:bg-muted pointer-events-none absolute",
+                                                "inset-0 opacity-0 transition group-hover/row:opacity-100",
+                                                !scrolledToEnd && PINNED_RIGHT_EDGE_ON,
                                             )}
                                     ></div>
                                     <div

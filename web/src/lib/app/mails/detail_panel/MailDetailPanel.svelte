@@ -206,6 +206,7 @@
                 onNextMail={() => stepTo(1)}
                 onPreviousMail={() => stepTo(-1)}
                 onChangeArchiveState={(newState) => mails.setArchiveState(mail.id, newState)}
+                onDownloadMail={() => mails.downloadMail(mail.id)}
                 onShareMail={() => alert("Sharing is not yet supported. Note that sharing a mail is not the same as forwarding it.")}
                 onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
                 onReclassify={() => mails.requestClassification(mail.id)}

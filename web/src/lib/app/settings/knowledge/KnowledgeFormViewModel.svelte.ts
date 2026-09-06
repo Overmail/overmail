@@ -164,7 +164,11 @@ export class KnowledgeFormViewModel {
      * not the one before it -- or, in the add dialog, a form somebody walked away from half-filled.
      */
     reset(entry: KnowledgeEntry | null = null) {
-        this.baseline = entry
+        // Filled in locally and read back from there, never from `this.baseline`: both dialogs
+        // call this from an effect that reads what to open on, and an effect that reads a piece
+        // of state it just wrote depends on itself -- which Svelte ends with
+        // `effect_update_depth_exceeded`, taking the screen it was rendering with it.
+        const baseline: Baseline = entry
             ? {
                   name: entry.name,
                   description: entry.description,
@@ -173,10 +177,11 @@ export class KnowledgeFormViewModel {
               }
             : EMPTY;
 
-        this.name = this.baseline.name;
-        this.description = this.baseline.description;
-        this.relevantOn = this.baseline.relevantOn;
-        this.keywords = [...this.baseline.keywords];
+        this.baseline = baseline;
+        this.name = baseline.name;
+        this.description = baseline.description;
+        this.relevantOn = baseline.relevantOn;
+        this.keywords = [...baseline.keywords];
         this.keywordDraft = "";
         this.saveState = {type: "idle"};
     }

@@ -51,6 +51,13 @@ test("a second word narrows the list rather than widening it", () => {
     expect(ids("abschlag wasser")).toEqual(["k-4"]);
 });
 
+test("what is known is searched for the word itself, not for its letters spread out", () => {
+    // k-3's text is "Das Rad ist bei der Versicherung gemeldet." -- it carries every letter of
+    // "dasein" in order, and a subsequence match over a paragraph would call that a hit.
+    expect(ids("dasein")).toEqual([]);
+    expect(ids("versicherung")).toEqual(["k-3"]);
+});
+
 test("capitals and umlauts are not part of the query", () => {
     expect(ids("STROM")).toEqual(["k-1"]);
     expect(ids("koeln")).toEqual(["k-2"]);

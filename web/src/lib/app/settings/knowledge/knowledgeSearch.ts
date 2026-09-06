@@ -74,11 +74,24 @@ function score(entry: KnowledgeEntry, terms: string[]): {matched: number; weight
     return {matched, weight};
 }
 
-/** The best place one term was found in, or 0 when the entry does not carry it at all. */
+/** Whether [needle] is in [haystack] as it was typed, capitals and umlauts aside. */
+function contains(haystack: string, needle: string): boolean {
+    return normalize(haystack).includes(normalize(needle));
+}
+
+/**
+ * The best place one term was found in, or 0 when the entry does not carry it at all.
+ *
+ * The name and the keywords are matched fuzzily, like the server matches them: they are a handle
+ * and a few words, so a subsequence of them still says something. What is known is not -- it is
+ * a paragraph, and any word's letters can be found scattered through one. Measured against the
+ * real list: "rechnung" fuzzily matched every entry there was, which is a search that answers
+ * nothing. So the text is searched for the word itself.
+ */
 function bestHit(entry: KnowledgeEntry, term: string): number {
     if (fuzzyContains(entry.name, term)) return WEIGHT.name;
     if (entry.keywords.some((keyword) => fuzzyContains(keyword, term))) return WEIGHT.keyword;
-    if (fuzzyContains(entry.description, term)) return WEIGHT.description;
+    if (contains(entry.description, term)) return WEIGHT.description;
     return 0;
 }
 

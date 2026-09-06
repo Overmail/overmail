@@ -15,6 +15,7 @@
 	import SidePanelResizer from "$lib/app/shell/SidePanelResizer.svelte";
 	import {fade} from 'svelte/transition';
 	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
+	import SettingsDialog from "$lib/app/settings/SettingsDialog.svelte";
 
 	let { children } = $props();
 
@@ -105,7 +106,14 @@
 			<!-- Renders the <main> and stretches to the wrapper's min-h-svh, so pages can size
 			     their content with flex-1 instead of a percentage height that has nothing to
 			     resolve against. -->
-			<Sidebar.Inset>
+			<!--
+			     `min-w-0`: a flex item defaults to `min-width: auto` and grows to whatever is
+			     inside it. The mail table asks for `min-w-[52rem]`, so below roughly 1216px of
+			     window this pushed the <main> wider than the window and made the whole document
+			     scroll sideways -- which is also why zooming out "fixed" the page. With this the
+			     table overflows inside its own scroller instead.
+			-->
+			<Sidebar.Inset class="min-w-0">
 				<AppHeader
 						{header}
 						bind:sidebarOpen={panel.open}
@@ -144,3 +152,5 @@
 		{@render children()}
 	{/if}
 {/if}
+
+<SettingsDialog />

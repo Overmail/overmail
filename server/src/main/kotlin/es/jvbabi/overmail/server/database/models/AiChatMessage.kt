@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.database.models
 
+import es.jvbabi.overmail.server.database.OvermailDatabase
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -84,7 +85,7 @@ object AiChatMessages : UuidTable("ai_chat_messages") {
     val sender = enumerationByName<AiChatMessageSender>("sender", 16)
     val sentAt = timestamp("sent_at")
     val finishedAt = timestamp("finished_at").nullable()
-    val content = jsonb<AiChatMessage.MessageContent>("content", Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true; prettyPrint = false })
+    val content = jsonb<AiChatMessage.MessageContent>("content", OvermailDatabase.json)
 }
 
 enum class AiChatMessageSender {

@@ -72,6 +72,10 @@ dependencies {
     implementation(libs.logback.classic)
 
     implementation(libs.kamel)
+    // Kamel keeps these at `implementation` scope, so its SocketInstance -- what the imap host
+    // probe opens a connection with -- is not compilable against without declaring them here.
+    implementation(libs.ktor.network)
+    implementation(libs.ktor.network.tls)
 
     // HTML-to-text for mails that ship no text/plain part, see HtmlToText.
     implementation(libs.jsoup)

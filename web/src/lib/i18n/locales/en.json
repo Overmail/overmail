@@ -128,6 +128,134 @@
     "search": "Search labels",
     "add": "Add a label"
   },
+  "settings": {
+    "emailAccounts": {
+      "add": "Add a new inbox",
+      "list": {
+        "columns": {
+          "username": "Username",
+          "server": "IMAP server",
+          "folders": "Folders"
+        },
+        "empty": {
+          "title": "No accounts",
+          "description": "Create your first IMAP Connection to import your emails."
+        },
+        "failed": "The mailboxes could not be read.",
+        "loading": "Loading mailboxes…",
+        "noFolders": "None",
+        "actions": {
+          "edit": "Edit connection",
+          "delete": "Delete connection",
+          "pause": "Pause import",
+          "resume": "Resume import",
+          "paused": "Paused"
+        },
+        "delete": {
+          "title": "Delete connection?",
+          "description": "{username} at {host} will be disconnected.",
+          "emails": "{count, plural, =0 {No imported mail is affected.} one {# imported mail will be deleted with it.} other {# imported mails will be deleted with it.}}",
+          "irreversible": "The mails stay in your mailbox at the provider; only Overmail's copies go.",
+          "confirm": "Delete",
+          "cancel": "Cancel",
+          "deleting": "Deleting…",
+          "failed": "The connection could not be deleted.",
+          "pauseInstead": "Pause instead",
+          "pauseHint": "Pausing stops the import and deletes nothing. You can resume it any time."
+        }
+      },
+      "new": {
+        "title": "New inbox",
+        "cancel": "Cancel",
+        "next": "Next",
+        "finish": "Done",
+        "steps": {
+          "server": "Server",
+          "credentials": "Sign-in",
+          "folders": "Folders"
+        },
+        "server": {
+          "description": "Connect your email provider. They have the imap details.",
+          "host": "IMAP server",
+          "port": "Port",
+          "test": {
+            "testing": "Connecting…",
+            "reachable": "Server reachable",
+            "loginDisabled": "Reachable, but no password sign-in",
+            "failed": "Could not run the check",
+            "outcome": {
+              "host_not_found": "No server under this address",
+              "connection_failed": "Nothing answers on this port",
+              "tls_failed": "No TLS on this port — usually 993",
+              "no_imap_server": "Not an imap server",
+              "timeout": "No answer from the server",
+              "unknown": "No connection"
+            }
+          }
+        },
+        "credentials": {
+          "description": "Your sign-in for {host}. Often the address itself.",
+          "username": "Username",
+          "password": "Password",
+          "test": {
+            "testing": "Signing in…",
+            "authenticated": "Sign-in works",
+            "failed": "Could not run the check",
+            "outcome": {
+              "invalid_credentials": "The server rejected these credentials",
+              "connection_failed": "The server is no longer answering",
+              "timeout": "No answer from the server",
+              "unknown": "Sign-in did not work"
+            }
+          }
+        },
+        "folders": {
+          "description": "Pick the folders to sync, and how far back the assistant should read.",
+          "listing": "Looking through the mailbox…",
+          "counting": "Counting folders… {counted} of {total}",
+          "failed": "The mailbox could not be read.",
+          "empty": "This mailbox has no folders.",
+          "columns": {
+            "folder": "Folder",
+            "mails": "Mails",
+            "oldest": "Oldest",
+            "realtime": "Live",
+            "ai": "Assistant reads"
+          },
+          "pending": "…",
+          "unknown": "—",
+          "aiMode": {
+            "new_only": "Only new mail",
+            "newest": "Newest",
+            "since": "Everything from",
+            "all": "Everything",
+            "countLabel": "How many mails",
+            "dateLabel": "Read from this date",
+            "triggerNewest": "Newest {count}",
+            "triggerSince": "From {date}"
+          },
+          "submit": {
+            "saving": "Creating the inbox…",
+            "conflict": "This mailbox is already set up.",
+            "failed": "The inbox could not be created."
+          }
+        }
+      },
+      "edit": {
+        "title": "Edit connection",
+        "description": "Everything is checked as you change it. Leave the password blank to keep the current one.",
+        "server": "Mail server",
+        "credentials": "Sign-in",
+        "folders": "Folders",
+        "passwordPlaceholder": "Unchanged",
+        "save": "Save",
+        "saving": "Saving…",
+        "loadFailed": "This mailbox could not be read.",
+        "conflict": "You already have a connection to that mailbox.",
+        "failed": "The changes could not be saved."
+      }
+    }
+  },
   "ai": {
     "title": "Overmail AI",
     "chat": {

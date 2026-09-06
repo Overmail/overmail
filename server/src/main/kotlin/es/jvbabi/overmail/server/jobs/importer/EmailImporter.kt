@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
+import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailPreviews
 import es.jvbabi.overmail.server.database.models.EmailUsers
@@ -14,6 +15,8 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
 import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlin.coroutines.coroutineContext
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -25,10 +28,23 @@ import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val POLL_INTERVAL = 5.minutes
+
+/**
+ * How often a watched folder re-issues its `IDLE`.
+ *
+ * RFC 2177 tells clients to renew at least every 29 minutes, and middleboxes drop an idle socket
+ * long before a server would -- a watch that is never renewed goes quiet without ever failing,
+ * which is the one way of breaking that nothing here would notice.
+ */
+private val IDLE_RENEW_INTERVAL = 25.minutes
+
+/** How long a watch waits before reconnecting. The poll keeps running meanwhile, so mail is not lost. */
+private val IDLE_RETRY_INTERVAL = 30.seconds
 
 /** What a decoder puts where a byte sequence made no sense. */
 private const val REPLACEMENT_CHARACTER = '\uFFFD'
@@ -45,9 +61,39 @@ data class ImapConnection(
     val port: Int,
     val username: String,
     val password: String,
+    /** The folders this account syncs, and how. Empty means nothing is imported for it. */
+    val folders: List<FolderSync>,
+    /** Whether the account is paused; a paused one has no importer at all. */
+    val isPaused: Boolean = false,
 ) {
     /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
-    val signature: String get() = "$host:$port:$username:$password"
+    val signature: String
+        get() = "$host:$port:$username:$password:" +
+            folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImport}/${it.createdAt}" }
+
+    /** One folder's settings, as `ImapAccountFolderSyncs` holds them. */
+    data class FolderSync(
+        val folder: String,
+        /** Whether the folder is watched over an open connection rather than only polled. */
+        val imapPush: Boolean,
+        val aiImport: ImapAccountFolderSync.AiImportSettings,
+        /** When the folder was added, which is what "only new messages" is measured against. */
+        val createdAt: Instant,
+    ) {
+        /**
+         * Whether a mail sent at [sentAt] is worth putting through the assistant.
+         *
+         * Every mail of a synced folder is imported either way -- this only decides what the
+         * assistant is paid to read, which is what the user picked per folder.
+         */
+        fun wantsAssistant(sentAt: Instant): Boolean = when (val scope = aiImport) {
+            ImapAccountFolderSync.AiImportSettings.AllMessages -> true
+            // Everything already in the folder when it was added is history; "only new" means
+            // what arrives from here on.
+            ImapAccountFolderSync.AiImportSettings.OnlyNewMessages -> sentAt >= createdAt
+            is ImapAccountFolderSync.AiImportSettings.AfterDate -> sentAt >= scope.date
+        }
+    }
 }
 
 class EmailImporter(
@@ -62,31 +108,104 @@ class EmailImporter(
 
     private var importerJob: Job? = null
 
+    /**
+     * Many events between two passes are one reason to look again, so the newest wins and the
+     * older ones are dropped: what a watch reports is "something changed", never which mail.
+     */
+    private val wakeUps = Channel<Unit>(Channel.CONFLATED)
+
     fun start() {
         importerJob = coroutineScope.launch {
-            while (isActive) {
-                // One failed cycle must not end the job: nothing restarts it (ImporterManager only
-                // reacts to config changes), so an uncaught error would stop the import for good.
-                try {
-                    importOnce()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    println("Import cycle failed for ${account.username}, retrying in $POLL_INTERVAL:")
-                    println(e.stackTraceToString())
+            // Started together with the pass below, not after it: a mailbox with years of mail in
+            // it takes a long time to walk, and a watch that waited for that would miss every mail
+            // arriving meanwhile -- which is the mail the user is actually waiting for.
+            val watches = account.folders
+                .filter { it.imapPush }
+                .map { folder -> launch { watch(folder) } }
+
+            try {
+                while (isActive) {
+                    // One failed cycle must not end the job: nothing restarts it (ImporterManager
+                    // only reacts to config changes), so an uncaught error would stop the import
+                    // for good.
+                    try {
+                        importOnce()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.error("Import cycle failed for ${account.username}, retrying in $POLL_INTERVAL", e)
+                    }
+                    // Whichever comes first: the timer, or a watch saying a folder changed.
+                    withTimeoutOrNull(POLL_INTERVAL) { wakeUps.receive() }
                 }
-                delay(POLL_INTERVAL)
+            } finally {
+                watches.forEach { it.cancel() }
             }
         }
     }
 
     /**
-     * One poll cycle on a connection of its own. Not reused across cycles: the pool inside
-     * [ImapClient] never evicts sockets the server has dropped in the meantime and hands them out
-     * again -- a dead socket can even yield an empty mail list instead of an error, which would
-     * look like an empty inbox forever.
+     * Holds an `IDLE` on [sync] and asks for a pass whenever the folder reports a change.
+     *
+     * A pass rather than a targeted fetch: `* n EXISTS` says how many mails the folder has now,
+     * not which one is new, so there is nothing to fetch by. Looking again is cheap -- the pass
+     * skips what it already has.
+     *
+     * Its own connection, because that is what `IDLE` is: a socket that says nothing until it has
+     * something to say, and can therefore not be shared with the commands the pass runs.
+     */
+    private suspend fun watch(sync: ImapConnection.FolderSync) {
+        while (coroutineContext.isActive) {
+            try {
+                ImapClient(
+                    host = account.host,
+                    port = account.port,
+                    username = account.username,
+                    password = account.password,
+                    debug = false,
+                ).use { client ->
+                    val folder = client.getFolders().firstOrNull { it.fullName == sync.folder }
+                    if (folder == null) {
+                        logger.warn("Cannot watch ${sync.folder} for ${account.username}: no such folder")
+                        return
+                    }
+
+                    folder.getIdleFolder().use { idleFolder ->
+                        while (coroutineContext.isActive) {
+                            // Re-issued on a timer: an IDLE nobody renews is dropped by the
+                            // server or by whatever sits between, and it goes quiet rather than
+                            // failing, so nothing here would ever notice.
+                            withTimeoutOrNull(IDLE_RENEW_INTERVAL) {
+                                idleFolder.idle {
+                                    onNewMessage { wakeUps.trySend(Unit) }
+                                    onRemovedMessage { wakeUps.trySend(Unit) }
+                                    onFlagChanged { _, _ -> wakeUps.trySend(Unit) }
+                                }
+                            }
+                            idleFolder.cancel()
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The poll keeps running regardless, so a watch that cannot hold its connection
+                // costs latency, not mail.
+                logger.warn("Watch on ${sync.folder} for ${account.username} failed, retrying in $IDLE_RETRY_INTERVAL", e)
+                delay(IDLE_RETRY_INTERVAL)
+            }
+        }
+    }
+
+    /**
+     * One poll cycle over every synced folder, on a connection of its own. Not reused across
+     * cycles: the pool inside [ImapClient] never evicts sockets the server has dropped in the
+     * meantime and hands them out again -- a dead socket can even yield an empty mail list instead
+     * of an error, which would look like an empty inbox forever.
      */
     private suspend fun importOnce() {
+        if (account.folders.isEmpty()) return
+
         ImapClient(
             host = account.host,
             port = account.port,
@@ -94,40 +213,54 @@ class EmailImporter(
             password = account.password,
             debug = false,
         ).use { client ->
-            val inbox = client.getFolders().firstOrNull { it.name == "INBOX" }
-            if (inbox == null) {
-                println("No INBOX folder found for account ${account.username}")
-                return
-            }
+            val byName = client.getFolders().associateBy { it.fullName }
 
-            val mails = inbox.getMails {
-                getAll()
-                envelope = true
-                flags = true
-                uid = true
-            }
-            mails.forEach { mail ->
-                try {
-                    import(mail)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // Skip only this mail; unknown ones are retried next cycle anyway.
-                    println("Failed to import a mail for ${account.username}:")
-                    println(e.stackTraceToString())
+            account.folders.forEach { sync ->
+                val folder = byName[sync.folder]
+                if (folder == null) {
+                    logger.warn("No folder ${sync.folder} for ${account.username}; it may have been renamed")
+                    return@forEach
+                }
+
+                folder.use { selected ->
+                    val mails = selected.getMails {
+                        getAll()
+                        envelope = true
+                        flags = true
+                        uid = true
+                    }
+                    mails.forEach { mail ->
+                        // The only place this cycle may be stopped: see the NonCancellable below.
+                        coroutineContext.ensureActive()
+                        try {
+                            import(mail, sync)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            // Skip only this mail; unknown ones are retried next cycle anyway.
+                            logger.error("Failed to import a mail for ${account.username}", e)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private suspend fun import(mail: Email) {
+    /**
+     * Imports one mail, all of it or none of it.
+     *
+     * `NonCancellable`, so stopping the importer never lands between the body being downloaded and
+     * the row being written -- the mail is finished, and the cycle stops at the check before the
+     * next one. It is the whole reason [stop] can promise a clean end.
+     */
+    private suspend fun import(mail: Email, sync: ImapConnection.FolderSync) = withContext(NonCancellable) {
         // A missing subject stores as "", never null: the dedup below compares it with
         // `=`, and NULL never equals NULL, so such mails would import over and over.
         val subject = mail.subject.await().orEmpty()
         val sentAt = mail.sentAt.await()
 
         // Before the body, not after: downloading it pulls the attachments too.
-        if (database.query { isKnown(sentAt, subject) }) return
+        if (database.query { isKnown(sentAt, subject) }) return@withContext
 
         val from = mail.from.await()
         val to = mail.to.await()
@@ -141,8 +274,8 @@ class EmailImporter(
 
         val fromHeader = from.firstOrNull()
         if (fromHeader == null) {
-            println("Skipping mail without a From header: $subject")
-            return
+            logger.warn("Skipping mail without a From header: $subject")
+            return@withContext
         }
 
         val recipients = listOf(
@@ -172,16 +305,24 @@ class EmailImporter(
         )
 
         if (storedId != null) {
-            println("Imported: $subject")
-            emailClassificationQueue.enqueue(storedId)
+            // Imported either way; only what the assistant reads is the user's choice per folder.
+            if (sync.wantsAssistant(sentAt)) emailClassificationQueue.enqueue(storedId)
             // The mail is in the mailbox now, so anything showing or counting it is stale.
             // A mail that was not there before: every listing is one longer and one row further down.
             mailNotifier.notifyMailChanged(account.userId, storedId, movedListings = true)
         }
     }
 
-    fun stop() {
-        importerJob?.cancel()
+    /**
+     * Stops the importer and waits for it to be done.
+     *
+     * Suspending on purpose: a mail that is halfway through being written finishes first (see
+     * [import]), so nothing is left behind half-imported and the connections are closed by the
+     * time this returns. The caller replacing this importer with a new one therefore never has
+     * two of them on the same mailbox.
+     */
+    suspend fun stop() {
+        importerJob?.cancelAndJoin()
         importerJob = null
     }
 

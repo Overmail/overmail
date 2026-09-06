@@ -7,6 +7,12 @@
     import {_} from "svelte-i18n";
     import {Button} from "$lib/components/ui/button";
     import {SidebarSimpleIcon} from "phosphor-svelte";
+    import * as Avatar from "$lib/components/ui/avatar";
+    import {useRepositories} from "$lib/repository/repositories";
+    import type {CurrentUser} from "$lib/repository/CurrentUserRepository";
+    import {onMount} from "svelte";
+    import {initials} from "$lib/utils.ts";
+    import {goto} from "$app/navigation";
 
     let {
         header,
@@ -38,6 +44,15 @@
             css: (t: number) => `width: ${t * cover.width}px`,
         };
     }
+
+    const {currentUser} = useRepositories();
+
+    let user = $state<CurrentUser | null>(null);
+
+    onMount(() => {
+        currentUser.get().then((result) => (user = result));
+    });
+
 </script>
 
 <!-- Sticky: the page is one scroll container, so without this the bar with the page's name and
@@ -56,6 +71,23 @@
         <div class="ms-auto flex items-center">
             <div class="flex items-center gap-2">
                 {@render header.actions?.()}
+
+                {#if user}
+
+                    <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onclick={() => {
+                                const url = new URL(page.url);
+                                url.searchParams.set("settings", "");
+                                goto(url, {replaceState: true, noScroll: true});
+                            }}
+                    >
+                        <Avatar.Root size="sm">
+                            <Avatar.Fallback>{initials(user.firstname + " " + user.lastname)}</Avatar.Fallback>
+                        </Avatar.Root>
+                    </Button>
+                {/if}
 
                 <Button
                         size="icon-sm"

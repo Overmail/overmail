@@ -20,6 +20,17 @@ import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
+import es.jvbabi.overmail.server.http.users.me.inboxes.getInboxes
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.deleteInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.getInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.streamInboxFoldersForInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
@@ -140,6 +151,63 @@ internal fun Application.configureRouting() {
             route("/users") {
                 route("/me") {
                     getCurrentUser()
+
+                    route("/inboxes") {
+                        getInboxes()
+
+                        route("/{inboxId}") {
+                            // What the edit screen opens on, saves through, and checks against.
+                            getInbox()
+                            updateInbox()
+                            deleteInbox()
+
+                            route("/test") {
+                                route("/imap-login") {
+                                    testInboxLogin()
+                                }
+                            }
+
+                            route("/folders") {
+                                route("/stream") {
+                                    streamInboxFoldersForInbox()
+                                }
+                            }
+
+                            // One route per state, like the read and archive routes above.
+                            route("/pause") {
+                                setInboxPaused(paused = true)
+                            }
+
+                            route("/resume") {
+                                setInboxPaused(paused = false)
+                            }
+                        }
+
+                        route("/create") {
+                            route("/folders") {
+                                route("/stream") {
+                                    streamInboxFolders()
+                                }
+                            }
+
+                            // The only step of the dialog that writes anything.
+                            route("/submit") {
+                                inboxSubmitRoute()
+                            }
+
+                            // What the "new inbox" dialog checks a half-filled form against, before
+                            // there is an inbox to create.
+                            route("/test") {
+                                route("/imap-host") {
+                                    testImapHost()
+                                }
+
+                                route("/imap-login") {
+                                    testImapLogin()
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

@@ -12,6 +12,14 @@ object ImapAccounts : UuidTable("imap_accounts") {
     val port = integer("port")
     val username = varchar("username", 255)
     val password = varchar("password", 255)
+
+    /**
+     * Whether the importer for this account is meant to be off.
+     *
+     * Paused rather than deleted is the whole point of it: nothing imported so far is touched, the
+     * connection just stops being polled and watched. See `ImporterManager`.
+     */
+    val isPaused = bool("is_paused").default(false)
 }
 
 class ImapAccount(id: EntityID<Uuid>) : UuidEntity(id) {
@@ -22,4 +30,7 @@ class ImapAccount(id: EntityID<Uuid>) : UuidEntity(id) {
     var port by ImapAccounts.port
     var username by ImapAccounts.username
     var password by ImapAccounts.password
+    var isPaused by ImapAccounts.isPaused
+
+    val folderSyncs by ImapAccountFolderSync referrersOn ImapAccountFolderSyncs.imapAccount
 }

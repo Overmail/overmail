@@ -31,9 +31,44 @@ class ImporterManager(
         }
     }
 
-    private fun reconcile(accounts: List<ImapConnection>) {
+    /**
+     * Starts the importer for [accountId] again, whatever state it was in.
+     *
+     * What a freshly submitted or re-configured account goes through, instead of waiting out
+     * [RELOAD_INTERVAL] for the next sweep to notice it. Stopping is awaited, so the old importer
+     * is finished before the new one opens a connection to the same mailbox -- two importers on
+     * one account would race each other into duplicate rows.
+     *
+     * An account that is no longer there is stopped and not replaced.
+     */
+    suspend fun reboot(accountId: Uuid) {
+        importer.remove(accountId)?.stop()
+
+        val account = database.query { ImapAccount.findById(accountId)?.toConnection() } ?: return
+        // Rebooting a paused account means leaving it stopped; the row is what decides, not the
+        // caller, so a resume and a pause can go through the same door.
+        if (account.isPaused) return
+        importer[accountId] = startImporter(account)
+    }
+
+    /**
+     * Stops the importer for [accountId] and forgets it.
+     *
+     * What a mailbox being deleted goes through, before the row is gone: awaited (see
+     * [EmailImporter.stop]), so a mail halfway through being written is finished and nothing is
+     * still inserting into an account that is about to disappear.
+     */
+    suspend fun stop(accountId: Uuid) {
+        importer.remove(accountId)?.stop()
+    }
+
+    private suspend fun reconcile(allAccounts: List<ImapConnection>) {
+        // A paused account is treated as one that is not there at all: whatever importer it has is
+        // stopped below and none is started for it. That also makes a pause set straight in the
+        // database take hold, within RELOAD_INTERVAL.
+        val accounts = allAccounts.filterNot { it.isPaused }
         val currentIds = accounts.map { it.id }.toSet()
-        importer.keys.filterNot { it in currentIds }.forEach { removedId ->
+        importer.keys.filterNot { it in currentIds }.toList().forEach { removedId ->
             importer.remove(removedId)?.stop()
         }
 
@@ -44,19 +79,17 @@ class ImporterManager(
                 existingImporter.stop()
             }
 
-            val newImporter = EmailImporter(
-                database = this.database,
-                account = account,
-                coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
-                emailClassificationQueue = this.emailClassificationQueue,
-                mailNotifier = this.mailNotifier,
-            )
-
-            newImporter.start()
-
-            importer[account.id] = newImporter
+            importer[account.id] = startImporter(account)
         }
     }
+
+    private fun startImporter(account: ImapConnection) = EmailImporter(
+        database = this.database,
+        account = account,
+        coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
+        emailClassificationQueue = this.emailClassificationQueue,
+        mailNotifier = this.mailNotifier,
+    ).also { it.start() }
 }
 
 /** Reads the row into the snapshot the job runs on; only valid inside the transaction. */
@@ -67,4 +100,15 @@ private fun ImapAccount.toConnection() = ImapConnection(
     port = port,
     username = username,
     password = password,
+    isPaused = isPaused,
+    // Read here, with the account: the importer outlives this transaction and could not follow
+    // the reference afterwards.
+    folders = folderSyncs.map { sync ->
+        ImapConnection.FolderSync(
+            folder = sync.folder,
+            imapPush = sync.imapPush,
+            aiImport = sync.aiImport,
+            createdAt = sync.createdAt,
+        )
+    },
 )

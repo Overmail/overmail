@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.database
 import es.jvbabi.overmail.server.database.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
@@ -26,10 +27,18 @@ class OvermailDatabase(private val database: Database) {
         )
     )
 
+    companion object {
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true; prettyPrint = false }
+    }
+
     suspend fun init() {
         query {
             SchemaUtils.create(Users)
-            SchemaUtils.create(ImapAccounts)
+            SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
+            // `create` only ever adds missing *tables*, so a column added to a table that already
+            // exists would never reach a database that has been running. There is no migration
+            // tool here, and this is the one table that has gained a column since.
+            SchemaUtils.createMissingTablesAndColumns(ImapAccounts)
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)

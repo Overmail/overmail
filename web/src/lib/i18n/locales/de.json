@@ -128,6 +128,134 @@
     "search": "Labels suchen",
     "add": "Label hinzufügen"
   },
+  "settings": {
+    "emailAccounts": {
+      "add": "Neues Postfach hinzufügen",
+      "list": {
+        "columns": {
+          "username": "Benutzername",
+          "server": "IMAP-Server",
+          "folders": "Ordner"
+        },
+        "empty": {
+          "title": "Keine Konten",
+          "description": "Verbinde dein erstes IMAP-Postfach, um E-Mails zu importieren."
+        },
+        "failed": "Die Postfächer konnten nicht gelesen werden.",
+        "loading": "Postfächer werden geladen…",
+        "noFolders": "Keine",
+        "actions": {
+          "edit": "Verbindung bearbeiten",
+          "delete": "Verbindung löschen",
+          "pause": "Import pausieren",
+          "resume": "Import fortsetzen",
+          "paused": "Pausiert"
+        },
+        "delete": {
+          "title": "Verbindung löschen?",
+          "description": "{username} bei {host} wird getrennt.",
+          "emails": "{count, plural, =0 {Es sind keine importierten E-Mails betroffen.} one {# importierte E-Mail wird mitgelöscht.} other {# importierte E-Mails werden mitgelöscht.}}",
+          "irreversible": "Die E-Mails bleiben im Postfach beim Anbieter; nur die Kopien in Overmail werden gelöscht.",
+          "confirm": "Löschen",
+          "cancel": "Abbrechen",
+          "deleting": "Wird gelöscht…",
+          "failed": "Die Verbindung konnte nicht gelöscht werden.",
+          "pauseInstead": "Stattdessen pausieren",
+          "pauseHint": "Pausieren stoppt den Import und löscht nichts. Du kannst jederzeit fortsetzen."
+        }
+      },
+      "new": {
+        "title": "Neues Postfach",
+        "cancel": "Abbrechen",
+        "next": "Weiter",
+        "finish": "Fertig",
+        "steps": {
+          "server": "Server",
+          "credentials": "Anmeldung",
+          "folders": "Ordner"
+        },
+        "server": {
+          "description": "Verbinde deinen E-Mail-Anbieter. Die IMAP-Daten bekommst du dort.",
+          "host": "IMAP-Server",
+          "port": "Port",
+          "test": {
+            "testing": "Verbinde…",
+            "reachable": "Server erreichbar",
+            "loginDisabled": "Erreichbar, aber ohne Passwort-Anmeldung",
+            "failed": "Prüfung nicht möglich",
+            "outcome": {
+              "host_not_found": "Diesen Server gibt es nicht",
+              "connection_failed": "Auf diesem Port antwortet nichts",
+              "tls_failed": "Kein TLS auf diesem Port – meist ist es 993",
+              "no_imap_server": "Hier antwortet kein IMAP-Server",
+              "timeout": "Keine Antwort vom Server",
+              "unknown": "Keine Verbindung"
+            }
+          }
+        },
+        "credentials": {
+          "description": "Deine Anmeldung für {host}. Oft die Adresse selbst.",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "test": {
+            "testing": "Melde an…",
+            "authenticated": "Anmeldung funktioniert",
+            "failed": "Prüfung nicht möglich",
+            "outcome": {
+              "invalid_credentials": "Der Server lehnt diese Zugangsdaten ab",
+              "connection_failed": "Der Server antwortet nicht mehr",
+              "timeout": "Keine Antwort vom Server",
+              "unknown": "Anmeldung hat nicht geklappt"
+            }
+          }
+        },
+        "folders": {
+          "description": "Wähle die Ordner und wie weit der Assistent darin zurücklesen soll.",
+          "listing": "Schaue im Postfach nach…",
+          "counting": "Zähle Ordner… {counted} von {total}",
+          "failed": "Das Postfach konnte nicht gelesen werden.",
+          "empty": "Dieses Postfach hat keine Ordner.",
+          "columns": {
+            "folder": "Ordner",
+            "mails": "E-Mails",
+            "oldest": "Älteste",
+            "realtime": "Echtzeit",
+            "ai": "Assistent liest"
+          },
+          "pending": "…",
+          "unknown": "—",
+          "aiMode": {
+            "new_only": "Nur neue E-Mails",
+            "newest": "Neueste",
+            "since": "Alles ab",
+            "all": "Alles",
+            "countLabel": "Wie viele E-Mails",
+            "dateLabel": "Lesen ab diesem Datum",
+            "triggerNewest": "Neueste {count}",
+            "triggerSince": "Ab {date}"
+          },
+          "submit": {
+            "saving": "Postfach wird angelegt…",
+            "conflict": "Dieses Postfach ist bereits eingerichtet.",
+            "failed": "Das Postfach konnte nicht angelegt werden."
+          }
+        }
+      },
+      "edit": {
+        "title": "Verbindung bearbeiten",
+        "description": "Alles wird beim Ändern geprüft. Passwort leer lassen, um das bisherige zu behalten.",
+        "server": "Mailserver",
+        "credentials": "Anmeldung",
+        "folders": "Ordner",
+        "passwordPlaceholder": "Unverändert",
+        "save": "Speichern",
+        "saving": "Wird gespeichert…",
+        "loadFailed": "Dieses Postfach konnte nicht gelesen werden.",
+        "conflict": "Zu diesem Postfach hast du bereits eine Verbindung.",
+        "failed": "Die Änderungen konnten nicht gespeichert werden."
+      }
+    }
+  },
   "ai": {
     "title": "Overmail AI",
     "chat": {

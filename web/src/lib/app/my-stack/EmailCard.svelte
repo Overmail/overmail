@@ -13,7 +13,7 @@
     import {_} from "svelte-i18n";
     import {onMount} from "svelte";
     import {goto} from "$app/navigation";
-    import {emailSlug} from "$lib/app/mails/emailPath";
+    import {emailPath} from "$lib/app/mails/emailPath";
 
     let {
         id,
@@ -150,7 +150,7 @@
 
                     <DropdownMenu.Group>
                         <DropdownMenu.Item onclick={() => {
-                            goto(`/emails/${emailSlug(id, subject)}`);
+                            goto(emailPath(id, subject));
                         }}>
                             {$_('myStack.email.menu.view')}
                         </DropdownMenu.Item>

@@ -29,6 +29,8 @@ test("what is left of the subject is url encoded", () => {
     expect(emailPath(id, "Rückfrage 50% ?")).toBe(`/emails/R%C3%BCckfrage-50%25-%3F-${bare}`);
     // A slash of its own would be another path segment.
     expect(emailPath(id, "Re: a/b")).toBe(`/emails/Re%3A-a%2Fb-${bare}`);
+    // A hash would cut the id off the url entirely and turn the rest into a fragment.
+    expect(emailPath(id, "Ticket #42")).toBe(`/emails/Ticket-%2342-${bare}`);
 });
 
 test("a subject cut mid emoji is still a url", () => {

@@ -16,6 +16,7 @@ import es.jvbabi.overmail.server.http.email.item.shares.item.updateShare
 import es.jvbabi.overmail.server.http.email.item.shares.newShare
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
+import es.jvbabi.overmail.server.http.email.list.emailListIds
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
@@ -98,6 +99,12 @@ internal fun Application.configureRouting() {
 
                     route("/groups") {
                         emailListGroups()
+                    }
+
+                    // GET /emails/list/ids?from=&to= -- a whole stretch at once, which is what
+                    // picking one in the table needs.
+                    route("/ids") {
+                        emailListIds()
                     }
                 }
 

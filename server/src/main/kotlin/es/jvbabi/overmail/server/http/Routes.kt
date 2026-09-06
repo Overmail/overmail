@@ -14,6 +14,8 @@ import es.jvbabi.overmail.server.http.email.item.shares.getShares
 import es.jvbabi.overmail.server.http.email.item.shares.item.deleteShare
 import es.jvbabi.overmail.server.http.email.item.shares.item.updateShare
 import es.jvbabi.overmail.server.http.email.item.shares.newShare
+import es.jvbabi.overmail.server.http.email.bulk.setEmailsArchiveState
+import es.jvbabi.overmail.server.http.email.bulk.setEmailsRead
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.list.emailListIds
@@ -93,6 +95,15 @@ internal fun Application.configureRouting() {
             route("/emails") {
                 // GET /emails?ids=a,b,c -- what a client-side cache asks for the ids it lacks.
                 emailsByIds()
+
+                // What the routes under /{emailId} do to one mail, for a whole selection: the ids
+                // come in the body, because a picked stretch of the mailbox does not fit in a url.
+                route("/bulk") {
+                    route("/read") { setEmailsRead(isRead = true) }
+                    route("/unread") { setEmailsRead(isRead = false) }
+                    route("/archive") { setEmailsArchiveState(EmailArchiveAction.Archive) }
+                    route("/unarchive") { setEmailsArchiveState(EmailArchiveAction.Unarchive) }
+                }
 
                 route("/list") {
                     emailList()

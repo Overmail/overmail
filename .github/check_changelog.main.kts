@@ -242,7 +242,48 @@ fun readChangelog(file: File, shape: Shape): Changelog {
     )
 }
 
+/**
+ * The label that decides whether an issue is rendered into the changelog at all.
+ *
+ * generate_changelog.main.kts leaves out every issue without it -- a release ships the app, and
+ * the app is what reads the changelog -- so requiring an entry here would require a file that no
+ * release ever reads. The two scripts have to agree on this, see APP_LABEL over there.
+ */
+val APP_LABEL = "project:app"
+val PROJECT_PREFIX = "project:"
+
+fun projectLabelsOf(kind: String, number: String): List<String> =
+    capture("gh", kind, "view", number, "--json", "labels", "--jq", "[.labels[].name] | join(\",\")")
+        .orEmpty()
+        .split(",")
+        .map { it.trim() }
+        .filter { it.startsWith(PROJECT_PREFIX) }
+
+// Read once and folded into every issue below. sync-labels.yaml copies the labels between the two
+// sides, but it runs on the same events this check does -- so a pull request labelled a moment ago
+// may still be looking at an issue the sync has not reached yet. Taking both is what the sync
+// itself would arrive at.
+val pullRequestLabels = pullRequest?.let { projectLabelsOf("pr", it) }.orEmpty()
+
 issues.forEach { issue ->
+    val labels = (projectLabelsOf("issue", "$issue") + pullRequestLabels).distinct().sorted()
+
+    // Asked before the issue type, so an issue that is not an app change costs one call and is
+    // never reported for a type or an entry it does not need. An entry that is there anyway is
+    // still validated below: somebody wrote it on purpose, and a broken file is worth saying.
+    if (APP_LABEL !in labels && File(repoRoot, "docs/changelog/issues/$issue").exists().not()) {
+        if (labels.isEmpty()) {
+            // Nothing says what this change touches. Warn rather than skip: if the label turns
+            // out to be $APP_LABEL after all, a Feature must not have lost its entry meanwhile.
+            warn("Issue #$issue carries no $PROJECT_PREFIX label, so it is checked as an app change. Please add one.")
+            findings.appendLine("- ⚠️ **#$issue** carries no `$PROJECT_PREFIX` label, so it is checked as an app change. Please add one.")
+        } else {
+            println("Issue #$issue is labelled ${labels.joinToString()}, not $APP_LABEL, so it needs no changelog.")
+            findings.appendLine("- ✅ **#$issue** is labelled `${labels.joinToString("`, `")}`, not `$APP_LABEL`, so it needs no changelog.")
+            return@forEach
+        }
+    }
+
     val type = capture("gh", "issue", "view", "$issue", "--json", "issueType", "--jq", ".issueType.name // \"\"")
     val required = type.equals("Feature", ignoreCase = true)
 
@@ -314,6 +355,7 @@ finish(
     when {
         failed -> "The changelog is not ready for $checked."
         warned -> "The changelog needs a look for $checked."
-        else -> "Every issue in this pull request has a changelog ($checked)."
+        // Not "every issue has one": an issue that is not an app change is in order without.
+        else -> "The changelog is in order for $checked."
     }
 )

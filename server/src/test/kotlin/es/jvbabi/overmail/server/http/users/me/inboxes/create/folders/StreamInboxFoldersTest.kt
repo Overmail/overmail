@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.post
+import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -100,6 +101,33 @@ class StreamInboxFoldersTest {
         }
 
         assertEquals(HttpStatusCode.Unauthorized, response.status)
+    }
+
+    @Test
+    fun `a reader that leaves mid-scan is not an error`() = testApplication {
+        setUpUser()
+        installRoute()
+
+        // The dialog closed before the folder table filled in. The scan has to unwind quietly:
+        // there is nobody to report to, and the connections to the mailbox must not stay open.
+        val port = ServerSocket(0).use { it.localPort }
+        val response = client.preparePost(ROUTE) {
+            contentType(ContentType.Application.Json)
+            setBody("""{"host":"127.0.0.1","port":$port,"username":"u","password":"p"}""")
+        }.execute { prepared ->
+            // Read nothing and hang up.
+            prepared.status
+        }
+
+        assertEquals(HttpStatusCode.OK, response)
+
+        // The application is still healthy afterwards: a second scan answers normally.
+        val second = client.post(ROUTE) {
+            contentType(ContentType.Application.Json)
+            setBody("""{"host":"127.0.0.1","port":$port,"username":"u","password":"p"}""")
+        }
+        assertEquals(HttpStatusCode.OK, second.status)
+        assertTrue(second.bodyAsText().contains("mailbox_unavailable"), second.bodyAsText())
     }
 
     private suspend fun setUpUser(): User {

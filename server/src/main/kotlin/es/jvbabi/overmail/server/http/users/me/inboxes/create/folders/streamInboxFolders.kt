@@ -10,6 +10,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
+import java.io.IOException
 import java.io.Writer
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
@@ -100,11 +101,15 @@ internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, userna
                 ).use { client -> scanFolders(writer, client) }
             }
         }
+    } catch (_: ClientHungUp) {
+        // Expected. See the class.
     } catch (e: CancellationException) {
-        // The client hung up, or the scan hit SCAN_TIMEOUT. Nothing left to write to either way.
+        // The scan hit SCAN_TIMEOUT, or the request itself was cancelled.
         throw e
     } catch (_: Exception) {
-        writeEvent(writer, FolderStreamEvent.Failed("mailbox_unavailable"))
+        // The mailbox failed, but the reader may have gone in the meantime as well -- saying so
+        // must not turn into a second failure on the way out.
+        runCatching { writeEvent(writer, FolderStreamEvent.Failed("mailbox_unavailable")) }
     } finally {
         connections.cancel()
     }
@@ -173,11 +178,30 @@ private suspend fun countFolder(folder: ImapFolder): FolderStreamEvent {
     }
 }
 
-/** One `data:` frame, flushed on its own -- an event buffered until the next one is not a stream. */
+/**
+ * One `data:` frame, flushed on its own -- an event buffered until the next one is not a stream.
+ *
+ * A closed connection surfaces here, on the flush, and is turned into [ClientHungUp]: the reader
+ * is gone, so there is nothing to report and nothing left worth scanning a mailbox for.
+ */
 private fun writeEvent(writer: Writer, event: FolderStreamEvent) {
-    writer.write("data: " + json.encodeToString<FolderStreamEvent>(event) + "\n\n")
-    writer.flush()
+    try {
+        writer.write("data: " + json.encodeToString<FolderStreamEvent>(event) + "\n\n")
+        writer.flush()
+    } catch (cause: IOException) {
+        throw ClientHungUp(cause)
+    }
 }
+
+/**
+ * The reader closed the connection while the scan was still going.
+ *
+ * Entirely ordinary: the dialog is closed before the folder table has filled in, which happens
+ * whenever somebody changes their mind. It unwinds the scan so the connections to the mailbox are
+ * dropped rather than kept open for nobody, and it is not an error to report -- there is no longer
+ * anyone to report it to.
+ */
+private class ClientHungUp(cause: IOException) : Exception(cause)
 
 @Serializable
 internal data class InboxFoldersRequest(

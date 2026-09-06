@@ -57,7 +57,7 @@
             viewModel.submit();
         }}
 >
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-row gap-3">
         <Field.Field>
             <Field.Label for={"imap-username-" + id}>
                 {$_("settings.emailAccounts.new.credentials.username")}

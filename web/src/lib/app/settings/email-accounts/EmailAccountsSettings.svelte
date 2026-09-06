@@ -247,7 +247,8 @@
                                     ></div>
                                     <div
                                             class="relative flex flex-row items-center justify-end gap-1 opacity-0
-                                                   transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
+                                                   transition-opacity group-hover/row:opacity-100
+                                                   has-focus-visible:opacity-100"
                                     >
                                         <Button
                                                 variant="ghost"

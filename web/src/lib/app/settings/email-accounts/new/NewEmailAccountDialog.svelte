@@ -81,14 +81,9 @@
         -->
         <AnimatedHeight>
             {#if step === "server"}
-                <!-- Narrow inside a wide dialog: a host field the width of a table reads badly. -->
-                <div class="max-w-md">
-                    <ServerStep {viewModel} />
-                </div>
+                <ServerStep {viewModel} />
             {:else if step === "credentials"}
-                <div class="max-w-md">
-                    <CredentialsStep {viewModel} />
-                </div>
+                <CredentialsStep {viewModel} />
             {:else}
                 <FolderStep {viewModel} />
             {/if}

@@ -125,19 +125,15 @@
             <div class="flex flex-col gap-6">
                 <section class="flex flex-col gap-2">
                     <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.server")}</h3>
-                    <div class="max-w-md">
-                        <ServerStep viewModel={viewModel} />
-                    </div>
+                    <ServerStep viewModel={viewModel} />
                 </section>
 
                 <section class="flex flex-col gap-2">
                     <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.credentials")}</h3>
-                    <div class="max-w-md">
-                        <CredentialsStep
-                                viewModel={viewModel}
-                                passwordPlaceholder={$_("settings.emailAccounts.edit.passwordPlaceholder")}
-                        />
-                    </div>
+                    <CredentialsStep
+                            viewModel={viewModel}
+                            passwordPlaceholder={$_("settings.emailAccounts.edit.passwordPlaceholder")}
+                    />
                 </section>
 
                 <section class="flex flex-col gap-2">

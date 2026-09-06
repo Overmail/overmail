@@ -1,7 +1,7 @@
 import {
     KnowledgeNameTakenError,
+    type KnowledgeDraft,
     type KnowledgeEntry,
-    type KnowledgeRepository,
 } from "$lib/repository/KnowledgeRepository";
 
 /**
@@ -13,19 +13,26 @@ export const MAX_KEYWORDS = 24;
 /** Where saving stands. [nameTaken] is the one failure a field can point at. */
 export type SaveState = {type: "idle"} | {type: "saving"} | {type: "nameTaken"} | {type: "failed"};
 
+/** What the form was opened on, so it can tell whether anything was changed since. */
+type Baseline = {name: string; description: string; keywords: string[]; relevantOn: string};
+
+const EMPTY: Baseline = {name: "", description: "", keywords: [], relevantOn: ""};
+
 /**
- * The "add knowledge" form.
+ * The knowledge form, behind both the add and the edit dialog.
  *
  * A view model rather than state in the dialog, like the inbox form: the keyword field has rules
  * of its own (what counts as a keyword, what a duplicate is, when the list is full) and those are
- * worth testing without a browser.
+ * worth testing without a browser. What differs between the two dialogs is only where [submit]
+ * writes to, which is the [save] handed in here -- `create` for a new entry, `update` for one
+ * that exists.
  *
  * The keywords are normalized here the way the server stores them -- lowercase, trimmed, inner
  * whitespace as one space. Not to save the server the work, which it does anyway, but so the chip
  * the user sees is the keyword that ends up in the row; anything else and "Rheinenergie" would be
  * added twice by anyone typing it in two capitalizations.
  */
-export class NewKnowledgeViewModel {
+export class KnowledgeFormViewModel {
     name = $state("");
     description = $state("");
     /** `yyyy-mm-dd`, or empty for the entries that are not about a day -- which is most of them. */
@@ -37,15 +44,42 @@ export class NewKnowledgeViewModel {
 
     saveState: SaveState = $state({type: "idle"});
 
-    constructor(private readonly repository: KnowledgeRepository) {}
+    /** What [reset] filled the form with; an empty entry for the add dialog. */
+    private baseline: Baseline = $state(EMPTY);
+
+    constructor(private readonly save: (draft: KnowledgeDraft) => Promise<KnowledgeEntry>) {}
 
     get saving(): boolean {
         return this.saveState.type === "saving";
     }
 
     /** An entry is its name and what is known; the rest is optional. */
+    get complete(): boolean {
+        return this.name.trim().length > 0 && this.description.trim().length > 0;
+    }
+
+    /**
+     * Whether the form says something else than what it was opened on.
+     *
+     * A keyword still in the field counts: it was typed for this entry, and a save button that is
+     * dead while somebody is looking at what they just typed would be its own bug. Nothing unsaved
+     * gets through that way -- [submit] commits the field first and asks again.
+     */
+    get changed(): boolean {
+        if (this.keywordDraft.trim().length > 0) return true;
+
+        return (
+            this.name.trim() !== this.baseline.name ||
+            this.description.trim() !== this.baseline.description ||
+            this.relevantOn !== this.baseline.relevantOn ||
+            this.keywords.length !== this.baseline.keywords.length ||
+            this.keywords.some((keyword, index) => keyword !== this.baseline.keywords[index])
+        );
+    }
+
+    /** Nothing is written for a form nobody changed, so the button is off until something is. */
     get canSubmit(): boolean {
-        return !this.saving && this.name.trim().length > 0 && this.description.trim().length > 0;
+        return !this.saving && this.complete && this.changed;
     }
 
     get keywordsFull(): boolean {
@@ -109,7 +143,7 @@ export class NewKnowledgeViewModel {
 
         this.saveState = {type: "saving"};
         try {
-            const entry = await this.repository.create({
+            const entry = await this.save({
                 name: this.name.trim(),
                 description: this.description.trim(),
                 keywords: this.keywords,
@@ -123,12 +157,26 @@ export class NewKnowledgeViewModel {
         }
     }
 
-    /** Back to an empty form. The dialog stays mounted, so this is what makes the next one new. */
-    reset() {
-        this.name = "";
-        this.description = "";
-        this.relevantOn = "";
-        this.keywords = [];
+    /**
+     * Fills the form with [entry], or empties it for a new one.
+     *
+     * The dialogs stay mounted, so this is what makes the next entry the one that was opened and
+     * not the one before it -- or, in the add dialog, a form somebody walked away from half-filled.
+     */
+    reset(entry: KnowledgeEntry | null = null) {
+        this.baseline = entry
+            ? {
+                  name: entry.name,
+                  description: entry.description,
+                  keywords: [...entry.keywords],
+                  relevantOn: entry.relevantOn ?? "",
+              }
+            : EMPTY;
+
+        this.name = this.baseline.name;
+        this.description = this.baseline.description;
+        this.relevantOn = this.baseline.relevantOn;
+        this.keywords = [...this.baseline.keywords];
         this.keywordDraft = "";
         this.saveState = {type: "idle"};
     }

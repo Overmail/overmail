@@ -11,4 +11,8 @@
 
     <!-- Netty logs its Unsafe/transport probing at DEBUG, including a stack trace on every boot. -->
     <logger name="io.netty" level="WARN"/>
+
+    <!-- INFO leaves the start and the end of a classification; DEBUG adds one line per stage,
+         including the prompts and the model's answers. -->
+    <logger name="es.jvbabi.overmail.server.ai.classification" level="INFO"/>
 </configuration>

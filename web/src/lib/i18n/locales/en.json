@@ -133,7 +133,10 @@
     "add": "Add a label"
   },
   "settings": {
+    "title": "Settings",
+    "description": "Manage your settings.",
     "emailAccounts": {
+      "title": "Email accounts",
       "add": "Add a new inbox",
       "list": {
         "columns": {
@@ -257,6 +260,29 @@
         "loadFailed": "This mailbox could not be read.",
         "conflict": "You already have a connection to that mailbox.",
         "failed": "The changes could not be saved."
+      }
+    },
+    "knowledge": {
+      "title": "Knowledge",
+      "add": "Add knowledge",
+      "list": {
+        "loading": "Reading what the assistant knows…",
+        "failed": "What the assistant knows could not be read.",
+        "columns": {
+          "name": "Name",
+          "description": "What is known",
+          "keywords": "Keywords"
+        },
+        "noKeywords": "No keywords",
+        "learnedByAgent": "Learned by the assistant",
+        "actions": {
+          "edit": "Edit entry",
+          "delete": "Forget entry"
+        }
+      },
+      "empty": {
+        "title": "No knowledge",
+        "description": "The agent learns from your emails to better understand them."
       }
     }
   },

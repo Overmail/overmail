@@ -133,7 +133,10 @@
     "add": "Label hinzufügen"
   },
   "settings": {
+    "title": "Einstellungen",
+    "description": "Verwalte deine Einstellungen.",
     "emailAccounts": {
+      "title": "E-Mail-Konten",
       "add": "Neues Postfach hinzufügen",
       "list": {
         "columns": {
@@ -257,6 +260,29 @@
         "loadFailed": "Dieses Postfach konnte nicht gelesen werden.",
         "conflict": "Zu diesem Postfach hast du bereits eine Verbindung.",
         "failed": "Die Änderungen konnten nicht gespeichert werden."
+      }
+    },
+    "knowledge": {
+      "title": "Wissen",
+      "add": "Wissen hinzufügen",
+      "list": {
+        "loading": "Wissen wird geladen …",
+        "failed": "Das Wissen konnte nicht geladen werden.",
+        "columns": {
+          "name": "Name",
+          "description": "Was bekannt ist",
+          "keywords": "Schlagwörter"
+        },
+        "noKeywords": "Keine Schlagwörter",
+        "learnedByAgent": "Vom Assistenten gelernt",
+        "actions": {
+          "edit": "Eintrag bearbeiten",
+          "delete": "Eintrag vergessen"
+        }
+      },
+      "empty": {
+        "title": "Kein Wissen",
+        "description": "Der Agent lernt über dich anhand deiner E-Mails, um sie besser zu verstehen."
       }
     }
   },

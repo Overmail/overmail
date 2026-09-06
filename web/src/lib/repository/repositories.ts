@@ -3,6 +3,7 @@ import {AuthRepository} from "$lib/repository/AuthRepository";
 import {CurrentUserRepository} from "$lib/repository/CurrentUserRepository";
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 import {InboxRepository} from "$lib/repository/InboxRepository";
+import {KnowledgeRepository} from "$lib/repository/KnowledgeRepository";
 import {InboxSetupRepository} from "$lib/repository/InboxSetupRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
 import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
@@ -33,6 +34,8 @@ export type Repositories = {
     inboxes: InboxRepository;
     /** The checks the "new inbox" dialog runs while the form is being filled in. */
     inboxSetup: InboxSetupRepository;
+    /** What the assistant knows about the user, as the settings screen lists it. */
+    knowledge: KnowledgeRepository;
     home: HomeScreenRepository;
     chatHistory: ChatHistoryRepository;
     emails: EntityRepository<CachedEmail>;
@@ -48,6 +51,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     emailBody: () => new EmailBodyRepository(),
     inboxes: () => new InboxRepository(),
     inboxSetup: () => new InboxSetupRepository(),
+    knowledge: () => new KnowledgeRepository(),
     chatHistory: () => new ChatHistoryRepository(),
     home: () => new HomeScreenRepository(),
     emails: createEmailRepository,

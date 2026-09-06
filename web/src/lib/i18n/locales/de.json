@@ -131,6 +131,20 @@
   "settings": {
     "emailAccounts": {
       "add": "Neues Postfach hinzufügen",
+      "list": {
+        "columns": {
+          "username": "Benutzername",
+          "server": "IMAP-Server",
+          "folders": "Ordner"
+        },
+        "empty": {
+          "title": "Keine Konten",
+          "description": "Verbinde dein erstes IMAP-Postfach, um E-Mails zu importieren."
+        },
+        "failed": "Die Postfächer konnten nicht gelesen werden.",
+        "loading": "Postfächer werden geladen…",
+        "noFolders": "Keine"
+      },
       "new": {
         "title": "Neues Postfach",
         "cancel": "Abbrechen",

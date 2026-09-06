@@ -43,7 +43,7 @@
         <Dialog.Title class="sr-only">Settings</Dialog.Title>
         <Dialog.Description class="sr-only">Customize your settings here.</Dialog.Description>
         <Sidebar.Provider class="items-start">
-            <Sidebar.Root collapsible="none" class="hidden md:flex pt-1 bg-transparent">
+            <Sidebar.Root collapsible="none" class="hidden md:flex pt-1">
                 <Sidebar.Content>
                     <Sidebar.Group>
                         <Sidebar.GroupContent>

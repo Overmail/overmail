@@ -4,9 +4,10 @@
      * mailbox to log into. The tree below is the shape of a real one: a nested Archiv, the special
      * folders beside it, one folder that could not be read.
      */
-    import NewEmailAccountDialog from "$lib/app/settings/email-accounts/new/NewEmailAccountDialog.svelte";
+    import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import {createRepositories, provideRepositories} from "$lib/repository/repositories";
     import type {FolderStreamEvent, InboxSetupRepository} from "$lib/repository/InboxSetupRepository";
+    import type {Inbox, InboxRepository} from "$lib/repository/InboxRepository";
 
     const FOLDERS = [
         ["Archiv", null],
@@ -38,6 +39,14 @@
     const inboxSetup = {
         testImapHost: async () => ({reachable: true, outcome: "reachable", capabilities: ["IMAP4rev1"]}),
         testImapLogin: async () => ({authenticated: true, outcome: "authenticated"}),
+        submitInbox: async () => {
+            await wait(300);
+            connected = [
+                ...connected,
+                {id: "acc-2", host: "imap.mail.de", port: 993, username: "new@example.com", folders: ["INBOX"]},
+            ];
+            return {type: "created", id: "acc-2"} as const;
+        },
         async *streamFolders(): AsyncGenerator<FolderStreamEvent> {
             await wait(400);
             yield {
@@ -59,13 +68,21 @@
         },
     } as unknown as InboxSetupRepository;
 
-    provideRepositories(createRepositories({inboxSetup}));
+    /** Grows when the dialog reports a creation, which is what the reload callback is for. */
+    let connected: Inbox[] = [
+        {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: ["INBOX", "Sent"]},
+    ];
 
-    let open = $state(true);
+    const inboxes = {
+        list: async () => {
+            await wait(200);
+            return [...connected];
+        },
+    } as unknown as InboxRepository;
+
+    provideRepositories(createRepositories({inboxSetup, inboxes}));
 </script>
 
 <div class="p-8">
-    <button class="underline" onclick={() => (open = true)}>open</button>
+    <EmailAccountsSettings />
 </div>
-
-<NewEmailAccountDialog bind:open />

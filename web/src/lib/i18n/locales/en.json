@@ -131,6 +131,20 @@
   "settings": {
     "emailAccounts": {
       "add": "Add a new inbox",
+      "list": {
+        "columns": {
+          "username": "Username",
+          "server": "IMAP server",
+          "folders": "Folders"
+        },
+        "empty": {
+          "title": "No accounts",
+          "description": "Create your first IMAP Connection to import your emails."
+        },
+        "failed": "The mailboxes could not be read.",
+        "loading": "Loading mailboxes…",
+        "noFolders": "None"
+      },
       "new": {
         "title": "New inbox",
         "cancel": "Cancel",

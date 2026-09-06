@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
+import es.jvbabi.overmail.server.http.users.me.inboxes.getInboxes
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
@@ -146,6 +147,8 @@ internal fun Application.configureRouting() {
                     getCurrentUser()
 
                     route("/inboxes") {
+                        getInboxes()
+
                         route("/create") {
                             route("/folders") {
                                 route("/stream") {

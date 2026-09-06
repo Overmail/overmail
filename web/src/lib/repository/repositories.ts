@@ -2,6 +2,7 @@ import {getContext, setContext} from "svelte";
 import {AuthRepository} from "$lib/repository/AuthRepository";
 import {CurrentUserRepository} from "$lib/repository/CurrentUserRepository";
 import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
+import {InboxRepository} from "$lib/repository/InboxRepository";
 import {InboxSetupRepository} from "$lib/repository/InboxSetupRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
 import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
@@ -28,6 +29,8 @@ export type Repositories = {
     mails: EmailRepository;
     currentUser: CurrentUserRepository;
     emailBody: EmailBodyRepository;
+    /** The mailboxes that are connected, as the settings screen lists them. */
+    inboxes: InboxRepository;
     /** The checks the "new inbox" dialog runs while the form is being filled in. */
     inboxSetup: InboxSetupRepository;
     home: HomeScreenRepository;
@@ -43,6 +46,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     mails: () => new EmailRepository(),
     currentUser: () => new CurrentUserRepository(),
     emailBody: () => new EmailBodyRepository(),
+    inboxes: () => new InboxRepository(),
     inboxSetup: () => new InboxSetupRepository(),
     chatHistory: () => new ChatHistoryRepository(),
     home: () => new HomeScreenRepository(),

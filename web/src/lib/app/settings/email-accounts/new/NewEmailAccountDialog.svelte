@@ -12,8 +12,11 @@
 
     let {
         open = $bindable(false),
+        onCreated,
     }: {
         open: boolean,
+        /** Called once an inbox exists, so whoever lists them can re-read. */
+        onCreated?: () => void,
     } = $props();
 
     const {inboxSetup} = useRepositories();
@@ -38,6 +41,7 @@
         if (!(await viewModel.submitInbox())) return;
         viewModel.reset();
         open = false;
+        onCreated?.();
     }
 
     /** Whether the step showing can be left, which is what the "next" button waits for. */

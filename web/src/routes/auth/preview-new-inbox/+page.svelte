@@ -70,7 +70,10 @@
 
     /** Grows when the dialog reports a creation, which is what the reload callback is for. */
     let connected: Inbox[] = [
-        {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: ["INBOX", "Sent"], emailCount: 2649},
+        {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: [
+            "INBOX", "Sent", "Drafts", "Trash", "Spam", "Archiv", "Archiv/Newsletter",
+            "Archiv/Bestellungen, Zahlungen", "Archiv/Nachrichten", "Archiv/Rechtliches", "Archiv/Systeme",
+        ], emailCount: 2649},
     ];
 
     const inboxes = {
@@ -89,6 +92,13 @@
     provideRepositories(createRepositories({inboxSetup, inboxes}));
 </script>
 
+<!--
+  Width-limited on purpose: in the app this screen sits inside the settings dialog, and a page
+  that is free to grow sideways would scroll the whole document instead of the table, which is
+  the one thing worth looking at here.
+-->
 <div class="p-8">
-    <EmailAccountsSettings />
+    <div class="w-[42rem] overflow-hidden">
+        <EmailAccountsSettings />
+    </div>
 </div>

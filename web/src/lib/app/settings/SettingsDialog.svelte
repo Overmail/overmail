@@ -37,7 +37,7 @@
         }}
 >
     <Dialog.Content
-            class="overflow-hidden p-0 md:max-h-125 md:max-w-175 lg:max-w-200"
+            class="overflow-hidden p-0 md:max-h-150 md:max-w-200 lg:max-w-[68rem] xl:max-w-[80rem]"
             trapFocus={false}
     >
         <Dialog.Title class="sr-only">Settings</Dialog.Title>
@@ -66,7 +66,7 @@
                     </Sidebar.Group>
                 </Sidebar.Content>
             </Sidebar.Root>
-            <main class="flex h-120 flex-1 flex-col overflow-hidden pt-5">
+            <main class="flex h-145 flex-1 flex-col overflow-hidden pt-5">
                 <header
                         class="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
                 >

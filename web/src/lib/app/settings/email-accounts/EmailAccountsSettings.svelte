@@ -58,19 +58,50 @@
                 {$_("settings.emailAccounts.add")}
             </Button>
             
+            <!-- `Table.Root` brings its own horizontally scrolling wrapper; this one only rounds it off. -->
             <div class="overflow-hidden rounded-2xl border">
                 <Table.Root class="text-sm">
                     <Table.Header>
                         <Table.Row>
-                            <Table.Head>{$_("settings.emailAccounts.list.columns.username")}</Table.Head>
+                            <!--
+                              Pinned while the rest scrolls sideways: the username is what says
+                              which row is which, and a row identified by nothing is not a row.
+                            -->
+                            <Table.Head class="bg-popover sticky left-0 z-20">
+                                {$_("settings.emailAccounts.list.columns.username")}
+                                <!--
+                                  No rule down the table: the pinned column ends in its own
+                                  background running out, so what scrolls under it disappears
+                                  instead of stopping at a line.
+                                -->
+                                <div
+                                        class="from-popover pointer-events-none absolute inset-y-0 right-0 w-8
+                                               translate-x-full bg-linear-to-r to-transparent"
+                                ></div>
+                            </Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
+                            <!-- The actions column; its header is empty on purpose. -->
+                            <Table.Head class="bg-popover sticky right-0 z-20 w-24">
+                                <div
+                                        class="from-popover pointer-events-none absolute inset-y-0 left-0 w-8
+                                               -translate-x-full bg-linear-to-l to-transparent"
+                                ></div>
+                            </Table.Head>
                         </Table.Row>
                     </Table.Header>
                     <Table.Body>
                         {#each inboxes.rows as inbox (inbox.id)}
-                            <Table.Row class="group/row">
-                                <Table.Cell class="font-medium">{inbox.username}</Table.Cell>
+                            <Table.Row class="group/row hover:bg-muted">
+                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky left-0 z-10 font-medium">
+                                    {inbox.username}
+                                    <!-- The run-out follows the row: same colour hovered or not. -->
+                                    <div
+                                            class="from-popover group-hover/row:from-muted pointer-events-none
+                                                   absolute inset-y-0 right-0 w-8 translate-x-full
+                                                   bg-linear-to-r to-transparent"
+                                    ></div>
+                                </Table.Cell>
                                 <!--
                                   The port belongs with the host: two accounts on one provider
                                   differ by it, and a row showing only the host reads as a
@@ -79,37 +110,47 @@
                                 <Table.Cell class="text-muted-foreground whitespace-nowrap">
                                     {inbox.host}:{inbox.port}
                                 </Table.Cell>
-                                <!--
-                                  The actions sit on the row's right edge, which is inside this
-                                  cell -- a `<div>` directly under a `<tr>` is not valid markup and
-                                  browsers move it out of the table.
-                                -->
-                                <Table.Cell class="relative">
-                                    <!--
-                                      Masked rather than hidden: only the strip the buttons cover
-                                      fades, so the folders on the left stay readable while the
-                                      pointer is on the row.
-                                    -->
-                                    <div
-                                            class="group-hover/row:[mask-image:linear-gradient(to_left,transparent_0,black_7rem)]"
-                                    >
-                                        {#if inbox.folders.length === 0}
-                                            <span class="text-muted-foreground">
-                                                {$_("settings.emailAccounts.list.noFolders")}
-                                            </span>
-                                        {:else}
-                                            <div class="flex flex-row flex-wrap gap-1">
-                                                {#each inbox.folders as folder (folder)}
-                                                    <Badge variant="secondary">{folder}</Badge>
-                                                {/each}
-                                            </div>
-                                        {/if}
-                                    </div>
+                                <Table.Cell>
+                                    {#if inbox.folders.length === 0}
+                                        <span class="text-muted-foreground">
+                                            {$_("settings.emailAccounts.list.noFolders")}
+                                        </span>
+                                    {:else}
+                                        <!--
+                                          `flex-nowrap`: a folder list belongs on one line. It is
+                                          what makes the table wider than the dialog, which is
+                                          what the horizontal scroll is for.
+                                        -->
+                                        <!--
+                                          `w-max` and `shrink-0`: without them the badges give way
+                                          to the table's `w-full` and squash instead of pushing the
+                                          row past the edge, so there would be nothing to scroll.
+                                        -->
+                                        <div class="flex w-max flex-row flex-nowrap gap-1">
+                                            {#each inbox.folders as folder (folder)}
+                                                <Badge variant="secondary" class="shrink-0 whitespace-nowrap">
+                                                    {folder}
+                                                </Badge>
+                                            {/each}
+                                        </div>
+                                    {/if}
+                                </Table.Cell>
 
+                                <!--
+                                  A column of its own rather than an overlay on the folders: the
+                                  table scrolls sideways now, and an overlay would scroll away with
+                                  the cell it sat in. Sticky, so the actions stay reachable wherever
+                                  the folder list has been scrolled to.
+                                -->
+                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky right-0 z-10 w-24">
                                     <div
-                                            class="absolute inset-y-0 right-0 flex flex-row items-center gap-1 pr-3
-                                                   opacity-0 transition-opacity
-                                                   group-hover/row:opacity-100 focus-within:opacity-100"
+                                            class="from-popover group-hover/row:from-muted pointer-events-none
+                                                   absolute inset-y-0 left-0 w-8 -translate-x-full
+                                                   bg-linear-to-l to-transparent"
+                                    ></div>
+                                    <div
+                                            class="flex flex-row items-center justify-end gap-1 opacity-0
+                                                   transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
                                     >
                                         <!-- TODO: no editing screen yet, see the note in the PR. -->
                                         <Button
@@ -133,6 +174,7 @@
                                         </Button>
                                     </div>
                                 </Table.Cell>
+
                             </Table.Row>
                         {/each}
                     </Table.Body>

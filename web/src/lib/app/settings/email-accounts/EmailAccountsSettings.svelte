@@ -67,25 +67,28 @@
                               Pinned while the rest scrolls sideways: the username is what says
                               which row is which, and a row identified by nothing is not a row.
                             -->
-                            <Table.Head class="bg-popover sticky left-0 z-20">
+                            <Table.Head class="bg-popover sticky left-0 z-20 pr-10">
                                 {$_("settings.emailAccounts.list.columns.username")}
                                 <!--
                                   No rule down the table: the pinned column ends in its own
                                   background running out, so what scrolls under it disappears
-                                  instead of stopping at a line.
+                                  instead of stopping at a line. The run-out sits inside the cell,
+                                  in padding kept free for it -- hung outside, it depended on the
+                                  neighbouring column being there and wide enough, which on a
+                                  narrow viewport it is not.
                                 -->
                                 <div
                                         class="from-popover pointer-events-none absolute inset-y-0 right-0 w-8
-                                               translate-x-full bg-linear-to-r to-transparent"
+                                               bg-linear-to-r to-transparent"
                                 ></div>
                             </Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
                             <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
                             <!-- The actions column; its header is empty on purpose. -->
-                            <Table.Head class="bg-popover sticky right-0 z-20 w-24">
+                            <Table.Head class="bg-popover sticky right-0 z-20 w-32 pl-10">
                                 <div
                                         class="from-popover pointer-events-none absolute inset-y-0 left-0 w-8
-                                               -translate-x-full bg-linear-to-l to-transparent"
+                                               bg-linear-to-l to-transparent"
                                 ></div>
                             </Table.Head>
                         </Table.Row>
@@ -93,13 +96,12 @@
                     <Table.Body>
                         {#each inboxes.rows as inbox (inbox.id)}
                             <Table.Row class="group/row hover:bg-muted">
-                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky left-0 z-10 font-medium">
+                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky left-0 z-10 pr-10 font-medium">
                                     {inbox.username}
                                     <!-- The run-out follows the row: same colour hovered or not. -->
                                     <div
                                             class="from-popover group-hover/row:from-muted pointer-events-none
-                                                   absolute inset-y-0 right-0 w-8 translate-x-full
-                                                   bg-linear-to-r to-transparent"
+                                                   absolute inset-y-0 right-0 w-8 bg-linear-to-r to-transparent"
                                     ></div>
                                 </Table.Cell>
                                 <!--
@@ -107,7 +109,7 @@
                                   differ by it, and a row showing only the host reads as a
                                   duplicate of the other.
                                 -->
-                                <Table.Cell class="text-muted-foreground whitespace-nowrap">
+                                <Table.Cell class="text-muted-foreground whitespace-nowrap font-mono">
                                     {inbox.host}:{inbox.port}
                                 </Table.Cell>
                                 <Table.Cell>
@@ -142,11 +144,10 @@
                                   the cell it sat in. Sticky, so the actions stay reachable wherever
                                   the folder list has been scrolled to.
                                 -->
-                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky right-0 z-10 w-24">
+                                <Table.Cell class="bg-popover group-hover/row:bg-muted sticky right-0 z-10 w-32 pl-10">
                                     <div
                                             class="from-popover group-hover/row:from-muted pointer-events-none
-                                                   absolute inset-y-0 left-0 w-8 -translate-x-full
-                                                   bg-linear-to-l to-transparent"
+                                                   absolute inset-y-0 left-0 w-8 bg-linear-to-l to-transparent"
                                     ></div>
                                     <div
                                             class="flex flex-row items-center justify-end gap-1 opacity-0

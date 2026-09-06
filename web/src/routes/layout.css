@@ -4,6 +4,7 @@
 @import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/oxanium";
 @import "@fontsource-variable/playfair-display";
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -257,4 +258,8 @@
 	::view-transition-new(*) {
 		animation: none !important;
 	}
+}
+
+.font-mono {
+	font-family: "JetBrains Mono", monospace;
 }

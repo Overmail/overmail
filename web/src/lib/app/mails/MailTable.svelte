@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
     import {FlexRender, createTable} from "@tanstack/svelte-table";
+    import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {_} from "svelte-i18n";
     import {untrack} from "svelte";
     import {page} from "$app/state";
@@ -20,6 +21,7 @@
     import {useRepositories} from "$lib/repository/repositories";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
+    import {MailSelection, setMailSelection} from "./mailSelection";
     import {EMAIL_PARAM, FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
@@ -59,6 +61,21 @@
 
     $effect(() => list.setScope(allMails ? "all" : "unarchived"));
 
+    /**
+     * Which mails are ticked. Handed to the cells through the context rather than as a prop: what
+     * a column declares is a component and the mail it gets, nothing else (see columns.ts).
+     */
+    const selection = new MailSelection();
+    setMailSelection(selection);
+
+    // Switching the list switches which mails are on the table, and a tick that is no longer on
+    // screen is one nobody can take back. Untracked because clearing writes the very set a row
+    // reads -- tracked, this would be an effect that re-runs itself.
+    $effect(() => {
+        void allMails;
+        untrack(() => selection.clear());
+    });
+
     // An empty mailbox holds no rows and would therefore subscribe to nothing, which is when the
     // announcement below matters most: this keeps the socket up for as long as the table is here.
     $effect(() => mails.watchMoves());
@@ -89,6 +106,17 @@
     // is opened or closed, and the header then moves along with the panel sliding rather than
     // after it has finished.
     coverHeaderEnd(PANEL_COVER, () => openId !== null);
+
+    /*
+     * Escape ends selection mode, and only then: it is the way out for somebody who ticked a row
+     * by accident. While a mail is open the panel owns the key -- what the reader means by it
+     * with a mail on screen is "close the mail", and the next Escape then drops the selection.
+     */
+    createHotkey(
+        "Escape",
+        () => selection.clear(),
+        () => ({enabled: selection.active && openId === null, ignoreInputs: true})
+    );
 
     /**
      * Opens a mail beside the list.
@@ -157,6 +185,16 @@
         const index = list.indexOf(next);
         const row = index === undefined ? undefined : list.layout.rowOf(index);
         if (row !== undefined) virtualizer.virtualizer.scrollToIndex(row, {align: "auto"});
+    }
+
+    /**
+     * Where the mails under a header start in the mailbox -- what its box needs to know which
+     * mails it is about. The row after a header is its first mail: a stretch with a header over
+     * it holds at least one, and there are never two headers in a row.
+     */
+    function groupStart(headerRow: number): number {
+        const first = list.layout.rowAt(headerRow + 1);
+        return first?.kind === "mail" ? first.index : 0;
     }
 
     /** The table's one preview, driven by the rows below; see MailRowPreview. */
@@ -332,9 +370,16 @@
                     {#if entry?.kind === "header"}
                         <!-- The stretch this and the rows below it belong to. One cell across the
                              table: a heading is not a value in a column. -->
-                        <Table.Row class="border-0 hover:bg-transparent">
+                        <!-- A row of the table like any other as far as the cursor goes: the
+                             header's own box comes out on hover, see selectionReveal. -->
+                        <Table.Row class="group/mail-row border-0 hover:bg-transparent">
                             <Table.Cell colspan={columns.length} class="p-0 align-bottom">
-                                <MailGroupHeader label={entry.label} count={entry.count}/>
+                                <MailGroupHeader
+                                        label={entry.label}
+                                        count={entry.count}
+                                        start={groupStart(item.index)}
+                                        {list}
+                                />
                             </Table.Cell>
                         </Table.Row>
                     {:else if modelRow}
@@ -347,10 +392,19 @@
                              the panel into the history, so the page's back button leads to the
                              list with that mail still open. The query is what puts it there. -->
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- The row is the group the avatar and its checkbox swap on, and a
+                             mail that has been picked takes the one colour of this theme that is
+                             not a grey -- so the picked rows stand out of a list whose every
+                             other state, the hover and the open mail included, is a shade of
+                             it. The text keeps the tones it has: what is picked is the row. -->
                         <Table.Row
                                 aria-rowindex={item.index + 1}
                                 data-state={modelRow.id === openId ? "selected" : undefined}
-                                class={cn("h-10 cursor-pointer border-0")}
+                                class={cn(
+                                    "group/mail-row h-10 cursor-pointer border-0",
+                                    selection.has(modelRow.id) &&
+                                        "bg-accent hover:bg-accent data-[state=selected]:bg-accent"
+                                )}
                                 onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
                                 onmouseleave={() => rowPreview?.leave()}
                                 onclick={() => showEmail(modelRow.id, "push")}

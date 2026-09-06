@@ -344,3 +344,26 @@ test("the scope that was not on screen is read again when it is", async () => {
     expect(list.total).toBe(4);
     expect(list.idAt(3)).toBe("all-3");
 });
+
+test("a stretch answers with the mails it holds, not with the ones it has not asked for", async () => {
+    // 150 mails today: the first page covers 100 of them, the rest of the day is still a gap.
+    mailbox({unarchived: [{key: day(0), count: 150}, {key: day(1), count: 2}], all: []});
+    const {repository: mails} = repository();
+    const list = new MailListViewModel(mails);
+
+    list.window(0, 5);
+    await settle();
+
+    const today = list.idsIn(0, 150);
+    expect(today.length).toBe(100);
+    expect(today[0]).toBe("unarchived-0");
+    expect(today.at(-1)).toBe("unarchived-99");
+
+    // Scrolling into the gap is what fills it, and the stretch then names those too.
+    list.window(101, 120);
+    await settle();
+    expect(list.idsIn(0, 150).length).toBe(150);
+
+    // The next stretch is its own mails and stops where it ends.
+    expect(list.idsIn(150, 2)).toEqual(["unarchived-150", "unarchived-151"]);
+});

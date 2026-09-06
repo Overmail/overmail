@@ -2,7 +2,7 @@
     import {cn} from "$lib/utils";
     import {displayName} from "$lib/app/mails/participants";
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
-    import MailUserAvatar from "./MailUserAvatar.svelte";
+    import MailSelectToggle from "./MailSelectToggle.svelte";
 
     let {mail}: {mail: EmailMeta} = $props();
 
@@ -11,7 +11,8 @@
 </script>
 
 <div class="flex items-center gap-2.5" title={mail.sender.address}>
-    <MailUserAvatar participant={mail.sender}/>
+    <!-- The face of the mail, and the checkbox that takes its place under the cursor. -->
+    <MailSelectToggle {mail}/>
 
     <!-- min-w-0 lets the flex child shrink, without it truncate never kicks in. -->
     <!-- Unread is the one thing that pulls out of the table's muted body, and only just: the

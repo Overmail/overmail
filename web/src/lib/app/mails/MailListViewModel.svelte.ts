@@ -142,6 +142,25 @@ export class MailListViewModel {
     }
 
     /**
+     * The mails of a stretch of the current scope that this can name: [count] positions from
+     * [from] on, and of those the ones whose page is here.
+     *
+     * Which is less than the stretch holds for as long as it has not been paged in -- what the
+     * table shows there are the rows it is keeping open. A caller that ticks these ticks the
+     * mails the list holds, not the ones nobody has asked for yet.
+     */
+    idsIn(from: number, count: number): string[] {
+        const ids: string[] = [];
+
+        for (let index = from; index < from + count; index++) {
+            const id = this.listing.entries[index];
+            if (id !== undefined) ids.push(id);
+        }
+
+        return ids;
+    }
+
+    /**
      * Where [id] sits in the current scope. Undefined for a mail this listing does not hold: one
      * of another scope, or one whose page has been let go of.
      *

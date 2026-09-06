@@ -39,11 +39,11 @@
 
 <Dialog.Root bind:open>
     <!--
-      One width for every step, set by the widest of them: the folder table needs the room, and a
-      dialog that resizes sideways as the user steps through it is worse than two steps with air
-      around their fields. The fields themselves stay narrow, see below.
+      One width for every step, set by the widest of them: six columns of folder table need the
+      room, and a dialog that resizes sideways as the user steps through it is worse than two
+      steps with air around their fields. The fields themselves stay narrow, see below.
     -->
-    <Dialog.Content class="sm:max-w-3xl">
+    <Dialog.Content class="sm:max-w-4xl">
         <Dialog.Header>
             <Dialog.Title>{$_("settings.emailAccounts.new.title")}</Dialog.Title>
             <Dialog.Description>

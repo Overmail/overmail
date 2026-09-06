@@ -82,6 +82,12 @@ export type FolderRow = {
     hasChildren: boolean;
     /** Whether this folder is imported at all. */
     enabled: boolean;
+    /**
+     * Whether the folder is watched over an open connection (imap IDLE) rather than picked up by
+     * the next poll. Costs a connection held open per folder, which is why it is per folder and
+     * not a switch for the whole account.
+     */
+    realtime: boolean;
     /** Null until counted, and after a folder that could not be read. */
     mailCount: number | null;
     oldestMailAt: string | null;
@@ -242,6 +248,11 @@ export class NewEmailAccountViewModel {
     toggleFolder(fullName: string) {
         const folder = this.folders.find((row) => row.fullName === fullName);
         if (folder) folder.enabled = !folder.enabled;
+    }
+
+    toggleRealtime(fullName: string) {
+        const folder = this.folders.find((row) => row.fullName === fullName);
+        if (folder) folder.realtime = !folder.realtime;
     }
 
     toggleCollapsed(fullName: string) {
@@ -438,8 +449,10 @@ export class NewEmailAccountViewModel {
 /**
  * The folder list as the table holds it: nesting resolved, and the INBOX switched on.
  *
- * The INBOX by default and nothing else: it is the folder everybody means by "my mail", while a
- * Trash or a Spam pulled in by default would import exactly what the user threw away.
+ * The INBOX by default and nothing else -- for being imported and for being watched live. It is
+ * the folder everybody means by "my mail", while a Trash or a Spam pulled in by default would
+ * import exactly what the user threw away, and watching every folder live would hold a connection
+ * open per folder for mail nobody is waiting on.
  */
 function toRows(folders: FolderNode[]): FolderRow[] {
     const parentOf = (folder: FolderNode) =>
@@ -454,6 +467,7 @@ function toRows(folders: FolderNode[]): FolderRow[] {
         specialType: folder.specialType,
         hasChildren: parents.has(folder.fullName),
         enabled: folder.specialType === "INBOX",
+        realtime: folder.specialType === "INBOX",
         mailCount: null,
         oldestMailAt: null,
         counted: false,

@@ -300,14 +300,23 @@ test("the inbox is on by default and nothing else is", async () => {
 
     // Trash off by default: importing it would pull in exactly what was thrown away.
     expect(viewModel.folders.filter((f) => f.enabled).map((f) => f.fullName)).toEqual(["INBOX"]);
+    // Same for watching live -- a held-open connection per folder is not a sensible default.
+    expect(viewModel.folders.filter((f) => f.realtime).map((f) => f.fullName)).toEqual(["INBOX"]);
     expect(viewModel.folders.every((f) => f.aiProcessing.type === "new_only")).toBe(true);
 
     viewModel.toggleFolder("Archiv.Newsletter");
+    viewModel.toggleRealtime("Archiv.Newsletter");
     viewModel.setAiProcessing("Archiv.Newsletter", {type: "newest", count: 50});
 
     const newsletter = viewModel.folders.find((f) => f.fullName === "Archiv.Newsletter")!;
     expect(newsletter.enabled).toBe(true);
+    expect(newsletter.realtime).toBe(true);
     expect(newsletter.aiProcessing).toEqual({type: "newest", count: 50});
+
+    // Turning the folder off leaves its settings alone, so switching it back on restores them.
+    viewModel.toggleFolder("Archiv.Newsletter");
+    expect(newsletter.enabled).toBe(false);
+    expect(newsletter.realtime).toBe(true);
 });
 
 test("a mailbox that could not be opened is a failed scan, not an empty one", async () => {

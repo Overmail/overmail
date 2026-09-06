@@ -69,11 +69,16 @@
                     <Table.Row>
                         <Table.Head class="w-10"></Table.Head>
                         <Table.Head>{$_("settings.emailAccounts.new.folders.columns.folder")}</Table.Head>
-                        <Table.Head class="w-20 text-right">
+                        <Table.Head class="w-16 text-right">
                             {$_("settings.emailAccounts.new.folders.columns.mails")}
                         </Table.Head>
                         <Table.Head class="w-28">
                             {$_("settings.emailAccounts.new.folders.columns.oldest")}
+                        </Table.Head>
+                        <!-- w-24, not w-20: the German header ("Echtzeit") needs 54 of the 56px
+                             that w-20 leaves after cell padding, which is no margin at all. -->
+                        <Table.Head class="w-24">
+                            {$_("settings.emailAccounts.new.folders.columns.realtime")}
                         </Table.Head>
                         <!--
                           Fixed, and only as wide as the control: it carries its own value, so
@@ -125,6 +130,19 @@
 
                             <Table.Cell class="text-right tabular-nums">{formatCount(row)}</Table.Cell>
                             <Table.Cell class="whitespace-nowrap">{formatOldest(row)}</Table.Cell>
+
+                            <Table.Cell>
+                                <!--
+                                  Off with the folder rather than cleared: switching a folder back
+                                  on should find its settings where they were left.
+                                -->
+                                <Checkbox
+                                        checked={row.realtime}
+                                        disabled={!row.enabled}
+                                        onCheckedChange={() => viewModel.toggleRealtime(row.fullName)}
+                                        aria-label={$_("settings.emailAccounts.new.folders.columns.realtime") + ": " + row.fullName}
+                                />
+                            </Table.Cell>
 
                             <Table.Cell>
                                 <AiProcessingControl

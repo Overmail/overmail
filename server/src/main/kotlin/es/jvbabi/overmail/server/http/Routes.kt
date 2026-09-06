@@ -32,6 +32,10 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInbo
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
+import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
+import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
@@ -157,6 +161,18 @@ internal fun Application.configureRouting() {
             route("/users") {
                 route("/me") {
                     getCurrentUser()
+
+                    // What the assistant learned about this user; the agent reaches the same
+                    // rows through `KnowledgeStore`.
+                    route("/knowledge") {
+                        getKnowledgeEntries()
+                        createKnowledgeEntry()
+
+                        route("/{knowledgeId}") {
+                            updateKnowledgeEntry()
+                            deleteKnowledgeEntry()
+                        }
+                    }
 
                     route("/inboxes") {
                         getInboxes()

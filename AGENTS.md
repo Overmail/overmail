@@ -44,6 +44,43 @@ modules are entry points and nothing else.
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 
+## Workflow
+
+Every change starts as an issue and lands as a pull request against `main`. The issue number is
+what ties the two together, and it is not cosmetic: `check_changelog.main.kts` and
+`sync-labels.yaml` both read it back out of the branch name.
+
+1. **The issue carries a type** -- Feature, Bug or Task. The type decides the shape of the
+   changelog entry and the section it is rendered under, so an issue without one is a warning on
+   every pull request that closes it.
+2. **Branch off `main`**, named `<type>/<issue number>-<kebab-case title>`:
+   `feat/5-add-download-raw-email-button`. The type is the same vocabulary the commits use.
+3. **Commits are `<type>(<component>/<topic> #<issue>): <short description>`**, e.g.
+   `feat(api+web/mail #5): implement email download functionality`. `<component>` is `api`, `web`,
+   `app` or `shared`, and `api+web` when one commit spans both. Work that belongs to no issue
+   leaves the reference out: `feat(web/button): add cursor pointer to button base styles`.
+4. **Add the changelog entry** for the issue, see [Changelog](#changelog).
+5. **Open the pull request against `main` and link the issue** with `Closes #<issue>` in the
+   description. The link is what the tooling reads first; the branch name is only its fallback,
+   for pull requests nobody linked.
+
+### Labels
+
+`project:*` says which parts of the system a change touches. It steers two things: what a merge to
+`main` builds (see below) and what the changelog lists. Put it on the issue or on the pull request
+-- [sync-labels.yaml](.github/workflows/sync-labels.yaml) copies it to the other side either way.
+
+| Label            | Means                                                            |
+|------------------|------------------------------------------------------------------|
+| `project:app`    | the Compose app; the only label a changelog entry is rendered for |
+| `project:server` | the Ktor server                                                   |
+| `project:webapp` | the SvelteKit web app                                             |
+| `project:other`  | ships nothing -- documentation, CI, tooling                       |
+
+Exactly one thing must not happen: merging without any of them. An unlabelled merge cannot be told
+apart from a forgotten label, so it falls back to building everything. `project:other` is how a
+change says it deliberately delivers nothing.
+
 ## Release pipeline
 
 A merge to `main` runs [deploy.yaml](.github/workflows/deploy.yaml), which builds only what the
@@ -53,11 +90,10 @@ merged pull request's `project:*` labels say it touches:
 |-------------------------------------|----------------------------------------------|
 | `project:app`                       | builds the APKs and publishes a GitHub release |
 | `project:server` / `project:webapp` | builds and pushes `ghcr.io/overmail/overmail:latest` |
+| `project:other`                     | builds nothing                                 |
 | none                                | builds everything, with a notice               |
 
-Labelling the issue or the pull request is enough:
-[sync-labels.yaml](.github/workflows/sync-labels.yaml) copies every `project:*` label between the
-two in both directions.
+Which side carries the label does not matter, see [Labels](#labels).
 
 The image runs all three processes behind one port — the Ktor jar, the SvelteKit server and a
 Caddy with the same `/api*` split as locally, see `deploy/production/`. It reads `/data/config.json`,
@@ -65,16 +101,19 @@ which is why `OVERMAIL_STORAGE_DIRECTORY` exists (`config/StorageDirectory.kt`).
 
 ### Changelog
 
-Every feature branch needs a changelog entry for the issue it closes, in
-`docs/changelog/issues/<issue ID>/changelog.<type>.json` — copy the matching file from
-`docs/changelog/issues/_template/`. `<type>` is the GitHub issue type: `feature` (needs `title`
+**Only issues labelled `project:app` need one** — a release ships the app, and the app is what
+reads the changelog. Both scripts below apply that gate, so a `project:server` change writes no
+entry and is not asked for one.
+
+An app issue gets `docs/changelog/issues/<issue ID>/changelog.<type>.json` — copy the matching file
+from `docs/changelog/issues/_template/`. `<type>` is the GitHub issue type: `feature` (needs `title`
 and `description`), `bug` or `task` (`description` only, no `title`). Texts are English at the
-top level, German under `localized.de`.
+top level, German under `localized.de`. A Feature must have an entry; for a Bug or a Task it is
+optional.
 
 `.github/check_changelog.main.kts` checks this on every pull request;
 `.github/generate_changelog.main.kts` renders the release body from the entries of every issue
-referenced by the commits since the last release. **Only issues labelled `project:app` make it
-into the changelog** — a release ships the app, and the app is what reads the changelog.
+referenced by the commits since the last release.
 
 ## Configuration
 

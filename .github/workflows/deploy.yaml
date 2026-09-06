@@ -50,6 +50,9 @@ jobs:
       # release only builds what the change actually needs.
       # Manual runs and pushes without a pull request carry no labels, so they
       # fall back to building everything rather than silently shipping nothing.
+      # project:other is the deliberate empty scope -- documentation, CI, tooling:
+      # it is a label, so it never reaches that fallback, and it matches nothing
+      # below, so neither job runs.
       - name: Determine affected projects
         id: scope
         env:
@@ -76,6 +79,17 @@ jobs:
           has 'project:app' && APP=true
           # The image carries the Ktor server and the SvelteKit app, so either one rebuilds it.
           { has 'project:server' || has 'project:webapp'; } && SERVER=true
+
+          # A merge that builds nothing is the expected outcome for documentation, CI and
+          # tooling -- but it is also what a mislabelled release looks like, so the two are
+          # told apart here rather than left to whoever reads the empty run afterwards.
+          if [ "$APP" = false ] && [ "$SERVER" = false ]; then
+            if has 'project:other'; then
+              echo "::notice::Labelled project:other, so there is nothing to build or publish."
+            else
+              echo "::warning::No project:* label decides anything here, so nothing is built. Add project:other if that is intended."
+            fi
+          fi
 
           echo "app=$APP" >> "$GITHUB_OUTPUT"
           echo "server=$SERVER" >> "$GITHUB_OUTPUT"

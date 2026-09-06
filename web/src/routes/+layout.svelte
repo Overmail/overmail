@@ -59,8 +59,15 @@
 	// /auth is where you land when you are not signed in, so checking there would loop.
 	const isAuthRoute = $derived(page.url.pathname.startsWith('/auth'));
 
+	/**
+	 * Pages that stand on their own: nobody is signed in on them, and there is no shell around
+	 * them. /share is one -- it is read by whoever holds the link, and a sidebar of somebody
+	 * else's mail around it would be both wrong and, for a signed-in owner, misleading.
+	 */
+	const isPublicRoute = $derived(isAuthRoute || page.url.pathname.startsWith('/share'));
+
 	$effect(() => {
-		if (isAuthRoute) {
+		if (isPublicRoute) {
 			checked = true;
 			return;
 		}
@@ -90,8 +97,8 @@
 	<div transition:fade={{duration: 200}} class="fixed inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-background">
 		<CheckingSession />
 	</div>
-{:else if isAuthRoute || session}
-	{#if session}
+{:else if isPublicRoute || session}
+	{#if session && !isPublicRoute}
 
 		<!-- Three variables, for everything that has to live with the panel: its width, how much
 		     of the window's inline end it takes right now (nothing while it is closed), and how

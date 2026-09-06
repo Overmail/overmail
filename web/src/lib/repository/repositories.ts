@@ -5,6 +5,8 @@ import {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 import {InboxRepository} from "$lib/repository/InboxRepository";
 import {KnowledgeRepository} from "$lib/repository/KnowledgeRepository";
 import {InboxSetupRepository} from "$lib/repository/InboxSetupRepository";
+import {ShareRepository} from "$lib/repository/ShareRepository";
+import {SharedEmailRepository} from "$lib/repository/SharedEmailRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
 import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import {HomeScreenRepository} from "$lib/repository/HomeScreenRepository.svelte";
@@ -36,6 +38,10 @@ export type Repositories = {
     inboxSetup: InboxSetupRepository;
     /** What the assistant knows about the user, as the settings screen lists it. */
     knowledge: KnowledgeRepository;
+    /** The links one mail was handed out under, as the share dialog reads and edits them. */
+    shares: ShareRepository;
+    /** A shared mail as the page behind a link reads it -- the one repository with no session. */
+    sharedEmail: SharedEmailRepository;
     home: HomeScreenRepository;
     chatHistory: ChatHistoryRepository;
     emails: EntityRepository<CachedEmail>;
@@ -52,6 +58,8 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     inboxes: () => new InboxRepository(),
     inboxSetup: () => new InboxSetupRepository(),
     knowledge: () => new KnowledgeRepository(),
+    shares: () => new ShareRepository(),
+    sharedEmail: () => new SharedEmailRepository(),
     chatHistory: () => new ChatHistoryRepository(),
     home: () => new HomeScreenRepository(),
     emails: createEmailRepository,

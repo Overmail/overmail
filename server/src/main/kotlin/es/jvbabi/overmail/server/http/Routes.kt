@@ -10,6 +10,9 @@ import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.labels.detachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
+import es.jvbabi.overmail.server.http.email.item.shares.getShares
+import es.jvbabi.overmail.server.http.email.item.shares.item.deleteShare
+import es.jvbabi.overmail.server.http.email.item.shares.item.updateShare
 import es.jvbabi.overmail.server.http.email.item.shares.newShare
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
@@ -18,6 +21,8 @@ import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
+import es.jvbabi.overmail.server.http.share.getShare
+import es.jvbabi.overmail.server.http.share.openShare
 import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
@@ -115,7 +120,13 @@ internal fun Application.configureRouting() {
                     }
 
                     route("/shares") {
+                        getShares()
                         newShare()
+
+                        route("/{shareId}") {
+                            updateShare()
+                            deleteShare()
+                        }
                     }
 
                     // One route per state rather than a body that names it: they are separate
@@ -146,6 +157,16 @@ internal fun Application.configureRouting() {
                         attachEmailLabel()
                         detachEmailLabel()
                     }
+                }
+            }
+
+            // What a share link resolves to. No session anywhere below here: holding the link
+            // is the whole authorization, see `getShare`.
+            route("/shares/{shareId}") {
+                getShare()
+
+                route("/open") {
+                    openShare()
                 }
             }
 

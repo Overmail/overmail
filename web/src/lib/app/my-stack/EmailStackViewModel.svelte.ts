@@ -21,6 +21,15 @@ export type StackEmail = EmailMeta & {
     classification: Classification | null;
 };
 
+/** One announced mail: the card to draw, or the reason there is none. */
+type StackCard = {email: StackEmail | null; onItsWay: boolean};
+
+/** Not on the pile, and nothing is coming for it either. */
+const NOT_A_CARD: StackCard = {email: null, onItsWay: false};
+
+/** Not drawable yet, but on its way. */
+const ON_ITS_WAY: StackCard = {email: null, onItsWay: true};
+
 /**
  * The pile of mails, one card at a time.
  *
@@ -45,27 +54,23 @@ export class EmailStackViewModel {
     /** What the reader picked, which may be a card that is not drawable (yet). */
     private selectedId: string | null = $state(null);
 
-    /**
-     * The cards to draw, newest first.
-     *
-     * A mail appears once it is known and its body is here; one that left the mailbox without
-     * this reader doing it -- the agent filing it as spam -- disappears, while one handled here
-     * stays so the pile can animate it away.
-     */
+    /** Every announced mail, in the order the pile handed it out; see [card]. */
+    private readonly cards: StackCard[] = $derived(this.ids.map((id) => this.card(id)));
+
+    /** The cards to draw, newest first. */
     emails: StackEmail[] = $derived(
-        this.ids
-            .map((id): StackEmail | null => {
-                const meta = this.mails.peek(id).value;
-                const body = this.bodies[id];
-                if (meta === null || body === undefined) return null;
-
-                const classification = this.handled[id] ?? null;
-                if (meta.archiveState !== "unarchive" && classification === null) return null;
-
-                return {...meta, body, classification};
-            })
+        this.cards
+            .map((card) => card.email)
             .filter((email): email is StackEmail => email !== null)
     );
+
+    /**
+     * How many mails of the pile cannot be drawn yet, because their metadata or their body is
+     * still on its way. Nothing that is not coming is counted -- a mail the server does not know,
+     * or one that is out of the mailbox -- because the stack waits on this before it deals the
+     * first cards, and it may not wait for something that never arrives.
+     */
+    onTheirWay: number = $derived(this.cards.filter((card) => card.onItsWay).length);
 
     /**
      * The card on top. Always one that is actually drawn: a pick whose mail is still loading --
@@ -159,6 +164,28 @@ export class EmailStackViewModel {
         if (this.mails.peek(id).value?.isRead !== false) return;
 
         this.socket.markEmailRead(id);
+    }
+
+    /**
+     * What one announced mail is right now.
+     *
+     * A mail is a card once it is known and its body is here. One that left the mailbox without
+     * this reader doing it -- the agent filing it as spam -- is no card and nothing to wait for,
+     * and neither is one the server does not know; a mail handled here stays, so the pile can
+     * animate it away.
+     */
+    private card(id: string): StackCard {
+        const entry = this.mails.peek(id);
+        const classification = this.handled[id] ?? null;
+
+        if (!entry.isLoading && entry.value === null) return NOT_A_CARD;
+        if (entry.value === null) return ON_ITS_WAY;
+        if (entry.value.archiveState !== "unarchive" && classification === null) return NOT_A_CARD;
+
+        const body = this.bodies[id];
+        if (body === undefined) return ON_ITS_WAY;
+
+        return {email: {...entry.value, body, classification}, onItsWay: false};
     }
 
     /**

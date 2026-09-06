@@ -104,6 +104,7 @@
                         emails={viewModel.emails ?? []}
                         onRequestReclassify={(email) => viewModel.onRequestEmailClassification(email.id)}
                         currentEmailId={viewModel.currentEmailId}
+                        onTheirWay={viewModel.onTheirWay}
                         class="h-full"
                 />
             </div>

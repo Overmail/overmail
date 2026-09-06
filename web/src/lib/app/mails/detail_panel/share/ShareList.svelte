@@ -19,13 +19,16 @@
     import {_, locale} from "svelte-i18n";
     import type {Share} from "$lib/repository/ShareRepository";
     import type {ShareDialogViewModel} from "$lib/app/mails/detail_panel/share/ShareDialogViewModel.svelte";
-    import {shareUrl} from "$lib/app/mails/detail_panel/share/sharePath";
+    import {shareUrl, subjectFor} from "$lib/app/mails/detail_panel/share/sharePath";
 
     let {
         viewModel,
+        subject,
         onCopyFailed,
     }: {
         viewModel: ShareDialogViewModel,
+        /** What the link says it is about, where the share lets a visitor see that anyway. */
+        subject?: string | null,
         /** The clipboard is the browser's to refuse, and the message for it sits in the dialog. */
         onCopyFailed?: (failed: boolean) => void,
     } = $props();
@@ -46,7 +49,8 @@
     }
 
     async function copy(share: Share) {
-        onCopyFailed?.(!(await viewModel.copy(share, shareUrl(share.id, location.origin))));
+        const url = shareUrl(share.id, location.origin, subjectFor(share, subject));
+        onCopyFailed?.(!(await viewModel.copy(share, url)));
     }
 </script>
 

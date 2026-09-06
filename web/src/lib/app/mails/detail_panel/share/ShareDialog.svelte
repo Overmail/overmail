@@ -26,15 +26,18 @@
     } from "$lib/app/mails/detail_panel/share/ShareDialogViewModel.svelte";
     import ShareList from "$lib/app/mails/detail_panel/share/ShareList.svelte";
     import DeleteShareDialog from "$lib/app/mails/detail_panel/share/DeleteShareDialog.svelte";
-    import {shareUrl} from "$lib/app/mails/detail_panel/share/sharePath";
+    import {shareUrl, subjectFor} from "$lib/app/mails/detail_panel/share/sharePath";
 
     let {
         open = $bindable(true),
         emailId,
+        subject,
     }: {
         open?: boolean,
         /** The mail the links are for. A dialog is opened on one mail and lives as long as it. */
         emailId: string,
+        /** What the link says it is about, where the share lets a visitor see that anyway. */
+        subject?: string | null,
     } = $props();
 
     let id = $props.id();
@@ -79,7 +82,10 @@
         const share = await viewModel.submit();
         if (!share) return;
 
-        if (creating) copyFailed = !(await viewModel.copy(share, shareUrl(share.id, location.origin)));
+        if (creating) {
+            const url = shareUrl(share.id, location.origin, subjectFor(share, subject));
+            copyFailed = !(await viewModel.copy(share, url));
+        }
     }
 </script>
 
@@ -219,7 +225,7 @@
 
         <div class="h-px w-full bg-muted my-3"></div>
 
-        <ShareList {viewModel} onCopyFailed={(failed) => (copyFailed = failed)} />
+        <ShareList {viewModel} {subject} onCopyFailed={(failed) => (copyFailed = failed)} />
     </Dialog.Content>
 </Dialog.Root>
 

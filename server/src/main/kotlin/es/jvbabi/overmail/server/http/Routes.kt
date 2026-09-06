@@ -22,6 +22,10 @@ import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.users.me.inboxes.getInboxes
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.deleteInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.getInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.streamInboxFoldersForInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
@@ -152,7 +156,22 @@ internal fun Application.configureRouting() {
                         getInboxes()
 
                         route("/{inboxId}") {
+                            // What the edit screen opens on, saves through, and checks against.
+                            getInbox()
+                            updateInbox()
                             deleteInbox()
+
+                            route("/test") {
+                                route("/imap-login") {
+                                    testInboxLogin()
+                                }
+                            }
+
+                            route("/folders") {
+                                route("/stream") {
+                                    streamInboxFoldersForInbox()
+                                }
+                            }
 
                             // One route per state, like the read and archive routes above.
                             route("/pause") {

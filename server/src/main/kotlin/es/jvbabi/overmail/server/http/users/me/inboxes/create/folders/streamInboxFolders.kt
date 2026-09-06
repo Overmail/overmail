@@ -76,10 +76,13 @@ fun Route.streamInboxFolders() {
 /**
  * Opens the mailbox and writes the whole scan into [writer].
  *
+ * `internal` because the edit screen scans an existing mailbox through the same code -- the only
+ * thing that differs there is where the password comes from.
+ *
  * Never throws: once the stream is open the only way to report a failure is an `error` event in
  * it, and a client left without one would wait for a `done` that never comes.
  */
-private suspend fun scanMailbox(writer: Writer, host: String, port: Int, username: String, password: String) {
+internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, username: String, password: String) {
     // Owned rather than the one `ImapClient` makes for itself: the scan opens a connection per
     // folder, and cancelling this is what closes down anything still running when the client hangs
     // up. The handler keeps an expected connection failure out of the thread's default one.

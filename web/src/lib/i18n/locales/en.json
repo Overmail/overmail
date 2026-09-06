@@ -283,6 +283,27 @@
       "empty": {
         "title": "No knowledge",
         "description": "The agent learns from your emails to better understand them."
+      },
+      "new": {
+        "title": "Add knowledge",
+        "description": "Something about you the assistant should keep in mind while it reads your mail.",
+        "name": "Name",
+        "namePlaceholder": "Electricity contract",
+        "nameTaken": "There is already an entry with this name.",
+        "text": "What is known",
+        "textPlaceholder": "I am with Rheinenergie and pay monthly by direct debit.",
+        "textHint": "Write it as you would tell it to somebody sorting your mail.",
+        "keywords": "Keywords",
+        "keywordsPlaceholder": "Type a keyword and press Enter",
+        "keywordsHint": "How the assistant finds this entry again while it sorts a mail.",
+        "keywordsFull": "That is as many keywords as an entry keeps.",
+        "removeKeyword": "Remove keyword {keyword}",
+        "relevantOn": "Relevant on",
+        "relevantOnHint": "Optional, for entries about a single day — a deadline, a move.",
+        "saving": "Saving…",
+        "failed": "The entry could not be saved.",
+        "cancel": "Cancel",
+        "submit": "Add"
       }
     }
   },

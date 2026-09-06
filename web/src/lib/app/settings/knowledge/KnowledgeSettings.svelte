@@ -14,11 +14,14 @@
         TrashIcon,
         WarningCircleIcon,
     } from "phosphor-svelte";
+    import NewKnowledgeDialog from "$lib/app/settings/knowledge/NewKnowledgeDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {KnowledgeEntry} from "$lib/repository/KnowledgeRepository";
     import {_, locale} from "svelte-i18n";
 
     const {knowledge: knowledgeRepository} = useRepositories();
+
+    let showNewKnowledgeDialog = $state(false);
 
     let entries: {type: "loading"} | {type: "loaded"; rows: KnowledgeEntry[]} | {type: "failed"} = $state({
         type: "loading",
@@ -67,8 +70,7 @@
         </div>
     {:else if entries.rows.length > 0}
         <div class="flex flex-col gap-4">
-            <!-- Prepared, like the row actions below: writing knowledge from here is its own step. -->
-            <Button class="w-fit" disabled>
+            <Button class="w-fit" onclick={() => (showNewKnowledgeDialog = true)}>
                 <PlusIcon />
                 {$_("settings.knowledge.add")}
             </Button>
@@ -147,7 +149,7 @@
                                 <Table.Cell class="w-24">
                                     <!--
                                       Prepared, not wired: editing and forgetting an entry each
-                                      open a dialog, and those come with the step that writes.
+                                      open a dialog of their own, and those are still to come.
                                       Disabled rather than absent so the column is already the
                                       width it will keep.
                                     -->
@@ -195,7 +197,7 @@
 
             <Empty.Content>
                 <div class="flex flex-row items-center gap-2">
-                    <Button class="w-fit" disabled>
+                    <Button class="w-fit" onclick={() => (showNewKnowledgeDialog = true)}>
                         <PlusIcon />
                         {$_("settings.knowledge.add")}
                     </Button>
@@ -204,3 +206,6 @@
         </Empty.Root>
     {/if}
 </div>
+
+<!-- The dialog does not know about this list, so it says it wrote something and this re-reads. -->
+<NewKnowledgeDialog bind:open={showNewKnowledgeDialog} onCreated={load} />

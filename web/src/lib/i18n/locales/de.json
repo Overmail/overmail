@@ -283,6 +283,27 @@
       "empty": {
         "title": "Kein Wissen",
         "description": "Der Agent lernt über dich anhand deiner E-Mails, um sie besser zu verstehen."
+      },
+      "new": {
+        "title": "Wissen hinzufügen",
+        "description": "Etwas über dich, das der Assistent beim Lesen deiner E-Mails berücksichtigen soll.",
+        "name": "Name",
+        "namePlaceholder": "Stromvertrag",
+        "nameTaken": "Es gibt bereits einen Eintrag mit diesem Namen.",
+        "text": "Was bekannt ist",
+        "textPlaceholder": "Ich bin bei Rheinenergie und zahle monatlich per Lastschrift.",
+        "textHint": "Schreib es so, wie du es jemandem erzählen würdest, der deine Post sortiert.",
+        "keywords": "Schlagwörter",
+        "keywordsPlaceholder": "Schlagwort eingeben und Enter drücken",
+        "keywordsHint": "Damit findet der Assistent diesen Eintrag beim Sortieren einer E-Mail wieder.",
+        "keywordsFull": "Mehr Schlagwörter behält ein Eintrag nicht.",
+        "removeKeyword": "Schlagwort {keyword} entfernen",
+        "relevantOn": "Relevant am",
+        "relevantOnHint": "Optional, für Einträge zu einem einzelnen Tag – eine Frist, ein Umzug.",
+        "saving": "Wird gespeichert …",
+        "failed": "Der Eintrag konnte nicht gespeichert werden.",
+        "cancel": "Abbrechen",
+        "submit": "Hinzufügen"
       }
     }
   },

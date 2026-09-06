@@ -21,6 +21,7 @@ import es.jvbabi.overmail.server.http.senders.sendersByIds
 import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
@@ -150,6 +151,11 @@ internal fun Application.configureRouting() {
                                 route("/stream") {
                                     streamInboxFolders()
                                 }
+                            }
+
+                            // The only step of the dialog that writes anything.
+                            route("/submit") {
+                                inboxSubmitRoute()
                             }
 
                             // What the "new inbox" dialog checks a half-filled form against, before

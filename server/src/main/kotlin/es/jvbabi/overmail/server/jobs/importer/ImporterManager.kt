@@ -31,9 +31,26 @@ class ImporterManager(
         }
     }
 
-    private fun reconcile(accounts: List<ImapConnection>) {
+    /**
+     * Starts the importer for [accountId] again, whatever state it was in.
+     *
+     * What a freshly submitted or re-configured account goes through, instead of waiting out
+     * [RELOAD_INTERVAL] for the next sweep to notice it. Stopping is awaited, so the old importer
+     * is finished before the new one opens a connection to the same mailbox -- two importers on
+     * one account would race each other into duplicate rows.
+     *
+     * An account that is no longer there is stopped and not replaced.
+     */
+    suspend fun reboot(accountId: Uuid) {
+        importer.remove(accountId)?.stop()
+
+        val account = database.query { ImapAccount.findById(accountId)?.toConnection() } ?: return
+        importer[accountId] = startImporter(account)
+    }
+
+    private suspend fun reconcile(accounts: List<ImapConnection>) {
         val currentIds = accounts.map { it.id }.toSet()
-        importer.keys.filterNot { it in currentIds }.forEach { removedId ->
+        importer.keys.filterNot { it in currentIds }.toList().forEach { removedId ->
             importer.remove(removedId)?.stop()
         }
 
@@ -44,19 +61,17 @@ class ImporterManager(
                 existingImporter.stop()
             }
 
-            val newImporter = EmailImporter(
-                database = this.database,
-                account = account,
-                coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
-                emailClassificationQueue = this.emailClassificationQueue,
-                mailNotifier = this.mailNotifier,
-            )
-
-            newImporter.start()
-
-            importer[account.id] = newImporter
+            importer[account.id] = startImporter(account)
         }
     }
+
+    private fun startImporter(account: ImapConnection) = EmailImporter(
+        database = this.database,
+        account = account,
+        coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
+        emailClassificationQueue = this.emailClassificationQueue,
+        mailNotifier = this.mailNotifier,
+    ).also { it.start() }
 }
 
 /** Reads the row into the snapshot the job runs on; only valid inside the transaction. */
@@ -67,4 +82,14 @@ private fun ImapAccount.toConnection() = ImapConnection(
     port = port,
     username = username,
     password = password,
+    // Read here, with the account: the importer outlives this transaction and could not follow
+    // the reference afterwards.
+    folders = folderSyncs.map { sync ->
+        ImapConnection.FolderSync(
+            folder = sync.folder,
+            imapPush = sync.imapPush,
+            aiImport = sync.aiImport,
+            createdAt = sync.createdAt,
+        )
+    },
 )

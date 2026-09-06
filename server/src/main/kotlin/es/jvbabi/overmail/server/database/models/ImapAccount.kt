@@ -22,4 +22,6 @@ class ImapAccount(id: EntityID<Uuid>) : UuidEntity(id) {
     var port by ImapAccounts.port
     var username by ImapAccounts.username
     var password by ImapAccounts.password
+
+    val folderSyncs by ImapAccountFolderSync referrersOn ImapAccountFolderSyncs.imapAccount
 }

@@ -209,6 +209,29 @@ test("a mail whose metadata never arrives does not block the pile", async () => 
     expect(viewModel.currentEmailId).toBe("m-2");
 });
 
+test("only the mails that are still coming count as on their way", async () => {
+    const {viewModel, content, pile} = stack();
+
+    pile().deliver({type: "data.emails", email_ids: ["m-1", "gone", "filed"]});
+    await settle();
+
+    // The bodies are here, the metadata of all three is still out.
+    expect(viewModel.onTheirWay).toBe(3);
+
+    content().deliver({type: "data.emails.unknown", ids: ["gone"]});
+    content().deliver({
+        type: "data.emails",
+        emails: [wireMail("m-1"), wireMail("filed", "spam")],
+    });
+    await settle();
+
+    // One card and nothing left to wait for: the mail the server does not know is not coming,
+    // and the one the agent filed is not a card. The stack holds its intro on this count, so a
+    // mail that never arrives may not keep it up.
+    expect(viewModel.emails.map((email) => email.id)).toEqual(["m-1"]);
+    expect(viewModel.onTheirWay).toBe(0);
+});
+
 test("disposing lets go of every mail", async () => {
     const {viewModel, content, serve} = stack();
 

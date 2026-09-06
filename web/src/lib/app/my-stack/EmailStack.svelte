@@ -2,16 +2,20 @@
     import EmailCard from "$lib/app/my-stack/EmailCard.svelte";
     import {cn} from "$lib/utils.js";
     import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import {StackIntro} from "$lib/app/my-stack/stackIntro.svelte";
 
     let {
         emails,
         currentEmailId,
+        onTheirWay,
         onRequestReclassify,
         class: className,
     }: {
         /** Newest first: `emails[0]` is the card on top. */
         emails: StackEmail[];
         currentEmailId: string | null;
+        /** How many mails of the pile are still on their way; see [StackIntro]. */
+        onTheirWay: number;
         onRequestReclassify: (email: StackEmail) => Promise<boolean>;
         class?: string;
     } = $props();
@@ -25,57 +29,18 @@
     /** Long enough for the last sheet to have landed, including its stagger. */
     const INTRO_DURATION = 1200;
 
-    /**
-     * The mails whose card is laid out and may be shown. A card is held back until then: the body
-     * is an iframe and an iframe has no height before it has measured itself, so a mail that goes
-     * up right away is a header that then grows a body under the reader -- and the stack would
-     * fan out a batch of cards that are still empty.
-     */
-    let readyIds = $state(new Set<string>());
+    /** How long the fan waits for the rest of the first batch; see [StackIntro]. */
+    const INTRO_WAIT = 2500;
 
-    function onCardReady(id: string) {
-        if (readyIds.has(id)) return;
-
-        readyIds = new Set(readyIds).add(id);
-    }
-
-    /**
-     * The mails of the very first batch, which are the ones that get laid down. The set empties
-     * again once the animation is over, so a card that only scrolls into the rendered window
-     * later -- a mail from the first batch that was too deep to be mounted, or a mail from a
-     * later batch -- appears in the pile instead of being dealt onto it a second time.
-     */
-    let introIds = $state(new Set<string>());
-    /** Whether the fan has been let go, which is what starts the animation. */
-    let laidDown = $state(false);
-    let introStarted = false;
+    /** Which cards the fan is made of, and when they are shown and dealt. */
+    const intro = new StackIntro({size: MAX_DEPTH + 1, wait: INTRO_WAIT, duration: INTRO_DURATION});
 
     $effect(() => {
-        if (introStarted || emails.length === 0) return;
-        introStarted = true;
-
-        introIds = new Set(emails.slice(0, MAX_DEPTH + 1).map((email) => email.id));
+        intro.observe(emails.map((email) => email.id), onTheirWay);
     });
 
-    // The whole batch goes down together, so it waits for the slowest body of the batch. Nothing
-    // guards against that never happening, because the card reports itself ready on a timeout
-    // rather than leaving the stack hanging on a mail that will not lay out.
-    $effect(() => {
-        if (laidDown || introIds.size === 0) return;
-
-        for (const id of introIds) {
-            if (!readyIds.has(id)) return;
-        }
-
-        laidDown = true;
-    });
-
-    $effect(() => {
-        if (!laidDown || introIds.size === 0) return;
-
-        const timer = setTimeout(() => (introIds = new Set()), INTRO_DURATION);
-        return () => clearTimeout(timer);
-    });
+    // Only the timers it has running; the fan itself goes with the component.
+    $effect(() => () => intro.dispose());
 
     /**
      * Where a card of the first batch comes in from: the fan is pushed in from below the window,
@@ -155,18 +120,17 @@
                 const depth = Math.max(position, 0);
 
                 const gone = position < 0 ? exit(email, -position) : null;
+                const {shown, dealt} = intro.card(id);
                 // Null until the fan is let go, so a card that is only waiting for the rest of
                 // the batch carries no animation at all.
-                const lay = introIds.has(id) && laidDown ? laid(id, depth) : null;
+                const lay = dealt ? laid(id, depth) : null;
 
                 return {
                     id,
                     email,
                     active,
                     lay,
-                    // A card of the first batch is part of the fan and appears with it, not
-                    // before: the batch is one movement, not five cards popping in.
-                    shown: readyIds.has(id) && (laidDown || !introIds.has(id)),
+                    shown,
                     // The current card stays straight where the box already is; everything below
                     // it drifts. Nothing here centres the card -- that is the layout's job, see
                     // the wrapper below, and a transform doing it as well would put every card's
@@ -258,7 +222,7 @@
                     <EmailCard
                             {...email}
                             onRequestReclassify={() => onRequestReclassify(email)}
-                            onReady={() => onCardReady(id)}
+                            onReady={() => intro.onReady(id)}
                     />
                     <div
                             class="pointer-events-none absolute inset-0 rounded-2xl bg-background transition-opacity duration-500 motion-reduce:transition-none"

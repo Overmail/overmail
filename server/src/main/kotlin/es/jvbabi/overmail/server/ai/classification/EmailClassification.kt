@@ -29,6 +29,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.lowerCase
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.slf4j.LoggerFactory
 import kotlin.time.Clock
 
 class EmailClassification(
@@ -39,6 +40,8 @@ class EmailClassification(
     /** The same knowledge the chat agent reads and writes; see [KnowledgeStore]. */
     private val knowledgeStore: KnowledgeStore,
 ) {
+
+    private val logger = LoggerFactory.getLogger(EmailClassification::class.java)
 
     private val promptExecutor = MultiLLMPromptExecutor(
         OpenAILLMClient(
@@ -51,6 +54,9 @@ class EmailClassification(
 
 
     suspend fun run(email: Email) {
+        val emailId = email.id.value
+        logger.info("Classifying email $emailId")
+
         val user = overmailDatabase.query { email.imapAccount.user }
 
         // Opened before and closed after the actual work (in the finally below), so every exit
@@ -72,17 +78,37 @@ class EmailClassification(
             response.message.metaInfo.outputTokensCount?.let { totalTokensOut = (totalTokensOut ?: 0) + it }
         }
 
+        // Two destinations, two levels of detail. The persisted event keeps every message whole
+        // -- prompts, raw responses, stack traces -- because that is what somebody reading up on
+        // a single classification wants. The console gets the shape of the run instead: which
+        // mail started, which one finished, and one line per stage in between.
         val logBuilder = StringBuilder()
+        fun record(message: String) = logBuilder.appendLine("[${Clock.System.now()}] $message")
+
         fun log(message: String) {
-            println(message)
-            logBuilder.appendLine("[${Clock.System.now()}] $message")
+            record(message)
+            logger.debug("Email $emailId: ${message.asOneLine()}")
+        }
+
+        // A stage that gave up returns rather than throws, so this is what tells the end of the
+        // run apart from a clean one -- without it every abandoned classification would still
+        // report itself as finished.
+        var failed = false
+
+        fun fail(message: String, cause: Throwable?) {
+            failed = true
+            record("$message: ${cause?.stackTraceToString() ?: "No exception details available."}")
+            logger.warn("Email $emailId: $message${cause?.let { " ($it)" }.orEmpty()}")
         }
 
         try {
-            classify(email, user, ::recordUsage, ::log)
+            classify(email, user, ::recordUsage, ::log, ::fail)
+            if (!failed) logger.info("Finished classifying email $emailId")
         } catch (exception: Exception) {
-            // Logged so the crash shows up in the persisted event, not just on stdout.
-            log("Unexpected error during classification: ${exception.stackTraceToString()}")
+            // The stack trace goes into the persisted event, so the crash is still readable
+            // afterwards; the console only needs to know which mail stopped and why.
+            record("Unexpected error during classification: ${exception.stackTraceToString()}")
+            logger.error("Classifying email $emailId failed: $exception")
             throw exception
         } finally {
             overmailDatabase.query {
@@ -98,7 +124,10 @@ class EmailClassification(
         email: Email,
         user: User,
         recordUsage: (StructuredResponse<*>) -> Unit,
+        /** One stage, one line. See the two of them in [run]. */
         log: (String) -> Unit,
+        /** A stage that could not finish. Warns on the console, keeps the stack trace in the event. */
+        fail: (String, Throwable?) -> Unit,
     ) {
         // Searched with what the mail itself offers -- who it is from, what it is about -- rather
         // than loaded whole: a mailbox collects hundreds of entries and only the ones this mail
@@ -144,7 +173,7 @@ class EmailClassification(
             }
         }
 
-        log("Classifying email ID: ${email.id} (${email.subject})")
+        log("Subject: ${email.subject}")
         log("Base prompt:\n" + basePrompt.messages.joinToString("\n") { "[${it.role}] ${it.textContent()}" })
 
         val firstLookRequest = "Analyze the email above and provide the requested classification."
@@ -158,8 +187,7 @@ class EmailClassification(
         )
 
         if (emailFirstLookResult.isFailure) {
-            log("Failed to classify email origin for email ID: ${email.id}")
-            log(emailFirstLookResult.exceptionOrNull()?.stackTraceToString() ?: "No exception details available.")
+            fail("Failed to classify email origin", emailFirstLookResult.exceptionOrNull())
             return
         }
 
@@ -219,8 +247,7 @@ class EmailClassification(
         )
 
         if (finalizedClassificationResult.isFailure) {
-            log("Failed to finalize email classification for email ID: ${email.id}")
-            log(finalizedClassificationResult.exceptionOrNull()?.stackTraceToString() ?: "No exception details available.")
+            fail("Failed to finalize the classification", finalizedClassificationResult.exceptionOrNull())
             return
         }
 
@@ -351,6 +378,18 @@ class EmailClassification(
         }
     }
 
+    /**
+     * One console line out of a stage message. Prompts and raw model responses run over dozens of
+     * lines and thousands of characters, which is what used to make a single classification fill
+     * the log -- collapsed and cut here, kept whole in the classification event.
+     */
+    private fun String.asOneLine(): String {
+        val collapsed = lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+        if (collapsed.length <= MAX_CONSOLE_MESSAGE_LENGTH) return collapsed
+        return collapsed.take(MAX_CONSOLE_MESSAGE_LENGTH) +
+                "... (${collapsed.length - MAX_CONSOLE_MESSAGE_LENGTH} more, see the classification event)"
+    }
+
     companion object {
         /**
          * How many entries of what is known go into a classification prompt. Enough for the
@@ -358,6 +397,9 @@ class EmailClassification(
          * to classify in it as well.
          */
         private const val MAX_KNOWLEDGE_IN_PROMPT = 6
+
+        /** How much of a stage message fits on one console line, see [asOneLine]. */
+        private const val MAX_CONSOLE_MESSAGE_LENGTH = 200
     }
 }
 

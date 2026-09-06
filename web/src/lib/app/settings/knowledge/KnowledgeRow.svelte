@@ -53,6 +53,19 @@
     /** Which cell is open for typing. The keyword field keeps its own, in [InlineKeywords]. */
     let openField: "name" | "description" | null = $state(null);
 
+    /**
+     * Opens a cell for typing, unless another one is still standing.
+     *
+     * Only one field is open at a time, and switching would throw away what is in the one being
+     * left -- which the editors deliberately do not do on blur either (see [InlineTextEdit]: a
+     * click elsewhere is neither "save" nor "discard"). An editor nobody typed in closes itself on
+     * that blur, so the ordinary case still opens on the first double-click.
+     */
+    function openEditor(field: "name" | "description") {
+        if (openField !== null) return;
+        openField = field;
+    }
+
     // A virtualizer may hand this component the next entry rather than building a new row, and an
     // editor left standing would then be writing into somebody else's entry. Only a different
     // entry closes it: the same one arriving again is this row's own save coming back.
@@ -142,6 +155,13 @@
       Pinned while the rest scrolls sideways, like the username in the mailbox table: the name is
       what says which row is which, and a row identified by nothing is not a row.
     -->
+    <!--
+      The double-click is on the cell, not on the text in it: the cell is what a pointer aims at,
+      and a click that lands next to the name -- on the date under it, on the padding around it --
+      meant the same thing. The keyboard way in stays on the name itself, which is what focus can
+      reach.
+    -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <Table.Cell
             class={cn(
                 "bg-popover group-hover/row:bg-muted sticky left-0 z-10 font-medium",
@@ -149,6 +169,7 @@
                 PINNED_LEFT_EDGE,
                 pinned && PINNED_LEFT_EDGE_ON,
             )}
+            ondblclick={() => openEditor("name")}
     >
         <div class="flex flex-col gap-0.5">
             {#if openField === "name"}
@@ -163,21 +184,16 @@
                 />
             {:else}
                 <div class="flex flex-row items-center gap-1.5">
-                    <!--
-                      The handler sits on the name and not on the cell, so double-clicking the
-                      date under it or the marker next to it does not open an editor.
-                    -->
                     <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
                     <span
                             role="button"
                             tabindex="0"
                             class="focus-visible:ring-ring/50 rounded-sm outline-none focus-visible:ring-2"
                             title={$_("settings.knowledge.inline.hint")}
-                            ondblclick={() => (openField = "name")}
                             onkeydown={(event) => {
                                 if (!startsEditing(event)) return;
                                 event.preventDefault();
-                                openField = "name";
+                                openEditor("name");
                             }}
                     >{entry.name}</span>
                     {#if entry.createdByAgent}
@@ -210,7 +226,11 @@
         </div>
     </Table.Cell>
 
-    <Table.Cell class="text-muted-foreground min-w-64 whitespace-normal">
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <Table.Cell
+            class="text-muted-foreground min-w-64 whitespace-normal"
+            ondblclick={() => openEditor("description")}
+    >
         {#if openField === "description"}
             <InlineTextEdit
                     multiline
@@ -230,11 +250,10 @@
                     tabindex="0"
                     class="focus-visible:ring-ring/50 line-clamp-2 rounded-sm outline-none focus-visible:ring-2"
                     title={$_("settings.knowledge.inline.hint")}
-                    ondblclick={() => (openField = "description")}
                     onkeydown={(event) => {
                         if (!startsEditing(event)) return;
                         event.preventDefault();
-                        openField = "description";
+                        openEditor("description");
                     }}
             >{entry.description}</span>
         {/if}

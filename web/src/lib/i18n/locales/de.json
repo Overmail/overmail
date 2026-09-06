@@ -167,6 +167,7 @@
   },
   "share": {
     "notice": "Diese E-Mail wurde mit dir geteilt.",
+    "noticeBy": "{name} hat diese E-Mail mit dir geteilt.",
     "loading": "E-Mail wird geladen…",
     "sender": "Von {sender}",
     "locked": {

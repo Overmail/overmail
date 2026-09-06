@@ -18,13 +18,16 @@ const METADATA = {
     labels: [],
 };
 
+const SHARED_BY = {firstname: "Julius", lastname: "Babies"};
+
 const OPEN: SharedEmail = {
     needsPassword: false,
+    sharedBy: SHARED_BY,
     metadata: METADATA,
     content: {text: "Hallo", html: "<p>Hallo</p>"},
 };
 
-const LOCKED: SharedEmail = {needsPassword: true, metadata: METADATA, content: null};
+const LOCKED: SharedEmail = {needsPassword: true, sharedBy: SHARED_BY, metadata: METADATA, content: null};
 
 /** A page whose link the test answers for. */
 function page(overrides: Partial<SharedEmailRepository> = {}) {

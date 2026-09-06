@@ -68,6 +68,11 @@ class ShareViewTest {
         assertEquals("The Sender", metadata["sender_name"]!!.jsonPrimitive.content)
         assertEquals("<p>Hallo</p>", body["content"]!!.jsonObject["html"]!!.jsonPrimitive.content)
 
+        // Who handed the link out: the owner of the mail, on every answer this route gives.
+        val sharedBy = body["shared_by"]!!.jsonObject
+        assertEquals("Julius", sharedBy["firstname"]!!.jsonPrimitive.content)
+        assertEquals("Babies", sharedBy["lastname"]!!.jsonPrimitive.content)
+
         // The url a reader sees carries the id without its hyphens, so that has to answer too.
         val bare = client.get("/api/shares/${share.toString().replace("-", "")}")
         assertEquals(HttpStatusCode.OK, bare.status)
@@ -145,6 +150,9 @@ class ShareViewTest {
         assertEquals(JsonNull, body["metadata"])
         assertEquals(JsonNull, body["content"])
         assertFalse(response.bodyAsText().contains("Die Rechnung"))
+        // The name stays: a visitor at a password field wants to know whose link this is, and
+        // that says nothing about the mail behind it.
+        assertEquals("Julius", body["shared_by"]!!.jsonObject["firstname"]!!.jsonPrimitive.content)
     }
 
     @Test

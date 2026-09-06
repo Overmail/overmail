@@ -22,10 +22,21 @@ export type SharedEmailContent = {
     html: string | null;
 };
 
+/** Who handed the link out -- the owner of the mail. */
+export type SharedBy = {
+    firstname: string;
+    lastname: string;
+};
+
 /** A shared mail as much as the link hands out right now. */
 export type SharedEmail = {
     /** Whether the mail is behind a password the visitor has not typed yet. */
     needsPassword: boolean;
+    /**
+     * Who shared it. Here even while the share is locked: it is what tells a visitor at a
+     * password field that this is the link they were promised.
+     */
+    sharedBy: SharedBy | null;
     /** Null where the share keeps even the subject behind its password. */
     metadata: SharedEmailMetadata | null;
     /** Null until the share is open. */
@@ -96,9 +107,16 @@ export class SharedEmailRepository {
 function toShared(shared: any): SharedEmail {
     const metadata = shared.metadata;
     const content = shared.content;
+    const sharedBy = shared.shared_by;
 
     return {
         needsPassword: (shared.needs_password ?? false) as boolean,
+        sharedBy: sharedBy
+            ? {
+                  firstname: (sharedBy.firstname ?? "") as string,
+                  lastname: (sharedBy.lastname ?? "") as string,
+              }
+            : null,
         metadata: metadata
             ? {
                   subject: (metadata.subject ?? "") as string,

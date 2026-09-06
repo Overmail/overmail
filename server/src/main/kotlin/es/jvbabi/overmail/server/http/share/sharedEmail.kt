@@ -3,8 +3,10 @@ package es.jvbabi.overmail.server.http.share
 import es.jvbabi.overmail.server.database.models.EmailLabels
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
+import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.Shares
+import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.http.api.ApiErrorCode
 import es.jvbabi.overmail.server.http.api.ApiException
 import es.jvbabi.overmail.server.http.api.database
@@ -34,6 +36,14 @@ data class SharedEmailResponse(
     /** Whether the mail itself is behind a password the visitor has not typed yet. */
     @SerialName("needs_password") val needsPassword: Boolean,
     /**
+     * Who handed the link out.
+     *
+     * Here even while the share is locked, and on purpose: the one thing a visitor staring at a
+     * password field wants to know is whether this is the link they were promised, and a name
+     * answers that. It says nothing about the mail, which is what the password guards.
+     */
+    @SerialName("shared_by") val sharedBy: SharedBy,
+    /**
      * Who wrote it, when, and about what.
      *
      * Null where the share keeps even that behind its password -- the page then has nothing to
@@ -43,6 +53,12 @@ data class SharedEmailResponse(
     /** The mail itself. Only ever here once the share is open. */
     @SerialName("content") val content: Content?,
 ) {
+    @Serializable
+    data class SharedBy(
+        @SerialName("firstname") val firstname: String,
+        @SerialName("lastname") val lastname: String,
+    )
+
     @Serializable
     data class Metadata(
         @SerialName("subject") val subject: String,
@@ -74,6 +90,8 @@ internal data class SharedLink(
     val includeLabels: Boolean,
     val passwordHash: String?,
     val allowMetadataWithoutPassword: Boolean,
+    /** The owner of the mail, which is who made the link. Read with the share, in one query. */
+    val sharedBy: SharedEmailResponse.SharedBy,
 )
 
 /**
@@ -93,8 +111,21 @@ internal suspend fun ApplicationCall.requireLiveShareFromUrl(): SharedLink {
         ?: runCatching { Uuid.parseHex(raw) }.getOrNull()
         ?: notFound("share", raw)
 
+    // Joined out to the owner: whose link this is comes from the account the mail was imported
+    // through, the same chain `ownerOfEmail` walks, and the page says the name on every state.
     val share = database().query {
-        Shares.selectAll().where { Shares.id eq id }.singleOrNull()
+        (Shares innerJoin Emails innerJoin ImapAccounts innerJoin Users)
+            .select(
+                Shares.email,
+                Shares.includeLabels,
+                Shares.passwordHash,
+                Shares.allowMetadataWithoutPassword,
+                Shares.validUntil,
+                Users.firstname,
+                Users.lastname,
+            )
+            .where { Shares.id eq id }
+            .singleOrNull()
     } ?: notFound("share", raw)
 
     val validUntil = share[Shares.validUntil]
@@ -112,6 +143,10 @@ internal suspend fun ApplicationCall.requireLiveShareFromUrl(): SharedLink {
         includeLabels = share[Shares.includeLabels],
         passwordHash = share[Shares.passwordHash],
         allowMetadataWithoutPassword = share[Shares.allowMetadataWithoutPassword],
+        sharedBy = SharedEmailResponse.SharedBy(
+            firstname = share[Users.firstname],
+            lastname = share[Users.lastname],
+        ),
     )
 }
 
@@ -123,7 +158,14 @@ internal suspend fun ApplicationCall.requireLiveShareFromUrl(): SharedLink {
  */
 internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked: Boolean): SharedEmailResponse {
     val showMetadata = unlocked || share.allowMetadataWithoutPassword
-    if (!showMetadata) return SharedEmailResponse(needsPassword = true, metadata = null, content = null)
+    if (!showMetadata) {
+        return SharedEmailResponse(
+            needsPassword = true,
+            sharedBy = share.sharedBy,
+            metadata = null,
+            content = null,
+        )
+    }
 
     return database().query {
         val row = (Emails innerJoin EmailUsers)
@@ -141,6 +183,7 @@ internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked
 
         SharedEmailResponse(
             needsPassword = !unlocked,
+            sharedBy = share.sharedBy,
             metadata = SharedEmailResponse.Metadata(
                 subject = row[Emails.subject],
                 senderName = row[Emails.senderName],

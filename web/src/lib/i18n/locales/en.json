@@ -167,6 +167,7 @@
   },
   "share": {
     "notice": "This email was shared with you.",
+    "noticeBy": "{name} shared this email with you.",
     "loading": "Reading the email…",
     "sender": "From {sender}",
     "locked": {

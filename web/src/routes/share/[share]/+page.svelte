@@ -41,6 +41,20 @@
     });
 
     const state = $derived(viewModel?.state ?? {type: "missing" as const});
+
+    /**
+     * Who handed the link out, as their name reads.
+     *
+     * Null before the first answer and for a link that is a dead end -- there is nobody to name
+     * then, and the pill falls back to saying only that this is a shared mail.
+     */
+    const sharedBy = $derived.by(() => {
+        const who = viewModel?.shared?.sharedBy;
+        if (!who) return null;
+
+        const name = `${who.firstname} ${who.lastname}`.trim();
+        return name.length > 0 ? name : null;
+    });
 </script>
 
 <svelte:head>
@@ -52,10 +66,19 @@
 <div class="bg-muted/30 flex min-h-svh w-full flex-col">
     <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8 sm:py-12">
         <!-- A pill rather than a line of grey text: it is a note about the page, not the first
-             line of the mail, and it should not read as one. -->
+             line of the mail, and it should not read as one.
+
+             With the name in it wherever there is one, locked shares included: it is what tells a
+             visitor at a password field that this is the link they were promised. -->
         <div class="text-muted-foreground bg-background flex w-fit flex-row items-center gap-2 rounded-full border py-1 ps-2.5 pe-3 text-xs">
             <ShareNetworkIcon class="size-3.5 shrink-0" />
-            <span>{$_("share.notice")}</span>
+            <span>
+                {#if sharedBy}
+                    {$_("share.noticeBy", {values: {name: sharedBy}})}
+                {:else}
+                    {$_("share.notice")}
+                {/if}
+            </span>
         </div>
 
         <!-- The mail on a surface of its own, so the page reads as "here is a mail" rather than

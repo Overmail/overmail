@@ -586,3 +586,138 @@ test("a failed submit keeps the form; a reset empties it", async () => {
     expect(viewModel.folders).toEqual([]);
     expect(viewModel.submitState).toEqual({type: "idle"});
 });
+
+/** The same form, opened on a mailbox that exists. */
+function editing(options: {
+    folders?: () => AsyncGenerator<FolderStreamEvent>;
+    save?: () => Promise<{type: "created"; id: string} | {type: "conflict"}>;
+} = {}) {
+    // Typed, so `mock.calls[0]` is the argument tuple rather than an empty one -- the inbox id
+    // in the last position is the whole point of these tests.
+    const login = mock(
+        async (
+            _host: string,
+            _port: number,
+            _username: string,
+            _password: string,
+            _signal?: AbortSignal,
+            _inboxId?: string,
+        ) => AUTHENTICATED,
+    );
+    const streamFolders = mock(async function* (
+        _host: string,
+        _port: number,
+        _username: string,
+        _password: string,
+        _signal?: AbortSignal,
+        _inboxId?: string,
+    ): AsyncGenerator<FolderStreamEvent> {
+        yield* options.folders?.() ?? (async function* () {
+            yield TREE;
+            yield {type: "done"} as const;
+        })();
+    });
+    const save = mock(
+        async (_imap: InboxConnection, _folders: SubmitInboxFolder[]) =>
+            (options.save ? await options.save() : ({type: "created", id: "acc-1"} as const)),
+    );
+    const repository = {
+        testImapHost: mock(async () => REACHABLE),
+        testImapLogin: login,
+        streamFolders,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository, {inboxId: "acc-1", save});
+    return {viewModel, login, streamFolders, save};
+}
+
+const STORED = {
+    id: "acc-1",
+    host: "imap.example.com",
+    port: 993,
+    username: "julius",
+    isPaused: false,
+    folders: [
+        {folderName: "Archiv.Newsletter", imapPush: true, aiImport: {type: "all_messages"}},
+        {folderName: "Trash", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
+    ],
+};
+
+test("opening on a mailbox fills the connection in and leaves the password empty", async () => {
+    const {viewModel} = editing();
+
+    viewModel.prefill(STORED as never);
+
+    expect(viewModel.host).toBe("imap.example.com");
+    expect(viewModel.port).toBe(993);
+    expect(viewModel.username).toBe("julius");
+    // The server never hands one out, and empty means "unchanged" everywhere it is sent.
+    expect(viewModel.password).toBe("");
+    expect(viewModel.isEditing).toBe(true);
+});
+
+test("an empty password is still checked when editing, and is not when creating", async () => {
+    const edit = editing();
+    edit.viewModel.prefill(STORED as never);
+    await tick(1100);
+    expect(edit.login).toHaveBeenCalledTimes(1);
+    // The inbox id is what lets the server fill the stored password in.
+    expect(edit.login.mock.calls[0][5]).toBe("acc-1");
+    expect(edit.viewModel.imapLoginTest).toEqual({type: "authenticated"});
+
+    const {repository, login} = walkingThrough();
+    const create = new NewEmailAccountViewModel(repository);
+    create.setHost("imap.example.com");
+    create.setUsername("julius");
+    await tick(1100);
+    expect(login).toHaveBeenCalledTimes(0);
+});
+
+test("the folder table opens on what the mailbox is configured with", async () => {
+    const {viewModel, streamFolders} = editing();
+    viewModel.prefill(STORED as never);
+    await tick(1100);
+    viewModel.goTo("folders");
+    await tick(60);
+
+    // The scan goes to the route for this mailbox, not the setup one.
+    expect(streamFolders.mock.calls[0][5]).toBe("acc-1");
+
+    const byName = Object.fromEntries(viewModel.folders.map((f) => [f.fullName, f]));
+    // Configured folders open on their settings...
+    expect(byName["Archiv.Newsletter"].enabled).toBe(true);
+    expect(byName["Archiv.Newsletter"].realtime).toBe(true);
+    expect(byName["Archiv.Newsletter"].aiProcessing).toEqual({type: "all"});
+    expect(byName["Trash"].enabled).toBe(true);
+    expect(byName["Trash"].aiProcessing.type).toBe("since");
+    // ...and one that has appeared since is off, like any folder nobody picked.
+    expect(byName["INBOX"].enabled).toBe(false);
+    expect(byName["Archiv"].enabled).toBe(false);
+});
+
+test("saving an edit writes to the mailbox instead of creating a second one", async () => {
+    const {viewModel, save} = editing();
+    viewModel.prefill(STORED as never);
+    await tick(1100);
+    viewModel.goTo("folders");
+    await tick(60);
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    const [imap, folders] = save.mock.calls[0];
+    expect(imap).toEqual({host: "imap.example.com", port: 993, username: "julius", password: ""});
+    // Only what is kept, and the settings it was opened on.
+    expect(folders.map((f) => f.folderName).sort()).toEqual(["Archiv.Newsletter", "Trash"]);
+});
+
+test("a mailbox the edit would collide with is reported, not thrown", async () => {
+    const {viewModel} = editing({save: async () => ({type: "conflict"}) as const});
+    viewModel.prefill(STORED as never);
+    await tick(1100);
+    viewModel.goTo("folders");
+    await tick(60);
+
+    expect(await viewModel.submitInbox()).toBe(false);
+    expect(viewModel.submitState).toEqual({type: "conflict"});
+});

@@ -7,7 +7,14 @@
     import {CheckCircleIcon, WarningCircleIcon, WarningIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
 
-    let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
+    let {
+        viewModel,
+        passwordPlaceholder = "",
+    }: {
+        viewModel: NewEmailAccountViewModel,
+        /** What an empty password field means. Only an edit screen has anything to say here. */
+        passwordPlaceholder?: string,
+    } = $props();
 
     const id = $props.id();
     const test = $derived(viewModel.imapLoginTest);
@@ -73,6 +80,7 @@
                     id={"imap-password-" + id}
                     type="password"
                     autocomplete="current-password"
+                    placeholder={passwordPlaceholder}
                     bind:value={() => viewModel.password, (password: string) => viewModel.setPassword(password)}
             />
         </Field.Field>

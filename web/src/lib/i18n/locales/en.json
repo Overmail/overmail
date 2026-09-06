@@ -240,6 +240,19 @@
             "failed": "The inbox could not be created."
           }
         }
+      },
+      "edit": {
+        "title": "Edit connection",
+        "description": "Everything is checked as you change it. Leave the password blank to keep the current one.",
+        "server": "Mail server",
+        "credentials": "Sign-in",
+        "folders": "Folders",
+        "passwordPlaceholder": "Unchanged",
+        "save": "Save",
+        "saving": "Saving…",
+        "loadFailed": "This mailbox could not be read.",
+        "conflict": "You already have a connection to that mailbox.",
+        "failed": "The changes could not be saved."
       }
     }
   },

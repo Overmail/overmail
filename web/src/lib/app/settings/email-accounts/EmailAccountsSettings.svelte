@@ -15,6 +15,7 @@
     } from "phosphor-svelte";
     import NewEmailAccountDialog from "$lib/app/settings/email-accounts/new/NewEmailAccountDialog.svelte";
     import DeleteInboxDialog from "$lib/app/settings/email-accounts/DeleteInboxDialog.svelte";
+    import EditEmailAccountDialog from "$lib/app/settings/email-accounts/EditEmailAccountDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
     import {cn} from "$lib/utils";
@@ -25,6 +26,8 @@
     let showNewEmailAccountDialog = $state(false);
     /** The mailbox the delete dialog is asking about; null while it is closed. */
     let inboxToDelete: Inbox | null = $state(null);
+    /** The mailbox the edit dialog is open on; null while it is closed. */
+    let inboxToEdit: Inbox | null = $state(null);
     /** Mailboxes whose pause is in flight, so the button cannot be pressed twice. */
     let pausing: string[] = $state([]);
 
@@ -246,13 +249,12 @@
                                             class="relative flex flex-row items-center justify-end gap-1 opacity-0
                                                    transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
                                     >
-                                        <!-- TODO: no editing screen yet, see the note in the PR. -->
                                         <Button
                                                 variant="ghost"
                                                 size="icon-sm"
-                                                disabled
                                                 aria-label={$_("settings.emailAccounts.list.actions.edit")}
                                                 title={$_("settings.emailAccounts.list.actions.edit")}
+                                                onclick={() => (inboxToEdit = inbox)}
                                         >
                                             <PencilSimpleIcon />
                                         </Button>
@@ -330,3 +332,4 @@
 <!-- Neither dialog knows about this list, so each says what it did and this re-reads. -->
 <NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} />
 <DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} onPaused={load} />
+<EditEmailAccountDialog bind:inbox={inboxToEdit} onSaved={load} />

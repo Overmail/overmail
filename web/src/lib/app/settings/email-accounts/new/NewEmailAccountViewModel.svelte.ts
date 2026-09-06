@@ -1,11 +1,27 @@
+import type {InboxDetail, InboxFolderSetting} from "$lib/repository/InboxRepository";
 import type {
     FolderNode,
     ImapHostOutcome,
     ImapLoginOutcome,
     InboxSetupRepository,
+    InboxConnection,
     SubmitInboxFolder,
+    SubmitInboxResult,
     WireAiScope,
 } from "$lib/repository/InboxSetupRepository";
+
+/**
+ * What makes this form edit an inbox rather than create one.
+ *
+ * The two are the same form: the same fields, the same checks against the same server, the same
+ * folder table. Only two things differ, and they are both in here -- the checks go to the routes
+ * for an existing mailbox (which fill in the stored password when none was typed), and saving
+ * writes to it instead of creating a second one.
+ */
+export type InboxEditing = {
+    inboxId: string;
+    save: (imap: InboxConnection, folders: SubmitInboxFolder[]) => Promise<SubmitInboxResult>;
+};
 
 /**
  * How long the form stays quiet before it asks the server.
@@ -149,7 +165,37 @@ export class NewEmailAccountViewModel {
     #hostPending: (() => void) | null = null;
     #loginPending: (() => void) | null = null;
 
-    constructor(private readonly inboxSetup: InboxSetupRepository) {}
+    /** The settings a folder already has, by name. Empty while creating; see [prefill]. */
+    #storedSettings = new Map<string, InboxFolderSetting>();
+
+    constructor(
+        private readonly inboxSetup: InboxSetupRepository,
+        /** Absent while creating. See [InboxEditing]. */
+        private readonly editing?: InboxEditing,
+    ) {}
+
+    /** Whether this form is editing a mailbox that exists rather than creating one. */
+    get isEditing(): boolean {
+        return this.editing !== undefined;
+    }
+
+    /**
+     * Opens the form on a mailbox that exists.
+     *
+     * The password stays empty on purpose: the server never hands one out, and an empty one means
+     * "unchanged" everywhere it is sent. The folder settings are kept aside rather than applied
+     * now -- the rows they belong to do not exist until the scan has read the mailbox.
+     */
+    prefill(detail: InboxDetail) {
+        this.#storedSettings = new Map(detail.folders.map((folder) => [folder.folderName, folder]));
+        this.host = detail.host;
+        this.port = detail.port;
+        this.username = detail.username;
+        this.password = "";
+        this.step = "server";
+        this.#scheduleHostTest();
+        this.#scheduleLoginTest();
+    }
 
     /** The host answered, so the credentials step has something to log in to. */
     canLeaveServerStep = $derived(this.imapServerTest.type === "reachable");
@@ -308,16 +354,16 @@ export class NewEmailAccountViewModel {
         this.submitState = {type: "saving"};
 
         try {
-            const result = await this.inboxSetup.submitInbox(
-                {
-                    host: this.host.trim(),
-                    port: this.port,
-                    username: this.username.trim(),
-                    password: this.password,
-                },
-                this.keptFolders.map(toSubmitFolder),
-                running.signal,
-            );
+            const imap = {
+                host: this.host.trim(),
+                port: this.port,
+                username: this.username.trim(),
+                password: this.password,
+            };
+            const folders = this.keptFolders.map(toSubmitFolder);
+            const result = this.editing
+                ? await this.editing.save(imap, folders)
+                : await this.inboxSetup.submitInbox(imap, folders, running.signal);
             if (running.signal.aborted) return false;
 
             if (result.type === "conflict") {
@@ -437,7 +483,9 @@ export class NewEmailAccountViewModel {
 
         const username = this.username.trim();
         const password = this.password;
-        if (username === "" || password === "") {
+        // Editing: an empty password means the stored one, so there is something to check even
+        // before anything is typed. Creating: there is not.
+        if (username === "" || (password === "" && !this.isEditing)) {
             this.imapLoginTest = {type: "idle"};
             return;
         }
@@ -452,7 +500,14 @@ export class NewEmailAccountViewModel {
         this.imapLoginTest = {type: "testing"};
 
         try {
-            const result = await this.inboxSetup.testImapLogin(host, port, username, password, running.signal);
+            const result = await this.inboxSetup.testImapLogin(
+                host,
+                port,
+                username,
+                password,
+                running.signal,
+                this.editing?.inboxId,
+            );
             if (running.signal.aborted) return;
             this.imapLoginTest = result.authenticated
                 ? {type: "authenticated"}
@@ -485,12 +540,13 @@ export class NewEmailAccountViewModel {
                 this.username.trim(),
                 this.password,
                 running.signal,
+                this.editing?.inboxId,
             )) {
                 if (running.signal.aborted) return;
 
                 switch (event.type) {
                     case "folders":
-                        this.folders = toRows(event.folders);
+                        this.folders = toRows(event.folders, this.#storedSettings);
                         this.folderScan = {type: "counting", counted: 0, total: event.folders.length};
                         break;
 
@@ -569,23 +625,43 @@ function toSubmitFolder(row: FolderRow): SubmitInboxFolder {
     return {folderName: row.fullName, imapPush: row.realtime, aiImport};
 }
 
-function toRows(folders: FolderNode[]): FolderRow[] {
+function toRows(folders: FolderNode[], stored: Map<string, InboxFolderSetting>): FolderRow[] {
     const parentOf = (folder: FolderNode) =>
         folder.path.length > 1 ? folder.path.slice(0, -1).join(folder.delimiter) : null;
     const parents = new Set(folders.map(parentOf).filter((name): name is string => name !== null));
 
-    return folders.map((folder) => ({
-        fullName: folder.fullName,
-        name: folder.name,
-        depth: folder.path.length - 1,
-        parentFullName: parentOf(folder),
-        specialType: folder.specialType,
-        hasChildren: parents.has(folder.fullName),
-        enabled: folder.specialType === "INBOX",
-        realtime: folder.specialType === "INBOX",
-        mailCount: null,
-        oldestMailAt: null,
-        counted: false,
-        aiProcessing: {type: "new_only"},
-    }));
+    return folders.map((folder) => {
+        // A folder that is already configured opens on what it is set to; one that has appeared in
+        // the mailbox since is off, like any folder nobody has picked.
+        const settings = stored.get(folder.fullName);
+        return {
+            fullName: folder.fullName,
+            name: folder.name,
+            depth: folder.path.length - 1,
+            parentFullName: parentOf(folder),
+            specialType: folder.specialType,
+            hasChildren: parents.has(folder.fullName),
+            enabled: settings !== undefined || (stored.size === 0 && folder.specialType === "INBOX"),
+            realtime: settings?.imapPush ?? (stored.size === 0 && folder.specialType === "INBOX"),
+            mailCount: null,
+            oldestMailAt: null,
+            counted: false,
+            aiProcessing: settings ? fromWire(settings.aiImport) : {type: "new_only"},
+        };
+    });
+}
+
+/** The stored scope as the table holds it. `newest_messages` never survives storage. */
+function fromWire(scope: WireAiScope): AiProcessingMode {
+    if (scope.type === "all_messages") return {type: "all"};
+    if (scope.type === "after_date" && typeof scope.timestamp === "number") {
+        const date = new Date(scope.timestamp * 1000);
+        const iso = [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0"),
+            String(date.getDate()).padStart(2, "0"),
+        ].join("-");
+        return {type: "since", date: iso};
+    }
+    return {type: "new_only"};
 }

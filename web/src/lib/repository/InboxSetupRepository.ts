@@ -155,8 +155,10 @@ export class InboxSetupRepository {
         username: string,
         password: string,
         signal?: AbortSignal,
+        /** An existing mailbox, when the form is editing one: see [inboxEndpoint]. */
+        inboxId?: string,
     ): Promise<ImapLoginTest> {
-        const response = await fetch(TEST_IMAP_LOGIN_ENDPOINT, {
+        const response = await fetch(inboxEndpoint(inboxId, "test/imap-login", TEST_IMAP_LOGIN_ENDPOINT), {
             method: "POST",
             credentials: "include",
             headers: {"content-type": "application/json"},
@@ -221,8 +223,10 @@ export class InboxSetupRepository {
         username: string,
         password: string,
         signal?: AbortSignal,
+        /** An existing mailbox, when the form is editing one: see [inboxEndpoint]. */
+        inboxId?: string,
     ): AsyncGenerator<FolderStreamEvent> {
-        const response = await fetch(FOLDER_STREAM_ENDPOINT, {
+        const response = await fetch(inboxEndpoint(inboxId, "folders/stream", FOLDER_STREAM_ENDPOINT), {
             method: "POST",
             credentials: "include",
             headers: {"content-type": "application/json"},
@@ -257,6 +261,18 @@ export class InboxSetupRepository {
             await reader.cancel().catch(() => {});
         }
     }
+}
+
+/**
+ * Where a check goes: the setup route, or the one for a mailbox that already exists.
+ *
+ * The two do the same thing and answer the same way. They differ in one respect only: given an
+ * existing mailbox, the server fills in the stored password when the form sent none, which is
+ * what lets an edit screen check anything at all without the password being re-typed.
+ */
+function inboxEndpoint(inboxId: string | undefined, path: string, whenCreating: string): string {
+    if (!inboxId) return whenCreating;
+    return `/api/users/me/inboxes/${encodeURIComponent(inboxId)}/${path}`;
 }
 
 /** One `data:` frame to an event, or null for the keep-alives and comments SSE allows. */

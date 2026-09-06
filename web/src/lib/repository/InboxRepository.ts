@@ -1,3 +1,10 @@
+import type {
+    InboxConnection,
+    SubmitInboxFolder,
+    SubmitInboxResult,
+    WireAiScope,
+} from "$lib/repository/InboxSetupRepository";
+
 /** One connected mailbox, as `GET /api/users/me/inboxes` reports it. */
 export type Inbox = {
     id: string;
@@ -14,6 +21,23 @@ export type Inbox = {
 };
 
 const ENDPOINT = "/api/users/me/inboxes";
+
+/** One folder's settings, as the edit screen reads them back and sends them again. */
+export type InboxFolderSetting = {
+    folderName: string;
+    imapPush: boolean;
+    aiImport: WireAiScope;
+};
+
+/** Everything the edit screen opens on. No password: the server never hands one out. */
+export type InboxDetail = {
+    id: string;
+    host: string;
+    port: number;
+    username: string;
+    isPaused: boolean;
+    folders: InboxFolderSetting[];
+};
 
 /**
  * The mailboxes this user has connected.
@@ -37,6 +61,62 @@ export class InboxRepository {
             folders: (inbox.folders ?? []) as string[],
             emailCount: (inbox.email_count ?? 0) as number,
         }));
+    }
+
+    /**
+     * One mailbox with the settings behind it, which the listing does not carry.
+     *
+     * The listing is what a table shows and holds folder names only; this is what a form opens on.
+     */
+    async get(id: string, signal?: AbortSignal): Promise<InboxDetail> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}`, {credentials: "include", signal});
+        if (!response.ok) throw new Error(`Could not read the inbox: ${response.status}`);
+
+        const body = await response.json();
+        return {
+            id: body.id as string,
+            host: body.host as string,
+            port: body.port as number,
+            username: body.username as string,
+            isPaused: (body.is_paused ?? false) as boolean,
+            folders: ((body.folders ?? []) as any[]).map((folder) => ({
+                folderName: folder.folder_name as string,
+                imapPush: (folder.imap_push ?? false) as boolean,
+                aiImport: folder.ai_import as WireAiScope,
+            })),
+        };
+    }
+
+    /**
+     * Saves an edited mailbox.
+     *
+     * [folders] is the complete set the screen is showing, not a change to it: anything left out
+     * is a folder the user took out. An empty password keeps the stored one.
+     */
+    async update(
+        id: string,
+        imap: InboxConnection,
+        folders: SubmitInboxFolder[],
+        signal?: AbortSignal,
+    ): Promise<SubmitInboxResult> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            credentials: "include",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify({
+                imap,
+                folder_settings: folders.map((folder) => ({
+                    folder_name: folder.folderName,
+                    imap_push: folder.imapPush,
+                    ai_import: folder.aiImport,
+                })),
+            }),
+            signal,
+        });
+
+        if (response.status === 409) return {type: "conflict"};
+        if (!response.ok) throw new Error(`Could not save the inbox: ${response.status}`);
+        return {type: "created", id};
     }
 
     /**

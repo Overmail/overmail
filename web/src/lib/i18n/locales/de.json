@@ -240,6 +240,19 @@
             "failed": "Das Postfach konnte nicht angelegt werden."
           }
         }
+      },
+      "edit": {
+        "title": "Verbindung bearbeiten",
+        "description": "Alles wird beim Ändern geprüft. Passwort leer lassen, um das bisherige zu behalten.",
+        "server": "Mailserver",
+        "credentials": "Anmeldung",
+        "folders": "Ordner",
+        "passwordPlaceholder": "Unverändert",
+        "save": "Speichern",
+        "saving": "Wird gespeichert…",
+        "loadFailed": "Dieses Postfach konnte nicht gelesen werden.",
+        "conflict": "Zu diesem Postfach hast du bereits eine Verbindung.",
+        "failed": "Die Änderungen konnten nicht gespeichert werden."
       }
     }
   },

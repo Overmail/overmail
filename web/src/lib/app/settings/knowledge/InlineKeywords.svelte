@@ -60,22 +60,36 @@
         {/if}
 
         {#each keywords as keyword (keyword)}
-            <Badge variant="secondary" class="gap-1 pr-1">
+            <Badge variant="secondary" class="relative">
                 {keyword}
                 <!--
-                  Rendered all the time and only faded in with the row, like the edit and delete
-                  buttons: a chip that changes width on hover would make the whole cell jump.
+                  Over the end of the word rather than next to it: the button only appears with the
+                  pointer on this chip, and space kept free for it the rest of the time reads as a
+                  chip with a gap in it. The word runs under it behind a fade, which is what says
+                  there is more of it -- the badge clips its own corners, so the panel ends where
+                  the chip does.
                 -->
-                <button
-                        type="button"
-                        class="text-muted-foreground hover:text-foreground rounded-full opacity-0 transition-opacity
-                               group-hover/row:opacity-100 focus-visible:opacity-100"
-                        aria-label={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
-                        title={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
-                        onclick={() => onremove(keyword)}
+                <span
+                        class="absolute inset-y-0 right-0 flex flex-row items-center opacity-0
+                               transition-opacity group-hover/badge:opacity-100 has-focus-visible:opacity-100"
                 >
-                    <XIcon class="size-3" />
-                </button>
+                    <!-- From the chip's own colour at zero alpha, not from `transparent`: that one
+                         is transparent *black*, and the fade would run through a grey. -->
+                    <span class="from-secondary/0 to-secondary pointer-events-none h-full w-3 bg-linear-to-r"></span>
+                    <!-- Opaque at rest, because the word runs under it; `accent` on hover, which
+                         is the one colour in the theme that is not a shade of the chip. -->
+                    <button
+                            type="button"
+                            class="bg-secondary text-muted-foreground hover:bg-accent
+                                   hover:text-accent-foreground flex h-full items-center pr-1 pl-0.5
+                                   transition-colors"
+                            aria-label={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
+                            title={$_("settings.knowledge.form.removeKeyword", {values: {keyword}})}
+                            onclick={() => onremove(keyword)}
+                    >
+                        <XIcon class="size-3" />
+                    </button>
+                </span>
             </Badge>
         {/each}
 

@@ -68,12 +68,13 @@ test("creating sends the whole share and reads back what was stored", async () =
 
     const request = (fetcher as any).mock.calls[0][1];
     expect(request.method).toBe("POST");
+    // No `remove_password`: a create has no password to take off, and the api reads a body
+    // strictly -- a key POST does not know is a 400, not something it ignores.
     expect(JSON.parse(request.body)).toEqual({
         share_name: "Projektgruppe",
         include_labels: true,
         valid_until: 1772600000,
         password: "hunter2",
-        remove_password: false,
         allow_metadata_without_password: true,
     });
     expect(created.id).toBe("s-1");

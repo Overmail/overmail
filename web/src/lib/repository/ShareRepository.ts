@@ -57,7 +57,7 @@ export class ShareRepository {
             method: "POST",
             credentials: "include",
             headers: {"content-type": "application/json"},
-            body: JSON.stringify(toBody(draft)),
+            body: JSON.stringify(toCreateBody(draft)),
             signal,
         });
 
@@ -76,7 +76,7 @@ export class ShareRepository {
             method: "PUT",
             credentials: "include",
             headers: {"content-type": "application/json"},
-            body: JSON.stringify(toBody(draft)),
+            body: JSON.stringify(toUpdateBody(draft)),
             signal,
         });
 
@@ -107,16 +107,34 @@ function toShare(share: any): Share {
     };
 }
 
-function toBody(draft: ShareDraft) {
+/**
+ * What a create sends.
+ *
+ * Without `remove_password`, which only an edit has anything to take off: the api reads a body
+ * strictly, and a key the route does not know is a 400 rather than something it ignores.
+ */
+function toCreateBody(draft: ShareDraft) {
     return {
         share_name: draft.shareName,
         include_labels: draft.includeLabels,
         valid_until: draft.validUntil,
-        // Blank is not a password; the server reads it as one that asks for none, and sending it
-        // on an edit would read as "set this", which is not what an untouched field means.
-        password: draft.password && draft.password.length > 0 ? draft.password : null,
-        remove_password: draft.removePassword ?? false,
+        password: passwordOf(draft),
         allow_metadata_without_password: draft.allowMetadataWithoutPassword,
     };
 }
 
+/** What an edit sends: the same, plus the one thing only an existing share can be told. */
+function toUpdateBody(draft: ShareDraft) {
+    return {
+        ...toCreateBody(draft),
+        remove_password: draft.removePassword ?? false,
+    };
+}
+
+/**
+ * Blank is not a password; the server reads it as one that asks for none, and sending it on an
+ * edit would read as "set this", which is not what an untouched field means.
+ */
+function passwordOf(draft: ShareDraft): string | null {
+    return draft.password && draft.password.length > 0 ? draft.password : null;
+}

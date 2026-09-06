@@ -186,6 +186,25 @@ class ShareRoutesTest {
     }
 
     @Test
+    fun `the body the dialog sends is the body the route takes`() = testApplication {
+        val mail = setUp()
+        installRoutes()
+        val until = (Clock.System.now() + 30.days).epochSeconds
+
+        // Verbatim what `ShareRepository.create` builds, keys and all: the request is read
+        // strictly, so a key this route does not know would be a 400 and not an ignored extra.
+        val response = client.post("/api/emails/$mail/shares") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"share_name":"test","include_labels":true,"valid_until":$until,""" +
+                    """"password":null,"allow_metadata_without_password":true}"""
+            )
+        }
+
+        assertEquals(HttpStatusCode.Created, response.status)
+    }
+
+    @Test
     fun `a share only answers under the mail it belongs to, and only to its owner`() = testApplication {
         val mail = setUp()
         installRoutes()

@@ -11,6 +11,7 @@
     let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
 
     const scan = $derived(viewModel.folderScan);
+    const submit = $derived(viewModel.submitState);
 
     /** One indent per level of nesting; the chevron column keeps the names lined up under it. */
     const INDENT_PER_LEVEL = 18;
@@ -39,7 +40,26 @@
       is happening -- on a real mailbox the counting is seconds of work.
     -->
     <div aria-live="polite" class="min-h-5">
-        {#if scan.type === "listing"}
+        <!-- Creating the inbox takes over the line: by then the scan has nothing left to say. -->
+        {#if submit.type === "saving"}
+            <SetupStatusLine
+                    icon={Spinner}
+                    message={$_("settings.emailAccounts.new.folders.submit.saving")}
+                    tone="text-muted-foreground"
+            />
+        {:else if submit.type === "conflict"}
+            <SetupStatusLine
+                    icon={WarningCircleIcon}
+                    message={$_("settings.emailAccounts.new.folders.submit.conflict")}
+                    tone="text-destructive"
+            />
+        {:else if submit.type === "failed"}
+            <SetupStatusLine
+                    icon={WarningCircleIcon}
+                    message={$_("settings.emailAccounts.new.folders.submit.failed")}
+                    tone="text-destructive"
+            />
+        {:else if scan.type === "listing"}
             <SetupStatusLine
                     icon={Spinner}
                     message={$_("settings.emailAccounts.new.folders.listing")}

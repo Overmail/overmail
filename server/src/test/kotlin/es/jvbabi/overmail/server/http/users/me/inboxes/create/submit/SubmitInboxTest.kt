@@ -235,6 +235,49 @@ class SubmitInboxTest {
         assertEquals(before, database.query { ImapAccount.all().count() })
     }
 
+    @Test
+    fun `the body the web client sends is the body this route reads`() = testApplication {
+        setUpUser()
+        installRoute()
+
+        // Copied verbatim out of InboxSetupRepository.test.ts, which asserts the client produces
+        // exactly this. Snake case, the `type` discriminator and seconds-since-the-epoch are the
+        // contract; if either side drifts, one of the two tests goes red.
+        val fromTheWebClient = """
+            {"imap":{"host":"127.0.0.1","port":$deadPort,"username":"julius","password":"secret"},
+             "folder_settings":[
+               {"folder_name":"INBOX","imap_push":true,"ai_import":{"type":"only_new_messages"}},
+               {"folder_name":"Archiv/Newsletter","imap_push":false,"ai_import":{"type":"newest_messages","count":250}},
+               {"folder_name":"Sent","imap_push":false,"ai_import":{"type":"after_date","timestamp":1757023200}},
+               {"folder_name":"Spam","imap_push":false,"ai_import":{"type":"all_messages"}}]}
+        """.trimIndent()
+
+        val response = client.post(ROUTE) {
+            contentType(ContentType.Application.Json)
+            setBody(fromTheWebClient)
+        }
+
+        assertEquals(HttpStatusCode.Created, response.status)
+        val id = Json.parseToJsonElement(response.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content
+
+        val stored = database.query {
+            ImapAccountFolderSyncs
+                .selectAll()
+                .where { ImapAccountFolderSyncs.imapAccount eq Uuid.parse(id) }
+                .associate { it[ImapAccountFolderSyncs.folder] to (it[ImapAccountFolderSyncs.imapPush] to it[ImapAccountFolderSyncs.aiImport]) }
+        }
+
+        assertEquals(4, stored.size)
+        assertEquals(true to ImapAccountFolderSync.AiImportSettings.OnlyNewMessages, stored.getValue("INBOX"))
+        assertEquals(false to ImapAccountFolderSync.AiImportSettings.AllMessages, stored.getValue("Spam"))
+        assertEquals(
+            ImapAccountFolderSync.AiImportSettings.AfterDate(kotlin.time.Instant.fromEpochSeconds(1757023200)),
+            stored.getValue("Sent").second,
+        )
+        // The mailbox is unreachable here, so the count has no n-th newest to date it from.
+        assertEquals(ImapAccountFolderSync.AiImportSettings.AllMessages, stored.getValue("Archiv/Newsletter").second)
+    }
+
     private suspend fun setUpUser(): User {
         database.init()
         return database.query {

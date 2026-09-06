@@ -110,3 +110,45 @@ test("the login test reports both outcomes", async () => {
         outcome: "invalid_credentials",
     });
 });
+
+test("the submit body is exactly what the server's route reads", async () => {
+    let sent: string | null = null;
+    globalThis.fetch = mock(async (_url: string, init: RequestInit) => {
+        sent = init.body as string;
+        return new Response(JSON.stringify({id: "acc-1"}), {status: 201});
+    }) as unknown as typeof fetch;
+
+    const result = await new InboxSetupRepository().submitInbox(
+        {host: "imap.example.com", port: 993, username: "julius", password: "secret"},
+        [
+            {folderName: "INBOX", imapPush: true, aiImport: {type: "only_new_messages"}},
+            {folderName: "Archiv/Newsletter", imapPush: false, aiImport: {type: "newest_messages", count: 250}},
+            {folderName: "Sent", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
+            {folderName: "Spam", imapPush: false, aiImport: {type: "all_messages"}},
+        ],
+    );
+
+    expect(result).toEqual({type: "created", id: "acc-1"});
+    // Snake case and the `type` discriminator are the contract; SubmitInboxTest.kt pins the
+    // other end of it with this same payload.
+    expect(JSON.parse(sent!)).toEqual({
+        imap: {host: "imap.example.com", port: 993, username: "julius", password: "secret"},
+        folder_settings: [
+            {folder_name: "INBOX", imap_push: true, ai_import: {type: "only_new_messages"}},
+            {folder_name: "Archiv/Newsletter", imap_push: false, ai_import: {type: "newest_messages", count: 250}},
+            {folder_name: "Sent", imap_push: false, ai_import: {type: "after_date", timestamp: 1757023200}},
+            {folder_name: "Spam", imap_push: false, ai_import: {type: "all_messages"}},
+        ],
+    });
+});
+
+test("a mailbox the user already has is an answer, not a throw", async () => {
+    globalThis.fetch = mock(async () => new Response("", {status: 409})) as unknown as typeof fetch;
+
+    expect(
+        await new InboxSetupRepository().submitInbox(
+            {host: "h", port: 993, username: "u", password: "p"},
+            [{folderName: "INBOX", imapPush: false, aiImport: {type: "all_messages"}}],
+        ),
+    ).toEqual({type: "conflict"});
+});

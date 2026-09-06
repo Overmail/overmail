@@ -3,6 +3,8 @@ import type {
     ImapHostOutcome,
     ImapLoginOutcome,
     InboxSetupRepository,
+    SubmitInboxFolder,
+    WireAiScope,
 } from "$lib/repository/InboxSetupRepository";
 
 /**
@@ -40,6 +42,14 @@ export type ImapLoginTestState =
     /** The server read them and said no, or the connection went away. */
     | {type: "rejected"; outcome: ImapLoginOutcome}
     /** The test itself did not happen. */
+    | {type: "failed"};
+
+/** Where creating the inbox stands. */
+export type SubmitState =
+    | {type: "idle"}
+    | {type: "saving"}
+    /** The user already has this mailbox. */
+    | {type: "conflict"}
     | {type: "failed"};
 
 /** How far the folder scan has got. */
@@ -126,11 +136,14 @@ export class NewEmailAccountViewModel {
     /** Folders whose children are hidden. By full name, so it survives the rows being replaced. */
     collapsed: string[] = $state([]);
 
+    submitState: SubmitState = $state({type: "idle"});
+
     #hostDebounce: ReturnType<typeof setTimeout> | null = null;
     #hostRunning: AbortController | null = null;
     #loginDebounce: ReturnType<typeof setTimeout> | null = null;
     #loginRunning: AbortController | null = null;
     #scanRunning: AbortController | null = null;
+    #submitRunning: AbortController | null = null;
 
     /** What the debounce above is waiting to run, kept so [submit] can run it straight away. */
     #hostPending: (() => void) | null = null;
@@ -250,6 +263,20 @@ export class NewEmailAccountViewModel {
         if (folder) folder.enabled = !folder.enabled;
     }
 
+    /** The folders that are actually being kept -- what the submit is made of. */
+    keptFolders = $derived(this.folders.filter((folder) => folder.enabled));
+
+    /**
+     * Whether the form can be sent.
+     *
+     * The tree arrives before the counting does, so a scan that is still counting is no reason to
+     * wait: the folders and their settings are all there. An inbox with no folder is not, and the
+     * server refuses it.
+     */
+    canSubmit = $derived(
+        this.step === "folders" && this.submitState.type !== "saving" && this.keptFolders.length > 0,
+    );
+
     toggleRealtime(fullName: string) {
         const folder = this.folders.find((row) => row.fullName === fullName);
         if (folder) folder.realtime = !folder.realtime;
@@ -266,12 +293,73 @@ export class NewEmailAccountViewModel {
         if (folder) folder.aiProcessing = mode;
     }
 
+    /**
+     * Creates the inbox. Answers whether it worked, which is what the dialog closes on.
+     *
+     * Only the folders that are being kept are sent; the ones switched off are not settings the
+     * server has any use for.
+     */
+    async submitInbox(): Promise<boolean> {
+        if (!this.canSubmit) return false;
+
+        const running = new AbortController();
+        this.#submitRunning?.abort();
+        this.#submitRunning = running;
+        this.submitState = {type: "saving"};
+
+        try {
+            const result = await this.inboxSetup.submitInbox(
+                {
+                    host: this.host.trim(),
+                    port: this.port,
+                    username: this.username.trim(),
+                    password: this.password,
+                },
+                this.keptFolders.map(toSubmitFolder),
+                running.signal,
+            );
+            if (running.signal.aborted) return false;
+
+            if (result.type === "conflict") {
+                this.submitState = {type: "conflict"};
+                return false;
+            }
+            this.submitState = {type: "idle"};
+            return true;
+        } catch {
+            if (running.signal.aborted) return false;
+            this.submitState = {type: "failed"};
+            return false;
+        } finally {
+            if (this.#submitRunning === running) this.#submitRunning = null;
+        }
+    }
+
+    /** Back to an empty form, so the next inbox does not start inside the last one. */
+    reset() {
+        this.dispose();
+        this.step = "server";
+        this.host = "";
+        this.port = DEFAULT_IMAP_PORT;
+        this.imapServerTest = {type: "idle"};
+        this.username = "";
+        this.password = "";
+        this.imapLoginTest = {type: "idle"};
+        this.folders = [];
+        this.collapsed = [];
+        this.folderScan = {type: "idle"};
+        this.submitState = {type: "idle"};
+    }
+
     /** Called when the dialog closes, so no check and no scan outlives it. */
     dispose() {
         this.#cancelHostTest();
         this.#cancelLoginTest();
         this.#scanRunning?.abort();
         this.#scanRunning = null;
+        this.#submitRunning?.abort();
+        this.#submitRunning = null;
+        if (this.submitState.type === "saving") this.submitState = {type: "idle"};
         // A check that was cut off never reached a verdict; left as `testing` it would greet the
         // next opening with a stuck spinner.
         if (this.imapServerTest.type === "testing") this.imapServerTest = {type: "idle"};
@@ -454,6 +542,33 @@ export class NewEmailAccountViewModel {
  * import exactly what the user threw away, and watching every folder live would hold a connection
  * open per folder for mail nobody is waiting on.
  */
+/**
+ * One row as the submit endpoint takes it.
+ *
+ * The date is read as local midnight rather than UTC: the user picked a day in the calendar in
+ * front of them, and "everything from the 5th" should mean their 5th, not a boundary that lands
+ * mid-afternoon on the 4th for anybody east of London.
+ */
+function toSubmitFolder(row: FolderRow): SubmitInboxFolder {
+    let aiImport: WireAiScope;
+    switch (row.aiProcessing.type) {
+        case "all":
+            aiImport = {type: "all_messages"};
+            break;
+        case "newest":
+            aiImport = {type: "newest_messages", count: row.aiProcessing.count};
+            break;
+        case "since": {
+            const [year, month, day] = row.aiProcessing.date.split("-").map(Number);
+            aiImport = {type: "after_date", timestamp: Math.floor(new Date(year, month - 1, day).getTime() / 1000)};
+            break;
+        }
+        default:
+            aiImport = {type: "only_new_messages"};
+    }
+    return {folderName: row.fullName, imapPush: row.realtime, aiImport};
+}
+
 function toRows(folders: FolderNode[]): FolderRow[] {
     const parentOf = (folder: FolderNode) =>
         folder.path.length > 1 ? folder.path.slice(0, -1).join(folder.delimiter) : null;

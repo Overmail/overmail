@@ -27,6 +27,19 @@
 
     const step = $derived(viewModel.step);
 
+    /**
+     * Creates the inbox and closes on success.
+     *
+     * Reset before closing, not after: the dialog is kept mounted, so the next inbox would
+     * otherwise open inside the one that was just created. A failure leaves everything where it
+     * is, with the reason under the table.
+     */
+    async function finish() {
+        if (!(await viewModel.submitInbox())) return;
+        viewModel.reset();
+        open = false;
+    }
+
     /** Whether the step showing can be left, which is what the "next" button waits for. */
     const canGoOn = $derived(
         step === "server"
@@ -85,6 +98,10 @@
                 <!-- Enabled by the check of the step it sits under, not by the fields being filled. -->
                 <Button disabled={!canGoOn} onclick={() => viewModel.goToNextStep()}>
                     {$_("settings.emailAccounts.new.next")}
+                </Button>
+            {:else}
+                <Button disabled={!viewModel.canSubmit} onclick={finish}>
+                    {$_("settings.emailAccounts.new.finish")}
                 </Button>
             {/if}
         </Dialog.Footer>

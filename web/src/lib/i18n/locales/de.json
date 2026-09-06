@@ -135,6 +135,7 @@
         "title": "Neues Postfach",
         "cancel": "Abbrechen",
         "next": "Weiter",
+        "finish": "Fertig",
         "steps": {
           "server": "Server",
           "credentials": "Anmeldung",
@@ -199,6 +200,11 @@
             "dateLabel": "Lesen ab diesem Datum",
             "triggerNewest": "Neueste {count}",
             "triggerSince": "Ab {date}"
+          },
+          "submit": {
+            "saving": "Postfach wird angelegt…",
+            "conflict": "Dieses Postfach ist bereits eingerichtet.",
+            "failed": "Das Postfach konnte nicht angelegt werden."
           }
         }
       }

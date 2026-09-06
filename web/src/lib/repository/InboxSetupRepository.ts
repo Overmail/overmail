@@ -30,6 +30,41 @@ export type ImapHostTest = {
 const TEST_IMAP_HOST_ENDPOINT = "/api/users/me/inboxes/create/test/imap-host";
 const TEST_IMAP_LOGIN_ENDPOINT = "/api/users/me/inboxes/create/test/imap-login";
 const FOLDER_STREAM_ENDPOINT = "/api/users/me/inboxes/create/folders/stream";
+const SUBMIT_ENDPOINT = "/api/users/me/inboxes/create/submit";
+
+/** The connection an inbox is created for. */
+export type InboxConnection = {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+};
+
+/**
+ * How far back the assistant reads one folder, on the wire.
+ *
+ * `newest_messages` is the odd one: the server resolves the count to the date of the n-th newest
+ * mail before storing it, because a count cannot be applied per mail as mail keeps arriving.
+ */
+export type WireAiScope =
+    | {type: "only_new_messages"}
+    | {type: "all_messages"}
+    /** Seconds since the epoch, which is what the server reads it as. */
+    | {type: "after_date"; timestamp: number}
+    | {type: "newest_messages"; count: number};
+
+/** One folder's settings as the submit endpoint takes them. */
+export type SubmitInboxFolder = {
+    folderName: string;
+    /** Watch the folder over an open connection rather than only polling it. */
+    imapPush: boolean;
+    aiImport: WireAiScope;
+};
+
+/** What creating an inbox came to. A mailbox already set up is an answer, not a failure. */
+export type SubmitInboxResult =
+    | {type: "created"; id: string}
+    | {type: "conflict"};
 
 /** Why a login did not work, or `authenticated` when it did. Mirrors `ImapLoginTestOutcome`. */
 export type ImapLoginOutcome =
@@ -135,6 +170,39 @@ export class InboxSetupRepository {
             authenticated: body.authenticated as boolean,
             outcome: body.outcome as ImapLoginOutcome,
         };
+    }
+
+    /**
+     * Creates the inbox, with one settings block per folder that is being kept.
+     *
+     * Answers rather than throws for a mailbox the user already has -- that is something to say
+     * in the dialog, not a broken request. Anything else throws.
+     */
+    async submitInbox(
+        imap: InboxConnection,
+        folders: SubmitInboxFolder[],
+        signal?: AbortSignal,
+    ): Promise<SubmitInboxResult> {
+        const response = await fetch(SUBMIT_ENDPOINT, {
+            method: "POST",
+            credentials: "include",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify({
+                imap,
+                folder_settings: folders.map((folder) => ({
+                    folder_name: folder.folderName,
+                    imap_push: folder.imapPush,
+                    ai_import: folder.aiImport,
+                })),
+            }),
+            signal,
+        });
+
+        if (response.status === 409) return {type: "conflict"};
+        if (!response.ok) throw new Error(`Could not create the inbox: ${response.status}`);
+
+        const body = await response.json();
+        return {type: "created", id: body.id as string};
     }
 
     /**

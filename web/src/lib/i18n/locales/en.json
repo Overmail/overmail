@@ -135,6 +135,7 @@
         "title": "New inbox",
         "cancel": "Cancel",
         "next": "Next",
+        "finish": "Done",
         "steps": {
           "server": "Server",
           "credentials": "Sign-in",
@@ -199,6 +200,11 @@
             "dateLabel": "Read from this date",
             "triggerNewest": "Newest {count}",
             "triggerSince": "From {date}"
+          },
+          "submit": {
+            "saving": "Creating the inbox…",
+            "conflict": "This mailbox is already set up.",
+            "failed": "The inbox could not be created."
           }
         }
       }

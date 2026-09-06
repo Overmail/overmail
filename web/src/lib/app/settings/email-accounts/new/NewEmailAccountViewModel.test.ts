@@ -4,7 +4,9 @@ import type {
     FolderStreamEvent,
     ImapHostTest,
     ImapLoginTest,
+    InboxConnection,
     InboxSetupRepository,
+    SubmitInboxFolder,
 } from "$lib/repository/InboxSetupRepository";
 
 const REACHABLE: ImapHostTest = {reachable: true, outcome: "reachable", capabilities: ["IMAP4rev1"]};
@@ -462,4 +464,125 @@ test("collapsing a folder hides its grandchildren too", async () => {
     viewModel.toggleCollapsed("Spam");
     viewModel.toggleCollapsed("Spam/Test2");
     expect(viewModel.visibleFolders.map((f) => f.fullName)).toEqual(["INBOX", "Spam", "Spam/Test2"]);
+});
+
+/** Gets to the folder step with the given rows and returns what a submit would send. */
+async function submittedPayload(prepare: (viewModel: NewEmailAccountViewModel) => void) {
+    // Typed, so `mock.calls[0]` is the argument tuple rather than an empty one.
+    const submit = mock(
+        async (_imap: InboxConnection, _folders: SubmitInboxFolder[]) => ({type: "created", id: "acc-1"}) as const,
+    );
+    const repository = {
+        testImapHost: mock(async () => REACHABLE),
+        testImapLogin: mock(async () => AUTHENTICATED),
+        streamFolders: mock(async function* () {
+            yield TREE;
+            yield {type: "done"} as const;
+        }),
+        submitInbox: submit,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = await atFolderStep(repository);
+    prepare(viewModel);
+    const ok = await viewModel.submitInbox();
+    return {ok, submit, viewModel};
+}
+
+test("only the folders that are kept are sent, with their settings", async () => {
+    const {ok, submit} = await submittedPayload((viewModel) => {
+        viewModel.toggleFolder("Archiv.Newsletter");
+        viewModel.setAiProcessing("Archiv.Newsletter", {type: "newest", count: 250});
+        viewModel.toggleRealtime("Archiv.Newsletter");
+    });
+
+    expect(ok).toBe(true);
+    expect(submit).toHaveBeenCalledTimes(1);
+
+    const [imap, folders] = submit.mock.calls[0];
+    expect(imap).toEqual({host: "imap.example.com", port: 993, username: "julius", password: "secret"});
+    // INBOX is on by default, Newsletter was just switched on; Archiv and Trash stay out.
+    expect(folders).toEqual([
+        {folderName: "Archiv.Newsletter", imapPush: true, aiImport: {type: "newest_messages", count: 250}},
+        {folderName: "INBOX", imapPush: true, aiImport: {type: "only_new_messages"}},
+    ]);
+});
+
+test("a date is sent as local midnight of the day that was picked", async () => {
+    const {submit} = await submittedPayload((viewModel) => {
+        viewModel.setAiProcessing("INBOX", {type: "since", date: "2026-09-05"});
+    });
+
+    const folders = submit.mock.calls[0][1];
+    const scope = folders.find((f) => f.folderName === "INBOX")!.aiImport as {type: string; timestamp: number};
+    expect(scope.type).toBe("after_date");
+    // The user picked a day in their own calendar, so that is the day the boundary belongs to.
+    expect(new Date(scope.timestamp * 1000)).toEqual(new Date(2026, 8, 5));
+});
+
+test("every assistant mode has a wire form", async () => {
+    for (const [mode, expected] of [
+        [{type: "all"}, {type: "all_messages"}],
+        [{type: "new_only"}, {type: "only_new_messages"}],
+        [{type: "newest", count: 7}, {type: "newest_messages", count: 7}],
+    ] as const) {
+        const {submit} = await submittedPayload((viewModel) => {
+            viewModel.setAiProcessing("INBOX", mode);
+        });
+        const folders = submit.mock.calls[0][1];
+        expect(folders.find((f) => f.folderName === "INBOX")!.aiImport).toEqual(expected);
+    }
+});
+
+test("an inbox with no folder kept cannot be submitted", async () => {
+    const {ok, submit} = await submittedPayload((viewModel) => {
+        // INBOX is the only one on by default; switching it off leaves nothing to create.
+        viewModel.toggleFolder("INBOX");
+    });
+
+    expect(ok).toBe(false);
+    expect(submit).toHaveBeenCalledTimes(0);
+});
+
+test("a mailbox that is already set up is reported, not thrown", async () => {
+    const repository = {
+        testImapHost: mock(async () => REACHABLE),
+        testImapLogin: mock(async () => AUTHENTICATED),
+        streamFolders: mock(async function* () {
+            yield TREE;
+            yield {type: "done"} as const;
+        }),
+        submitInbox: mock(async () => ({type: "conflict"}) as const),
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = await atFolderStep(repository);
+    expect(await viewModel.submitInbox()).toBe(false);
+    expect(viewModel.submitState).toEqual({type: "conflict"});
+    // The form stays as it was, so the user can go back and change the account.
+    expect(viewModel.step).toBe("folders");
+});
+
+test("a failed submit keeps the form; a reset empties it", async () => {
+    const repository = {
+        testImapHost: mock(async () => REACHABLE),
+        testImapLogin: mock(async () => AUTHENTICATED),
+        streamFolders: mock(async function* () {
+            yield TREE;
+            yield {type: "done"} as const;
+        }),
+        submitInbox: mock(async () => {
+            throw new Error("offline");
+        }),
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = await atFolderStep(repository);
+    expect(await viewModel.submitInbox()).toBe(false);
+    expect(viewModel.submitState).toEqual({type: "failed"});
+    expect(viewModel.folders.length).toBeGreaterThan(0);
+
+    viewModel.reset();
+    expect(viewModel.step).toBe("server");
+    expect(viewModel.host).toBe("");
+    expect(viewModel.password).toBe("");
+    expect(viewModel.folders).toEqual([]);
+    expect(viewModel.submitState).toEqual({type: "idle"});
 });

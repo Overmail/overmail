@@ -47,6 +47,16 @@ export function slugSegment(id: string, subject?: string | null): string {
  * it means. Null when there is no id in it at all.
  */
 export function parseEmailId(value: string | null | undefined): string | null {
+	return parseSlugId(value);
+}
+
+/**
+ * The uuid at the end of a slug, whatever the slug is about -- a mail, or a share of one.
+ *
+ * The counterpart of [slugSegment]: what is in front of the id is for the reader, so only the
+ * last 32 hex characters are read. Null when there is no id in it at all.
+ */
+export function parseSlugId(value: string | null | undefined): string | null {
 	if (!value) return null;
 
 	const bare = value.slice(-32).toLowerCase();

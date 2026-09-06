@@ -165,6 +165,33 @@
       "noContent": "Kein Inhalt verfügbar"
     }
   },
+  "share": {
+    "notice": "Diese E-Mail wurde mit dir geteilt.",
+    "loading": "E-Mail wird geladen…",
+    "sender": "Von {sender}",
+    "locked": {
+      "title": "Passwort erforderlich",
+      "description": "Diese E-Mail ist mit einem Passwort geschützt.",
+      "password": "Passwort",
+      "submit": "E-Mail anzeigen",
+      "unlocking": "Wird geprüft…",
+      "wrong": "Das Passwort stimmt nicht.",
+      "failed": "Die E-Mail konnte nicht geladen werden."
+    },
+    "expired": {
+      "title": "Link abgelaufen",
+      "description": "Dieser Link ist nicht mehr gültig. Frag die Person, die ihn geteilt hat, nach einem neuen."
+    },
+    "missing": {
+      "title": "Link nicht gefunden",
+      "description": "Diesen Link gibt es nicht (mehr). Vielleicht wurde die Freigabe zurückgezogen."
+    },
+    "failed": {
+      "title": "Etwas ist schiefgelaufen",
+      "description": "Die E-Mail konnte nicht geladen werden.",
+      "retry": "Erneut versuchen"
+    }
+  },
   "myStack": {
     "shortcuts": {
       "archive": "Archivieren",

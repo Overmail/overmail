@@ -165,6 +165,33 @@
       "noContent": "No content available"
     }
   },
+  "share": {
+    "notice": "This email was shared with you.",
+    "loading": "Reading the email…",
+    "sender": "From {sender}",
+    "locked": {
+      "title": "Password needed",
+      "description": "This email is protected with a password.",
+      "password": "Password",
+      "submit": "Show email",
+      "unlocking": "Checking…",
+      "wrong": "That password does not fit.",
+      "failed": "The email could not be read."
+    },
+    "expired": {
+      "title": "Link expired",
+      "description": "This link does not work any more. Ask whoever shared it for a new one."
+    },
+    "missing": {
+      "title": "Link not found",
+      "description": "There is no such link. The share may have been taken back."
+    },
+    "failed": {
+      "title": "Something went wrong",
+      "description": "The email could not be read.",
+      "retry": "Try again"
+    }
+  },
   "myStack": {
     "shortcuts": {
       "archive": "Archive",

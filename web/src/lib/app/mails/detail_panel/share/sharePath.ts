@@ -1,13 +1,12 @@
-import {slugSegment} from "$lib/app/mails/emailPath";
+import {parseSlugId, slugSegment} from "$lib/app/mails/emailPath";
 import type {Share} from "$lib/repository/ShareRepository";
 
 /**
  * Where a shared mail is read: `/share/<subject>-<id without hyphens>`, like a mail page.
  *
  * [subject] is the readable part and is left out where there is none -- and, more importantly,
- * where the link must not carry it; [subjectFor] is what decides that. The page itself is not
- * built yet: this is the link the dialog hands out, and the one place that spells the route out,
- * so building it is a change to this file.
+ * where the link must not carry it; [subjectFor] is what decides that. The one place that spells
+ * the route out: the page behind it reads the id back with [parseShareId].
  */
 export function sharePath(shareId: string, subject?: string | null): string {
 	return `/share/${slugSegment(shareId, subject)}`;
@@ -36,4 +35,14 @@ export function subjectFor(share: Share, subject: string | null | undefined): st
 	if (share.hasPassword && !share.allowMetadataWithoutPassword) return null;
 
 	return subject ?? null;
+}
+
+/**
+ * The share a `/share/...` path segment is about, as the uuid the api knows.
+ *
+ * Only the id at the end of it is read, like a mail slug: the subject in front is there for the
+ * reader, and a link whose subject was edited by hand still opens the share it means.
+ */
+export function parseShareId(segment: string | null | undefined): string | null {
+	return parseSlugId(segment);
 }

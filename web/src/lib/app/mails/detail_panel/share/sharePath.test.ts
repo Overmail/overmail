@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {sharePath, shareUrl, subjectFor} from "./sharePath";
+import {parseShareId, sharePath, shareUrl, subjectFor} from "./sharePath";
 import type {Share} from "$lib/repository/ShareRepository";
 
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -46,4 +46,11 @@ test("a link that hides everything behind its password carries no subject either
 test("a mail without a subject is the bare id, password or not", () => {
 	expect(subjectFor(SHARE, null)).toBeNull();
 	expect(subjectFor(SHARE, undefined)).toBeNull();
+});
+
+test("the id is read back out of a link, whatever subject was put in front of it", () => {
+	expect(parseShareId(`Termin-Donnerstag-${BARE}`)).toBe(ID);
+	expect(parseShareId(BARE)).toBe(ID);
+	expect(parseShareId("nothing-here")).toBeNull();
+	expect(parseShareId(null)).toBeNull();
 });

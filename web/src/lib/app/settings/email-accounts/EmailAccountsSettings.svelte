@@ -38,20 +38,22 @@
     });
 
     /**
-     * How a pinned column ends: a hard rule, and a shadow falling over what scrolls under it.
+     * How the username column ends: a hard rule, and a shadow falling over what scrolls under it.
      *
      * Only worth drawing while something is actually behind the column -- `*_ON` is added once the
      * table is scrolled, and the `transition-shadow` on the cell fades it in.
+     *
+     * The actions column does not use this. It appears and disappears with the pointer rather than
+     * standing there permanently, and a panel that comes and goes reads better running out into
+     * the folders than snapping to a rule -- see its cell below.
      */
     const PINNED_LEFT_EDGE = "shadow-none";
     const PINNED_LEFT_EDGE_ON = "shadow-[1px_0_0_0_var(--border),8px_0_12px_-8px_rgb(0_0_0/0.28)]";
-    const PINNED_RIGHT_EDGE_ON = "shadow-[-1px_0_0_0_var(--border),-8px_0_12px_-8px_rgb(0_0_0/0.28)]";
 
     /** The table itself; `Table.Root` puts it inside the wrapper that does the scrolling. */
     let tableElement: HTMLTableElement | null = $state(null);
-    /** Whether anything is hidden past the left edge, and whether anything is left to the right. */
+    /** Whether anything is hidden past the left edge, which is what the username column marks. */
     let scrolledFromStart = $state(false);
-    let scrolledToEnd = $state(true);
 
     // A pinned column is only worth separating off while it is covering something. With the table
     // sitting still there is nothing behind it, and a rule down the middle would be a line for no
@@ -63,13 +65,12 @@
 
         const update = () => {
             scrolledFromStart = scroller.scrollLeft > 0;
-            scrolledToEnd = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 1;
         };
         update();
 
         scroller.addEventListener("scroll", update, {passive: true});
-        // Both ends also change without anyone scrolling: the dialog resizes, and the table grows
-        // as folders arrive.
+        // It also changes without anyone scrolling: the dialog resizes, and the table grows as
+        // folders arrive, either of which can leave the scroll position back at the start.
         const observer = new ResizeObserver(update);
         observer.observe(scroller);
         observer.observe(table);
@@ -122,7 +123,7 @@
                               under the buttons belongs to a row being hovered, and a header is
                               never hovered -- given one anyway it just sat there permanently.
                             -->
-                            <Table.Head class="sticky right-0 z-20 w-24"></Table.Head>
+                            <Table.Head class="sticky right-0 z-20 w-32"></Table.Head>
                         </Table.Row>
                     </Table.Header>
                     <Table.Body>
@@ -178,18 +179,27 @@
                                   the cell it sat in. Sticky, so the actions stay reachable wherever
                                   the folder list has been scrolled to.
                                 -->
-                                <Table.Cell class="sticky right-0 z-10 w-24">
+                                <Table.Cell class="sticky right-0 z-10 w-32 pl-10">
                                     <!--
-                                      Backdrop and edge come in together with the buttons: they are
-                                      the only thing that needs covering, and until the row is
-                                      hovered the folders may run the full width.
+                                      The backdrop comes in with the buttons: they are the only
+                                      thing that needs covering, and until the row is hovered the
+                                      folders may run the full width.
+
+                                      Two boxes rather than one, and no rule: it runs out over the
+                                      2rem the padding keeps free, so the folders disappear under
+                                      the buttons instead of stopping at a line. `transition`, not
+                                      `transition-colors`, so appearing and the hover colour share
+                                      the row's 150ms.
                                     -->
                                     <div
-                                            class={cn(
-                                                "bg-popover group-hover/row:bg-muted pointer-events-none absolute",
-                                                "inset-0 opacity-0 transition group-hover/row:opacity-100",
-                                                !scrolledToEnd && PINNED_RIGHT_EDGE_ON,
-                                            )}
+                                            class="to-popover group-hover/row:to-muted pointer-events-none absolute
+                                                   inset-y-0 left-0 w-8 bg-linear-to-r from-transparent opacity-0
+                                                   transition group-hover/row:opacity-100"
+                                    ></div>
+                                    <div
+                                            class="bg-popover group-hover/row:bg-muted pointer-events-none absolute
+                                                   inset-y-0 right-0 left-8 opacity-0 transition
+                                                   group-hover/row:opacity-100"
                                     ></div>
                                     <div
                                             class="relative flex flex-row items-center justify-end gap-1 opacity-0

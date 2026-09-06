@@ -11,6 +11,12 @@ const ENDPOINT = "/api/webapp/content/socket";
  */
 const RELEASE_GRACE_MS = 10_000;
 
+/**
+ * How many mails one bulk write carries. Keep at or below `MAX_BULK_IDS` on the server, which is
+ * what a longer selection is cut into parts for.
+ */
+const BULK_CHUNK = 500;
+
 export type EmailLabel = {
     id: string;
     name: string;
@@ -258,6 +264,57 @@ export class EmailRepository {
     }
 
     /**
+     * The same two writes for a whole selection: one request per [BULK_CHUNK] mails rather than
+     * one per mail, because what is picked here is a stretch of the mailbox.
+     *
+     * The api is idempotent and quiet about what it does not touch -- mails already in that state,
+     * mails that are not the caller's -- so these hand it what was ticked and let it sort out what
+     * of that is work.
+     */
+    async setReadAll(ids: string[], isRead: boolean): Promise<void> {
+        await this.bulkWrite(ids, isRead ? "read" : "unread");
+    }
+
+    /** Where a selection stands. Spam is one mail at a time; nothing files a stretch as spam. */
+    async setArchiveStateAll(ids: string[], state: "archive" | "unarchive"): Promise<void> {
+        await this.bulkWrite(ids, state);
+    }
+
+    /**
+     * `POST /api/emails/bulk/<action>` for every part of [ids], one part after the other.
+     *
+     * In parts because the route takes so many at once (see `MAX_BULK_IDS`), and one after the
+     * other because a selection of thousands would otherwise be a burst of requests -- everything
+     * else on the page, the socket included, queues behind the same few connections.
+     *
+     * A part that failed is logged and the rest carry on: stopping half way would leave the
+     * selection half written with nothing saying where it stopped.
+     */
+    private async bulkWrite(ids: string[], action: string): Promise<void> {
+        for (let from = 0; from < ids.length; from += BULK_CHUNK) {
+            const part = ids.slice(from, from + BULK_CHUNK);
+
+            try {
+                const response = await fetch(`/api/emails/bulk/${action}`, {
+                    method: "POST",
+                    headers: {"content-type": "application/json"},
+                    body: JSON.stringify({ids: part}),
+                });
+
+                if (!response.ok) {
+                    console.error(`Could not write ${part.length} mails: ${response.status}`);
+                    continue;
+                }
+
+                // What is on screen is read again; the rest of the part is not held anyway.
+                this.requestSnapshots(part);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    }
+
+    /**
      * Saves the mail's own source as an `.eml`, the file a mail client can be handed.
      *
      * A fetch and an anchor rather than pointing the browser straight at the url: the answer only
@@ -369,6 +426,14 @@ export class EmailRepository {
         if (!this.watchers.has(id) && !this.releasing.has(id)) return;
 
         this.send("subscribe.emails", [id]);
+    }
+
+    /** The same for a batch, in one message: the ids of it that anything is showing. */
+    private requestSnapshots(ids: string[]) {
+        const held = ids.filter((id) => this.watchers.has(id) || this.releasing.has(id));
+        if (held.length === 0) return;
+
+        this.send("subscribe.emails", held);
     }
 
     /**

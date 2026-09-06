@@ -19,6 +19,7 @@
     import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
+    import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
     import {MailSelection, setMailSelection} from "./mailSelection";
@@ -28,6 +29,7 @@
     import MailDetailPanel, {PANEL_COVER} from "./detail_panel/MailDetailPanel.svelte";
     import {coverHeaderEnd} from "$lib/app/shell/pageHeader.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
+    import MailSelectionBar from "./MailSelectionBar.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
     /**
@@ -74,6 +76,29 @@
     $effect(() => {
         void allMails;
         untrack(() => selection.clear());
+    });
+
+    /**
+     * Whether [mail] is still in the list it was picked in. The mailbox is what has not been put
+     * away; everything that ever arrived is everything but spam -- the two scopes, see MailScope
+     * on the server.
+     */
+    const stillListed = (mail: EmailMeta) =>
+        allMails ? mail.archiveState !== "spam" : mail.archiveState === "unarchive";
+
+    // A mail that left the list is not picked any more: it was archived from the panel, or filed
+    // by the assistant, and a tick nobody can see is one nobody can take back.
+    //
+    // Only the mails the repository holds are looked at -- the rest are not on screen either, and
+    // what put them away would have gone through here as well. Writing bumps the set this reads,
+    // so this runs once more and then finds nothing left to drop.
+    $effect(() => {
+        const gone = selection.ids.filter((id) => {
+            const mail = mails.peek(id).value;
+            return mail !== null && !stillListed(mail);
+        });
+
+        if (gone.length > 0) untrack(() => selection.setAll(gone, false));
     });
 
     // An empty mailbox holds no rows and would therefore subscribe to nothing, which is when the
@@ -317,22 +342,33 @@
     <!-- Stays under the app header while the rows run past it: this is the bar the filters go
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
          header's height, and the background is its own -- rows would show through it. -->
-    <div class="bg-background sticky top-12 z-20 flex items-baseline gap-2 px-4 py-2">
-        <h2 class="font-heading text-sm font-medium">
-            {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
-        </h2>
-        {#if list.initialized}
-            <span class="text-muted-foreground text-xs tabular-nums">
-                {$_("mails.count", {values: {count: list.total}})}
-            </span>
-        {/if}
+    <!-- What is in it depends on what the reader is doing: which list this is, or -- while mails
+         are picked -- what has been picked and what can be done to it. The same bar either way,
+         and the same height, so the list below does not move as the two swap. The toggle and the
+         buttons are both 2rem, which is what sets it. -->
+    <div class="bg-background sticky top-12 z-20 flex h-12 items-center px-4">
+        {#if selection.active}
+            <MailSelectionBar {selection}/>
+        {:else}
+            <div class="flex w-full items-baseline gap-2">
+                <h2 class="font-heading text-sm font-medium">
+                    {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
+                </h2>
+                {#if list.initialized}
+                    <span class="text-muted-foreground text-xs tabular-nums">
+                        {$_("mails.count", {values: {count: list.total}})}
+                    </span>
+                {/if}
 
-        <!-- The filters live at this end of the bar, and this is the first of them. Not
-             "archived yes or no" but which list it is: the mailbox, or everything that arrived. -->
-        <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
-            <ArchiveIcon data-icon="inline-start"/>
-            {$_("mails.filters.allMails")}
-        </Toggle>
+                <!-- The filters live at this end of the bar, and this is the first of them. Not
+                     "archived yes or no" but which list it is: the mailbox, or everything that
+                     arrived. -->
+                <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
+                    <ArchiveIcon data-icon="inline-start"/>
+                    {$_("mails.filters.allMails")}
+                </Toggle>
+            </div>
+        {/if}
     </div>
 
     <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap

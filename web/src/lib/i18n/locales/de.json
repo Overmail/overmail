@@ -67,7 +67,13 @@
     "noSubject": "(kein Betreff)",
     "selection": {
       "select": "„{subject}“ auswählen",
-      "selectGroup": "Alles unter „{group}“ auswählen"
+      "selectGroup": "Alles unter „{group}“ auswählen",
+      "count": "{count, plural, one {# Mail ausgewählt} other {# Mails ausgewählt}}",
+      "more": "+{count}",
+      "markRead": "Alle als gelesen markieren",
+      "markUnread": "Alle als ungelesen markieren",
+      "archive": "Alle archivieren",
+      "unarchive": "Alle zurück ins Postfach"
     },
     "participants": {
       "to": "An",

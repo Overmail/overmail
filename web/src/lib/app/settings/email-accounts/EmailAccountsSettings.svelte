@@ -4,7 +4,15 @@
     import * as Empty from "$lib/components/ui/empty";
     import * as Table from "$lib/components/ui/table";
     import {Spinner} from "$lib/components/ui/spinner/index.ts";
-    import {EnvelopeSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon, WarningCircleIcon} from "phosphor-svelte";
+    import {
+        EnvelopeSimpleIcon,
+        PauseIcon,
+        PencilSimpleIcon,
+        PlayIcon,
+        PlusIcon,
+        TrashIcon,
+        WarningCircleIcon,
+    } from "phosphor-svelte";
     import NewEmailAccountDialog from "$lib/app/settings/email-accounts/new/NewEmailAccountDialog.svelte";
     import DeleteInboxDialog from "$lib/app/settings/email-accounts/DeleteInboxDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
@@ -17,6 +25,36 @@
     let showNewEmailAccountDialog = $state(false);
     /** The mailbox the delete dialog is asking about; null while it is closed. */
     let inboxToDelete: Inbox | null = $state(null);
+    /** Mailboxes whose pause is in flight, so the button cannot be pressed twice. */
+    let pausing: string[] = $state([]);
+
+    /**
+     * Switches the import for one mailbox off or on.
+     *
+     * The row is patched rather than the list re-read: re-reading would put the whole table back
+     * through its loading state for one flag. A failure does re-read, because then the screen and
+     * the server disagree and the server is right.
+     */
+    async function togglePaused(inbox: Inbox) {
+        if (pausing.includes(inbox.id)) return;
+        pausing = [...pausing, inbox.id];
+
+        try {
+            await inboxRepository.setPaused(inbox.id, !inbox.isPaused);
+            if (inboxes.type === "loaded") {
+                inboxes = {
+                    type: "loaded",
+                    rows: inboxes.rows.map((row) =>
+                        row.id === inbox.id ? {...row, isPaused: !inbox.isPaused} : row,
+                    ),
+                };
+            }
+        } catch {
+            await load();
+        } finally {
+            pausing = pausing.filter((id) => id !== inbox.id);
+        }
+    }
 
     let inboxes: {type: "loading"} | {type: "loaded"; rows: Inbox[]} | {type: "failed"} = $state({
         type: "loading",
@@ -116,8 +154,9 @@
                             <Table.Head class={cn("bg-popover sticky left-0 z-20 transition-shadow", PINNED_LEFT_EDGE, scrolledFromStart && PINNED_LEFT_EDGE_ON)}>
                                 {$_("settings.emailAccounts.list.columns.username")}
                             </Table.Head>
-                            <Table.Head>{$_("settings.emailAccounts.list.columns.server")}</Table.Head>
-                            <Table.Head>{$_("settings.emailAccounts.list.columns.folders")}</Table.Head>
+                            <Table.Head>
+                                <span class="pl-1">{$_("settings.emailAccounts.list.columns.folders")}</span>
+                            </Table.Head>
                             <!--
                               The actions column. Empty *and* transparent on purpose: the backdrop
                               under the buttons belongs to a row being hovered, and a header is
@@ -137,19 +176,21 @@
                                             scrolledFromStart && PINNED_LEFT_EDGE_ON,
                                         )}
                                 >
-                                    {inbox.username}
-                                </Table.Cell>
-                                <!--
-                                  The port belongs with the host: two accounts on one provider
-                                  differ by it, and a row showing only the host reads as a
-                                  duplicate of the other.
-                                -->
-                                <Table.Cell class="text-muted-foreground whitespace-nowrap font-mono">
-                                    {inbox.host}:{inbox.port}
+                                    <div class="flex flex-col">
+                                        <span>
+                                            {inbox.username}
+                                        </span>
+                                        <div class="flex flex-row gap-1 items-center text-muted-foreground whitespace-nowrap text-xs font-mono">
+                                            {#if inbox.isPaused}
+                                                <PauseIcon class="w-3 h-3" />
+                                            {/if}
+                                            <span>{inbox.host}:{inbox.port}</span>
+                                        </div>
+                                    </div>
                                 </Table.Cell>
                                 <Table.Cell>
                                     {#if inbox.folders.length === 0}
-                                        <span class="text-muted-foreground">
+                                        <span class="text-muted-foreground pl-1">
                                             {$_("settings.emailAccounts.list.noFolders")}
                                         </span>
                                     {:else}
@@ -215,6 +256,33 @@
                                         >
                                             <PencilSimpleIcon />
                                         </Button>
+                                        <!--
+                                          Between edit and delete, and the only one of the three
+                                          that is reversible -- which is why the delete dialog
+                                          offers it as the way out.
+                                        -->
+                                        <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                disabled={pausing.includes(inbox.id)}
+                                                aria-label={$_(
+                                                    inbox.isPaused
+                                                        ? "settings.emailAccounts.list.actions.resume"
+                                                        : "settings.emailAccounts.list.actions.pause",
+                                                )}
+                                                title={$_(
+                                                    inbox.isPaused
+                                                        ? "settings.emailAccounts.list.actions.resume"
+                                                        : "settings.emailAccounts.list.actions.pause",
+                                                )}
+                                                onclick={() => togglePaused(inbox)}
+                                        >
+                                            {#if inbox.isPaused}
+                                                <PlayIcon />
+                                            {:else}
+                                                <PauseIcon />
+                                            {/if}
+                                        </Button>
                                         <Button
                                                 variant="ghost"
                                                 size="icon-sm"
@@ -261,4 +329,4 @@
 
 <!-- Neither dialog knows about this list, so each says what it did and this re-reads. -->
 <NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} />
-<DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} />
+<DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} onPaused={load} />

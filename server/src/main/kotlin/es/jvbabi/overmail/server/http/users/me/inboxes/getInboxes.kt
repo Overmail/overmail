@@ -33,11 +33,25 @@ fun Route.getInboxes() {
 
             val inboxes = call.database().query {
                 val accounts = ImapAccounts
-                    .select(ImapAccounts.id, ImapAccounts.host, ImapAccounts.port, ImapAccounts.username)
+                    .select(
+                        ImapAccounts.id,
+                        ImapAccounts.host,
+                        ImapAccounts.port,
+                        ImapAccounts.username,
+                        ImapAccounts.isPaused,
+                    )
                     .where { ImapAccounts.user eq userId }
                     .orderBy(ImapAccounts.username to SortOrder.ASC)
                     .map { row ->
-                        Triple(row[ImapAccounts.id].value, row[ImapAccounts.host] to row[ImapAccounts.port], row[ImapAccounts.username])
+                        InboxesResponse.Inbox(
+                            id = row[ImapAccounts.id].value,
+                            host = row[ImapAccounts.host],
+                            port = row[ImapAccounts.port],
+                            username = row[ImapAccounts.username],
+                            isPaused = row[ImapAccounts.isPaused],
+                            folders = emptyList(),
+                            emailCount = 0L,
+                        )
                     }
 
                 // One query for every account's mails rather than one per account, same as the
@@ -45,7 +59,7 @@ fun Route.getInboxes() {
                 // somebody has. The count is what a delete has to warn about.
                 val mailsByAccount = if (accounts.isEmpty()) emptyMap() else Emails
                     .select(Emails.imapAccount, Emails.id.count())
-                    .where { Emails.imapAccount inList accounts.map { it.first } }
+                    .where { Emails.imapAccount inList accounts.map { it.id } }
                     .groupBy(Emails.imapAccount)
                     .associate { it[Emails.imapAccount].value to it[Emails.id.count()] }
 
@@ -54,18 +68,14 @@ fun Route.getInboxes() {
                 // somebody has.
                 val foldersByAccount = if (accounts.isEmpty()) emptyMap() else ImapAccountFolderSyncs
                     .selectAll()
-                    .where { ImapAccountFolderSyncs.imapAccount inList accounts.map { it.first } }
+                    .where { ImapAccountFolderSyncs.imapAccount inList accounts.map { it.id } }
                     .orderBy(ImapAccountFolderSyncs.folder to SortOrder.ASC)
                     .groupBy({ it[ImapAccountFolderSyncs.imapAccount].value }, { it[ImapAccountFolderSyncs.folder] })
 
-                accounts.map { (id, hostAndPort, username) ->
-                    InboxesResponse.Inbox(
-                        id = id,
-                        host = hostAndPort.first,
-                        port = hostAndPort.second,
-                        username = username,
-                        folders = foldersByAccount[id].orEmpty(),
-                        emailCount = mailsByAccount[id] ?: 0L,
+                accounts.map { inbox ->
+                    inbox.copy(
+                        folders = foldersByAccount[inbox.id].orEmpty(),
+                        emailCount = mailsByAccount[inbox.id] ?: 0L,
                     )
                 }
             }
@@ -86,6 +96,8 @@ private data class InboxesResponse(
         @SerialName("port") val port: Int,
         /** The imap login, which for most providers is the address itself. */
         @SerialName("username") val username: String,
+        /** Whether the importer for it is switched off; nothing imported is affected by that. */
+        @SerialName("is_paused") val isPaused: Boolean,
         /** The folders being synced, by name, alphabetically. */
         @SerialName("folders") val folders: List<String>,
         /** How many mails were imported through it -- what deleting it would take with it. */

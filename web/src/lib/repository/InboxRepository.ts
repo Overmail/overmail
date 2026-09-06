@@ -5,6 +5,8 @@ export type Inbox = {
     port: number;
     /** The imap login, which for most providers is the address itself. */
     username: string;
+    /** Whether its importer is switched off. Nothing already imported is affected by that. */
+    isPaused: boolean;
     /** The folders being synced, by name, alphabetically. */
     folders: string[];
     /** How many mails were imported through it -- what disconnecting it would take with it. */
@@ -31,9 +33,25 @@ export class InboxRepository {
             host: inbox.host as string,
             port: inbox.port as number,
             username: inbox.username as string,
+            isPaused: (inbox.is_paused ?? false) as boolean,
             folders: (inbox.folders ?? []) as string[],
             emailCount: (inbox.email_count ?? 0) as number,
         }));
+    }
+
+    /**
+     * Stops or restarts the import for a mailbox.
+     *
+     * Nothing is deleted either way -- this only decides whether the importer runs, which is what
+     * makes it the gentler answer to "make this stop" than disconnecting.
+     */
+    async setPaused(id: string, paused: boolean, signal?: AbortSignal): Promise<void> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/${paused ? "pause" : "resume"}`, {
+            method: "POST",
+            credentials: "include",
+            signal,
+        });
+        if (!response.ok) throw new Error(`Could not ${paused ? "pause" : "resume"} the inbox: ${response.status}`);
     }
 
     /**

@@ -43,7 +43,7 @@
             await wait(300);
             connected = [
                 ...connected,
-                {id: "acc-2", host: "imap.mail.de", port: 993, username: "new@example.com", folders: ["INBOX"], emailCount: 0},
+                {id: "acc-2", host: "imap.mail.de", port: 993, username: "new@example.com", folders: ["INBOX"], emailCount: 0, isPaused: false},
             ];
             return {type: "created", id: "acc-2"} as const;
         },
@@ -73,7 +73,7 @@
         {id: "acc-1", host: "imap.strato.de", port: 993, username: "julius@example.com", folders: [
             "INBOX", "Sent", "Drafts", "Trash", "Spam", "Archiv", "Archiv/Newsletter",
             "Archiv/Bestellungen, Zahlungen", "Archiv/Nachrichten", "Archiv/Rechtliches", "Archiv/Systeme",
-        ], emailCount: 2649},
+        ], emailCount: 2649, isPaused: false},
     ];
 
     const inboxes = {

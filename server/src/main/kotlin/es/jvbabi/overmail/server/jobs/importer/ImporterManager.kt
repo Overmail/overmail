@@ -45,6 +45,9 @@ class ImporterManager(
         importer.remove(accountId)?.stop()
 
         val account = database.query { ImapAccount.findById(accountId)?.toConnection() } ?: return
+        // Rebooting a paused account means leaving it stopped; the row is what decides, not the
+        // caller, so a resume and a pause can go through the same door.
+        if (account.isPaused) return
         importer[accountId] = startImporter(account)
     }
 
@@ -59,7 +62,11 @@ class ImporterManager(
         importer.remove(accountId)?.stop()
     }
 
-    private suspend fun reconcile(accounts: List<ImapConnection>) {
+    private suspend fun reconcile(allAccounts: List<ImapConnection>) {
+        // A paused account is treated as one that is not there at all: whatever importer it has is
+        // stopped below and none is started for it. That also makes a pause set straight in the
+        // database take hold, within RELOAD_INTERVAL.
+        val accounts = allAccounts.filterNot { it.isPaused }
         val currentIds = accounts.map { it.id }.toSet()
         importer.keys.filterNot { it in currentIds }.toList().forEach { removedId ->
             importer.remove(removedId)?.stop()
@@ -93,6 +100,7 @@ private fun ImapAccount.toConnection() = ImapConnection(
     port = port,
     username = username,
     password = password,
+    isPaused = isPaused,
     // Read here, with the account: the importer outlives this transaction and could not follow
     // the reference afterwards.
     folders = folderSyncs.map { sync ->

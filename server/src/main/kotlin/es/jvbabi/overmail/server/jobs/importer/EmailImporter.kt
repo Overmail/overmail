@@ -63,6 +63,8 @@ data class ImapConnection(
     val password: String,
     /** The folders this account syncs, and how. Empty means nothing is imported for it. */
     val folders: List<FolderSync>,
+    /** Whether the account is paused; a paused one has no importer at all. */
+    val isPaused: Boolean = false,
 ) {
     /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
     val signature: String

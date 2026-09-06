@@ -35,6 +35,10 @@ class OvermailDatabase(private val database: Database) {
         query {
             SchemaUtils.create(Users)
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
+            // `create` only ever adds missing *tables*, so a column added to a table that already
+            // exists would never reach a database that has been running. There is no migration
+            // tool here, and this is the one table that has gained a column since.
+            SchemaUtils.createMissingTablesAndColumns(ImapAccounts)
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)

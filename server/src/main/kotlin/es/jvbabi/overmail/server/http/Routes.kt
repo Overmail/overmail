@@ -22,6 +22,7 @@ import es.jvbabi.overmail.server.http.stack.stackSocket
 import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.users.me.inboxes.getInboxes
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.deleteInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
@@ -152,6 +153,15 @@ internal fun Application.configureRouting() {
 
                         route("/{inboxId}") {
                             deleteInbox()
+
+                            // One route per state, like the read and archive routes above.
+                            route("/pause") {
+                                setInboxPaused(paused = true)
+                            }
+
+                            route("/resume") {
+                                setInboxPaused(paused = false)
+                            }
                         }
 
                         route("/create") {

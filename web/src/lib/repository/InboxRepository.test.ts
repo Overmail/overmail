@@ -17,6 +17,7 @@ test("reads the mailboxes and their folders", async () => {
                 username: "julius@example.com",
                 folders: ["Archiv/Newsletter", "INBOX"],
                 email_count: 2649,
+                is_paused: true,
             },
         ],
     });
@@ -27,6 +28,7 @@ test("reads the mailboxes and their folders", async () => {
             host: "imap.example.com",
             port: 993,
             username: "julius@example.com",
+            isPaused: true,
             folders: ["Archiv/Newsletter", "INBOX"],
             emailCount: 2649,
         },
@@ -40,6 +42,8 @@ test("a mailbox without folders or mail is still a mailbox", async () => {
     const inbox = (await new InboxRepository().list())[0];
     expect(inbox.folders).toEqual([]);
     expect(inbox.emailCount).toBe(0);
+    // A mailbox the server says nothing about is running, not paused.
+    expect(inbox.isPaused).toBe(false);
 });
 
 test("deleting answers with how many mails went with the mailbox", async () => {

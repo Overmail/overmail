@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
     import {FlexRender, createTable} from "@tanstack/svelte-table";
+    import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {_} from "svelte-i18n";
     import {untrack} from "svelte";
     import {page} from "$app/state";
@@ -18,14 +19,17 @@
     import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
+    import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
+    import {MailSelection, setMailSelection} from "./mailSelection";
     import {EMAIL_PARAM, FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
     import MailDetailPanel, {PANEL_COVER} from "./detail_panel/MailDetailPanel.svelte";
     import {coverHeaderEnd} from "$lib/app/shell/pageHeader.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
+    import MailSelectionBar from "./MailSelectionBar.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
 
     /**
@@ -59,6 +63,44 @@
 
     $effect(() => list.setScope(allMails ? "all" : "unarchived"));
 
+    /**
+     * Which mails are ticked. Handed to the cells through the context rather than as a prop: what
+     * a column declares is a component and the mail it gets, nothing else (see columns.ts).
+     */
+    const selection = new MailSelection();
+    setMailSelection(selection);
+
+    // Switching the list switches which mails are on the table, and a tick that is no longer on
+    // screen is one nobody can take back. Untracked because clearing writes the very set a row
+    // reads -- tracked, this would be an effect that re-runs itself.
+    $effect(() => {
+        void allMails;
+        untrack(() => selection.clear());
+    });
+
+    /**
+     * Whether [mail] is still in the list it was picked in. The mailbox is what has not been put
+     * away; everything that ever arrived is everything but spam -- the two scopes, see MailScope
+     * on the server.
+     */
+    const stillListed = (mail: EmailMeta) =>
+        allMails ? mail.archiveState !== "spam" : mail.archiveState === "unarchive";
+
+    // A mail that left the list is not picked any more: it was archived from the panel, or filed
+    // by the assistant, and a tick nobody can see is one nobody can take back.
+    //
+    // Only the mails the repository holds are looked at -- the rest are not on screen either, and
+    // what put them away would have gone through here as well. Writing bumps the set this reads,
+    // so this runs once more and then finds nothing left to drop.
+    $effect(() => {
+        const gone = selection.ids.filter((id) => {
+            const mail = mails.peek(id).value;
+            return mail !== null && !stillListed(mail);
+        });
+
+        if (gone.length > 0) untrack(() => selection.setAll(gone, false));
+    });
+
     // An empty mailbox holds no rows and would therefore subscribe to nothing, which is when the
     // announcement below matters most: this keeps the socket up for as long as the table is here.
     $effect(() => mails.watchMoves());
@@ -89,6 +131,17 @@
     // is opened or closed, and the header then moves along with the panel sliding rather than
     // after it has finished.
     coverHeaderEnd(PANEL_COVER, () => openId !== null);
+
+    /*
+     * Escape ends selection mode, and only then: it is the way out for somebody who ticked a row
+     * by accident. While a mail is open the panel owns the key -- what the reader means by it
+     * with a mail on screen is "close the mail", and the next Escape then drops the selection.
+     */
+    createHotkey(
+        "Escape",
+        () => selection.clear(),
+        () => ({enabled: selection.active && openId === null, ignoreInputs: true})
+    );
 
     /**
      * Opens a mail beside the list.
@@ -157,6 +210,16 @@
         const index = list.indexOf(next);
         const row = index === undefined ? undefined : list.layout.rowOf(index);
         if (row !== undefined) virtualizer.virtualizer.scrollToIndex(row, {align: "auto"});
+    }
+
+    /**
+     * Where the mails under a header start in the mailbox -- what its box needs to know which
+     * mails it is about. The row after a header is its first mail: a stretch with a header over
+     * it holds at least one, and there are never two headers in a row.
+     */
+    function groupStart(headerRow: number): number {
+        const first = list.layout.rowAt(headerRow + 1);
+        return first?.kind === "mail" ? first.index : 0;
     }
 
     /** The table's one preview, driven by the rows below; see MailRowPreview. */
@@ -279,22 +342,33 @@
     <!-- Stays under the app header while the rows run past it: this is the bar the filters go
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
          header's height, and the background is its own -- rows would show through it. -->
-    <div class="bg-background sticky top-12 z-20 flex items-baseline gap-2 px-4 py-2">
-        <h2 class="font-heading text-sm font-medium">
-            {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
-        </h2>
-        {#if list.initialized}
-            <span class="text-muted-foreground text-xs tabular-nums">
-                {$_("mails.count", {values: {count: list.total}})}
-            </span>
-        {/if}
+    <!-- What is in it depends on what the reader is doing: which list this is, or -- while mails
+         are picked -- what has been picked and what can be done to it. The same bar either way,
+         and the same height, so the list below does not move as the two swap. The toggle and the
+         buttons are both 2rem, which is what sets it. -->
+    <div class="bg-background sticky top-12 z-20 flex h-12 items-center px-4">
+        {#if selection.active}
+            <MailSelectionBar {selection}/>
+        {:else}
+            <div class="flex w-full items-baseline gap-2">
+                <h2 class="font-heading text-sm font-medium">
+                    {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
+                </h2>
+                {#if list.initialized}
+                    <span class="text-muted-foreground text-xs tabular-nums">
+                        {$_("mails.count", {values: {count: list.total}})}
+                    </span>
+                {/if}
 
-        <!-- The filters live at this end of the bar, and this is the first of them. Not
-             "archived yes or no" but which list it is: the mailbox, or everything that arrived. -->
-        <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
-            <ArchiveIcon data-icon="inline-start"/>
-            {$_("mails.filters.allMails")}
-        </Toggle>
+                <!-- The filters live at this end of the bar, and this is the first of them. Not
+                     "archived yes or no" but which list it is: the mailbox, or everything that
+                     arrived. -->
+                <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
+                    <ArchiveIcon data-icon="inline-start"/>
+                    {$_("mails.filters.allMails")}
+                </Toggle>
+            </div>
+        {/if}
     </div>
 
     <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap
@@ -332,9 +406,16 @@
                     {#if entry?.kind === "header"}
                         <!-- The stretch this and the rows below it belong to. One cell across the
                              table: a heading is not a value in a column. -->
-                        <Table.Row class="border-0 hover:bg-transparent">
+                        <!-- A row of the table like any other as far as the cursor goes: the
+                             header's own box comes out on hover, see selectionReveal. -->
+                        <Table.Row class="group/mail-row border-0 hover:bg-transparent">
                             <Table.Cell colspan={columns.length} class="p-0 align-bottom">
-                                <MailGroupHeader label={entry.label} count={entry.count}/>
+                                <MailGroupHeader
+                                        label={entry.label}
+                                        count={entry.count}
+                                        start={groupStart(item.index)}
+                                        {list}
+                                />
                             </Table.Cell>
                         </Table.Row>
                     {:else if modelRow}
@@ -347,10 +428,19 @@
                              the panel into the history, so the page's back button leads to the
                              list with that mail still open. The query is what puts it there. -->
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- The row is the group the avatar and its checkbox swap on, and a
+                             mail that has been picked takes the one colour of this theme that is
+                             not a grey -- so the picked rows stand out of a list whose every
+                             other state, the hover and the open mail included, is a shade of
+                             it. The text keeps the tones it has: what is picked is the row. -->
                         <Table.Row
                                 aria-rowindex={item.index + 1}
                                 data-state={modelRow.id === openId ? "selected" : undefined}
-                                class={cn("h-10 cursor-pointer border-0")}
+                                class={cn(
+                                    "group/mail-row h-10 cursor-pointer border-0",
+                                    selection.has(modelRow.id) &&
+                                        "bg-accent hover:bg-accent data-[state=selected]:bg-accent"
+                                )}
                                 onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
                                 onmouseleave={() => rowPreview?.leave()}
                                 onclick={() => showEmail(modelRow.id, "push")}

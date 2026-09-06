@@ -65,6 +65,16 @@
     "loadFailed": "Could not load more mail.",
     "retry": "Try again",
     "noSubject": "(no subject)",
+    "selection": {
+      "select": "Select “{subject}”",
+      "selectGroup": "Select everything under “{group}”",
+      "count": "{count, plural, one {# mail selected} other {# mails selected}}",
+      "more": "+{count}",
+      "markRead": "Mark all as read",
+      "markUnread": "Mark all as unread",
+      "archive": "Archive all",
+      "unarchive": "Move all back to the mailbox"
+    },
     "participants": {
       "to": "To",
       "cc": "Cc",

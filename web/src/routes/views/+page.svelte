@@ -34,6 +34,14 @@
     const MAX_ACTIVE = 2;
     const FLIP_MS = 150;
 
+    // Same shape as a category's `sort`, but for the mails inside a group.
+    const MAIL_SORTS: GroupCategory["sort"][] = [
+        { key: "date", label: "nach Datum" },
+        { key: "sender", label: "nach Absender" },
+        { key: "subject", label: "nach Betreff" },
+        { key: "size", label: "nach Größe" },
+    ];
+
     // One ordered list; the first `activeCount` entries are the active group.
     // Membership is therefore a consequence of position, never stored separately.
     let groupCategories = $state<GroupCategory[]>([
@@ -55,12 +63,18 @@
     // `sort` above, which is static config — and it survives reordering.
     let reversedSort = $state<Record<string, boolean>>({});
 
+    // Only the deepest active category holds mails directly, so this is a single
+    // setting rather than one per category.
+    let mailSortKey = $state(MAIL_SORTS[0].key);
+    let mailSortReversed = $state(false);
+
     // flip animates with transforms, so getBoundingClientRect() reports positions
     // mid-flight — measurements are only trusted once the list has settled.
     let settledAt = 0;
 
     const active = $derived(groupCategories.slice(0, activeCount));
     const inactive = $derived(groupCategories.slice(activeCount));
+    const deepest = $derived(active.at(-1));
 
     // Changing group means leaving one {#each} and entering the other, which
     // animate:flip cannot follow — crossfade bridges the two.
@@ -214,6 +228,23 @@
                 <DropdownMenu.SubContent class="w-64">
                     {@render categoryGroup(`Aktive Kategorien (${activeCount}/${MAX_ACTIVE})`, active, true, "Zum Gruppieren hierher ziehen")}
                     {@render categoryGroup("Inaktive Kategorien", inactive, false, "Alle Kategorien sind aktiv")}
+
+                    {#if deepest}
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Group>
+                            <DropdownMenu.Label>E-Mails in „{deepest.name}“</DropdownMenu.Label>
+                            <DropdownMenu.RadioGroup bind:value={mailSortKey}>
+                                {#each MAIL_SORTS as option (option.key)}
+                                    <DropdownMenu.RadioItem value={option.key} closeOnSelect={false}>
+                                        {option.label}
+                                    </DropdownMenu.RadioItem>
+                                {/each}
+                            </DropdownMenu.RadioGroup>
+                            <DropdownMenu.CheckboxItem bind:checked={mailSortReversed} closeOnSelect={false}>
+                                Umgekehrte Reihenfolge
+                            </DropdownMenu.CheckboxItem>
+                        </DropdownMenu.Group>
+                    {/if}
                 </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
         </DropdownMenu.Content>

@@ -19,6 +19,7 @@
     import {Button} from "$lib/components/ui/button";
     import {flip} from "svelte/animate";
     import {crossfade} from "svelte/transition";
+    import * as Tooltip from "$lib/components/ui/tooltip";
     import {
         ArchiveIcon,
         CalendarDotIcon,
@@ -34,26 +35,27 @@
     const MAX_ACTIVE = 2;
     const FLIP_MS = 150;
 
-    // Same shape as a category's `sort`, but for the mails inside a group.
-    const MAIL_SORTS: GroupCategory["sort"][] = [
-        { key: "date", label: "nach Datum" },
-        { key: "sender", label: "nach Absender" },
-        { key: "subject", label: "nach Betreff" },
-        { key: "size", label: "nach Größe" },
+    // `name` is what the row reads; `label`/`label_reversed` are the full tooltip
+    // sentences for the two directions, same rule as a category's `sort`.
+    const MAIL_SORTS = [
+        { key: "date", name: "Datum", label: "Nach Datum, neueste zuerst", label_reversed: "Nach Datum, älteste zuerst" },
+        { key: "sender", name: "Absender", label: "Absender, A–Z", label_reversed: "Absender, Z–A" },
+        { key: "subject", name: "Betreff", label: "Betreff, A–Z", label_reversed: "Betreff, Z–A" },
+        { key: "size", name: "Größe", label: "Größte zuerst", label_reversed: "Kleinste zuerst" },
     ];
 
     // One ordered list; the first `activeCount` entries are the active group.
     // Membership is therefore a consequence of position, never stored separately.
     let groupCategories = $state<GroupCategory[]>([
         // the first MAX_ACTIVE entries are the initially active ones
-        { key: "date-smart", name: "Datum (intelligent)", icon: CalendarStarIcon, sort: { key: "date", reversible: true, label: "nach Datum", label_reversed: "nach Datum" } },
+        { key: "date-smart", name: "Datum (intelligent)", icon: CalendarStarIcon, sort: { key: "date", reversible: true, label: "Nach Datum, neueste zuerst", label_reversed: "Nach Datum, älteste zuerst" } },
         { key: "read", name: "Gelesen", icon: EyeglassesIcon, sort: { key: "read", label: "Gelesene zuerst", reversible: true, label_reversed: "Ungelesene zuerst" } },
-        { key: "date-month", name: "Monat", icon: CalendarDotsIcon, sort: { key: "date", reversible: true, label: "nach Datum", label_reversed: "nach Datum" } },
-        { key: "date-year", name: "Jahr", icon: CalendarDotIcon, sort: { key: "date", reversible: true, label: "nach Datum", label_reversed: "nach Datum" } },
-        { key: "date-day", name: "Tag", icon: CalendarIcon, sort: { key: "date", reversible: true, label: "nach Datum", label_reversed: "nach Datum" } },
-        { key: "sender", name: "Absender", icon: PersonSimpleIcon, sort: { key: "sender", reversible: true, label: "nach Absender", label_reversed: "nach Absender" } },
-        { key: "imap-account", name: "E-Mail-Konto", icon: UsersIcon, sort: { key: "imap-account", reversible: true, label: "nach E-Mail-Konto", label_reversed: "nach E-Mail-Konto" } },
-        { key: "Archive", name: "Archiviert", icon: ArchiveIcon, sort: { key: "archive", reversible: true, label: "nach Archiviert", label_reversed: "nach Archiviert" } },
+        { key: "date-month", name: "Monat", icon: CalendarDotsIcon, sort: { key: "date", reversible: true, label: "Nach Monat, neueste zuerst", label_reversed: "Nach Monat, älteste zuerst" } },
+        { key: "date-year", name: "Jahr", icon: CalendarDotIcon, sort: { key: "date", reversible: true, label: "Nach Jahr, neueste zuerst", label_reversed: "Nach Jahr, älteste zuerst" } },
+        { key: "date-day", name: "Tag", icon: CalendarIcon, sort: { key: "date", reversible: true, label: "Nach Tag, neueste zuerst", label_reversed: "Nach Tag, älteste zuerst" } },
+        { key: "sender", name: "Absender", icon: PersonSimpleIcon, sort: { key: "sender", reversible: true, label: "Absender, A–Z", label_reversed: "Absender, Z–A" } },
+        { key: "imap-account", name: "E-Mail-Konto", icon: UsersIcon, sort: { key: "imap-account", reversible: true, label: "E-Mail-Konto, A–Z", label_reversed: "E-Mail-Konto, Z–A" } },
+        { key: "Archive", name: "Archiviert", icon: ArchiveIcon, sort: { key: "archive", reversible: true, label: "Aktive zuerst", label_reversed: "Archivierte zuerst" } },
     ]);
 
     let activeCount = $state(MAX_ACTIVE);
@@ -97,6 +99,13 @@
     function toggleSort(category: GroupCategory) {
         if (!category.sort.reversible) return;
         reversedSort[category.key] = !reversedSort[category.key];
+    }
+
+    // Reversing is not an option of its own: picking the already picked field
+    // flips it, switching fields starts from that field's natural order.
+    function selectMailSort(key: string) {
+        if (mailSortKey === key) mailSortReversed = !mailSortReversed;
+        else mailSortReversed = false;
     }
 
     function allowDrop(event: DragEvent) {
@@ -162,6 +171,21 @@
     }
 </script>
 
+<!-- A span, not Tooltip.Trigger's default button: a button inside a menuitem
+     would break the role and swallow the row's own click handling. -->
+{#snippet sortHint(Icon: Component, text: string)}
+    <Tooltip.Root delayDuration={300}>
+        <Tooltip.Trigger>
+            {#snippet child({ props })}
+                <span {...props} class="ml-auto flex items-center text-muted-foreground">
+                    <Icon />
+                </span>
+            {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content side="right">{text}</Tooltip.Content>
+    </Tooltip.Root>
+{/snippet}
+
 {#snippet categoryGroup(label: string, list: GroupCategory[], isActive: boolean, emptyHint: string)}
     <!-- The group, not each item, owns the drop handling — an emptied list stays reachable -->
     <div
@@ -184,7 +208,6 @@
                         data-key={category.key}
                         class={draggingKey === category.key ? "opacity-40" : undefined}
                         aria-label={isActive ? `${category.name}: ${sortLabel(category)}` : category.name}
-                        title={isActive ? sortLabel(category) : undefined}
                         onSelect={() => isActive && toggleSort(category)}
                 >
                     <span
@@ -200,12 +223,44 @@
                     <Icon />
                     <span class="truncate">{category.name}</span>
                     {#if isActive && category.sort.reversible}
-                        {@const SortIcon = reversedSort[category.key] ? SortDescendingIcon : SortAscendingIcon}
-                        <SortIcon class="ml-auto text-muted-foreground" />
+                        {@render sortHint(
+                            reversedSort[category.key] ? SortDescendingIcon : SortAscendingIcon,
+                            sortLabel(category)
+                        )}
                     {/if}
                 </DropdownMenu.Item>
             </div>
         {/each}
+
+        {#if isActive && deepest}
+            <!-- The deepest active category is the last row, so rendering right after
+                 the loop puts these under the group whose mails they actually order -->
+            <div class="my-1 ml-5 border-l pl-1">
+                <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
+                    E-Mails hierin sortieren
+                </DropdownMenu.Label>
+                <DropdownMenu.RadioGroup bind:value={mailSortKey}>
+                    {#each MAIL_SORTS as option (option.key)}
+                        {@const selected = mailSortKey === option.key}
+                        {@const hint = selected && mailSortReversed ? option.label_reversed : option.label}
+                        <DropdownMenu.RadioItem
+                                value={option.key}
+                                closeOnSelect={false}
+                                onSelect={() => selectMailSort(option.key)}
+                                aria-label={`${option.name}: ${hint}`}
+                        >
+                            <span class="truncate">{option.name}</span>
+                            {#if selected}
+                                {@render sortHint(
+                                    mailSortReversed ? SortDescendingIcon : SortAscendingIcon,
+                                    hint
+                                )}
+                            {/if}
+                        </DropdownMenu.RadioItem>
+                    {/each}
+                </DropdownMenu.RadioGroup>
+            </div>
+        {/if}
 
         {#if list.length === 0}
             <p class="mx-2 my-1 rounded-xl border border-dashed px-2 py-3 text-center text-xs text-muted-foreground">
@@ -228,23 +283,6 @@
                 <DropdownMenu.SubContent class="w-64">
                     {@render categoryGroup(`Aktive Kategorien (${activeCount}/${MAX_ACTIVE})`, active, true, "Zum Gruppieren hierher ziehen")}
                     {@render categoryGroup("Inaktive Kategorien", inactive, false, "Alle Kategorien sind aktiv")}
-
-                    {#if deepest}
-                        <DropdownMenu.Separator />
-                        <DropdownMenu.Group>
-                            <DropdownMenu.Label>E-Mails in „{deepest.name}“</DropdownMenu.Label>
-                            <DropdownMenu.RadioGroup bind:value={mailSortKey}>
-                                {#each MAIL_SORTS as option (option.key)}
-                                    <DropdownMenu.RadioItem value={option.key} closeOnSelect={false}>
-                                        {option.label}
-                                    </DropdownMenu.RadioItem>
-                                {/each}
-                            </DropdownMenu.RadioGroup>
-                            <DropdownMenu.CheckboxItem bind:checked={mailSortReversed} closeOnSelect={false}>
-                                Umgekehrte Reihenfolge
-                            </DropdownMenu.CheckboxItem>
-                        </DropdownMenu.Group>
-                    {/if}
                 </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
         </DropdownMenu.Content>

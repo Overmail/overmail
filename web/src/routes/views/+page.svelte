@@ -26,6 +26,8 @@
         CalendarIcon,
         CalendarStarIcon, DotsSixVerticalIcon, EyeglassesIcon,
         PersonSimpleIcon,
+        SortAscendingIcon,
+        SortDescendingIcon,
         UsersIcon
     } from "phosphor-svelte";
 
@@ -43,11 +45,15 @@
         { key: "date-day", name: "Tag", icon: CalendarIcon, sort: { key: "date", reversible: true, label: "nach Datum", label_reversed: "nach Datum" } },
         { key: "sender", name: "Absender", icon: PersonSimpleIcon, sort: { key: "sender", reversible: true, label: "nach Absender", label_reversed: "nach Absender" } },
         { key: "imap-account", name: "E-Mail-Konto", icon: UsersIcon, sort: { key: "imap-account", reversible: true, label: "nach E-Mail-Konto", label_reversed: "nach E-Mail-Konto" } },
-        { key: "Archive", name: "Archiviert", icon: ArchiveIcon, sort: { key: "archive", reversible: true, label: "nach Archiviert"}, label_reversed: "nach Archiviert" }
+        { key: "Archive", name: "Archiviert", icon: ArchiveIcon, sort: { key: "archive", reversible: true, label: "nach Archiviert", label_reversed: "nach Archiviert" } },
     ]);
 
     let activeCount = $state(MAX_ACTIVE);
     let draggingKey = $state<string | null>(null);
+
+    // Which categories run their sort reversed, keyed by category. Separate from
+    // `sort` above, which is static config — and it survives reordering.
+    let reversedSort = $state<Record<string, boolean>>({});
 
     // flip animates with transforms, so getBoundingClientRect() reports positions
     // mid-flight — measurements are only trusted once the list has settled.
@@ -66,6 +72,17 @@
         // Firefox starts no drag without a payload
         event.dataTransfer?.setData("text/plain", category.key);
         if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    }
+
+    function sortLabel(category: GroupCategory) {
+        return reversedSort[category.key]
+            ? category.sort.label_reversed ?? category.sort.label
+            : category.sort.label;
+    }
+
+    function toggleSort(category: GroupCategory) {
+        if (!category.sort.reversible) return;
+        reversedSort[category.key] = !reversedSort[category.key];
     }
 
     function allowDrop(event: DragEvent) {
@@ -152,6 +169,9 @@
                         closeOnSelect={false}
                         data-key={category.key}
                         class={draggingKey === category.key ? "opacity-40" : undefined}
+                        aria-label={isActive ? `${category.name}: ${sortLabel(category)}` : category.name}
+                        title={isActive ? sortLabel(category) : undefined}
+                        onSelect={() => isActive && toggleSort(category)}
                 >
                     <span
                             draggable="true"
@@ -159,11 +179,16 @@
                             class="flex cursor-grab items-center active:cursor-grabbing"
                             ondragstart={(event) => onDragStart(event, category)}
                             ondragend={() => (draggingKey = null)}
+                            onclick={(event) => event.stopPropagation()}
                     >
                         <DotsSixVerticalIcon />
                     </span>
                     <Icon />
-                    {category.name}
+                    <span class="truncate">{category.name}</span>
+                    {#if isActive && category.sort.reversible}
+                        {@const SortIcon = reversedSort[category.key] ? SortDescendingIcon : SortAscendingIcon}
+                        <SortIcon class="ml-auto text-muted-foreground" />
+                    {/if}
                 </DropdownMenu.Item>
             </div>
         {/each}
@@ -186,7 +211,7 @@
         <DropdownMenu.Content class="w-56" align="start">
             <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>Gruppieren</DropdownMenu.SubTrigger>
-                <DropdownMenu.SubContent>
+                <DropdownMenu.SubContent class="w-64">
                     {@render categoryGroup(`Aktive Kategorien (${activeCount}/${MAX_ACTIVE})`, active, true, "Zum Gruppieren hierher ziehen")}
                     {@render categoryGroup("Inaktive Kategorien", inactive, false, "Alle Kategorien sind aktiv")}
                 </DropdownMenu.SubContent>

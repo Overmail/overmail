@@ -55,6 +55,7 @@ class OvermailDatabase(private val database: Database) {
             // Like `ImapAccounts` above: the password columns came after the table did, and
             // `create` would not add them to a database that already has a `shares`.
             SchemaUtils.createMissingTablesAndColumns(Shares)
+            SchemaUtils.create(Views)
         }
     }
 

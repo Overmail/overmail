@@ -32,7 +32,7 @@
         UsersIcon
     } from "phosphor-svelte";
 
-    const MAX_ACTIVE = 2;
+    const MAX_ACTIVE = 4;
     const FLIP_MS = 150;
 
     // `name` is what the row reads; `label`/`label_reversed` are the full tooltip
@@ -41,7 +41,6 @@
         { key: "date", name: "Datum", label: "Nach Datum, neueste zuerst", label_reversed: "Nach Datum, älteste zuerst" },
         { key: "sender", name: "Absender", label: "Absender, A–Z", label_reversed: "Absender, Z–A" },
         { key: "subject", name: "Betreff", label: "Betreff, A–Z", label_reversed: "Betreff, Z–A" },
-        { key: "size", name: "Größe", label: "Größte zuerst", label_reversed: "Kleinste zuerst" },
     ];
 
     // One ordered list; the first `activeCount` entries are the active group.

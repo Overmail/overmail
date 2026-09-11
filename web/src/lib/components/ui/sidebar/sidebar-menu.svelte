@@ -16,7 +16,6 @@
 	data-sidebar="menu"
 	class={cn(
 		"gap-0.5 flex w-full min-w-0 flex-col",
-		"group-data-[compact=true]/sidebar-root:gap-0",
 		className
 	)}
 	{...restProps}

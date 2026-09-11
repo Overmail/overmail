@@ -16,7 +16,7 @@
 	data-sidebar="footer"
 	class={cn(
 		"gap-2 p-2 flex flex-col",
-		"group-data-[compact=true]/sidebar-root:gap-1 group-data-[compact=true]/sidebar-root:p-1.5",
+		"group-data-[compact=true]/sidebar-root:gap-1.5 group-data-[compact=true]/sidebar-root:p-1.5",
 		className
 	)}
 	{...restProps}

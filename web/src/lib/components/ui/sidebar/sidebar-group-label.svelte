@@ -19,7 +19,7 @@
 			// The icon-collapsed margin hides the label by pulling it up by its own height, so a
 			// shorter label needs a shorter pull. Both conditions sit on the same element, hence
 			// one selector instead of two stacked group variants.
-			"group-data-[compact=true]/sidebar-root:h-6 group-data-[compact=true]/sidebar-root:px-2 group-[[data-compact=true][data-collapsible=icon]]/sidebar-root:-mt-6",
+			"group-data-[compact=true]/sidebar-root:h-7 group-data-[compact=true]/sidebar-root:px-2.5 group-[[data-compact=true][data-collapsible=icon]]/sidebar-root:-mt-7",
 			className
 		),
 		"data-slot": "sidebar-group-label",

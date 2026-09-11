@@ -14,7 +14,7 @@
     Reordering is pointer-only for now; there is no keyboard way to move a row.
 -->
 <script lang="ts">
-    import {DotsThreeVerticalIcon, ListIcon, PlusIcon} from "phosphor-svelte";
+    import {PlusIcon} from "phosphor-svelte";
     import {flip} from "svelte/animate";
     import {goto} from "$app/navigation";
     import {page} from "$app/state";
@@ -26,9 +26,9 @@
         SidebarMenuSkeleton,
     } from "$lib/components/ui/sidebar";
     import {neighbourInOrder} from "$lib/app/views/reorder";
-    import {openViewId, viewHref, viewUrl} from "$lib/app/views/viewPath";
+    import {openViewId, viewUrl} from "$lib/app/views/viewPath";
     import {useRepositories} from "$lib/repository/repositories";
-    import {Button} from "$lib/components/ui/button";
+    import ViewListItem from "./ViewListItem.svelte";
 
     /** Long enough to follow a row to its new place, short enough not to hold up the next drag. */
     const FLIP_MS = 150;
@@ -220,26 +220,7 @@
                     ondragstart={(event) => onDragStart(event, view.id)}
                     ondragend={onDragEnd}
                 >
-                    <SidebarMenuButton isActive={view.id === openId}>
-                        <!-- An anchor, so a view can be opened in a new tab and its address
-                             copied; the router handles the click. Not draggable itself: a link
-                             drags its url, and the row around it drags the view. -->
-                        {#snippet child({ props })}
-                            <div class="flex flex-row items-center gap-1 justify-between pr-2">
-                                <a href={viewHref(view.id, view.name, page.url)} draggable="false" {...props}>
-                                    <ListIcon/>
-                                    <span>{view.name}</span>
-                                </a>
-                                <Button
-                                        variant="ghost"
-                                        size="icon-xs"
-                                        class="hover:opacity-100 opacity-0 group-hover/menu-item:opacity-100"
-                                >
-                                    <DotsThreeVerticalIcon />
-                                </Button>
-                            </div>
-                        {/snippet}
-                    </SidebarMenuButton>
+                    <ViewListItem {view} isActive={view.id === openId}/>
                 </li>
             {/each}
         {/if}

@@ -1,8 +1,11 @@
 package es.jvbabi.overmail.server.http.users.me.views
 
+import es.jvbabi.overmail.server.data.notifier.ViewNotifier
 import es.jvbabi.overmail.server.database.models.ViewSettings
 import es.jvbabi.overmail.server.database.models.Views
+import es.jvbabi.overmail.server.database.models.viewSortKeyAfter
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -28,6 +31,13 @@ import org.jetbrains.exposed.v1.jdbc.select
  * that exist at this moment rather than from a stored counter. A counter column would drift the
  * first time a view is renamed or deleted, and two tabs creating a view at once would both read
  * the same value out of it anyway. See [nextViewName] for what "empty" and the numbering mean.
+ *
+ * The new row is announced through [ViewNotifier], so the sidebar of every open tab shows it
+ * without the one that asked having to tell the others.
+ *
+ * The row is placed behind the generated name below it -- "Neue Ansicht 3" lands under "Neue
+ * Ansicht 2" wherever the user has dragged that one, and a refilled gap lands back in its gap.
+ * Only a name with nothing below it goes to the end of the list.
  */
 fun Route.createView() {
     authenticate {
@@ -48,22 +58,38 @@ fun Route.createView() {
 
             val created = call.database().query {
                 // Read and insert inside one transaction, so a second request creating a view
-                // cannot pick the same number between the two statements.
-                val existingNames = Views
-                    .select(Views.name)
+                // cannot pick the same number, or the same place in the list, between the two
+                // statements.
+                val existing = Views
+                    .select(Views.name, Views.sortKey)
                     .where { Views.user eq userId }
-                    .map { row -> row[Views.name] }
+                    .toList()
 
-                val name = nextViewName(language, existingNames)
+                val name = nextViewName(language, existing.map { row -> row[Views.name] })
+
+                // The view below the new one, by name. It is a name, not a position, so it holds
+                // up after the list has been reordered; when it is absent -- number 1, a renamed
+                // predecessor, a filled gap at the top -- the new view goes to the end.
+                val predecessor = previousViewName(language, name)
+                val after = existing
+                    .firstOrNull { row -> row[Views.name] == predecessor }
+                    ?.get(Views.sortKey)
+
+                val sortKey = viewSortKeyAfter(existing.map { row -> row[Views.sortKey] }, after)
 
                 val id = Views.insertAndGetId {
                     it[user] = userId
                     it[Views.name] = name
                     it[view] = settings
+                    it[Views.sortKey] = sortKey
                 }
 
-                CreatedViewResponse(id = id.value, name = name, view = settings)
+                CreatedViewResponse(id = id.value, name = name, view = settings, sortKey = sortKey)
             }
+
+            // After the transaction committed: a socket reacting to this re-reads the list, and
+            // from inside it would read the state from before the insert.
+            call.dependency<ViewNotifier>().notifyViewChanged(userId, created.id)
 
             call.respond(HttpStatusCode.Created, created)
         }
@@ -76,4 +102,6 @@ private data class CreatedViewResponse(
     /** Generated, see [nextViewName] -- the caller did not choose it and has to be told. */
     @SerialName("name") val name: String,
     @SerialName("view") val view: ViewSettings,
+    /** Where the row goes in the list, see [viewSortKeyAfter] -- generated as well. */
+    @SerialName("sort_key") val sortKey: String,
 )

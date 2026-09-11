@@ -56,6 +56,9 @@ class OvermailDatabase(private val database: Database) {
             // `create` would not add them to a database that already has a `shares`.
             SchemaUtils.createMissingTablesAndColumns(Shares)
             SchemaUtils.create(Views)
+            // Like the two above: `sort_key` came after the table did. It carries a default, so
+            // the views a running database already has get one instead of the ALTER failing.
+            SchemaUtils.createMissingTablesAndColumns(Views)
         }
     }
 

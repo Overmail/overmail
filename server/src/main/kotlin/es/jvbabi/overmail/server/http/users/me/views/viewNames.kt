@@ -73,3 +73,19 @@ fun nextViewName(language: ViewNameLanguage, existingNames: List<String>): Strin
     while (number in used) number++
     return language.newViewStem + " " + number
 }
+
+/**
+ * The generated name one number below [name], or null when [name] is not a generated name of
+ * [language] or is its number 1.
+ *
+ * What a new view is placed behind: "Neue Ansicht 3" belongs under "Neue Ansicht 2", not at the
+ * bottom of a list the user has reordered. The returned name may not exist -- see [nextViewName],
+ * which hands out freed numbers -- in which case there is nothing to place it behind.
+ */
+fun previousViewName(language: ViewNameLanguage, name: String): String? {
+    val suffix = name.removePrefix(language.newViewStem + " ")
+    if (suffix == name) return null
+    val number = suffix.toIntOrNull() ?: return null
+    if (number <= 1) return null
+    return language.newViewStem + " " + (number - 1)
+}

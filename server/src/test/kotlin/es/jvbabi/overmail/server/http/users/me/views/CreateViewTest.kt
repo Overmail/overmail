@@ -1,9 +1,12 @@
 package es.jvbabi.overmail.server.http.users.me.views
 
+import es.jvbabi.overmail.server.data.notifier.ViewEvent
+import es.jvbabi.overmail.server.data.notifier.ViewNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.ViewSettings
 import es.jvbabi.overmail.server.database.models.Views
+import es.jvbabi.overmail.server.database.models.viewSortKeyAfter
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -24,6 +27,12 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,6 +42,7 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -43,6 +53,8 @@ class CreateViewTest {
     private val database = OvermailDatabase(
         Database.connect("jdbc:h2:mem:create-view;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
     )
+
+    private val viewNotifier = ViewNotifier()
 
     private var signedIn: User? = null
 
@@ -207,12 +219,117 @@ class CreateViewTest {
     }
 
     @Test
+    fun `the views stand in the order they were created in`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        repeat(3) { client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") } }
+
+        assertEquals(listOf("Neue Ansicht 1", "Neue Ansicht 2", "Neue Ansicht 3"), namesInOrder(user))
+    }
+
+    @Test
+    fun `a refilled number lands back in its gap instead of at the end`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        repeat(3) { client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") } }
+        database.query {
+            Views.deleteWhere { (Views.user eq user.id.value) and (Views.name eq "Neue Ansicht 2") }
+        }
+
+        // Behind "Neue Ansicht 1", which is where the number says it belongs -- not behind 3.
+        client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") }
+
+        assertEquals(listOf("Neue Ansicht 1", "Neue Ansicht 2", "Neue Ansicht 3"), namesInOrder(user))
+    }
+
+    @Test
+    fun `a view whose predecessor moved follows it rather than the list`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        repeat(3) { client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") } }
+        // What dragging "Neue Ansicht 1" to the bottom does: only its own key is rewritten.
+        database.query {
+            val keys = Views.selectAll().where { Views.user eq user.id.value }.map { row -> row[Views.sortKey] }
+            Views.update({ (Views.user eq user.id.value) and (Views.name eq "Neue Ansicht 1") }) {
+                it[sortKey] = viewSortKeyAfter(keys, null)
+            }
+        }
+
+        // Behind "Neue Ansicht 3", which is no longer the last row.
+        client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") }
+
+        assertEquals(
+            listOf("Neue Ansicht 2", "Neue Ansicht 3", "Neue Ansicht 4", "Neue Ansicht 1"),
+            namesInOrder(user),
+        )
+    }
+
+    @Test
+    fun `a view without a predecessor goes to the end`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        repeat(2) { client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=de") } }
+        // "New view 1" is a number 1: nothing to sit behind, so it appends.
+        client.post("/api/users/me/views/new") { header(HttpHeaders.Cookie, "$LOCALE_COOKIE=en") }
+
+        assertEquals(listOf("Neue Ansicht 1", "Neue Ansicht 2", "New view 1"), namesInOrder(user))
+    }
+
+    @Test
+    fun `the answer carries the key the row was written with`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        val response = client.post("/api/users/me/views/new")
+        val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+
+        val stored = database.query {
+            Views.selectAll().where { Views.user eq user.id.value }.single()
+        }
+        assertEquals(stored[Views.sortKey], body["sort_key"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `the created view is announced`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+
+        val events = viewNotifier.subscribe(user.id.value)
+        coroutineScope {
+            // The notifier keeps no history, so the collector has to be attached before the
+            // request -- an event fired in between would reach nobody.
+            val subscribed = CompletableDeferred<Unit>()
+            val event = async { events.onSubscription { subscribed.complete(Unit) }.first() }
+            subscribed.await()
+
+            val response = client.post("/api/users/me/views/new")
+            val id = Json.parseToJsonElement(response.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content
+
+            assertEquals(ViewEvent.Changed(Uuid.parse(id)), withTimeout(5_000) { event.await() })
+        }
+    }
+
+    @Test
     fun `without a session nothing is created`() = testApplication {
         setUpUser()
         signedIn = null
         installRoute()
 
         assertEquals(HttpStatusCode.Unauthorized, client.post("/api/users/me/views/new").status)
+    }
+
+    /** The user's views by key, sorted the way the list is meant to read. */
+    private suspend fun namesInOrder(user: User): List<String> = database.query {
+        Views
+            .selectAll()
+            .where { Views.user eq user.id.value }
+            .map { row -> row[Views.sortKey] to row[Views.name] }
+            .sortedBy { it.first }
+            .map { it.second }
     }
 
     private suspend fun setUpUser(): User {
@@ -232,7 +349,10 @@ class CreateViewTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies { provide<OvermailDatabase> { database } }
+            dependencies {
+                provide<OvermailDatabase> { database }
+                provide<ViewNotifier> { viewNotifier }
+            }
             routing {
                 route("/api/users/me/views/new") { createView() }
             }

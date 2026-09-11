@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.database.models
 
+import com.davidarvelo.fractionalindexing.FractionalIndexing
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -11,18 +12,40 @@ import org.jetbrains.exposed.v1.dao.UuidEntityClass
 import org.jetbrains.exposed.v1.json.jsonb
 import kotlin.uuid.Uuid
 
-class View(id: EntityID<Uuid>): UuidEntity(id) {
+class View(id: EntityID<Id>): UuidEntity(id) {
     companion object : UuidEntityClass<View>(Views)
+
+    typealias Id = Uuid
 
     val user by User referencedOn Views.user
     var name by Views.name
     var view by Views.view
+    var sortKey by Views.sortKey
 }
 
 object Views : UuidTable("views") {
     val user = reference("user_id", Users, onDelete = ReferenceOption.CASCADE)
     val name = varchar("name", 255)
     val view = jsonb<ViewSettings>("view", OvermailDatabase.json)
+    val sortKey = varchar("sort_key", 255).default(FIRST_VIEW_SORT_KEY)
+}
+
+val FIRST_VIEW_SORT_KEY: String = FractionalIndexing.generateFractionalIndexBetween(null, null)
+
+/**
+ * A key that sorts in front of everything in [keys] -- the top of the list.
+ *
+ * The counterpart of [viewSortKeyAfter] for a move: there is no view to sit behind up there, and
+ * `after = null` already means the other end.
+ */
+fun viewSortKeyFirst(keys: List<String>): String =
+    FractionalIndexing.generateFractionalIndexBetween(null, keys.minOrNull())
+
+fun viewSortKeyAfter(keys: List<String>, after: String?): String {
+    val sorted = keys.sorted()
+    val before = after ?: sorted.lastOrNull()
+    val successor = if (before == null) null else sorted.firstOrNull { key -> key > before }
+    return FractionalIndexing.generateFractionalIndexBetween(before, successor)
 }
 
 @Serializable

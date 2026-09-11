@@ -16,6 +16,8 @@
 	data-sidebar="menu-badge"
 	class={cn(
 		"pointer-events-none absolute right-1 flex h-5 min-w-5 rounded-xl px-1 text-xs font-medium text-sidebar-foreground peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-sidebar-accent-foreground flex items-center justify-center tabular-nums select-none group-data-[collapsible=icon]:hidden",
+		// Same centring as the action: the badge is 20px tall, the compact rows are shorter.
+		"group-data-[compact=true]/sidebar-root:peer-data-[size=default]/menu-button:top-1.5 group-data-[compact=true]/sidebar-root:peer-data-[size=sm]/menu-button:top-1 group-data-[compact=true]/sidebar-root:peer-data-[size=lg]/menu-button:top-3.5",
 		className
 	)}
 	{...restProps}

@@ -26,7 +26,7 @@
     );
 </script>
 
-<Sidebar>
+<Sidebar compact>
     <SidebarHeader />
     <SidebarContent>
         <SidebarGroup>

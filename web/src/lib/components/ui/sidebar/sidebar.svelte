@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
 	import { cn, type WithElementRef } from "$lib/utils.js";
-	import { SIDEBAR_WIDTH_MOBILE } from "./constants.js";
+	import { SIDEBAR_WIDTH_COMPACT, SIDEBAR_WIDTH_MOBILE } from "./constants.js";
 	import { useSidebar } from "./context.svelte.js";
 	import type { HTMLAttributes } from "svelte/elements";
 	import { _ } from "svelte-i18n";
@@ -11,6 +11,7 @@
 		side = "left",
 		variant = "sidebar",
 		collapsible = "offcanvas",
+		compact = false,
 		class: className,
 		children,
 		...restProps
@@ -18,17 +19,29 @@
 		side?: "left" | "right";
 		variant?: "sidebar" | "floating" | "inset";
 		collapsible?: "offcanvas" | "icon" | "none";
+		/**
+		 * Tighter spacing, smaller rows and a narrower sidebar. Set here once: the sub-components
+		 * pick it up from `data-compact` on this root via the `sidebar-root` group, so nothing
+		 * inside has to be told about it.
+		 */
+		compact?: boolean;
 	} = $props();
 
 	const sidebar = useSidebar();
+
+	// `undefined` rather than "false", so the attribute is absent when it does not apply.
+	const compactAttr = $derived(compact ? "true" : undefined);
+	const compactWidth = $derived(compact ? `--sidebar-width: ${SIDEBAR_WIDTH_COMPACT};` : undefined);
 </script>
 
 {#if collapsible === "none"}
 	<div
 		class={cn(
-			"flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+			"group/sidebar-root flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
 			className
 		)}
+		data-compact={compactAttr}
+		style={compactWidth}
 		bind:this={ref}
 		{...restProps}
 	>
@@ -41,8 +54,9 @@
 			data-sidebar="sidebar"
 			data-slot="sidebar"
 			data-mobile="true"
+			data-compact={compactAttr}
 			class={cn(
-				"w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
+				"group/sidebar-root w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
 				className
 			)}
 			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
@@ -60,12 +74,14 @@
 {:else}
 	<div
 		bind:this={ref}
-		class="group peer hidden text-sidebar-foreground md:block"
+		class="group/sidebar-root group peer hidden text-sidebar-foreground md:block"
 		data-state={sidebar.state}
 		data-collapsible={sidebar.state === "collapsed" ? collapsible : ""}
 		data-variant={variant}
 		data-side={side}
 		data-slot="sidebar"
+		data-compact={compactAttr}
+		style={compactWidth}
 	>
 		<!-- This is what handles the sidebar gap on desktop -->
 		<div

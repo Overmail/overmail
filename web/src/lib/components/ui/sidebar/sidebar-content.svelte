@@ -16,6 +16,7 @@
 	data-sidebar="content"
 	class={cn(
 		"no-scrollbar gap-2 [--radius:var(--radius-xl)] flex min-h-0 flex-1 flex-col overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+		"group-data-[compact=true]/sidebar-root:gap-1.5",
 		className
 	)}
 	{...restProps}

@@ -10,11 +10,13 @@ import Inset from "./sidebar-inset.svelte";
 import MenuAction from "./sidebar-menu-action.svelte";
 import MenuBadge from "./sidebar-menu-badge.svelte";
 import MenuButton from "./sidebar-menu-button.svelte";
+import MenuEntry from "./sidebar-menu-entry.svelte";
 import MenuItem from "./sidebar-menu-item.svelte";
 import MenuSkeleton from "./sidebar-menu-skeleton.svelte";
 import MenuSubButton from "./sidebar-menu-sub-button.svelte";
 import MenuSubItem from "./sidebar-menu-sub-item.svelte";
 import MenuSub from "./sidebar-menu-sub.svelte";
+import MenuTrailing from "./sidebar-menu-trailing.svelte";
 import Menu from "./sidebar-menu.svelte";
 import Provider from "./sidebar-provider.svelte";
 import Rail from "./sidebar-rail.svelte";
@@ -37,11 +39,13 @@ export {
 	MenuAction,
 	MenuBadge,
 	MenuButton,
+	MenuEntry,
 	MenuItem,
 	MenuSkeleton,
 	MenuSub,
 	MenuSubButton,
 	MenuSubItem,
+	MenuTrailing,
 	Provider,
 	Rail,
 	Root,
@@ -61,11 +65,13 @@ export {
 	MenuAction as SidebarMenuAction,
 	MenuBadge as SidebarMenuBadge,
 	MenuButton as SidebarMenuButton,
+	MenuEntry as SidebarMenuEntry,
 	MenuItem as SidebarMenuItem,
 	MenuSkeleton as SidebarMenuSkeleton,
 	MenuSub as SidebarMenuSub,
 	MenuSubButton as SidebarMenuSubButton,
 	MenuSubItem as SidebarMenuSubItem,
+	MenuTrailing as SidebarMenuTrailing,
 	Provider as SidebarProvider,
 	Rail as SidebarRail,
 	Separator as SidebarSeparator,

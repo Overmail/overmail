@@ -17,9 +17,10 @@
 <script lang="ts">
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import {Button} from "$lib/components/ui/button";
-    import {flip} from "svelte/animate";
-    import {crossfade} from "svelte/transition";
     import * as Tooltip from "$lib/components/ui/tooltip";
+    import {DndReorderElement, DndReorderHandle, DndReorderZone} from "$lib/components/dnd";
+    import {DndReorder} from "$lib/hooks/dnd-reorder.svelte";
+    import {moveTo} from "$lib/hooks/dnd-reorder";
     import {
         ArchiveIcon,
         CalendarDotIcon,
@@ -33,7 +34,6 @@
     } from "phosphor-svelte";
 
     const MAX_ACTIVE = 4;
-    const FLIP_MS = 150;
 
     // `name` is what the row reads; `label`/`label_reversed` are the full tooltip
     // sentences for the two directions, same rule as a category's `sort`.
@@ -43,10 +43,7 @@
         { key: "subject", name: "Betreff", label: "Betreff, A–Z", label_reversed: "Betreff, Z–A" },
     ];
 
-    // One ordered list; the first `activeCount` entries are the active group.
-    // Membership is therefore a consequence of position, never stored separately.
-    let groupCategories = $state<GroupCategory[]>([
-        // the first MAX_ACTIVE entries are the initially active ones
+    const CATEGORIES: GroupCategory[] = [
         { key: "date-smart", name: "Datum (intelligent)", icon: CalendarStarIcon, sort: { key: "date", reversible: true, label: "Nach Datum, neueste zuerst", label_reversed: "Nach Datum, älteste zuerst" } },
         { key: "read", name: "Gelesen", icon: EyeglassesIcon, sort: { key: "read", label: "Gelesene zuerst", reversible: true, label_reversed: "Ungelesene zuerst" } },
         { key: "date-month", name: "Monat", icon: CalendarDotsIcon, sort: { key: "date", reversible: true, label: "Nach Monat, neueste zuerst", label_reversed: "Nach Monat, älteste zuerst" } },
@@ -55,39 +52,54 @@
         { key: "sender", name: "Absender", icon: PersonSimpleIcon, sort: { key: "sender", reversible: true, label: "Absender, A–Z", label_reversed: "Absender, Z–A" } },
         { key: "imap-account", name: "E-Mail-Konto", icon: UsersIcon, sort: { key: "imap-account", reversible: true, label: "E-Mail-Konto, A–Z", label_reversed: "E-Mail-Konto, Z–A" } },
         { key: "Archive", name: "Archiviert", icon: ArchiveIcon, sort: { key: "archive", reversible: true, label: "Aktive zuerst", label_reversed: "Archivierte zuerst" } },
-    ]);
+    ];
 
-    let activeCount = $state(MAX_ACTIVE);
-    let draggingKey = $state<string | null>(null);
+    const byKey = new Map(CATEGORIES.map((category) => [category.key, category]));
 
-    // Which categories run their sort reversed, keyed by category. Separate from
-    // `sort` above, which is static config — and it survives reordering.
-    let reversedSort = $state<Record<string, boolean>>({});
+    // Membership is position: which list a category is in is the whole of whether it groups.
+    let activeKeys = $state(CATEGORIES.slice(0, MAX_ACTIVE).map((category) => category.key));
+    let inactiveKeys = $state(CATEGORIES.slice(MAX_ACTIVE).map((category) => category.key));
+
+    const dnd = new DndReorder({
+        zones: () => ({
+            active: activeKeys.map((key) => byKey.get(key)!),
+            inactive: inactiveKeys.map((key) => byKey.get(key)!),
+        }),
+        id: (category) => category.key,
+        /**
+         * The active group holds MAX_ACTIVE and no more, and a drag into a full one is not
+         * refused: whoever is pushed past the end moves over to the inactive ones, which is what
+         * makes the boundary feel like a shelf rather than a wall.
+         */
+        applyMove: (order, move) => {
+            const next = moveTo(order, move);
+            if (next.active.length <= MAX_ACTIVE) return next;
+
+            // The dragged one keeps the place the cursor gave it; the one beside it goes.
+            const evicted = next.active.at(-1) === move.id ? next.active.at(-2) : next.active.at(-1);
+            if (evicted === undefined) return null;
+
+            return {
+                active: next.active.filter((key) => key !== evicted),
+                inactive: [evicted, ...next.inactive],
+            };
+        },
+        onDrop: ({order}) => {
+            activeKeys = order.active;
+            inactiveKeys = order.inactive;
+        },
+    });
 
     // Only the deepest active category holds mails directly, so this is a single
     // setting rather than one per category.
     let mailSortKey = $state(MAIL_SORTS[0].key);
     let mailSortReversed = $state(false);
 
-    // flip animates with transforms, so getBoundingClientRect() reports positions
-    // mid-flight — measurements are only trusted once the list has settled.
-    let settledAt = 0;
+    // Which categories run their sort reversed, keyed by category. Separate from
+    // `sort` above, which is static config — and it survives reordering.
+    let reversedSort = $state<Record<string, boolean>>({});
 
-    const active = $derived(groupCategories.slice(0, activeCount));
-    const inactive = $derived(groupCategories.slice(activeCount));
-    const deepest = $derived(active.at(-1));
-
-    // Changing group means leaving one {#each} and entering the other, which
-    // animate:flip cannot follow — crossfade bridges the two.
-    const [send, receive] = crossfade({ duration: FLIP_MS });
-
-    function onDragStart(event: DragEvent, category: GroupCategory) {
-        draggingKey = category.key;
-        settledAt = 0;
-        // Firefox starts no drag without a payload
-        event.dataTransfer?.setData("text/plain", category.key);
-        if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-    }
+    const deepest = $derived(dnd.zones.active.at(-1));
 
     function sortLabel(category: GroupCategory) {
         return reversedSort[category.key]
@@ -106,68 +118,6 @@
         if (mailSortKey === key) mailSortReversed = !mailSortReversed;
         else mailSortReversed = false;
     }
-
-    function allowDrop(event: DragEvent) {
-        event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    }
-
-    /**
-     * Moves the dragged category to `slot` within the destination group. The
-     * group only owns a fixed range of the list, so clamping `slot` into that
-     * range is what pushes a surplus category over the boundary — no explicit
-     * eviction anywhere.
-     */
-    function moveTo(toActive: boolean, slot: number) {
-        const key = draggingKey;
-        if (key === null) return;
-
-        const from = groupCategories.findIndex(category => category.key === key);
-        if (from === -1) return;
-
-        const wasActive = from < activeCount;
-        const nextActiveCount = toActive
-            ? wasActive ? activeCount : Math.min(activeCount + 1, MAX_ACTIVE)
-            : wasActive ? activeCount - 1 : activeCount;
-
-        const first = toActive ? 0 : nextActiveCount;
-        const last = toActive ? nextActiveCount - 1 : groupCategories.length - 1;
-        const to = Math.min(Math.max(first + slot, first), last);
-
-        // re-inserting at `from` would rebuild the same list
-        if (to === from && nextActiveCount === activeCount) return;
-
-        const [moved] = groupCategories.splice(from, 1);
-        groupCategories.splice(to, 0, moved);
-        activeCount = nextActiveCount;
-        settledAt = performance.now() + FLIP_MS;
-    }
-
-    /**
-     * The slot is how many of the group's other items have their midpoint above
-     * the cursor — a pure function of the cursor position and settled geometry,
-     * and monotonic in `clientY`. Two neighbours therefore agree on their shared
-     * edge (no flicker there), and once moved the cursor sits over the dragged
-     * item itself, which buys a full item height of hysteresis.
-     *
-     * Listening on the group rather than on each item also means hovering the
-     * label inserts at the top, not at the bottom.
-     */
-    function onDragOver(event: DragEvent & { currentTarget: HTMLElement }, isActive: boolean) {
-        allowDrop(event);
-        if (draggingKey === null) return;
-        // mid-flip rects are in transit and would misplace the item
-        if (performance.now() < settledAt) return;
-
-        let slot = 0;
-        for (const element of event.currentTarget.querySelectorAll<HTMLElement>("[data-key]")) {
-            if (element.dataset.key === draggingKey) continue;
-            const rect = element.getBoundingClientRect();
-            if (event.clientY > rect.top + rect.height / 2) slot++;
-        }
-
-        moveTo(isActive, slot);
-    }
 </script>
 
 <!-- A span, not Tooltip.Trigger's default button: a button inside a menuitem
@@ -185,40 +135,30 @@
     </Tooltip.Root>
 {/snippet}
 
-{#snippet categoryGroup(label: string, list: GroupCategory[], isActive: boolean, emptyHint: string)}
+{#snippet categoryGroup(zone: string, label: string, emptyHint: string)}
+    {@const list = dnd.zones[zone]}
+    {@const isActive = zone === "active"}
     <!-- The group, not each item, owns the drop handling — an emptied list stays reachable -->
-    <div
-            role="group"
-            aria-label={label}
-            ondragover={(event) => onDragOver(event, isActive)}
-            ondrop={(event) => event.preventDefault()}
-    >
+    <DndReorderZone {dnd} id={zone} role="group" aria-label={label}>
         <DropdownMenu.Label>{label}</DropdownMenu.Label>
 
         {#each list as category (category.key)}
             {@const Icon = category.icon}
-            <div
-                    animate:flip={{ duration: FLIP_MS }}
-                    in:receive={{ key: category.key }}
-                    out:send={{ key: category.key }}
-            >
+            <!-- The row the drag moves; the menu item inside it keeps its own clicks. -->
+            <DndReorderElement {dnd} id={category.key} handle={false}>
                 <DropdownMenu.Item
                         closeOnSelect={false}
-                        data-key={category.key}
-                        class={draggingKey === category.key ? "opacity-40" : undefined}
+                        class={dnd.isDragging(category.key) ? "opacity-40" : undefined}
                         aria-label={isActive ? `${category.name}: ${sortLabel(category)}` : category.name}
                         onSelect={() => isActive && toggleSort(category)}
                 >
-                    <span
-                            draggable="true"
+                    <DndReorderHandle
                             aria-hidden="true"
                             class="flex cursor-grab items-center active:cursor-grabbing"
-                            ondragstart={(event) => onDragStart(event, category)}
-                            ondragend={() => (draggingKey = null)}
                             onclick={(event) => event.stopPropagation()}
                     >
                         <DotsSixVerticalIcon />
-                    </span>
+                    </DndReorderHandle>
                     <Icon />
                     <span class="truncate">{category.name}</span>
                     {#if isActive && category.sort.reversible}
@@ -228,7 +168,7 @@
                         )}
                     {/if}
                 </DropdownMenu.Item>
-            </div>
+            </DndReorderElement>
         {/each}
 
         {#if isActive && deepest}
@@ -266,7 +206,7 @@
                 {emptyHint}
             </p>
         {/if}
-    </div>
+    </DndReorderZone>
 {/snippet}
 
 <div class="flex flex-row">
@@ -280,8 +220,8 @@
             <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger>Gruppieren</DropdownMenu.SubTrigger>
                 <DropdownMenu.SubContent class="w-64">
-                    {@render categoryGroup(`Aktive Kategorien (${activeCount}/${MAX_ACTIVE})`, active, true, "Zum Gruppieren hierher ziehen")}
-                    {@render categoryGroup("Inaktive Kategorien", inactive, false, "Alle Kategorien sind aktiv")}
+                    {@render categoryGroup("active", `Aktive Kategorien (${dnd.zones.active.length}/${MAX_ACTIVE})`, "Zum Gruppieren hierher ziehen")}
+                    {@render categoryGroup("inactive", "Inaktive Kategorien", "Alle Kategorien sind aktiv")}
                 </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
         </DropdownMenu.Content>

@@ -17,6 +17,7 @@
     import {page} from "$app/state";
     import {_, locale} from "svelte-i18n";
     import {defaultLocale, localeNames, locales, setLocale, type Locale} from "$lib/i18n";
+    import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
 
     // `$locale` carries whatever was negotiated, e.g. `de-DE`; the menu only knows the base ones.
     const currentLocale = $derived(
@@ -46,6 +47,11 @@
                     </SidebarMenuItem>
                 {/each}
             </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+            <SidebarGroupLabel>Ansichten</SidebarGroupLabel>
+            <ViewList />
         </SidebarGroup>
     </SidebarContent>
 

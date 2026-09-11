@@ -14,8 +14,18 @@ const SUBJECT_LIMIT = 64;
  * twice over. [emailPath] is the same slug for a path segment, where it does its own.
  */
 export function emailSlug(id: string, subject?: string | null): string {
+	return slugParam(id, subject);
+}
+
+/**
+ * The same slug for anything a url is about: the readable beginning of [text], then the bare id.
+ *
+ * Shared, like [parseSlugId] on the way back -- a view in `?view=` is spelled the way a mail in
+ * `?email=` is, and both are read back by the same rule. Unencoded, for a query parameter.
+ */
+export function slugParam(id: string, text?: string | null): string {
 	const bare = bareId(id);
-	const slug = subjectSlug(subject);
+	const slug = subjectSlug(text);
 
 	return slug === "" ? bare : `${slug}-${bare}`;
 }

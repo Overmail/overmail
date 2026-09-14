@@ -2,6 +2,7 @@ import {
     parseView,
     ViewSocket,
     type View,
+    type ViewFilter,
     type ViewGrouping,
     type ViewPayload,
     type ViewSorting,
@@ -17,8 +18,12 @@ const ITEM_ENDPOINT = (id: string) => `/api/users/me/views/${encodeURIComponent(
  */
 export type ViewPatch = {
     name?: string;
-    /** The whole settings object; there is nothing inside it to address on its own. */
-    settings?: {groupings: ViewGrouping[]; sorting: ViewSorting};
+    /**
+     * The whole settings object; there is nothing inside it to address on its own. The filter is
+     * part of it and is not optional here on purpose: the server replaces the settings with what
+     * it is sent, so a patch that left the filter out would clear it.
+     */
+    settings?: {groupings: ViewGrouping[]; filter: ViewFilter; sorting: ViewSorting};
     /** Where the view goes: behind [afterViewId], or at the top of the list when that is null. */
     position?: {afterViewId: string | null};
 };
@@ -193,6 +198,16 @@ function toBody(patch: ViewPatch) {
                           type: grouping.kind,
                           sort_reversed: grouping.reversed,
                       })),
+                      // Nulls and all: the server reads a missing key as no restriction, and
+                      // what this sends is the filter the view is to have, not a change to it.
+                      filter: {
+                          read_state: patch.settings.filter.readState,
+                          archived_state: patch.settings.filter.archivedState,
+                          imap_account_ids: patch.settings.filter.imapAccountIds,
+                          sent_by: patch.settings.filter.sentBy,
+                          sent_to: patch.settings.filter.sentTo,
+                          has_labels: patch.settings.filter.hasLabels,
+                      },
                       email_sorting: {
                           type: patch.settings.sorting.kind,
                           sort_reversed: patch.settings.sorting.reversed,

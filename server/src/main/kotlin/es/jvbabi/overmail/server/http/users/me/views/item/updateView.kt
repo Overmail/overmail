@@ -37,6 +37,11 @@ private const val NAME_LIMIT = 255
  * everything else along and could overwrite what another tab wrote in between. What is not in
  * the body stays as it is.
  *
+ * `view` is the one thing that is replaced rather than changed: what a view groups by, filters by
+ * and sorts by is one object with nothing in it to address on its own. It is therefore sent whole,
+ * and sending it without a `filter` puts the filter back to [ViewSettings.Filter.NONE] -- a caller
+ * that changes the grouping has to send the filter the view has along with it.
+ *
  * Where the view sits is asked for as a neighbour, not as a sort key: `position.after_view_id` is
  * the view it goes behind, null the top of the list, and the key between the two is worked out
  * here. The client therefore never has to generate one, and two clients dragging at once produce
@@ -120,7 +125,10 @@ fun Route.updateView() {
 private data class UpdateViewRequest(
     /** Trimmed before it is written. Absent leaves the name alone; blank is refused. */
     @SerialName("name") val name: String? = null,
-    /** The whole settings object, not a change to it -- there is nothing in it to address. */
+    /**
+     * The whole settings object, not a change to it -- there is nothing in it to address. Absent
+     * leaves the settings alone; present replaces them, filter included, see above.
+     */
     @SerialName("view") val view: ViewSettings? = null,
     /** Absent leaves the view where it is; see [Position] for what null inside it means. */
     @SerialName("position") val position: Position? = null,

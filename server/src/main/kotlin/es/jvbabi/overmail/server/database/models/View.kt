@@ -51,6 +51,12 @@ fun viewSortKeyAfter(keys: List<String>, after: String?): String {
 @Serializable
 data class ViewSettings(
     @SerialName("groupings") val groupings: List<Grouping>,
+    /**
+     * What the listing leaves out. Defaults to [Filter.NONE], which is also what rows written
+     * before views had a filter decode to -- there is no migration tool here, and a row without
+     * the key would otherwise not read at all.
+     */
+    @SerialName("filter") val filter: Filter = Filter.NONE,
     @SerialName("email_sorting") val emailSorting: EmailSorting,
 ) {
     @Serializable
@@ -128,5 +134,28 @@ data class ViewSettings(
         data class SubjectSorting(
             @SerialName("sort_reversed") override val reversed: Boolean,
         ) : EmailSorting()
+    }
+
+    /**
+     * Which mails a view shows at all, before anything is grouped or sorted.
+     *
+     * Null is no restriction on that attribute, which is not the same as an empty set: a set says
+     * which values pass, so an empty one lets nothing through. Every attribute that is set narrows
+     * the listing further -- they are read together, not as alternatives.
+     */
+    @Serializable
+    data class Filter(
+        /** True only read, false only unread, null both. */
+        @SerialName("read_state") val readState: Boolean? = null,
+        @SerialName("archived_state") val archivedState: Set<EmailArchiveAction>? = null,
+        @SerialName("imap_account_ids") val imapAccountIds: Set<Uuid>? = null,
+        @SerialName("sent_by") val sentByEmailUser: Set<Uuid>? = null,
+        @SerialName("sent_to") val sentToEmailUser: Set<Uuid>? = null,
+        @SerialName("has_labels") val hasLabels: Set<Uuid>? = null,
+    ) {
+        companion object {
+            /** Everything passes; what a view filters by until somebody says otherwise. */
+            val NONE: Filter = Filter()
+        }
     }
 }

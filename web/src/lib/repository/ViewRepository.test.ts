@@ -1,6 +1,6 @@
 import {expect, mock, test} from "bun:test";
 import {ViewRepository} from "./ViewRepository.svelte";
-import {ViewSocket, type View} from "./ViewSocket";
+import {ViewSocket, type View, type ViewFilter} from "./ViewSocket";
 
 /** A socket that sends nothing; these tests are about the writes, not about the list arriving. */
 const silentSocket = () =>
@@ -15,6 +15,16 @@ const silentSocket = () =>
         }),
     });
 
+/** A filter that restricts nothing, which is what a view has until somebody sets one. */
+const NO_FILTER = {
+    readState: null,
+    archivedState: null,
+    imapAccountIds: null,
+    sentBy: null,
+    sentTo: null,
+    hasLabels: null,
+} satisfies ViewFilter;
+
 function repository(views: {id: string; name: string}[]): ViewRepository {
     const repo = new ViewRepository(silentSocket());
     repo.views = views.map((view, index) => ({
@@ -22,6 +32,7 @@ function repository(views: {id: string; name: string}[]): ViewRepository {
         name: view.name,
         sortKey: `a${index}`,
         groupings: [],
+        filter: {...NO_FILTER},
         sorting: {kind: "date", reversed: false},
     })) satisfies View[];
 
@@ -90,7 +101,9 @@ test("the settings are not applied before the answer", async () => {
     answering(200, PAYLOAD);
 
     const repo = repository([{id: "1", name: "First"}]);
-    await repo.update("1", {settings: {groupings: [], sorting: {kind: "date", reversed: true}}});
+    await repo.update("1", {
+        settings: {groupings: [], filter: {...NO_FILTER}, sorting: {kind: "date", reversed: true}},
+    });
 
     // Only the name is worth applying early; the rest is not on screen while it is sent, and
     // the socket is what says what the view now is.
@@ -153,6 +166,7 @@ test("the settings go over as the whole object", async () => {
     await repository([{id: "1", name: "First"}]).update("1", {
         settings: {
             groupings: [{kind: "sender", reversed: true}],
+            filter: {...NO_FILTER, readState: false, hasLabels: ["l-1"]},
             sorting: {kind: "subject", reversed: false},
         },
     });
@@ -160,6 +174,16 @@ test("the settings go over as the whole object", async () => {
     expect(JSON.parse((fetcher as any).mock.calls[0][1].body)).toEqual({
         view: {
             groupings: [{type: "sender", sort_reversed: true}],
+            // Nulls and all: the server replaces the settings with this, so a key that is not
+            // there would clear what the view filters by.
+            filter: {
+                read_state: false,
+                archived_state: null,
+                imap_account_ids: null,
+                sent_by: null,
+                sent_to: null,
+                has_labels: ["l-1"],
+            },
             email_sorting: {type: "subject", sort_reversed: false},
         },
     });

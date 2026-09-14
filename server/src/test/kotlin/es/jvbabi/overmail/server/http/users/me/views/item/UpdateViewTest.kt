@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.users.me.views.item
 import es.jvbabi.overmail.server.data.notifier.ViewEvent
 import es.jvbabi.overmail.server.data.notifier.ViewNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.View
 import es.jvbabi.overmail.server.database.models.ViewSettings
@@ -45,8 +46,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 
-/** Single attributes of a view: its name, where it sits, what it groups by. */
+/** Single attributes of a view: its name, where it sits, what it groups and filters by. */
 class UpdateViewTest {
+
+    /** Stands in for a label; the route stores what it is given and does not look it up. */
+    private val LABEL = Uuid.random()
 
     private val database = OvermailDatabase(
         Database.connect("jdbc:h2:mem:update-view;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
@@ -142,6 +146,54 @@ class UpdateViewTest {
         val stored = database.query { Views.selectAll().where { Views.id eq view }.single()[Views.view] }
         assertEquals(listOf(ViewSettings.Grouping.SenderGrouping(reversed = true)), stored.groupings)
         assertEquals(ViewSettings.EmailSorting.SubjectSorting(reversed = false), stored.emailSorting)
+    }
+
+    @Test
+    fun `writes the filter and sends it back`() = testApplication {
+        setUpUser()
+        installRoute()
+        val view = addView("First", "a0")
+
+        val response = patchView(
+            view,
+            """{"view":{"groupings":[],"filter":{"read_state":false,""" +
+                """"archived_state":["Archive","Spam"],"has_labels":["$LABEL"]},""" +
+                """"email_sorting":{"type":"date","sort_reversed":false}}}""",
+        )
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val stored = database.query { Views.selectAll().where { Views.id eq view }.single()[Views.view] }
+        assertEquals(false, stored.filter.readState)
+        assertEquals(
+            setOf(EmailArchiveAction.Archive, EmailArchiveAction.Spam),
+            stored.filter.archivedState,
+        )
+        assertEquals(setOf(LABEL), stored.filter.hasLabels)
+        // Not asked for is not restricted, rather than an empty set, which would let nothing
+        // through.
+        assertEquals(null, stored.filter.imapAccountIds)
+
+        // The answer carries the filter, so the caller does not have to read it back.
+        val filter = response.bodyAsText().let(Json::parseToJsonElement)
+            .jsonObject["view"]!!.jsonObject["filter"]!!.jsonObject
+        assertEquals(false, filter["read_state"]!!.jsonPrimitive.content.toBoolean())
+    }
+
+    @Test
+    fun `settings sent without a filter leave nothing filtered`() = testApplication {
+        setUpUser()
+        installRoute()
+        val view = addView("First", "a0", filter = ViewSettings.Filter(readState = true))
+
+        // The settings are replaced whole, and a filter that is not in them is no filter -- see
+        // the route's note on why the object has nothing in it to address on its own.
+        patchView(
+            view,
+            """{"view":{"groupings":[],"email_sorting":{"type":"date","sort_reversed":false}}}""",
+        )
+
+        val stored = database.query { Views.selectAll().where { Views.id eq view }.single()[Views.view] }
+        assertEquals(ViewSettings.Filter.NONE, stored.filter)
     }
 
     @Test
@@ -281,12 +333,14 @@ class UpdateViewTest {
         name: String,
         sortKey: String,
         owner: User.Id = signedIn!!.id.value,
+        filter: ViewSettings.Filter = ViewSettings.Filter.NONE,
     ): View.Id = database.query {
         Views.insertAndGetId {
             it[user] = owner
             it[Views.name] = name
             it[view] = ViewSettings(
                 groupings = emptyList(),
+                filter = filter,
                 emailSorting = ViewSettings.EmailSorting.DateSorting(reversed = false),
             )
             it[Views.sortKey] = sortKey

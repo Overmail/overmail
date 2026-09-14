@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {ViewSocket, type View} from "./ViewSocket";
+import {ViewSocket, type View, type ViewFilterPayload} from "./ViewSocket";
 import type {SocketLike} from "./ReconnectingSocket";
 
 /** A socket whose events this test fires by hand. */
@@ -23,7 +23,7 @@ class FakeSocket implements SocketLike {
         this.onclose?.({wasClean: false});
     }
 
-    sendViews(...views: {id: string; name: string; sortKey?: string}[]) {
+    sendViews(...views: {id: string; name: string; sortKey?: string; filter?: ViewFilterPayload}[]) {
         this.onmessage?.({
             data: JSON.stringify({
                 type: "data.views",
@@ -33,6 +33,9 @@ class FakeSocket implements SocketLike {
                     sort_key: view.sortKey ?? "a0",
                     view: {
                         groupings: [{type: "sender", sort_reversed: true}],
+                        // Left out unless a test asks for one, which is what a view stored
+                        // before filters existed looks like.
+                        ...(view.filter === undefined ? {} : {filter: view.filter}),
                         email_sorting: {type: "subject", sort_reversed: false},
                     },
                 })),
@@ -83,7 +86,39 @@ test("reads the settings of a view", () => {
         name: "First",
         sortKey: "a0",
         groupings: [{kind: "sender", reversed: true}],
+        // No filter in the payload is a filter that restricts nothing -- what a view stored
+        // before filters existed says.
+        filter: {
+            readState: null,
+            archivedState: null,
+            imapAccountIds: null,
+            sentBy: null,
+            sentTo: null,
+            hasLabels: null,
+        },
         sorting: {kind: "subject", reversed: false},
+    });
+});
+
+test("reads the filter of a view", () => {
+    const {views, latest, lists} = socket();
+
+    views.start();
+    latest().onopen?.();
+    latest().sendViews({
+        id: "1",
+        name: "First",
+        filter: {read_state: false, archived_state: ["Archive", "Spam"], has_labels: ["l-1"]},
+    });
+
+    expect(lists[0][0].filter).toEqual({
+        readState: false,
+        archivedState: ["Archive", "Spam"],
+        hasLabels: ["l-1"],
+        // What the payload does not name restricts nothing.
+        imapAccountIds: null,
+        sentBy: null,
+        sentTo: null,
     });
 });
 

@@ -49,10 +49,11 @@ fun Route.createView() {
                 acceptLanguage = call.request.headers[HttpHeaders.AcceptLanguage],
             )
 
-            // Empty is empty: no grouping at all, and the mails in date order, which is what a
-            // mailbox looks like before anybody groups it.
+            // Empty is empty: no grouping at all, nothing filtered out, and the mails in date
+            // order, which is what a mailbox looks like before anybody groups it.
             val settings = ViewSettings(
                 groupings = listOf(ViewSettings.Grouping.DateSmartGrouping(reversed = false)),
+                filter = ViewSettings.Filter.NONE,
                 emailSorting = ViewSettings.EmailSorting.DateSorting(reversed = false),
             )
 

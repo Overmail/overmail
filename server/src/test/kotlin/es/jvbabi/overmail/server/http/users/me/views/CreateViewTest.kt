@@ -176,12 +176,15 @@ class CreateViewTest {
             ViewSettings.EmailSorting.DateSorting(reversed = false),
             stored[Views.view].emailSorting,
         )
+        // Empty includes the filter: a new view leaves nothing out of the listing.
+        assertEquals(ViewSettings.Filter.NONE, stored[Views.view].filter)
         assertEquals(stored[Views.id].value.toString(), body["id"]!!.jsonPrimitive.content)
         assertEquals(stored[Views.name], body["name"]!!.jsonPrimitive.content)
 
         // And the answer carries them, so the caller can render the row without a second request.
         val view = body["view"]!!.jsonObject
         assertTrue(view.containsKey("groupings"), view.toString())
+        assertTrue(view.containsKey("filter"), view.toString())
         assertTrue(view.containsKey("email_sorting"), view.toString())
     }
 

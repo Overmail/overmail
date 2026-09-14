@@ -13,6 +13,9 @@ export type ViewGroupingKind =
     | "read"
     | "archived";
 
+/** What an archived state can be, the server's `EmailArchiveAction` names. */
+export type ViewArchivedState = "Archive" | "Unarchive" | "Spam";
+
 /** What the mails inside the deepest group are ordered by. */
 export type ViewSortingKind = "date" | "sender" | "subject";
 
@@ -27,6 +30,23 @@ export type ViewSorting = {
     reversed: boolean;
 };
 
+/**
+ * What a view leaves out, before anything is grouped or sorted.
+ *
+ * Null is no restriction on that attribute, which is not the same as an empty list: a list says
+ * which values pass, so an empty one lets nothing through. What is set is read together with the
+ * rest, not as alternatives. The ids are the server's -- inboxes, mail addresses, labels.
+ */
+export type ViewFilter = {
+    /** True only read, false only unread, null both. */
+    readState: boolean | null;
+    archivedState: ViewArchivedState[] | null;
+    imapAccountIds: string[] | null;
+    sentBy: string[] | null;
+    sentTo: string[] | null;
+    hasLabels: string[] | null;
+};
+
 /** One of the user's views, as the socket reports it. */
 export type View = {
     id: string;
@@ -38,6 +58,7 @@ export type View = {
     sortKey: string;
     /** The categories it groups by, outermost first. Empty is an ungrouped listing. */
     groupings: ViewGrouping[];
+    filter: ViewFilter;
     sorting: ViewSorting;
 };
 
@@ -51,8 +72,20 @@ export type ViewPayload = {
     sort_key: string;
     view: {
         groupings: {type: ViewGroupingKind; sort_reversed: boolean}[];
+        /** Absent says the same as a filter of nothing but nulls, see [parseViewFilter]. */
+        filter?: ViewFilterPayload | null;
         email_sorting: {type: ViewSortingKind; sort_reversed: boolean};
     };
+};
+
+/** One filter on the wire. Every key is optional: what is not there restricts nothing. */
+export type ViewFilterPayload = {
+    read_state?: boolean | null;
+    archived_state?: ViewArchivedState[] | null;
+    imap_account_ids?: string[] | null;
+    sent_by?: string[] | null;
+    sent_to?: string[] | null;
+    has_labels?: string[] | null;
 };
 
 /** What the server sends over this socket. */
@@ -111,9 +144,28 @@ export function parseView(view: ViewPayload): View {
             kind: grouping.type,
             reversed: grouping.sort_reversed,
         })),
+        filter: parseViewFilter(view.view.filter),
         sorting: {
             kind: view.view.email_sorting.type,
             reversed: view.view.email_sorting.sort_reversed,
         },
+    };
+}
+
+/**
+ * The filter of a view, as the app holds it.
+ *
+ * A filter that is not there at all reads as one that restricts nothing -- that is what a view
+ * stored before filters existed says, and what a server that leaves its defaults out of the
+ * answer says as well. Built fresh every time: the filter belongs to the one view it came with.
+ */
+export function parseViewFilter(filter: ViewFilterPayload | null | undefined): ViewFilter {
+    return {
+        readState: filter?.read_state ?? null,
+        archivedState: filter?.archived_state ?? null,
+        imapAccountIds: filter?.imap_account_ids ?? null,
+        sentBy: filter?.sent_by ?? null,
+        sentTo: filter?.sent_to ?? null,
+        hasLabels: filter?.has_labels ?? null,
     };
 }

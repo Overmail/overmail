@@ -32,8 +32,9 @@ export type ViewPatch = {
  *
  * Writes go through the api and are not applied here: the server announces them and the list
  * comes back over the socket, so what is on screen is what the server has, and a change another
- * tab made arrives the same way as one this tab asked for. [move] is the one exception -- a
- * dragged row cannot wait for a round trip.
+ * tab made arrives the same way as one this tab asked for. The two exceptions are what the user
+ * is looking at while they wait -- a dragged row ([move]) and a renamed one ([update]) cannot
+ * wait for a round trip without reading as a change that did not take.
  */
 export class ViewRepository {
     /** Every view, in sidebar order. Empty until the socket has said -- see [hasLoaded]. */
@@ -95,20 +96,64 @@ export class ViewRepository {
     /**
      * Changes single attributes of a view. What is not in [patch] is not touched.
      *
-     * The list is not written here either: the server announces the change and the socket sends
-     * it back. [move] is the exception, and says why.
+     * A name is applied here first and then sent, the way [move] applies an order: the editor
+     * closes onto the row, and the old name showing there until the socket answers reads as a
+     * rename that did not go through. The socket's answer overwrites it a moment later, and a
+     * request that fails puts the old name back. Nothing else in a patch is on screen the moment
+     * it is sent, so nothing else is applied early.
      */
     async update(id: string, patch: ViewPatch, signal?: AbortSignal): Promise<View> {
+        const previousName = patch.name === undefined ? null : this.applyName(id, patch.name);
+
+        try {
+            const response = await fetch(ITEM_ENDPOINT(id), {
+                method: "PATCH",
+                credentials: "include",
+                headers: {"content-type": "application/json"},
+                body: JSON.stringify(toBody(patch)),
+                signal,
+            });
+            if (!response.ok) throw new Error(`Could not change the view: ${response.status}`);
+
+            return parseView((await response.json()) as ViewPayload);
+        } catch (error) {
+            if (previousName !== null) this.applyName(id, previousName);
+            throw error;
+        }
+    }
+
+    /**
+     * Puts [name] on the view in the list and hands back the name it had, or null when the list
+     * does not have that view -- another tab may have deleted it while this one renamed it.
+     *
+     * Only that one view is written, rather than the list being put back wholesale on a failure:
+     * the socket may have sent a new one in the meantime, and that one is newer than anything
+     * this had to go on.
+     */
+    private applyName(id: string, name: string): string | null {
+        const current = this.views.find((view) => view.id === id);
+        if (current === undefined) return null;
+
+        const previous = current.name;
+        this.views = this.views.map((view) => (view.id === id ? {...view, name} : view));
+
+        return previous;
+    }
+
+    /**
+     * Takes a view away.
+     *
+     * The list is not touched here: the row leaves it when the socket sends the list
+     * without it, the same way it arrived. A view holds no mail, so this loses nothing but the
+     * way of looking at it.
+     */
+    async remove(id: string, signal?: AbortSignal): Promise<void> {
         const response = await fetch(ITEM_ENDPOINT(id), {
-            method: "PATCH",
+            method: "DELETE",
             credentials: "include",
-            headers: {"content-type": "application/json"},
-            body: JSON.stringify(toBody(patch)),
             signal,
         });
-        if (!response.ok) throw new Error(`Could not change the view: ${response.status}`);
-
-        return parseView((await response.json()) as ViewPayload);
+        if (!response.ok) throw new Error(`Could not delete the view: ${response.status}`);
     }
 
     /**

@@ -57,6 +57,46 @@ test("a rename sends only the name", async () => {
     expect(view.groupings).toEqual([{kind: "sender", reversed: true}]);
 });
 
+test("the row carries the new name before the server has answered", async () => {
+    let release: (() => void) | null = null;
+    globalThis.fetch = mock(
+        () =>
+            new Promise((resolve) => {
+                release = () => resolve(new Response(JSON.stringify(PAYLOAD), {status: 200}));
+            })
+    ) as unknown as typeof fetch;
+
+    const repo = repository([{id: "1", name: "First"}, {id: "2", name: "Second"}]);
+    const renaming = repo.update("1", {name: "Erste"});
+
+    // The old name showing until the socket answers reads as a rename that did not take.
+    expect(repo.views.map((view) => view.name)).toEqual(["Erste", "Second"]);
+
+    release!();
+    await renaming;
+});
+
+test("a rename the server refuses puts the old name back", async () => {
+    answering(500);
+
+    const repo = repository([{id: "1", name: "First"}]);
+
+    await expect(repo.update("1", {name: "Erste"})).rejects.toThrow();
+
+    expect(repo.views.map((view) => view.name)).toEqual(["First"]);
+});
+
+test("the settings are not applied before the answer", async () => {
+    answering(200, PAYLOAD);
+
+    const repo = repository([{id: "1", name: "First"}]);
+    await repo.update("1", {settings: {groupings: [], sorting: {kind: "date", reversed: true}}});
+
+    // Only the name is worth applying early; the rest is not on screen while it is sent, and
+    // the socket is what says what the view now is.
+    expect(repo.views[0].sorting).toEqual({kind: "date", reversed: false});
+});
+
 test("a move is sent as the view it goes behind", async () => {
     const fetcher = answering(200, PAYLOAD);
 
@@ -123,4 +163,22 @@ test("the settings go over as the whole object", async () => {
             email_sorting: {type: "subject", sort_reversed: false},
         },
     });
+});
+
+test("a delete asks the view's own endpoint", async () => {
+    const fetcher = answering(204);
+
+    const repo = repository([{id: "1", name: "First"}, {id: "2", name: "Second"}]);
+    await repo.remove("1");
+
+    expect((fetcher as any).mock.calls[0][0]).toBe("/api/users/me/views/1");
+    expect((fetcher as any).mock.calls[0][1].method).toBe("DELETE");
+    // The row leaves the list when the socket sends it without it, not here.
+    expect(repo.views.map((view) => view.id)).toEqual(["1", "2"]);
+});
+
+test("a delete the server refuses throws", async () => {
+    answering(500);
+
+    await expect(repository([{id: "1", name: "First"}]).remove("1")).rejects.toThrow();
 });

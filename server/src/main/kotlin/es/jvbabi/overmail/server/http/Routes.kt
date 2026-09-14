@@ -45,6 +45,7 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.views.createView
+import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
 import es.jvbabi.overmail.server.http.users.me.views.item.updateView
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
@@ -223,6 +224,7 @@ internal fun Application.configureRouting() {
 
                         route("/{viewId}") {
                             updateView()
+                            deleteView()
                         }
                     }
 

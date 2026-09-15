@@ -231,7 +231,12 @@
     "emailCount": "{count, plural, one {# mail} other {# mails}}",
     "create": "New label “{name}”",
     "search": "Search labels",
-    "add": "Add a label"
+    "add": "Add a label",
+    "filter": {
+      "title": "Labels",
+      "titleActive": "Labels:",
+      "more": "{count, plural, one {and one more} other {and # more}}"
+    }
   },
   "settings": {
     "title": "Settings",

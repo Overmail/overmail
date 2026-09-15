@@ -18,6 +18,7 @@
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import {Button} from "$lib/components/ui/button";
     import * as Tooltip from "$lib/components/ui/tooltip";
+    import * as Popover from "$lib/components/ui/popover"
     import {DndReorderElement, DndReorderHandle, DndReorderZone} from "$lib/components/dnd";
     import {DndReorder} from "$lib/hooks/dnd-reorder.svelte";
     import {moveTo} from "$lib/hooks/dnd-reorder";
@@ -26,12 +27,14 @@
         CalendarDotIcon,
         CalendarDotsIcon,
         CalendarIcon,
-        CalendarStarIcon, DotsSixVerticalIcon, EyeglassesIcon,
+        CalendarStarIcon, CaretDownIcon, DotsSixVerticalIcon, EyeglassesIcon,
         PersonSimpleIcon,
         SortAscendingIcon,
         SortDescendingIcon,
+        TagIcon,
         UsersIcon
     } from "phosphor-svelte";
+    import LabelFilter from "$lib/app/labels/LabelFilter.svelte";
 
     const MAX_ACTIVE = 4;
 
@@ -227,3 +230,5 @@
         </DropdownMenu.Content>
     </DropdownMenu.Root>
 </div>
+
+<LabelFilter />

@@ -159,7 +159,7 @@ class CreateViewTest {
     }
 
     @Test
-    fun `the view is created empty and readable back out of the database`() = testApplication {
+    fun `the view starts as the mailbox does and is readable back out of the database`() = testApplication {
         val user = setUpUser()
         installRoute()
 
@@ -171,12 +171,17 @@ class CreateViewTest {
         val stored = database.query {
             Views.selectAll().where { Views.user eq user.id.value }.single()
         }
-        assertEquals(emptyList<ViewSettings.Grouping>(), stored[Views.view].groupings)
+        // What the mailbox itself is cut by: a view with no grouping at all is a wall of mail,
+        // and the stretches are what a new view is meant to be configured *from*.
+        assertEquals(
+            listOf(ViewSettings.Grouping.DateSmartGrouping(reversed = false)),
+            stored[Views.view].groupings,
+        )
         assertEquals(
             ViewSettings.EmailSorting.DateSorting(reversed = false),
             stored[Views.view].emailSorting,
         )
-        // Empty includes the filter: a new view leaves nothing out of the listing.
+        // The filter is the empty one: a new view leaves nothing out of the listing.
         assertEquals(ViewSettings.Filter.NONE, stored[Views.view].filter)
         assertEquals(stored[Views.id].value.toString(), body["id"]!!.jsonPrimitive.content)
         assertEquals(stored[Views.name], body["name"]!!.jsonPrimitive.content)

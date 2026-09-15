@@ -44,6 +44,9 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.views.createView
+import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
+import es.jvbabi.overmail.server.http.users.me.views.item.updateView
 import es.jvbabi.overmail.server.http.webapp.ai.aiSocket
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
@@ -52,6 +55,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
+import es.jvbabi.overmail.server.http.webapp.views.viewsSocket
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
@@ -213,6 +217,17 @@ internal fun Application.configureRouting() {
                         }
                     }
 
+                    route("/views") {
+                        route("/new") {
+                            createView()
+                        }
+
+                        route("/{viewId}") {
+                            updateView()
+                            deleteView()
+                        }
+                    }
+
                     route("/inboxes") {
                         getInboxes()
 
@@ -290,6 +305,12 @@ internal fun Application.configureRouting() {
                 route("/home") {
                     route("/socket") {
                         homeSocket()
+                    }
+                }
+
+                route("/views") {
+                    route("/socket") {
+                        viewsSocket()
                     }
                 }
 

@@ -18,6 +18,7 @@ import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
 import es.jvbabi.overmail.server.data.notifier.AiChatStreamNotifier
 import es.jvbabi.overmail.server.data.notifier.AvatarNotifier
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
+import es.jvbabi.overmail.server.data.notifier.ViewNotifier
 import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
@@ -76,6 +77,7 @@ private fun Application.configureDependencies() {
         provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
         provide<AvatarNotifier> { AvatarNotifier() }
         provide<MailNotifier> { MailNotifier() }
+        provide<ViewNotifier> { ViewNotifier() }
 
         // Creating the schema on first resolution keeps it in one place: every caller reaches
         // the database through this provider, so nothing can query it before this ran.

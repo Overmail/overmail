@@ -17,6 +17,7 @@ batik = "1.19"
 twelvemonkeys = "3.12.0"
 koog = "1.2.0"
 h2 = "2.4.240"
+fractional-indexing = "3.2.2"
 
 # App
 agp = "9.1.1"
@@ -79,6 +80,7 @@ imageio-bmp = { module = "com.twelvemonkeys.imageio:imageio-bmp", version.ref = 
 koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
+fractional-indexing = { module = "com.davidarvelo:fractional-indexing", version.ref = "fractional-indexing" }
 
 # App - Compose
 app-compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }

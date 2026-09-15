@@ -23,7 +23,7 @@
     } = $props();
 
     // Routes outside the menu -- none so far -- fall back to the product name over an empty bar.
-    const item = $derived(currentNavItem(page.url.pathname));
+    const item = $derived(currentNavItem(page.url));
 
     /**
      * The room the cover takes at the end of the bar, opened and closed with it.

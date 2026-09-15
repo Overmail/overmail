@@ -38,7 +38,7 @@ class OvermailDatabase(private val database: Database) {
             // `create` only ever adds missing *tables*, so a column added to a table that already
             // exists would never reach a database that has been running. There is no migration
             // tool here, and this is the one table that has gained a column since.
-            SchemaUtils.createMissingTablesAndColumns(ImapAccounts)
+            SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails)
@@ -54,7 +54,11 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(Shares)
             // Like `ImapAccounts` above: the password columns came after the table did, and
             // `create` would not add them to a database that already has a `shares`.
-            SchemaUtils.createMissingTablesAndColumns(Shares)
+            SchemaUtils.create(Shares)
+            SchemaUtils.create(Views)
+            // Like the two above: `sort_key` came after the table did. It carries a default, so
+            // the views a running database already has get one instead of the ALTER failing.
+            SchemaUtils.create(Views)
         }
     }
 

@@ -56,7 +56,9 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "week": "This week",
-      "month": "This month"
+      "month": "This month",
+      "read": "Read",
+      "unread": "Unread"
     },
     "filters": {
       "allMails": "All mail"
@@ -231,7 +233,52 @@
     "emailCount": "{count, plural, one {# mail} other {# mails}}",
     "create": "New label “{name}”",
     "search": "Search labels",
-    "add": "Add a label"
+    "add": "Add a label",
+    "filter": {
+      "title": "Labels",
+      "titleActive": "Labels:"
+    }
+  },
+  "views": {
+    "predefined": {
+      "inbox": "Inbox",
+      "sent": "Sent"
+    },
+    "grouping": {
+      "title": "Grouping",
+      "none": "No grouping"
+    },
+    "save": "Save as view",
+    "saving": "Saving …",
+    "nameLabel": "View name"
+  },
+  "senders": {
+    "empty": "Nobody found",
+    "emailCount": "{count, plural, one {# mail} other {# mails}}",
+    "search": "Search people",
+    "self": "My accounts"
+  },
+  "filters": {
+    "from": "From",
+    "to": "To",
+    "more": "{count, plural, one {and one more} other {and # more}}",
+    "all": "All",
+    "states": "Pick states",
+    "account": {
+      "title": "Accounts",
+      "empty": "No accounts connected",
+      "failed": "The accounts could not be loaded."
+    },
+    "read": {
+      "unread": "Unread",
+      "read": "Read"
+    },
+    "archive": {
+      "archived": "Archived",
+      "quick": "Archived too",
+      "inbox": "Inbox",
+      "spam": "Spam"
+    }
   },
   "settings": {
     "title": "Settings",

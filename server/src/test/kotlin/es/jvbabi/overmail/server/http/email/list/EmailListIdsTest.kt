@@ -48,33 +48,32 @@ class EmailListIdsTest {
     private lateinit var signedIn: User
 
     @Test
-    fun `a range answers with every mail in it, newest first`() = testApplication {
+    fun `a group answers with every mail under it, newest first`() = testApplication {
         val mails = setUp(count = 5)
         installRoute()
 
-        // The fixture puts one mail per day, newest first, so this is today and the two days
-        // under it -- the stretch a header would stand over.
-        val answer = client
-            .get("/api/emails/list/ids?from=${startOfDay(2)}&to=${startOfDay(-1)}")
-            .body()
+        // The fixture puts one mail per day, newest first, so today's group holds exactly one --
+        // the stretch a header stands over.
+        val answer = client.get("/api/emails/list/ids?by=day&group=${day(0)}").body()
 
-        assertEquals(3, answer["total"]!!.jsonPrimitive.long)
-        assertEquals(mails.take(3).map { it.toString() }, answer.ids())
+        assertEquals(1, answer["total"]!!.jsonPrimitive.long)
+        assertEquals(listOf(mails[0].toString()), answer.ids())
     }
 
     @Test
-    fun `the upper end is the boundary of the next stretch, not part of this one`() = testApplication {
+    fun `fewer keys than levels is the group further up`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
 
-        // Midnight of today: what the stretch below it ends at, so today's mail is not in it.
-        val answer = client.get("/api/emails/list/ids?to=${startOfDay(0)}").body()
+        // What ticking the outer header means: that day, whoever wrote -- the deeper level is
+        // simply not named.
+        val answer = client.get("/api/emails/list/ids?by=day,sender&group=${day(1)}").body()
 
-        assertEquals(mails.drop(1).map { it.toString() }, answer.ids())
+        assertEquals(listOf(mails[1].toString()), answer.ids())
     }
 
     @Test
-    fun `without bounds it is the whole scope`() = testApplication {
+    fun `without bounds it is everything the filter lets through`() = testApplication {
         val mails = setUp(count = 4)
         installRoute()
 
@@ -82,41 +81,42 @@ class EmailListIdsTest {
     }
 
     @Test
-    fun `a stretch holds what its scope holds`() = testApplication {
+    fun `a stretch holds what the filter holds`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        // Picking a stretch of the mailbox must not pick the mails that were put away out of it,
-        // and spam is in neither scope.
-        assertEquals(listOf(mails[2].toString()), client.get("/api/emails/list/ids").ids())
+        // Picking a stretch of the mailbox must not pick the mails that were put away out of it.
+        assertEquals(
+            listOf(mails[2].toString()),
+            client.get("/api/emails/list/ids?archived_state=Unarchive").ids(),
+        )
         assertEquals(
             listOf(mails[1], mails[2]).map { it.toString() },
-            client.get("/api/emails/list/ids?scope=all").ids(),
+            client.get("/api/emails/list/ids?archived_state=Unarchive,Archive").ids(),
         )
     }
 
     @Test
-    fun `a bound that is not a time is refused`() = testApplication {
+    fun `a key that means nothing at its level is refused`() = testApplication {
         setUp(count = 1)
         installRoute()
 
         assertEquals(
             HttpStatusCode.BadRequest,
-            client.get("/api/emails/list/ids?from=gestern").status,
+            client.get("/api/emails/list/ids?by=day&group=gestern").status,
         )
         assertEquals(
             HttpStatusCode.BadRequest,
-            client.get("/api/emails/list/ids?to=heute").status,
+            client.get("/api/emails/list/ids?by=nonsense").status,
         )
     }
 
-    /** Midnight [daysBack] days ago in the server's zone, in epoch seconds. */
-    private fun startOfDay(daysBack: Int): Long {
+    /** The day [daysBack] days ago in the server's zone, as a group key. */
+    private fun day(daysBack: Int): String {
         val zone = TimeZone.currentSystemDefault()
-        return (Clock.System.now() - daysBack.days).toLocalDateTime(zone).date
-            .atStartOfDayIn(zone).epochSeconds
+        return (Clock.System.now() - daysBack.days).toLocalDateTime(zone).date.toString()
     }
 
     private suspend fun io.ktor.client.statement.HttpResponse.body() =

@@ -9,28 +9,40 @@
     import {FlexRender, createTable} from "@tanstack/svelte-table";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {_} from "svelte-i18n";
-    import {untrack} from "svelte";
+    import {untrack, type Snippet} from "svelte";
     import {page} from "$app/state";
     import {goto} from "$app/navigation";
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
     import {Toggle} from "$lib/components/ui/toggle";
-    import {ArchiveIcon} from "phosphor-svelte";
+    import {ArchiveIcon, UserIcon, UsersIcon} from "phosphor-svelte";
     import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
     import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
+    import type {ViewFilter} from "$lib/repository/ViewSocket";
+    import type {ReadState} from "$lib/app/filters/IsUnreadFilter.svelte";
+    import {readStateOf} from "$lib/app/filters/readState";
+    import {type ViewSettings} from "$lib/app/views/viewSettings";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
+    import type {MailGroupNode} from "./mailLayout";
     import {MailSelection, setMailSelection} from "./mailSelection";
     import {EMAIL_PARAM, FROM_MAIL_LIST, FROM_PARAM, emailPath, emailSlug, parseEmailId} from "./emailPath";
     import MailGhostCell from "./table/MailGhostCell.svelte";
     import MailGroupHeader from "./table/MailGroupHeader.svelte";
+    import RenameInput from "$lib/app/views/RenameInput.svelte";
     import MailDetailPanel, {PANEL_COVER} from "./detail_panel/MailDetailPanel.svelte";
     import {coverHeaderEnd} from "$lib/app/shell/pageHeader.svelte";
     import MailRowPreview from "./MailRowPreview.svelte";
     import MailSelectionBar from "./MailSelectionBar.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
+    import IsUnreadFilter from "$lib/app/filters/IsUnreadFilter.svelte";
+    import LabelFilter from "$lib/app/labels/LabelFilter.svelte";
+    import SenderFilter from "$lib/app/senders/SenderFilter.svelte";
+    import InboxFilter from "$lib/app/filters/InboxFilter.svelte";
+    import GroupingSettings from "$lib/app/views/GroupingSettings.svelte";
+    import IsArchiveFilter from "$lib/app/filters/IsArchiveFilter.svelte";
 
     /**
      * Not estimates but the heights: every row is one clipped line, so the scrollbar is sized
@@ -41,7 +53,45 @@
      * above and below itself, so the two have to be changed together.
      */
     const ROW_HEIGHT = 40;
+
+    /**
+     * What a header row takes, by level. The outermost one brings the air that sets one stretch
+     * off from the one before it; a header under it is a smaller step, or the list would be more
+     * space than mail. Both have to match what `MailGroupHeader` actually draws, or the
+     * virtualizer sizes the rows from the wrong number and the list drifts.
+     */
     const HEADER_HEIGHT = 60;
+    const SUB_HEADER_HEIGHT = 38;
+
+    /**
+     * How far a mail row sits from the left, by how deep the group holding it is.
+     *
+     * One step per level, the same step the headers take: a row ends up exactly under the header
+     * it belongs to -- its avatar in the column that header's own box stands in. An ungrouped
+     * listing takes no step at all, because there is no header to line up with.
+     */
+    const INDENT_STEP_REM = 0.75;
+
+    const mailIndent = (depth: number) =>
+        depth === 0 ? undefined : `padding-left: ${depth * INDENT_STEP_REM}rem`;
+
+    /** Where the bar above the rows comes to rest: the app header's height, its own `top-12`. */
+    const BAR_TOP = 48;
+
+    /** What one pinned header takes: its line and the step under it, without the air above it. */
+    const PINNED_HEIGHT = 21;
+
+    /**
+     * The air over the pinned headers.
+     *
+     * Not decoration: a header's text is centred on the top edge of its own box and hangs half a
+     * line above it (which is what the space above it is for). Pinned flush under the bar, that
+     * half would be behind the bar -- the header would read as a white strip with no text in it.
+     */
+    const PINNED_PAD = 10;
+
+    /** The air a header keeps above itself, which is where its line actually begins. */
+    const headerTopMargin = (level: number) => (level === 0 ? 40 : 16);
 
     /** How many rows around the viewport are held and kept up to date. */
     const OVERSCAN = 12;
@@ -52,16 +102,73 @@
      */
     const PLACEHOLDER_ROWS = 8;
 
+    let {view = $bindable(), name = null, onRename, renaming = $bindable(false), actions}: {
+        /**
+         * The listing this table is: what it leaves out, how it is cut up, what orders it. The
+         * bar above the rows writes into it, so a caller that wants the changes kept binds it to
+         * something that keeps them -- the mailbox binds it to state of its own, which is gone
+         * with the page.
+         */
+        view: ViewSettings;
+        /**
+         * What this listing is called. Null is a listing that is not a view somebody made, and
+         * then the heading says what it holds instead -- the mailbox, or everything in it.
+         */
+        name?: string | null;
+        /**
+         * Renames it. Given only where the name belongs to somebody: a view the app brings cannot
+         * be renamed, and without this the heading is a heading and not an editor.
+         */
+        onRename?: (name: string) => void;
+        /** Whether the name is being edited. Bindable, so a caller can open the editor itself. */
+        renaming?: boolean;
+        /**
+         * What the caller puts at the end of the filter row. The table knows what was changed
+         * about the view, not what can be done about it -- saving it is the page's business,
+         * because only the page knows which view this is.
+         */
+        actions?: Snippet;
+    } = $props();
+
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
 
-    /**
-     * Which mails the list is about. The mailbox as it stands unless somebody asks for all of it;
-     * the view model holds both, so switching is not a reload.
-     */
-    let allMails = $state(false);
+    /** The listing is the view: what it leaves out, how it is cut up, what orders it. */
+    $effect(() => list.setView(view));
 
-    $effect(() => list.setScope(allMails ? "all" : "unarchived"));
+    /**
+     * Whether the listing is more than the mailbox. What the title says, and what a row that left
+     * it is measured against -- the filter as a whole is the server's business, this is the one
+     * part of it the table has to know itself.
+     */
+    const allMails = $derived(
+        view.filter.archivedState === null ||
+            view.filter.archivedState.some((state) => state !== "Unarchive")
+    );
+
+    /**
+     * What each chip reads and writes: the view's filter itself.
+     *
+     * No state of its own in between. A chip that kept its own copy would have to be told when
+     * the view changed under it -- and the one that was here wrote its copy back over every view
+     * this page was handed, which is how "sent" came out as the inbox.
+     */
+    const withFilter = (change: Partial<ViewFilter>) => {
+        view.filter = {...view.filter, ...change};
+    };
+
+    /** Ids for a view, or null where nothing is picked -- no restriction, not an empty set. */
+    const idsOrNull = (ids: string[]) => (ids.length === 0 ? null : ids);
+
+    /** The end of the editing: null is the name staying as it is, see `renamedTo`. */
+    function endRename(next: string | null) {
+        renaming = false;
+        if (next !== null) onRename?.(next);
+    }
+
+    /** The read states a chip shows for what the filter says, and back again. */
+    const readStates = (state: boolean | null): ReadState[] =>
+        state === null ? [] : state ? ["read"] : ["unread"];
 
     /**
      * Which mails are ticked. Handed to the cells through the context rather than as a prop: what
@@ -74,7 +181,7 @@
     // screen is one nobody can take back. Untracked because clearing writes the very set a row
     // reads -- tracked, this would be an effect that re-runs itself.
     $effect(() => {
-        void allMails;
+        void view.filter;
         untrack(() => selection.clear());
     });
 
@@ -207,23 +314,33 @@
 
         // Stepping onto a row that is not on screen scrolls it into view; a highlighted row
         // nobody can see is the panel and the table saying different things.
-        const index = list.indexOf(next);
-        const row = index === undefined ? undefined : list.layout.rowOf(index);
+        const row = list.rowOf(next);
         if (row !== undefined) virtualizer.virtualizer.scrollToIndex(row, {align: "auto"});
-    }
-
-    /**
-     * Where the mails under a header start in the mailbox -- what its box needs to know which
-     * mails it is about. The row after a header is its first mail: a stretch with a header over
-     * it holds at least one, and there are never two headers in a row.
-     */
-    function groupStart(headerRow: number): number {
-        const first = list.layout.rowAt(headerRow + 1);
-        return first?.kind === "mail" ? first.index : 0;
     }
 
     /** The table's one preview, driven by the rows below; see MailRowPreview. */
     let rowPreview: ReturnType<typeof MailRowPreview> | undefined = $state();
+
+    /**
+     * The bar above the rows, measured: what is in it decides how tall it is -- the filters wrap
+     * on a narrow window, and the selection bar is another height again -- and the headers pinned
+     * under it have to sit exactly on its edge. A gap of a few pixels is rows shimmering through
+     * between the two.
+     */
+    let barElement = $state<HTMLDivElement | null>(null);
+    let barHeight = $state(0);
+
+    $effect(() => {
+        const element = barElement;
+        if (element === null) return;
+
+        const observer = new ResizeObserver(() => (barHeight = element.getBoundingClientRect().height));
+        observer.observe(element);
+        return () => observer.disconnect();
+    });
+
+    /** Where the pinned headers rest, and the line the topmost row is measured against. */
+    const pinnedTop = $derived(BAR_TOP + barHeight);
 
     /** The box the rows sit in, measured to know where the list starts on the page. */
     let listElement = $state<HTMLDivElement | null>(null);
@@ -262,8 +379,12 @@
         return {
             count: visibleRowCount,
             // Follows the layout: a stretch of headers appearing changes which rows are tall.
-            estimateSize: (index: number) =>
-                layout.rowAt(index)?.kind === "header" ? HEADER_HEIGHT : ROW_HEIGHT,
+            estimateSize: (index: number) => {
+                const row = layout.rowAt(index);
+                if (row?.kind !== "header") return ROW_HEIGHT;
+
+                return row.node.level === 0 ? HEADER_HEIGHT : SUB_HEADER_HEIGHT;
+            },
             overscan: OVERSCAN,
             scrollMargin,
         };
@@ -280,7 +401,7 @@
                 const entry = list.layout.rowAt(item.index);
                 if (entry?.kind === "header") return {item, entry, row: undefined};
 
-                const id = entry === undefined ? undefined : list.idAt(entry.index);
+                const id = entry === undefined ? undefined : list.idAt(entry);
                 const mail = id === undefined ? null : mails.peek(id).value;
                 return {
                     item,
@@ -320,7 +441,7 @@
         if (first === undefined || last === undefined) {
             list.window(0, 0);
             return;
-        }
+        }   
 
         list.window(first, last);
     });
@@ -336,37 +457,189 @@
     const paddingBottom = $derived(
         virtualizer.totalSize - ((visible.at(-1)?.item.end ?? scrollMargin) - scrollMargin)
     );
+
+    /**
+     * The headers that stay under the bar while their stretch is scrolled through, and how far
+     * the next one has pushed them up.
+     *
+     * Copies rather than the rows themselves: a windowed table drops the header row from the DOM
+     * long before the stretch is over, so there is nothing left up there to make sticky. What
+     * decides is the row the line at [pinnedTop] falls in -- every header that row is under and
+     * that has already gone past the line is drawn again here, outermost first.
+     *
+     * The push is what CSS does on its own between two sticky headers: as the next one comes up
+     * from below it takes the stack's place rather than sliding under it.
+     */
+    const pinned = $derived.by(() => {
+        const line = virtualizer.scrollOffset + pinnedTop;
+        const crossing = visible.findIndex(({item}) => item.end > line);
+        if (crossing < 0) return {headers: [] as MailGroupNode[], push: 0};
+
+        // The air a header keeps above itself still belongs to the stretch before it: as long as
+        // its own line has not reached the top, that stretch is what is being read.
+        const found = visible[crossing];
+        const early =
+            found.entry?.kind === "header" &&
+            found.item.start + headerTopMargin(found.entry.node.level) > line;
+        const top = early ? (visible[crossing - 1] ?? found) : found;
+
+        const layout = list.layout;
+        const headers = layout
+            .headersAt(top.item.index)
+            .filter((node) => (layout.headerRow(node) ?? top.item.index) < top.item.index);
+        if (headers.length === 0) return {headers, push: 0};
+
+        const height = PINNED_PAD + headers.length * PINNED_HEIGHT;
+        for (const {item, entry} of visible) {
+            if (entry?.kind !== "header") continue;
+
+            const drawn = item.start + headerTopMargin(entry.node.level);
+            if (drawn < line) continue;
+
+            return {headers, push: Math.max(0, height - (drawn - line))};
+        }
+
+        return {headers, push: 0};
+    });
 </script>
 
 <section class="flex flex-col">
     <!-- Stays under the app header while the rows run past it: this is the bar the filters go
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
-         header's height, and the background is its own -- rows would show through it. -->
+         header's height, and the background is its own -- rows would show through it.
+
+         Its last few pixels are a gradient rather than an edge: a row passing underneath
+         dissolves into the bar instead of being cut off by it, which is what says "header" and
+         not "first row of the list". Nothing is tinted while the list sits at the top -- what is
+         behind the fade there is the page itself. -->
     <!-- What is in it depends on what the reader is doing: which list this is, or -- while mails
          are picked -- what has been picked and what can be done to it. The same bar either way,
          and the same height, so the list below does not move as the two swap. The toggle and the
          buttons are both 2rem, which is what sets it. -->
-    <div class="bg-background sticky top-12 z-20 flex h-12 items-center px-4">
+    <div
+            bind:this={barElement}
+            class={cn(
+                "sticky top-12 z-20 flex items-center px-4 py-2",
+                // While a header is pinned under it the fade moves down there, or a row would
+                // vanish behind that header and come back out through this gradient.
+                pinned.headers.length > 0
+                    ? "bg-background"
+                    : "bg-linear-to-b from-background from-[calc(100%-0.75rem)] to-transparent"
+            )}
+    >
         {#if selection.active}
             <MailSelectionBar {selection}/>
         {:else}
-            <div class="flex w-full items-baseline gap-2">
-                <h2 class="font-heading text-sm font-medium">
-                    {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
-                </h2>
-                {#if list.initialized}
+            <div class="flex flex-col w-full gap-2">
+                <div class="flex w-full items-baseline gap-2">
+                    <!-- The view's own name, and a double click edits it: a listing somebody
+                         put together is called what they call it. A listing that is nobody's says
+                         what it holds instead, and there is nothing to rename about that. -->
+                    {#if renaming && name !== null && onRename !== undefined}
+                        <RenameInput
+                                {name}
+                                onEnd={endRename}
+                                label={$_("views.nameLabel")}
+                                class="font-heading min-w-0 flex-1 bg-transparent text-lg font-medium outline-hidden"
+                        />
+                    {:else}
+                        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                        <h2
+                                class="font-heading text-lg font-medium"
+                                ondblclick={() => (renaming = onRename !== undefined && name !== null)}
+                        >
+                            {name ?? $_(allMails ? "mails.title.all" : "mails.title.unarchived")}
+                        </h2>
+                    {/if}
+                    {#if list.initialized}
                     <span class="text-muted-foreground text-xs tabular-nums">
                         {$_("mails.count", {values: {count: list.total}})}
                     </span>
-                {/if}
+                    {/if}
+                </div>
 
-                <!-- The filters live at this end of the bar, and this is the first of them. Not
-                     "archived yes or no" but which list it is: the mailbox, or everything that
-                     arrived. -->
-                <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
-                    <ArchiveIcon data-icon="inline-start"/>
-                    {$_("mails.filters.allMails")}
-                </Toggle>
+                <div class="flex flex-row flex-wrap items-center gap-2">
+                    <!-- Bound to the filter through a getter and a setter each: the view is the
+                         one copy of what is filtered, and a chip is a way of writing into it. -->
+                    <LabelFilter
+                            bind:ids={
+                                () => view.filter.hasLabels ?? [],
+                                (ids) => withFilter({hasLabels: idsOrNull(ids)})
+                            }
+                    />
+                    <IsUnreadFilter
+                            bind:selected={
+                                () => readStates(view.filter.readState),
+                                (states) => withFilter({readState: readStateOf(states)})
+                            }
+                    />
+                    <IsArchiveFilter
+                            bind:selected={
+                                () => view.filter.archivedState ?? [],
+                                (states) => withFilter({archivedState: states.length === 0 ? null : states})
+                            }
+                    />
+                    <!-- The same control twice: who a mail came from, and who it went to. -->
+                    <SenderFilter
+                            title={$_("filters.from")}
+                            icon={UserIcon}
+                            bind:ids={
+                                () => view.filter.sentBy ?? [],
+                                (ids) => withFilter({sentBy: idsOrNull(ids)})
+                            }
+                    />
+                    <SenderFilter
+                            title={$_("filters.to")}
+                            icon={UsersIcon}
+                            bind:ids={
+                                () => view.filter.sentTo ?? [],
+                                (ids) => withFilter({sentTo: idsOrNull(ids)})
+                            }
+                    />
+                    <InboxFilter
+                            bind:ids={
+                                () => view.filter.imapAccountIds ?? [],
+                                (ids) => withFilter({imapAccountIds: idsOrNull(ids)})
+                            }
+                    />
+
+                    <!-- What the caller offers about this listing -- keeping it, above all. -->
+                    <div class="ml-auto flex flex-row items-center gap-2">
+                        {@render actions?.()}
+
+                        <!-- The other side of the row: what is shown is set on the left, how it
+                             is arranged here. -->
+                        <GroupingSettings bind:groupings={view.groupings} bind:sorting={view.sorting}/>
+                    </div>
+                </div>
+            </div>
+        {/if}
+    </div>
+
+    <!--
+        The stretch being read, held under the bar.
+
+        Outside the table and not a sticky row: the rows of a windowed table are dropped from the
+        DOM as they leave the viewport, so the header of a long stretch is gone long before the
+        stretch is. This has no height of its own -- it is drawn over the rows, not between them.
+    -->
+    <div class="sticky z-10 h-0" style="top: {pinnedTop}px">
+        {#if pinned.headers.length > 0}
+            <!-- One group for the cursor, like a row of the table: hovering the pinned header
+                 brings its box out the same way hovering the real one does. -->
+            <!-- The last stretch of it is a gradient rather than an edge: a row passing
+                 underneath dissolves into the header instead of being cut off by it. Which is
+                 what the bar above does while nothing is pinned. -->
+            <div
+                    class="group/mail-row bg-background absolute inset-x-0 top-0 pt-2.5
+                           after:pointer-events-none after:absolute after:inset-x-0 after:top-full
+                           after:h-3 after:bg-linear-to-b after:from-background after:to-transparent
+                           after:content-['']"
+                    style="transform: translateY(-{pinned.push}px)"
+            >
+                {#each pinned.headers as node (node.path.join("/"))}
+                    <MailGroupHeader {node} {list} pinned/>
+                {/each}
             </div>
         {/if}
     </div>
@@ -401,7 +674,12 @@
                     </tr>
                 {/if}
 
-                {#each visible as {item, entry, row} (row?.id ?? `row-${item.index}`)}
+                <!-- The kind is part of the key: a row that was a header and is now a gap -- which
+                     is what a change of filter makes of it, until the new listing is here -- has
+                     to be a new block rather than the old one updated. Updated, the header
+                     component lives on for a beat with nothing behind it and reads a stretch that
+                     is no longer there. -->
+                {#each visible as {item, entry, row} (row?.id ?? `${entry?.kind ?? "gap"}-${item.index}`)}
                     {@const modelRow = row === undefined ? undefined : rowsById.get(row.id)}
                     {#if entry?.kind === "header"}
                         <!-- The stretch this and the rows below it belong to. One cell across the
@@ -410,12 +688,7 @@
                              header's own box comes out on hover, see selectionReveal. -->
                         <Table.Row class="group/mail-row border-0 hover:bg-transparent">
                             <Table.Cell colspan={columns.length} class="p-0 align-bottom">
-                                <MailGroupHeader
-                                        label={entry.label}
-                                        count={entry.count}
-                                        start={groupStart(item.index)}
-                                        {list}
-                                />
+                                <MailGroupHeader node={entry.node} {list}/>
                             </Table.Cell>
                         </Table.Row>
                     {:else if modelRow}
@@ -446,8 +719,15 @@
                                 onclick={() => showEmail(modelRow.id, "push")}
                                 ondblclick={() => openEmailPage(modelRow.id, row?.mail.subject)}
                         >
-                            {#each modelRow.getAllCells() as cell (cell.id)}
-                                <Table.Cell class="h-10 overflow-hidden py-0">
+                            <!-- The indent goes on the first cell: the columns are fixed, so a
+                                 row that steps in steps in where its avatar is. -->
+                            {#each modelRow.getAllCells() as cell, column (cell.id)}
+                                <Table.Cell
+                                        class="h-10 overflow-hidden py-0"
+                                        style={column === 0 && entry?.kind === "mail"
+                                            ? mailIndent(entry.path.length)
+                                            : undefined}
+                                >
                                     <FlexRender {cell}/>
                                 </Table.Cell>
                             {/each}
@@ -456,9 +736,16 @@
                         <!-- A mail the list has and does not hold yet: the shape of the row
                              without the content, so nothing shifts when it arrives. -->
                         <Table.Row aria-rowindex={item.index + 1} class="h-10 border-0 hover:bg-transparent">
-                            {#each columns as column (column.id)}
+                            {#each columns as column, index (column.id)}
                                 {@const ghost = GHOST_SHAPES[column.id ?? ""]}
-                                <Table.Cell class="h-10 overflow-hidden py-0">
+                                <!-- The same indent as the mail that lands here, so nothing
+                                     shifts sideways when it arrives. -->
+                                <Table.Cell
+                                        class="h-10 overflow-hidden py-0"
+                                        style={index === 0 && entry?.kind === "mail"
+                                            ? mailIndent(entry.path.length)
+                                            : undefined}
+                                >
                                     {#if ghost}
                                         <MailGhostCell widthClass={ghost.width} withAvatar={ghost.withAvatar}/>
                                     {/if}

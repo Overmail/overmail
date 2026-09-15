@@ -39,6 +39,10 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.postgresql)
 
+    // Sort keys for the views list: a key between two others, so reordering one view writes one
+    // row instead of renumbering the rest.
+    implementation(libs.fractional.indexing)
+
     // BIMI records are DNS TXT lookups, which the JDK offers no supported API for.
     implementation(libs.dnsjava)
 

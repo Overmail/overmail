@@ -1,4 +1,5 @@
 import type {Prompt, PromptSegment, PromptSender} from "$lib/app/ai/composer/prompt";
+import {findSenders} from "$lib/app/senders/senderSearch";
 
 export type SenderSearchResult = PromptSender & {emailCount: number};
 
@@ -45,29 +46,9 @@ export class OvermailPromptViewModel {
         this.prompt.segments = segments;
     }
 
-    async findSenders(query: string): Promise<SenderSearchResult[]> {
-        const response = await fetch(`/api/senders/search?query=${encodeURIComponent(query)}`);
-        if (!response.ok) return [];
-
-        const data: {
-            senders: {
-                id: string;
-                name: string | null;
-                address: string;
-                avatar_url: string | null;
-                avatar_padding: number | null;
-                email_count: number;
-            }[];
-        } = await response.json();
-
-        return data.senders.map((sender) => ({
-            id: sender.id,
-            name: sender.name,
-            address: sender.address,
-            avatarUrl: sender.avatar_url,
-            avatarPadding: sender.avatar_padding,
-            emailCount: sender.email_count,
-        }));
+    /** The same search the sender filter picks from, see `senders/senderSearch`. */
+    findSenders(query: string): Promise<SenderSearchResult[]> {
+        return findSenders(query);
     }
 
     async findEmails(query: string): Promise<EmailSearchResult[]> {

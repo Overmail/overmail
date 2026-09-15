@@ -7,6 +7,17 @@ export type LabelSearchResult = {
 };
 
 /**
+ * The least a label has to be to be shown as a chip. A [LabelSearchResult] is one, and so is what
+ * the entity cache keeps -- which is what a caller has after reading ids back out of a stored
+ * filter.
+ */
+export type PickedLabel = {
+	id: string;
+	name: string;
+	color: string;
+};
+
+/**
  * The labels whose name matches [query], in the order the server puts them.
  *
  * An empty query is not an empty answer: it is what to offer somebody who has not typed yet.

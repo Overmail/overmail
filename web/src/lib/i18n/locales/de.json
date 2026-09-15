@@ -56,7 +56,9 @@
       "today": "Heute",
       "yesterday": "Gestern",
       "week": "Diese Woche",
-      "month": "Dieser Monat"
+      "month": "Dieser Monat",
+      "read": "Gelesen",
+      "unread": "Ungelesen"
     },
     "filters": {
       "allMails": "Alle Mails"
@@ -231,7 +233,52 @@
     "emailCount": "{count, plural, one {# Mail} other {# Mails}}",
     "create": "Neues Label „{name}“",
     "search": "Labels suchen",
-    "add": "Label hinzufügen"
+    "add": "Label hinzufügen",
+    "filter": {
+      "title": "Labels",
+      "titleActive": "Labels:"
+    }
+  },
+  "views": {
+    "predefined": {
+      "inbox": "Posteingang",
+      "sent": "Gesendet"
+    },
+    "grouping": {
+      "title": "Gruppierung",
+      "none": "Keine Gruppierung"
+    },
+    "save": "Als Ansicht speichern",
+    "saving": "Wird gespeichert …",
+    "nameLabel": "Name der Ansicht"
+  },
+  "senders": {
+    "empty": "Niemand gefunden",
+    "emailCount": "{count, plural, one {# Mail} other {# Mails}}",
+    "search": "Personen suchen",
+    "self": "Meine Konten"
+  },
+  "filters": {
+    "from": "Von",
+    "to": "An",
+    "more": "{count, plural, one {und ein weiteres} other {und # weitere}}",
+    "all": "Alle",
+    "states": "Zustände wählen",
+    "account": {
+      "title": "Konten",
+      "empty": "Keine Konten verbunden",
+      "failed": "Die Konten konnten nicht geladen werden."
+    },
+    "read": {
+      "unread": "Ungelesen",
+      "read": "Gelesen"
+    },
+    "archive": {
+      "archived": "Archiviert",
+      "quick": "Auch archivierte",
+      "inbox": "Posteingang",
+      "spam": "Spam"
+    }
   },
   "settings": {
     "title": "Einstellungen",

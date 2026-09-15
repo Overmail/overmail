@@ -7,6 +7,7 @@ import org.jetbrains.exposed.v1.core.alias
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.exists
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.core.notExists
@@ -130,6 +131,36 @@ fun emailIsNotSpam(): Op<Boolean> {
                             (laterNonSpam[EmailArchives.email] eq EmailArchives.email) and
                                     (laterNonSpam[EmailArchives.action] neq EmailArchiveAction.Spam) and
                                     (laterNonSpam[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
+                        }
+                    )
+        }
+    )
+}
+
+/**
+ * True for mails whose archive state is [action]: the latest event in the log, with no event at
+ * all reading as [EmailArchiveAction.Unarchive].
+ *
+ * The general form of [emailIsNotArchived] and [emailIsNotSpam], and it resolves a tie the same
+ * way they do: an event at the very same instant with another action wins, so two events in one
+ * moment leave the mail out of *both* states rather than in both. That is a client that did two
+ * things at once, and a filter that shows it twice would be the worse answer.
+ *
+ * Correlates on [Emails], so it goes into the `where` of a query over that table.
+ */
+fun emailArchiveStateIs(action: EmailArchiveAction): Op<Boolean> {
+    if (action == EmailArchiveAction.Unarchive) return emailIsNotArchived()
+
+    val later = EmailArchives.alias("later_than_state")
+    return exists(
+        EmailArchives.selectAll().where {
+            (EmailArchives.email eq Emails.id) and
+                    (EmailArchives.action eq action) and
+                    notExists(
+                        later.selectAll().where {
+                            (later[EmailArchives.email] eq EmailArchives.email) and
+                                    (later[EmailArchives.action] neq action) and
+                                    (later[EmailArchives.createdAt] greaterEq EmailArchives.createdAt)
                         }
                     )
         }

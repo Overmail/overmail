@@ -28,7 +28,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -56,36 +55,58 @@ class EmailListGroupsTest {
     private val today = Clock.System.now().toLocalDateTime(zone).date
 
     @Test
-    fun `by date is one stretch per day, newest first`() = testApplication {
+    fun `the smart date cuts today, yesterday and the months before`() = testApplication {
         setUp()
         installRoute()
         addMail(daysAgo(0))
         addMail(daysAgo(0))
         addMail(daysAgo(1))
-        addMail(daysAgo(40))
+        val old = daysAgo(400)
+        addMail(old)
 
-        val groups = client.get("/api/emails/list/groups?by=date").groups()
+        val groups = client.get("/api/emails/list/groups?by=date_smart").groups()
+            .associate { it.keys().single() to it["count"]!!.jsonPrimitive.long }
+
+        assertEquals(2L, groups["1"])
+        assertEquals(1L, groups["2"])
+        // Over a year back, so it is the month it was sent in, whatever the near stretches are
+        // doing today.
+        val sent = old.toLocalDateTime(zone).date
+        assertEquals(1L, groups["${sent.year * 100 + sent.month.ordinal + 1}"])
+    }
+
+    @Test
+    fun `a year and a month are one number each`() = testApplication {
+        setUp()
+        installRoute()
+        val sent = daysAgo(400)
+        addMail(sent)
+        val date = sent.toLocalDateTime(zone).date
 
         assertEquals(
-            listOf(day(0) to 2L, day(1) to 1L, day(40) to 1L),
-            groups.map { it["key"]!!.jsonPrimitive.content to it["count"]!!.jsonPrimitive.long },
+            listOf(date.year.toString()),
+            client.get("/api/emails/list/groups?by=year").groups().map { it.keys().single() },
+        )
+        assertEquals(
+            listOf("${date.year * 100 + date.month.ordinal + 1}"),
+            client.get("/api/emails/list/groups?by=month").groups().map { it.keys().single() },
         )
     }
 
     @Test
-    fun `a day nothing arrived on is not a stretch`() = testApplication {
+    fun `a day nothing arrived on is not a group`() = testApplication {
         setUp()
         installRoute()
         addMail(daysAgo(1))
 
-        val groups = client.get("/api/emails/list/groups?by=date").groups()
+        val groups = client.get("/api/emails/list/groups?by=day").groups()
 
         // Nothing today, so today is not in the answer -- a header never stands over nothing.
-        assertEquals(listOf(day(1)), groups.map { it["key"]!!.jsonPrimitive.content })
+        assertEquals(listOf(day(1)), groups.map { it.keys().single() })
     }
 
     @Test
-    fun `without grouping the whole mailbox is one stretch`() = testApplication {
+    fun `without grouping the whole mailbox is one group`() = testApplication {
         setUp()
         installRoute()
         addMail(daysAgo(0))
@@ -94,12 +115,68 @@ class EmailListGroupsTest {
         val groups = client.get("/api/emails/list/groups").groups()
 
         assertEquals(1, groups.size)
-        assertEquals(JsonNull, groups.single()["key"])
+        assertEquals(emptyList(), groups.single().keys())
         assertEquals(2, groups.single()["count"]!!.jsonPrimitive.long)
     }
 
     @Test
-    fun `the stretches hold the same mails the listing does`() = testApplication {
+    fun `two levels are one row per combination that holds mail`() = testApplication {
+        setUp()
+        installRoute()
+        addMail(daysAgo(0))
+        val fromOther = addMail(daysAgo(0))
+        addMail(daysAgo(1))
+        val other = otherSender(fromOther)
+
+        val groups = client.get("/api/emails/list/groups?by=day,sender").groups()
+
+        // Today holds two senders, yesterday one -- and the keys come outermost first.
+        assertEquals(
+            mapOf(
+                listOf(day(0), sender.id.value.toString()) to 1L,
+                listOf(day(0), other.toString()) to 1L,
+                listOf(day(1), sender.id.value.toString()) to 1L,
+            ),
+            groups.associate { it.keys() to it["count"]!!.jsonPrimitive.long },
+        )
+    }
+
+    @Test
+    fun `the read state is a grouping of its own`() = testApplication {
+        setUp()
+        installRoute()
+        val read = addMail(daysAgo(0))
+        addMail(daysAgo(0))
+        markRead(read)
+
+        val groups = client.get("/api/emails/list/groups?by=read").groups()
+
+        assertEquals(
+            mapOf("true" to 1L, "false" to 1L),
+            groups.associate { it.keys().single() to it["count"]!!.jsonPrimitive.long },
+        )
+    }
+
+    @Test
+    fun `the archive state is a grouping of its own, event log and all`() = testApplication {
+        setUp()
+        installRoute()
+        val archived = addMail(daysAgo(0))
+        val spam = addMail(daysAgo(0))
+        addMail(daysAgo(0))
+        archive(archived, EmailArchiveAction.Archive)
+        archive(spam, EmailArchiveAction.Spam)
+
+        val groups = client.get("/api/emails/list/groups?by=archived&archived_state=Unarchive,Archive,Spam").groups()
+
+        assertEquals(
+            mapOf("Archive" to 1L, "Spam" to 1L, "Unarchive" to 1L),
+            groups.associate { it.keys().single() to it["count"]!!.jsonPrimitive.long },
+        )
+    }
+
+    @Test
+    fun `the groups hold the same mails the listing does`() = testApplication {
         setUp()
         installRoute()
         val spam = addMail(daysAgo(0))
@@ -109,26 +186,26 @@ class EmailListGroupsTest {
         archive(spam, EmailArchiveAction.Spam)
         archive(archived, EmailArchiveAction.Archive)
 
-        val byDate = client.get("/api/emails/list/groups?by=date").groups()
+        val byDate = client.get("/api/emails/list/groups?by=date_smart&archived_state=Unarchive").groups()
             .sumOf { it["count"]!!.jsonPrimitive.long }
-        val ungrouped = client.get("/api/emails/list/groups?by=none").groups()
+        val ungrouped = client.get("/api/emails/list/groups?archived_state=Unarchive").groups()
             .single()["count"]!!.jsonPrimitive.long
 
         // Spam and the archived mail are out of both, and every mail left is in exactly one
-        // stretch -- which is what lets a layout be built from them.
+        // group -- which is what lets a layout be built from them.
         assertEquals(2, byDate)
         assertEquals(2, ungrouped)
     }
 
     @Test
-    fun `the stretches grow with the archived mails in the other scope`() = testApplication {
+    fun `the groups grow with the archived mails when the filter asks for them`() = testApplication {
         setUp()
         installRoute()
         val archived = addMail(daysAgo(0))
         addMail(daysAgo(0))
         archive(archived, EmailArchiveAction.Archive)
 
-        val counted = client.get("/api/emails/list/groups?by=date&scope=all").groups()
+        val counted = client.get("/api/emails/list/groups?by=date_smart&archived_state=Unarchive,Archive").groups()
             .sumOf { it["count"]!!.jsonPrimitive.long }
 
         // The same filter the listing uses, or a header would count mails the rows do not show.
@@ -136,17 +213,22 @@ class EmailListGroupsTest {
     }
 
     @Test
-    fun `an unknown grouping or scope is refused`() = testApplication {
+    fun `an unknown grouping or filter is refused`() = testApplication {
         setUp()
         installRoute()
 
         assertEquals(
             HttpStatusCode.BadRequest,
-            client.get("/api/emails/list/groups?by=sender").status,
+            client.get("/api/emails/list/groups?by=labels").status,
+        )
+        // The same level twice would be one header under another saying the same thing.
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            client.get("/api/emails/list/groups?by=day,day").status,
         )
         assertEquals(
             HttpStatusCode.BadRequest,
-            client.get("/api/emails/list/groups?by=date&scope=spam").status,
+            client.get("/api/emails/list/groups?by=day&archived_state=spam").status,
         )
     }
 
@@ -159,6 +241,24 @@ class EmailListGroupsTest {
 
     private suspend fun io.ktor.client.statement.HttpResponse.groups() =
         Json.parseToJsonElement(bodyAsText()).jsonObject.getValue("groups").jsonArray.map { it.jsonObject }
+
+    /** The keys of one group row, outermost first. */
+    private fun kotlinx.serialization.json.JsonObject.keys() =
+        getValue("keys").jsonArray.map { it.jsonPrimitive.content }
+
+    private suspend fun markRead(emailId: Uuid) {
+        database.query { Email.findById(emailId)!!.isRead = true }
+    }
+
+    /** A second correspondent, as the sender of [mail]. */
+    private suspend fun otherSender(mail: Uuid): Uuid = database.query {
+        val other = EmailUser.new {
+            user = signedIn
+            address = "other@example.com"
+        }
+        Email.findById(mail)!!.sender = other
+        other.id.value
+    }
 
     private suspend fun addMail(sentAt: Instant): Uuid = database.query {
         Email.new {

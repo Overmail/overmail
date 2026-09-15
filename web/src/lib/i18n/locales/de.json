@@ -234,8 +234,40 @@
     "add": "Label hinzufügen",
     "filter": {
       "title": "Labels",
-      "titleActive": "Labels:",
-      "more": "{count, plural, one {und ein weiteres} other {und # weitere}}"
+      "titleActive": "Labels:"
+    }
+  },
+  "views": {
+    "grouping": {
+      "title": "Gruppierung",
+      "none": "Keine Gruppierung"
+    }
+  },
+  "senders": {
+    "empty": "Niemand gefunden",
+    "emailCount": "{count, plural, one {# Mail} other {# Mails}}",
+    "search": "Personen suchen"
+  },
+  "filters": {
+    "from": "Von",
+    "to": "An",
+    "more": "{count, plural, one {und ein weiteres} other {und # weitere}}",
+    "all": "Alle",
+    "states": "Zustände wählen",
+    "account": {
+      "title": "Konten",
+      "empty": "Keine Konten verbunden",
+      "failed": "Die Konten konnten nicht geladen werden."
+    },
+    "read": {
+      "unread": "Ungelesen",
+      "read": "Gelesen"
+    },
+    "archive": {
+      "archived": "Archiviert",
+      "quick": "Auch archivierte",
+      "inbox": "Posteingang",
+      "spam": "Spam"
     }
   },
   "settings": {

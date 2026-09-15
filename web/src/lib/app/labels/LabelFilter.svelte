@@ -17,7 +17,8 @@
     import * as Popover from "$lib/components/ui/popover";
     import LabelPicker from "$lib/app/labels/LabelPicker.svelte";
     import type {PickedLabel} from "$lib/app/labels/labelSearch";
-    import {summariseLabels} from "$lib/app/labels/labelSummary";
+    import {filterChip} from "$lib/app/filters/chip";
+    import {summarisePicked} from "$lib/app/filters/summarise";
     import {cn} from "$lib/utils";
 
     let {
@@ -47,7 +48,11 @@
     /** Nothing picked is not a filter, and the chip says so by looking like every other one. */
     const active = $derived(labels.length > 0);
 
-    const summary = $derived(summariseLabels(labels.map((label) => label.name)));
+    const summary = $derived(summarisePicked(labels.map((label) => label.name)));
+
+    // The same pill the toggle filters are, so a row of them reads as one kind of control; this
+    // one is a single button, so both slots go on it.
+    const chip = $derived(filterChip({active}));
 
     // Opening starts over: the query from the last time says nothing about this one. The focus
     // goes to the field, because that is what the list is driven by -- arrows and Enter are
@@ -108,13 +113,7 @@
             <button
                     {...props}
                     type="button"
-                    class={cn(
-                        "flex cursor-pointer flex-row items-center gap-1.5 w-fit rounded-full px-2 py-0.5 text-sm outline-none transition-colors duration-100 focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                        active
-                            ? "bg-primary-foreground text-primary hover:bg-primary/80"
-                            : "bg-accent text-accent-foreground hover:bg-accent/80",
-                        className
-                    )}
+                    class={cn(chip.root(), chip.action(), className)}
             >
                 <TagIcon class="h-lh" weight={active ? "fill" : "regular"}/>
                 <span class={active ? "font-medium" : undefined}>
@@ -124,7 +123,7 @@
                     <span>
                         {summary.shown.join(", ")}{summary.rest === 0
                             ? ""
-                            : ` ${$_("labels.filter.more", {values: {count: summary.rest}})}`}
+                            : ` ${$_("filters.more", {values: {count: summary.rest}})}`}
                     </span>
                 {/if}
                 <CaretDownIcon class="h-lh"/>

@@ -5,6 +5,7 @@
     import {Skeleton} from "$lib/components/ui/skeleton";
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
+    import {mailboxView} from "$lib/app/views/viewSettings";
     import {onMount} from "svelte";
 
     const {home} = useRepositories();
@@ -27,6 +28,13 @@
             if (user) currentUserName = user.firstname + " " + user.lastname;
         })
     })
+
+    /**
+     * The listing this page shows. Its own, and only as long as the page: the mailbox is not a
+     * view somebody saved, but it is set up like one, so the bar above it can be the same bar.
+     */
+    let mailbox = $state(mailboxView());
+
 </script>
 
 <svelte:head>
@@ -50,6 +58,6 @@
     </div>
 
     <div class="px-4 pt-12 pb-16">
-        <MailTable/>
+        <MailTable bind:view={mailbox}/>
     </div>
 </div>

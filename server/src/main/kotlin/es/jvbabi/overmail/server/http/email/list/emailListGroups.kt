@@ -28,8 +28,9 @@ import org.jetbrains.exposed.v1.jdbc.select
  * the listing itself has (newest first) and every mail is in exactly one of them, so the n-th
  * mail row of a layout built from these is the n-th mail of `GET /api/emails/list`.
  *
- * Which mails it counts is `?scope=`, the same as the listing itself, see [MailScope]. A stretch
- * that counted mails the rows do not show would be a header over the wrong number.
+ * Which mails it counts is the filter, the same one the listing itself is drawn with, see
+ * [MailFilter]. A stretch that counted mails the rows do not show would be a header over the
+ * wrong number.
  *
  * `by=date` is one stretch per calendar day. Folding those into what a reader is shown -- today,
  * yesterday, the rest of this week, the rest of this month, then month by month -- is the
@@ -41,7 +42,7 @@ fun Route.emailListGroups() {
     authenticate {
         get {
             val grouping = call.emailGrouping()
-            val scope = call.mailScope()
+            val filter = call.mailFilter()
             val userId = call.requireAuthenticatedUserId()
 
             val groups = call.database().query {
@@ -56,7 +57,7 @@ fun Route.emailListGroups() {
                             count = Emails
                                 .leftJoin(ImapAccounts)
                                 .select(Emails.id)
-                                .where { (ImapAccounts.user eq userId) and scope.filter() }
+                                .where { (ImapAccounts.user eq userId) and filter.predicate() }
                                 .count(),
                         )
                     )
@@ -71,7 +72,7 @@ fun Route.emailListGroups() {
                         Emails
                             .leftJoin(ImapAccounts)
                             .select(day, mails)
-                            .where { (ImapAccounts.user eq userId) and scope.filter() }
+                            .where { (ImapAccounts.user eq userId) and filter.predicate() }
                             .groupBy(day)
                             .orderBy(day, SortOrder.DESC)
                             .map { row -> EmailGroup(key = row[day].toString(), count = row[mails]) }

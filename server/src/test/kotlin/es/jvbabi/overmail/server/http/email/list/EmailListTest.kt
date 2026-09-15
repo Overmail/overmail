@@ -4,7 +4,11 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailArchive
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
+import es.jvbabi.overmail.server.database.models.EmailLabel
+import es.jvbabi.overmail.server.database.models.EmailRecipient
+import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailUser
+import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
@@ -133,7 +137,7 @@ class EmailListTest {
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        val page = client.get("/api/emails/list").page()
+        val page = client.get("/api/emails/list?archived_state=Unarchive").page()
 
         // Putting a mail away has to mean something in the listing it was put away from.
         assertEquals(1, page["total"]!!.jsonPrimitive.long)
@@ -141,24 +145,110 @@ class EmailListTest {
     }
 
     @Test
-    fun `every mail is in the other scope, spam still is not`() = testApplication {
+    fun `the archived ones come back when the filter asks for them`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        val page = client.get("/api/emails/list?scope=all").page()
+        val page = client.get("/api/emails/list?archived_state=Unarchive,Archive").page()
 
         assertEquals(2, page["total"]!!.jsonPrimitive.long)
         assertEquals(listOf(mails[1], mails[2]).map { it.toString() }, page.ids())
     }
 
     @Test
-    fun `a scope nobody offers is refused`() = testApplication {
+    fun `spam is a state like any other, and only what is asked for is in`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        archive(mails[0], EmailArchiveAction.Spam)
+        archive(mails[1], EmailArchiveAction.Archive)
+
+        val page = client.get("/api/emails/list?archived_state=Spam").page()
+
+        assertEquals(listOf(mails[0].toString()), page.ids())
+    }
+
+    @Test
+    fun `a filter that names no state at all lets nothing through`() = testApplication {
+        setUp(count = 3)
+        installRoute()
+
+        // Not the same as leaving the parameter out, which is every state there is.
+        val page = client.get("/api/emails/list?archived_state=").page()
+
+        assertEquals(0, page["total"]!!.jsonPrimitive.long)
+    }
+
+    @Test
+    fun `a state nobody offers is refused`() = testApplication {
         setUp(count = 1)
         installRoute()
 
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?scope=spam").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?archived_state=spam").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?has_labels=not-an-id").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?read_state=maybe").status)
+    }
+
+    @Test
+    fun `the read state cuts the listing both ways`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        markRead(mails[1])
+
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?read_state=true").ids())
+        assertEquals(
+            listOf(mails[0], mails[2]).map { it.toString() },
+            client.get("/api/emails/list?read_state=false").ids(),
+        )
+    }
+
+    @Test
+    fun `a label filter holds the mails carrying any of them`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        val work = addLabel("Work", mails[0])
+        val bills = addLabel("Bills", mails[2])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?has_labels=$work").ids())
+        // Any of them, not all: two labels are two ways in, not a mail that has to carry both.
+        assertEquals(
+            listOf(mails[0], mails[2]).map { it.toString() },
+            client.get("/api/emails/list?has_labels=$work,$bills").ids(),
+        )
+    }
+
+    @Test
+    fun `who wrote and who was written to are two filters`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val other = addSender("other@example.com", mails[0])
+        val recipient = addRecipient("team@example.com", mails[1])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=$other").ids())
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?sent_to=$recipient").ids())
+    }
+
+    @Test
+    fun `an account filter holds the mails that came through it`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val second = addAccount("imap.other.example.com", mails[0])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?imap_account_ids=$second").ids())
+    }
+
+    @Test
+    fun `filters are read together, not as alternatives`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        val work = addLabel("Work", mails[0], mails[1])
+        markRead(mails[1])
+
+        assertEquals(
+            listOf(mails[1].toString()),
+            client.get("/api/emails/list?has_labels=$work&read_state=true").ids(),
+        )
     }
 
     @Test
@@ -239,6 +329,65 @@ class EmailListTest {
                 createdByAgent = false
             }
         }
+    }
+
+    private suspend fun markRead(emailId: Uuid) {
+        database.query { Email.findById(emailId)!!.isRead = true }
+    }
+
+    /** A label of this user, put on [mails]. */
+    private suspend fun addLabel(name: String, vararg mails: Uuid): Uuid = database.query {
+        val label = Label.new {
+            owner = signedIn
+            this.name = name
+            color = "#000000"
+            createdByAgent = false
+        }
+        for (mailId in mails) {
+            EmailLabel.new {
+                email = Email.findById(mailId)!!
+                this.label = label
+                labeledByAgent = false
+            }
+        }
+        label.id.value
+    }
+
+    /** A second correspondent, as the sender of [mail]. */
+    private suspend fun addSender(address: String, mail: Uuid): Uuid = database.query {
+        val sender = EmailUser.new {
+            user = signedIn
+            this.address = address
+        }
+        Email.findById(mail)!!.sender = sender
+        sender.id.value
+    }
+
+    /** A second correspondent, as a recipient of [mail]. */
+    private suspend fun addRecipient(address: String, mail: Uuid): Uuid = database.query {
+        val recipient = EmailUser.new {
+            user = signedIn
+            this.address = address
+        }
+        EmailRecipient.new {
+            email = Email.findById(mail)!!
+            emailUser = recipient
+            type = EmailRecipientType.RECIPIENT
+        }
+        recipient.id.value
+    }
+
+    /** A second mailbox of this user, as the one [mail] came through. */
+    private suspend fun addAccount(host: String, mail: Uuid): Uuid = database.query {
+        val account = ImapAccount.new {
+            user = signedIn
+            this.host = host
+            port = 993
+            username = "owner"
+            password = "secret"
+        }
+        Email.findById(mail)!!.imapAccount = account
+        account.id.value
     }
 
     private suspend fun addMail(sentAt: kotlin.time.Instant): Uuid = database.query {

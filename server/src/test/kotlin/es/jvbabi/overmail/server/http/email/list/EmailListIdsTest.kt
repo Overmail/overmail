@@ -74,7 +74,7 @@ class EmailListIdsTest {
     }
 
     @Test
-    fun `without bounds it is the whole scope`() = testApplication {
+    fun `without bounds it is everything the filter lets through`() = testApplication {
         val mails = setUp(count = 4)
         installRoute()
 
@@ -82,18 +82,20 @@ class EmailListIdsTest {
     }
 
     @Test
-    fun `a stretch holds what its scope holds`() = testApplication {
+    fun `a stretch holds what the filter holds`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        // Picking a stretch of the mailbox must not pick the mails that were put away out of it,
-        // and spam is in neither scope.
-        assertEquals(listOf(mails[2].toString()), client.get("/api/emails/list/ids").ids())
+        // Picking a stretch of the mailbox must not pick the mails that were put away out of it.
+        assertEquals(
+            listOf(mails[2].toString()),
+            client.get("/api/emails/list/ids?archived_state=Unarchive").ids(),
+        )
         assertEquals(
             listOf(mails[1], mails[2]).map { it.toString() },
-            client.get("/api/emails/list/ids?scope=all").ids(),
+            client.get("/api/emails/list/ids?archived_state=Unarchive,Archive").ids(),
         )
     }
 

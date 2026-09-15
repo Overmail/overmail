@@ -28,6 +28,8 @@
     import type {PickedLabel} from "$lib/app/labels/labelSearch";
     import type {ReadState} from "$lib/app/filters/IsUnreadFilter.svelte";
     import type {PickedInbox} from "$lib/app/filters/InboxFilter.svelte";
+    import {readStateOf} from "$lib/app/filters/readState";
+    import {type ViewSettings} from "$lib/app/views/viewSettings";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
     import {MailSelection, setMailSelection} from "./mailSelection";
@@ -66,36 +68,60 @@
      */
     const PLACEHOLDER_ROWS = 8;
 
+    let {view = $bindable()}: {
+        /**
+         * The listing this table is: what it leaves out, how it is cut up, what orders it. The
+         * bar above the rows writes into it, so a caller that wants the changes kept binds it to
+         * something that keeps them -- the mailbox binds it to state of its own, which is gone
+         * with the page.
+         */
+        view: ViewSettings;
+    } = $props();
+
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
 
+    /** The listing is the view's filter; the view model reads it again when it says other mails. */
+    $effect(() => list.setFilter(view.filter));
+
+
     /**
-     * Which mails the list is about. The mailbox as it stands unless somebody asks for all of it;
-     * the view model holds both, so switching is not a reload.
+     * Whether the listing is more than the mailbox. What the title says, and what a row that left
+     * it is measured against -- the filter as a whole is the server's business, this is the one
+     * part of it the table has to know itself.
      */
-    let allMails = $state(false);
-
-    $effect(() => list.setScope(allMails ? "all" : "unarchived"));
+    const allMails = $derived(
+        view.filter.archivedState === null ||
+            view.filter.archivedState.some((state) => state !== "Unarchive")
+    );
 
     /**
-     * What the bar above the list is set to.
+     * What the chips are set to.
      *
-     * Nothing reads it yet: the rows are still the mailbox as [MailListViewModel] knows it, and
-     * the scope below is what decides whether the archived ones are in it. These are here so the
-     * controls have somewhere to write while the view behind them is built -- a chip that cannot
-     * hold what it was set to would forget it on the next render.
-     *
-     * The starting values are what each control calls unset, so the bar comes up quiet; the
-     * grouping is what `createView` writes for a new view.
+     * They hold whole labels, people and accounts so they can name them; a view holds ids. These
+     * are that side of it, and [view.filter] is written from them below -- one way for now, which
+     * is what a view nobody stored needs.
      */
     let filterLabels: PickedLabel[] = $state([]);
     let filterRead: ReadState[] = $state([]);
-    let filterArchived: ViewArchivedState[] = $state(["Unarchive"]);
+    let filterArchived: ViewArchivedState[] = $state([...(view.filter.archivedState ?? [])]);
     let filterFrom: EmailParticipant[] = $state([]);
     let filterTo: EmailParticipant[] = $state([]);
     let filterAccounts: PickedInbox[] = $state([]);
-    let groupings: ViewGrouping[] = $state([{kind: "date_smart", reversed: false}]);
-    let sorting: ViewSorting = $state({kind: "date", reversed: false});
+
+    /** Ids for a view, or null where nothing is picked -- which is no restriction, not an empty set. */
+    const ids = (picked: {id: string}[]) => (picked.length === 0 ? null : picked.map((one) => one.id));
+
+    $effect(() => {
+        view.filter = {
+            readState: readStateOf(filterRead),
+            archivedState: filterArchived.length === 0 ? null : [...filterArchived],
+            imapAccountIds: ids(filterAccounts),
+            sentBy: ids(filterFrom),
+            sentTo: ids(filterTo),
+            hasLabels: ids(filterLabels),
+        };
+    });
 
     /**
      * Which mails are ticked. Handed to the cells through the context rather than as a prop: what
@@ -108,7 +134,7 @@
     // screen is one nobody can take back. Untracked because clearing writes the very set a row
     // reads -- tracked, this would be an effect that re-runs itself.
     $effect(() => {
-        void allMails;
+        void view.filter;
         untrack(() => selection.clear());
     });
 
@@ -354,7 +380,7 @@
         if (first === undefined || last === undefined) {
             list.window(0, 0);
             return;
-        }
+        }   
 
         list.window(first, last);
     });
@@ -411,31 +437,29 @@
                     <InboxFilter bind:accounts={filterAccounts} />
 
                     <!-- The other side of the row: what is shown is set on the left, how it is arranged here. -->
-                    <GroupingSettings bind:groupings bind:sorting class="ml-auto" />
+                    <GroupingSettings
+                            bind:groupings={view.groupings}
+                            bind:sorting={view.sorting}
+                            class="ml-auto"
+                    />
                 </div>
             </div>
         {/if}
     </div>
 
-    <!-- Vertically the page is the only scroller, so the greeting and the heatmap above scroll
-         away before the rows begin to move. Sideways is the table's own box: below its minimum
-         width the whole page used to slide, and the header with the filters slid out of reach
-         along with it. Nothing in the rows paints outside that box, so taking the scroll back
-         into it clips nothing. -->
-    <div bind:this={listElement}>
+    <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap
+         above scroll away before the rows begin to move. The table's own wrapper is kept from
+         scrolling as well, or it would clip the rows vertically along with sideways. -->
+    <div
+            bind:this={listElement}
+            class="[&>[data-slot=table-container]]:overflow-visible"
+    >
         <!-- The row count is stated for a screen reader, because the DOM no longer carries it: a
              windowed table holds the rows near the viewport and nothing else. -->
         <!-- The body reads back rather than at full contrast: a mailbox is a long list of rows nobody
              reads one by one, so what has been read stays quiet and the unread rows below step
              forward against it. -->
-        <!-- `scroll-fade-x` on the box the table scrolls in: below 52rem the columns run past
-             the edge, and a column cut in half reads as a rendering fault rather than as
-             something to scroll to. -->
-        <Table.Root
-                class="text-muted-foreground min-w-[52rem] table-fixed"
-                containerClass="scroll-fade-x"
-                aria-rowcount={list.total}
-        >
+        <Table.Root class="text-muted-foreground min-w-[52rem] table-fixed" aria-rowcount={list.total}>
             <colgroup>
                 {#each columns as column (column.id)}
                     {@const width = COLUMN_WIDTHS[column.id ?? ""]}
@@ -453,7 +477,12 @@
                     </tr>
                 {/if}
 
-                {#each visible as {item, entry, row} (row?.id ?? `row-${item.index}`)}
+                <!-- The kind is part of the key: a row that was a header and is now a gap -- which
+                     is what a change of filter makes of it, until the new listing is here -- has
+                     to be a new block rather than the old one updated. Updated, the header
+                     component lives on for a beat with nothing behind it and reads a stretch that
+                     is no longer there. -->
+                {#each visible as {item, entry, row} (row?.id ?? `${entry?.kind ?? "gap"}-${item.index}`)}
                     {@const modelRow = row === undefined ? undefined : rowsById.get(row.id)}
                     {#if entry?.kind === "header"}
                         <!-- The stretch this and the rows below it belong to. One cell across the

@@ -1,6 +1,19 @@
 import {expect, test} from "bun:test";
-import {MailListViewModel, type MailScope} from "./MailListViewModel.svelte";
+import {MailListViewModel, everyMail} from "./MailListViewModel.svelte";
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import type {ViewFilter} from "$lib/repository/ViewSocket";
+
+/**
+ * The two listings these tests use, by the one attribute that tells them apart: the mailbox is
+ * what is not archived, "all" is that plus the archived ones. The fake below reads the filter the
+ * same way the server does.
+ */
+type MailScope = "unarchived" | "all";
+
+const filterFor = (scope: MailScope): ViewFilter => ({
+    ...everyMail(),
+    archivedState: scope === "unarchived" ? ["Unarchive"] : ["Archive", "Unarchive"],
+});
 
 type Request = {scope: string; before: string | null; beforeId: string | null; limit: string | null};
 
@@ -43,7 +56,10 @@ function mailbox(scopes: Record<MailScope, {key: string; count: number}[]>) {
 
     globalThis.fetch = (async (url: string) => {
         const target = new URL(url, "http://localhost");
-        const scope = (target.searchParams.get("scope") ?? "unarchived") as MailScope;
+        // Sorted by `filterParams`, so "Archive,Unarchive" is the whole of it and "Unarchive"
+        // alone is the mailbox.
+        const scope: MailScope =
+            target.searchParams.get("archived_state") === "Unarchive" ? "unarchived" : "all";
         const days = scopes[scope];
         const all = rows(scope);
 
@@ -174,7 +190,7 @@ test("a gap inside a long day carries on from where the last page ended", async 
     expect(requests.at(-1)!.beforeId).toBe("unarchived-99");
 });
 
-test("switching the scope keeps both listings and the subscriptions", async () => {
+test("changing the filter keeps both listings and the subscriptions", async () => {
     mailbox({
         unarchived: [{key: day(0), count: 2}],
         all: [{key: day(0), count: 2}, {key: day(1), count: 3}],
@@ -188,7 +204,7 @@ test("switching the scope keeps both listings and the subscriptions", async () =
     expect(list.total).toBe(2);
     expect([...held].sort()).toEqual(["unarchived-0", "unarchived-1"]);
 
-    list.setScope("all");
+    list.setFilter(filterFor("all"));
     list.window(0, 10);
     await settle();
     list.window(0, 10);
@@ -199,7 +215,7 @@ test("switching the scope keeps both listings and the subscriptions", async () =
 
     // Back again: the listing is still there, so nothing is fetched and nothing is subscribed
     // that was not subscribed before.
-    list.setScope("unarchived");
+    list.setFilter(filterFor("unarchived"));
     list.window(0, 10);
     await settle();
 
@@ -354,18 +370,18 @@ test("the scope that was not on screen is read again when it is", async () => {
 
     list.window(0, 20);
     await settle();
-    list.setScope("all");
+    list.setFilter(filterFor("all"));
     list.window(0, 20);
     await settle();
     expect(list.total).toBe(2);
 
-    // Two arrive while the other scope is on screen.
-    list.setScope("unarchived");
+    // Two arrive while the other listing is on screen.
+    list.setFilter(filterFor("unarchived"));
     all[0] = {key: day(0), count: 4};
     list.refresh();
     await settle();
 
-    list.setScope("all");
+    list.setFilter(filterFor("all"));
     list.window(0, 20);
     await settle();
     expect(list.total).toBe(4);

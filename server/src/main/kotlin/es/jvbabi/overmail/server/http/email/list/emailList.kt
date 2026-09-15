@@ -35,9 +35,9 @@ private const val DEFAULT_LIMIT = 100
  *
  * Paged by send time, not by offset: `before` is a send time, and what comes back is the mails
  * older than it. Two reasons. The database walks the index instead of counting the rows in front
- * of the page, which an offset makes it do -- and a position is only a position within one scope,
- * so a client that switches scope would have to throw away everything it holds, while a send time
- * still means the same mail.
+ * of the page, which an offset makes it do -- and a position is only a position within one
+ * filter, so a client that changes the filter would have to throw away everything it holds, while
+ * a send time still means the same mail.
  *
  * The cursor is a whole second because [Emails.sent] is: it is stored truncated, as the dedup key
  * of the importer. `sent` alone is not unique though, so `before_id` continues within a second,
@@ -45,12 +45,13 @@ private const val DEFAULT_LIMIT = 100
  * that shares its second with another. Days are cut in the server's zone, see `emailListGroups`,
  * so a day boundary passed as `before` lands exactly between two stretches.
  *
- * Which mails are in it at all is `?scope=`, see [MailScope].
+ * Which mails are in it at all is the filter, see [MailFilter]: the same parameters the groups
+ * and the ids take, because the three have to be about the same mails.
  */
 fun Route.emailList() {
     authenticate {
         get {
-            val scope = call.mailScope()
+            val filter = call.mailFilter()
             val limit = call.intQueryParameter("limit", default = DEFAULT_LIMIT, range = 1..MAX_LIMIT)
             val before = call.instantQueryParameter("before")
             val beforeId = call.uuidQueryParameter("before_id")
@@ -61,7 +62,7 @@ fun Route.emailList() {
                 val mailbox = Emails
                     .leftJoin(ImapAccounts)
                     .select(Emails.id, Emails.sent)
-                    .where { (ImapAccounts.user eq userId) and scope.filter() }
+                    .where { (ImapAccounts.user eq userId) and filter.predicate() }
 
                 // The count comes from the same query as the page, so the length a client sizes
                 // its scrollbar from and the ids it draws cannot disagree.
@@ -97,7 +98,7 @@ fun Route.emailList() {
 
 @Serializable
 private data class EmailListResponse(
-    /** How long the list is in this scope, not how much of it was asked for. */
+    /** How long the list is under this filter, not how much of it was asked for. */
     @SerialName("total") val total: Long,
     @SerialName("ids") val ids: List<Uuid>,
     @SerialName("next") val next: Cursor?,

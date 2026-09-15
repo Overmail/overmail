@@ -109,9 +109,9 @@ class EmailListGroupsTest {
         archive(spam, EmailArchiveAction.Spam)
         archive(archived, EmailArchiveAction.Archive)
 
-        val byDate = client.get("/api/emails/list/groups?by=date").groups()
+        val byDate = client.get("/api/emails/list/groups?by=date&archived_state=Unarchive").groups()
             .sumOf { it["count"]!!.jsonPrimitive.long }
-        val ungrouped = client.get("/api/emails/list/groups?by=none").groups()
+        val ungrouped = client.get("/api/emails/list/groups?by=none&archived_state=Unarchive").groups()
             .single()["count"]!!.jsonPrimitive.long
 
         // Spam and the archived mail are out of both, and every mail left is in exactly one
@@ -121,14 +121,14 @@ class EmailListGroupsTest {
     }
 
     @Test
-    fun `the stretches grow with the archived mails in the other scope`() = testApplication {
+    fun `the stretches grow with the archived mails when the filter asks for them`() = testApplication {
         setUp()
         installRoute()
         val archived = addMail(daysAgo(0))
         addMail(daysAgo(0))
         archive(archived, EmailArchiveAction.Archive)
 
-        val counted = client.get("/api/emails/list/groups?by=date&scope=all").groups()
+        val counted = client.get("/api/emails/list/groups?by=date&archived_state=Unarchive,Archive").groups()
             .sumOf { it["count"]!!.jsonPrimitive.long }
 
         // The same filter the listing uses, or a header would count mails the rows do not show.
@@ -136,7 +136,7 @@ class EmailListGroupsTest {
     }
 
     @Test
-    fun `an unknown grouping or scope is refused`() = testApplication {
+    fun `an unknown grouping or filter is refused`() = testApplication {
         setUp()
         installRoute()
 
@@ -146,7 +146,7 @@ class EmailListGroupsTest {
         )
         assertEquals(
             HttpStatusCode.BadRequest,
-            client.get("/api/emails/list/groups?by=date&scope=spam").status,
+            client.get("/api/emails/list/groups?by=date&archived_state=spam").status,
         )
     }
 

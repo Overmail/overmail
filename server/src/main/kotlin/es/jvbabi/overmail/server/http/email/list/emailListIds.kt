@@ -38,7 +38,7 @@ private const val MAX_IDS = 10_000
  * whatever is done next with the selection.
  *
  * The range is `[from, to)` in whole seconds, the same clock the pages are cut by, and both ends
- * are optional: without them this is every mail of the scope. A day-grouped client passes the
+ * are optional: without them this is every mail the filter lets through. A day-grouped client passes the
  * midnight the stretch starts at and the midnight after its newest day, which are the same
  * boundaries `GET /api/emails/list/groups` counted its days by -- so the ids here and the count
  * of a header are about the same mails.
@@ -46,12 +46,13 @@ private const val MAX_IDS = 10_000
  * Ids and a length, like the listing itself: what a row shows is subscribed per mail over the
  * content socket.
  *
- * Which mails are in it at all is `?scope=`, see [MailScope].
+ * Which mails are in it at all is the filter, see [MailFilter] -- the same one the listing was
+ * drawn with, or the stretch would hold mails the rows never showed.
  */
 fun Route.emailListIds() {
     authenticate {
         get {
-            val scope = call.mailScope()
+            val filter = call.mailFilter()
             val from = call.fromQueryParameter()
             val to = call.toQueryParameter()
 
@@ -61,7 +62,7 @@ fun Route.emailListIds() {
                 val stretch = Emails
                     .leftJoin(ImapAccounts)
                     .select(Emails.id)
-                    .where { (ImapAccounts.user eq userId) and scope.filter() }
+                    .where { (ImapAccounts.user eq userId) and filter.predicate() }
                     .let { query -> if (from == null) query else query.andWhere { Emails.sent greaterEq from } }
                     .let { query -> if (to == null) query else query.andWhere { Emails.sent less to } }
 

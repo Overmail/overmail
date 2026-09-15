@@ -1,4 +1,7 @@
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import type {ViewFilter} from "$lib/repository/ViewSocket";
+import {filterKey, filterParams} from "$lib/app/mails/mailFilterQuery";
+import {mailboxView} from "$lib/app/views/viewSettings";
 import {
     MailLayout,
     foldGroups,
@@ -9,8 +12,15 @@ import {
 /** How many mails one request asks for. The server caps this at 500. */
 const PAGE_SIZE = 100;
 
-/** Which mails a listing is about, as the server names them. */
-export type MailScope = "unarchived" | "all";
+/** Everything a listing lets through, which is the filter nobody set. */
+export const everyMail = (): ViewFilter => ({
+    readState: null,
+    archivedState: null,
+    imapAccountIds: null,
+    sentBy: null,
+    sentTo: null,
+    hasLabels: null,
+});
 
 /** One mail along the listing: -1 is up the table, which is the newer one. */
 export type MailStep = -1 | 1;
@@ -18,7 +28,7 @@ export type MailStep = -1 | 1;
 /** Where a page carries on: a send time in whole seconds, and the mail that sat at it. */
 type Cursor = {before: number; beforeId?: string};
 
-/** Everything held for one scope. Switching scope leaves the other one's untouched. */
+/** Everything held for one filter. Changing the filter leaves what the old one read alone. */
 type Listing = {
     /** Row of this listing -> mail id. A missing row is one that has not been asked for. */
     entries: Record<number, string>;
@@ -29,7 +39,7 @@ type Listing = {
      */
     cursors: Record<number, Cursor>;
 
-    /** How many mails this scope holds. 0 until the first page came back. */
+    /** How many mails this filter lets through. 0 until the first page came back. */
     total: number;
 
     initialized: boolean;
@@ -62,7 +72,13 @@ const emptyListing = (): Listing => ({
     daysGeneration: 0,
 });
 
-/** The days of a scope with the row each of them starts at. */
+/**
+ * What a filter that has not been read yet looks like. Shared and never written to -- see the
+ * note on [MailListViewModel.listing].
+ */
+const NOTHING_READ: Listing = emptyListing();
+
+/** The days of a listing with the row each of them starts at. */
 type Day = {key: string | null; count: number; start: number};
 
 /**
@@ -79,19 +95,23 @@ type Day = {key: string | null; count: number; start: number};
  *
  * Pages are asked for by send time, never by position. A day the server counted is a cursor -- to
  * draw the rows of a day, ask for the mails older than the day above it -- and every answer says
- * where the page after it carries on. That is also what makes the scope switch cheap: a position
- * only means something within one scope, a send time means the same mail in both.
+ * where the page after it carries on. That is also what makes changing the filter cheap: a
+ * position only means something under one filter, a send time means the same mail under all of
+ * them.
  *
- * Both scopes are held at once, so switching back shows what was already there. The row
- * subscriptions are shared: what a mail *is* does not depend on which listing it is shown in.
+ * Every filter this has read keeps what it read, so going back to one shows what was already
+ * there. The row subscriptions are shared: what a mail *is* does not depend on which listing it
+ * is shown in.
  */
 export class MailListViewModel {
-    private readonly listings: Record<MailScope, Listing> = $state({
-        unarchived: emptyListing(),
-        all: emptyListing(),
-    });
+    /** What was read, per filter -- see [filterKey] for what makes two of them the same. */
+    private readonly listings: Record<string, Listing> = $state({});
 
-    private scope: MailScope = $state("unarchived");
+    /**
+     * What the listing is about. The mailbox until somebody says otherwise -- a table that was
+     * given no filter is the one every mail client opens on, not one that starts with spam in it.
+     */
+    private filter: ViewFilter = $state(mailboxView().filter);
 
     failed = $state(false);
 
@@ -99,13 +119,13 @@ export class MailListViewModel {
     private readonly inFlight = new Set<string>();
 
     /**
-     * The ids of a stretch as the server named them, by scope, generation and stretch -- so
+     * The ids of a stretch as the server named them, by filter, generation and stretch -- so
      * ticking one and taking it back again is one request, not two. Promises rather than
      * answers: a second click while the first is on its way waits for the same one.
      */
     private readonly stretches = new Map<string, Promise<string[]>>();
 
-    /** The rows this holds a subscription for, by id. Kept across a scope switch. */
+    /** The rows this holds a subscription for, by id. Kept across a change of filter. */
     private readonly subscribed = new Map<string, () => void>();
 
     /** The last range a table asked for, so a move can read exactly that one again. */
@@ -116,16 +136,37 @@ export class MailListViewModel {
         private readonly grouping: MailGrouping = "date",
     ) {}
 
-    private get listing(): Listing {
-        return this.listings[this.scope];
+    /** What identifies the listing being shown: everything held is keyed by it. */
+    private get key(): string {
+        return filterKey(this.filter);
     }
 
-    /** How many mails the current scope holds. */
+    /**
+     * What has been read under the current filter, and an empty listing until anything has been.
+     *
+     * Reads only: a getter that started a listing would be writing state from inside whatever
+     * derived asked for it, which Svelte refuses -- and rightly, the reader of a list is not what
+     * decides that it exists. [listingFor] is the writing side, and the loads go through it.
+     */
+    private get listing(): Listing {
+        return this.listings[this.key] ?? NOTHING_READ;
+    }
+
+    /** The listing for [key], started as an empty one the first time something writes to it. */
+    private listingFor(key: string): Listing {
+        // Read back rather than handed on: what was put in is state now, and writing to the plain
+        // object that went in would change the values without telling anybody who is watching.
+        if (this.listings[key] === undefined) this.listings[key] = emptyListing();
+
+        return this.listings[key];
+    }
+
+    /** How many mails the current filter lets through. */
     get total(): number {
         return this.listing.total;
     }
 
-    /** Whether anything came back for this scope yet. Before that a table stands in for it. */
+    /** Whether anything came back for this listing yet. Before that a table stands in for it. */
     get initialized(): boolean {
         return this.listing.initialized;
     }
@@ -143,13 +184,13 @@ export class MailListViewModel {
         return new MailLayout(foldGroups(days, new Date()));
     }
 
-    /** The mail at [index] of the current scope, or undefined while that page is not here. */
+    /** The mail at [index] of the listing, or undefined while that page is not here. */
     idAt(index: number): string | undefined {
         return this.listing.entries[index];
     }
 
     /**
-     * The mails of a stretch of the current scope that this can name: [count] positions from
+     * The mails of a stretch of the listing that this can name: [count] positions from
      * [from] on, and of those the ones whose page is here.
      *
      * Which is less than the stretch holds for as long as it has not been paged in -- what the
@@ -181,8 +222,8 @@ export class MailListViewModel {
      * and answers with what it holds.
      */
     async idsOfStretch(from: number, count: number): Promise<string[]> {
-        const scope = this.scope;
-        const listing = this.listings[scope];
+        const key = this.key;
+        const listing = this.listingFor(key);
         const generation = listing.generation;
 
         // Newest first, like everything else here, so the first of them ends the range and the
@@ -195,15 +236,13 @@ export class MailListViewModel {
         const oldest = days.at(-1)?.key;
         if (newest == null || oldest == null) return this.idsIn(from, count);
 
-        const key = `${scope}:${generation}:${oldest}:${newest}`;
-        const held = this.stretches.get(key);
+        const stretchKey = `${key}:${generation}:${oldest}:${newest}`;
+        const held = this.stretches.get(stretchKey);
         if (held !== undefined) return held;
 
-        const query = new URLSearchParams({
-            scope,
-            from: String(startOfDay(oldest)),
-            to: String(startOfDayAfter(newest)),
-        });
+        const query = filterParams(this.filter);
+        query.set("from", String(startOfDay(oldest)));
+        query.set("to", String(startOfDayAfter(newest)));
 
         const request = (async () => {
             const response = await fetch(`/api/emails/list/ids?${query}`);
@@ -217,7 +256,7 @@ export class MailListViewModel {
         })().catch((error) => {
             console.error(error);
             this.failed = true;
-            this.stretches.delete(key);
+            this.stretches.delete(stretchKey);
 
             // What the listing holds of it, so the click does something rather than nothing. The
             // failure itself is on screen: it is the same bar the pages report through.
@@ -231,13 +270,13 @@ export class MailListViewModel {
             return known;
         });
 
-        this.stretches.set(key, request);
+        this.stretches.set(stretchKey, request);
         return request;
     }
 
     /**
-     * Where [id] sits in the current scope. Undefined for a mail this listing does not hold: one
-     * of another scope, or one whose page has been let go of.
+     * Where [id] sits in the listing. Undefined for a mail this one does not hold: one another
+     * filter lets through, or one whose page has been let go of.
      *
      * A scan over what is loaded rather than a reverse index: what is held are the pages that
      * have been scrolled to, and this is asked when the open mail changes, not per frame.
@@ -281,12 +320,25 @@ export class MailListViewModel {
     }
 
     /**
-     * Switches which mails the list is about. Nothing is thrown away: the other scope keeps its
-     * pages and its days, and the rows on screen keep their subscriptions -- what a mail is does
-     * not change with the scope it is listed in.
+     * Switches which mails the list is about. Nothing is thrown away: what the old filter read
+     * stays where it was, and the rows on screen keep their subscriptions -- what a mail is does
+     * not depend on the listing it is shown in.
+     *
+     * A filter that asks for the same mails is not a change, whatever object it arrives in: the
+     * caller builds a fresh one whenever anything around it moves, and every one of those would
+     * otherwise be a listing read again from the top.
      */
-    setScope(scope: MailScope) {
-        this.scope = scope;
+    setFilter(filter: ViewFilter) {
+        if (filterKey(filter) === this.key) return;
+
+        this.filter = filter;
+        // Started here rather than left to whoever reads it: a listing nobody has read yet is
+        // empty, and an empty one asks for nothing, so the table would sit at a length of zero
+        // waiting for a scroll that never comes. The same reading `refresh` does after a move.
+        this.listingFor(this.key);
+
+        const last = this.lastWindow;
+        if (last !== null) this.window(last.fromRow, last.toRow);
     }
 
     /**
@@ -340,8 +392,9 @@ export class MailListViewModel {
      * beside it -- the rows are read from the day boundaries again instead, and the first page
      * back replaces every row in one go rather than one flashing skeleton at a time.
      *
-     * Both scopes, because a mail arriving is in both. The one that is not on screen is read
-     * again the next time it is, rather than shown as it was before the move.
+     * Every listing, because a mail arriving is in as many of them as let it through. The ones
+     * not on screen are read again the next time they are, rather than shown as they were before
+     * the move.
      */
     refresh() {
         // A stretch is a set of positions, and a move is what makes them mean other mails.
@@ -361,7 +414,7 @@ export class MailListViewModel {
     /** Asks again after a failure -- what the retry button does. */
     retry() {
         this.failed = false;
-        this.listings[this.scope] = emptyListing();
+        this.listings[this.key] = emptyListing();
         this.inFlight.clear();
         this.stretches.clear();
         void this.loadDays();
@@ -377,7 +430,7 @@ export class MailListViewModel {
     /**
      * Holds a subscription for exactly the mails in [wanted]. Rows that left the window are
      * released; the repository keeps them a while longer, so scrolling back -- or switching
-     * scope and back -- does not go to the server again.
+     * the filter and back -- does not go to the server again.
      */
     private subscribeRange(wanted: number[]) {
         const ids = new Set<string>();
@@ -398,7 +451,7 @@ export class MailListViewModel {
         }
     }
 
-    /** The days of this scope with the row each of them starts at, newest first. */
+    /** The days of this listing with the row each of them starts at, newest first. */
     private days(): Day[] {
         const counts = this.listing.groupCounts;
         if (counts === null) return [];
@@ -440,18 +493,19 @@ export class MailListViewModel {
         const anchor = this.cursorFor(index);
         if (anchor === null) return;
 
-        const scope = this.scope;
-        const listing = this.listings[scope];
+        const filterKeyNow = this.key;
+        const listing = this.listingFor(filterKeyNow);
         const generation = listing.generation;
 
         // The generation is part of the key: a request that was cut for the listing as it stood
         // before a move must not stand in the way of the one that reads it again.
-        const key = `${scope}:${generation}:${anchor.row}`;
+        const key = `${filterKeyNow}:${generation}:${anchor.row}`;
         if (this.inFlight.has(key)) return;
         this.inFlight.add(key);
 
         try {
-            const query = new URLSearchParams({scope, limit: String(PAGE_SIZE)});
+            const query = filterParams(this.filter);
+            query.set("limit", String(PAGE_SIZE));
             if (anchor.cursor !== null) {
                 query.set("before", String(anchor.cursor.before));
                 if (anchor.cursor.beforeId !== undefined) {
@@ -502,24 +556,26 @@ export class MailListViewModel {
     }
 
     /**
-     * The days of this scope: how long the listing is and where its headers sit.
+     * The days of this listing: how long it is and where its headers sit.
      *
      * Once per generation. They are the shape of the list, not its contents, so they are read
      * again when the mailbox moved -- and swapped for the new ones only when those are here, so
      * a table keeps its headers and its scroll position while they are on their way.
      */
     private async loadDays() {
-        const scope = this.scope;
-        const listing = this.listings[scope];
+        const filterKeyNow = this.key;
+        const listing = this.listingFor(filterKeyNow);
         const generation = listing.generation;
         if (listing.groupCounts !== null && listing.daysGeneration === generation) return;
 
-        const key = `${scope}:${generation}:days`;
+        const key = `${filterKeyNow}:${generation}:days`;
         if (this.inFlight.has(key)) return;
         this.inFlight.add(key);
 
         try {
-            const response = await fetch(`/api/emails/list/groups?by=${this.grouping}&scope=${scope}`);
+            const response = await fetch(
+                `/api/emails/list/groups?by=${this.grouping}&${filterParams(this.filter)}`
+            );
             if (!response.ok) throw new Error(`Could not read the mailbox shape: ${response.status}`);
 
             const answer = (await response.json()) as {groups?: MailGroupCount[]};

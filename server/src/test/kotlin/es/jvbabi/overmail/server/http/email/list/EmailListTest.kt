@@ -4,7 +4,11 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailArchive
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
+import es.jvbabi.overmail.server.database.models.EmailLabel
+import es.jvbabi.overmail.server.database.models.EmailRecipient
+import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailUser
+import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
@@ -28,7 +32,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonObject
@@ -62,45 +65,58 @@ class EmailListTest {
     }
 
     @Test
-    fun `the cursor of a page is where the next one carries on`() = testApplication {
+    fun `an offset carries on where the page before it ended`() = testApplication {
         val mails = setUp(count = 5)
         installRoute()
 
-        val first = client.get("/api/emails/list?limit=2").page()
-        val cursor = first["next"]!!.jsonObject
-        val second = client
-            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
-                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
-            .page()
+        val second = client.get("/api/emails/list?limit=2&offset=2").page()
 
         // Where the last page ended, not one mail earlier or later.
         assertEquals(mails.subList(2, 4).map { it.toString() }, second.ids())
     }
 
     @Test
-    fun `the last page says there is nothing after it`() = testApplication {
-        setUp(count = 2)
-        installRoute()
+    fun `an offset past the end is an empty page, and still says how long the group is`() =
+        testApplication {
+            setUp(count = 2)
+            installRoute()
 
-        val page = client.get("/api/emails/list?limit=10").page()
+            val page = client.get("/api/emails/list?offset=50").page()
 
-        assertEquals(JsonNull, page["next"])
-    }
+            assertEquals(2, page["total"]!!.jsonPrimitive.long)
+            assertEquals(0, page.ids().size)
+        }
 
     @Test
-    fun `a day boundary as the cursor lands between two days`() = testApplication {
+    fun `a group is the mails under it`() = testApplication {
         val mails = setUp(count = 4)
         installRoute()
 
-        // The fixture puts one mail per day, newest first, so midnight of the newest day is the
-        // boundary the second mail sits below -- which is how a table jumps to a date.
-        val startOfToday = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault()).date
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
+        // The fixture puts one mail per day, newest first, so the day below today holds exactly
+        // the second one -- which is how a table asks for the rows of a stretch.
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val yesterday = kotlinx.datetime.LocalDate.fromEpochDays(today.toEpochDays() - 1)
 
-        val page = client.get("/api/emails/list?before=${startOfToday.epochSeconds}").page()
+        val page = client.get("/api/emails/list?by=day&group=$yesterday").page()
 
-        assertEquals(mails.drop(1).map { it.toString() }, page.ids())
+        assertEquals(1, page["total"]!!.jsonPrimitive.long)
+        assertEquals(listOf(mails[1].toString()), page.ids())
+    }
+
+    @Test
+    fun `a group of a deeper level is the mails under that path`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val other = addSender("other@example.com", mails[0])
+
+        // That day and that correspondent: the one mail of theirs.
+        assertEquals(
+            listOf(mails[0].toString()),
+            client.get("/api/emails/list?by=day,sender&group=$today,$other").ids(),
+        )
+        // One key alone is the level above it -- the whole day, whoever wrote.
+        assertEquals(1, client.get("/api/emails/list?by=day,sender&group=$today").ids().size)
     }
 
     @Test
@@ -109,21 +125,38 @@ class EmailListTest {
         installRoute()
         // Three mails in the same second: without the id as a tiebreaker their order is the
         // database's mood, and a page boundary inside them loses one or hands it out twice.
-        // Truncated, as every writer stores it -- see Emails.sent, which is a dedup key at
-        // second precision, and which is what lets the cursor be a second.
         val sameSecond = Clock.System.now().truncatedToSecond()
         repeat(3) { addMail(sameSecond) }
 
-        val first = client.get("/api/emails/list?limit=2").page()
-        val cursor = first["next"]!!.jsonObject
-        val second = client
-            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
-                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
-            .page()
+        val first = client.get("/api/emails/list?limit=2").ids()
+        val second = client.get("/api/emails/list?limit=2&offset=2").ids()
 
-        val seen = first.ids() + second.ids()
+        val seen = first + second
         assertEquals(3, seen.size)
         assertEquals(3, seen.toSet().size)
+    }
+
+    @Test
+    fun `the sort orders the mails inside the group`() = testApplication {
+        setUp(count = 0)
+        installRoute()
+        val now = Clock.System.now().truncatedToSecond()
+        val b = addMail(now, subject = "Bravo")
+        val a = addMail(now - 1.days, subject = "Alpha")
+
+        assertEquals(listOf(b, a).map { it.toString() }, client.get("/api/emails/list").ids())
+        assertEquals(
+            listOf(a, b).map { it.toString() },
+            client.get("/api/emails/list?sort=date:r").ids(),
+        )
+        assertEquals(
+            listOf(a, b).map { it.toString() },
+            client.get("/api/emails/list?sort=subject").ids(),
+        )
+        assertEquals(
+            listOf(b, a).map { it.toString() },
+            client.get("/api/emails/list?sort=subject:r").ids(),
+        )
     }
 
     @Test
@@ -133,7 +166,7 @@ class EmailListTest {
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        val page = client.get("/api/emails/list").page()
+        val page = client.get("/api/emails/list?archived_state=Unarchive").page()
 
         // Putting a mail away has to mean something in the listing it was put away from.
         assertEquals(1, page["total"]!!.jsonPrimitive.long)
@@ -141,24 +174,175 @@ class EmailListTest {
     }
 
     @Test
-    fun `every mail is in the other scope, spam still is not`() = testApplication {
+    fun `the archived ones come back when the filter asks for them`() = testApplication {
         val mails = setUp(count = 3)
         installRoute()
         archive(mails[0], EmailArchiveAction.Spam)
         archive(mails[1], EmailArchiveAction.Archive)
 
-        val page = client.get("/api/emails/list?scope=all").page()
+        val page = client.get("/api/emails/list?archived_state=Unarchive,Archive").page()
 
         assertEquals(2, page["total"]!!.jsonPrimitive.long)
         assertEquals(listOf(mails[1], mails[2]).map { it.toString() }, page.ids())
     }
 
     @Test
-    fun `a scope nobody offers is refused`() = testApplication {
+    fun `spam is a state like any other, and only what is asked for is in`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        archive(mails[0], EmailArchiveAction.Spam)
+        archive(mails[1], EmailArchiveAction.Archive)
+
+        val page = client.get("/api/emails/list?archived_state=Spam").page()
+
+        assertEquals(listOf(mails[0].toString()), page.ids())
+    }
+
+    @Test
+    fun `a filter that names no state at all lets nothing through`() = testApplication {
+        setUp(count = 3)
+        installRoute()
+
+        // Not the same as leaving the parameter out, which is every state there is.
+        val page = client.get("/api/emails/list?archived_state=").page()
+
+        assertEquals(0, page["total"]!!.jsonPrimitive.long)
+    }
+
+    @Test
+    fun `a state nobody offers is refused`() = testApplication {
         setUp(count = 1)
         installRoute()
 
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?scope=spam").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?archived_state=spam").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?has_labels=not-an-id").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?read_state=maybe").status)
+    }
+
+    @Test
+    fun `the read state cuts the listing both ways`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        markRead(mails[1])
+
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?read_state=true").ids())
+        assertEquals(
+            listOf(mails[0], mails[2]).map { it.toString() },
+            client.get("/api/emails/list?read_state=false").ids(),
+        )
+    }
+
+    @Test
+    fun `a label filter holds the mails carrying any of them`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        val work = addLabel("Work", mails[0])
+        val bills = addLabel("Bills", mails[2])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?has_labels=$work").ids())
+        // Any of them, not all: two labels are two ways in, not a mail that has to carry both.
+        assertEquals(
+            listOf(mails[0], mails[2]).map { it.toString() },
+            client.get("/api/emails/list?has_labels=$work,$bills").ids(),
+        )
+    }
+
+    @Test
+    fun `who wrote and who was written to are two filters`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val other = addSender("other@example.com", mails[0])
+        val recipient = addRecipient("team@example.com", mails[1])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=$other").ids())
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?sent_to=$recipient").ids())
+    }
+
+    @Test
+    fun `self is this account's own addresses, not an id`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        // The fixture's account logs in as "owner"; a mail from that address is one this account
+        // sent, whatever the address book calls the entry.
+        val own = addSender("owner@example.com", mails[0])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=self").ids())
+        // And it reads together with the ids beside it, as any set of correspondents does.
+        assertEquals(
+            listOf(mails[0].toString()),
+            client.get("/api/emails/list?sent_by=self,$own").ids(),
+        )
+    }
+
+    @Test
+    fun `self is matched without regard to case`() = testApplication {
+        val mails = setUp(count = 1)
+        installRoute()
+        addSender("Owner@Example.com", mails[0])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=self").ids())
+    }
+
+    @Test
+    fun `self on the receiving side is the mails written to this account`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        addRecipient("owner@example.com", mails[1])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?sent_to=self").ids())
+    }
+
+    @Test
+    fun `an account filter narrows which of the own addresses self means`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        addSender("owner@example.com", mails[0])
+        setAccountLogin("owner@example.com")
+        // A second mailbox, with the second mail sent from its own address.
+        val second = addAccount("imap.other.example.com", mails[1], login = "other@example.com")
+        addSender("other@example.com", mails[1])
+
+        // Both addresses are this account's, so both mails are "sent".
+        assertEquals(2, client.get("/api/emails/list?sent_by=self").ids().size)
+        // With one mailbox named, only what went out through it.
+        assertEquals(
+            listOf(mails[1].toString()),
+            client.get("/api/emails/list?sent_by=self&imap_account_ids=$second").ids(),
+        )
+    }
+
+    @Test
+    fun `self is only a correspondent, nowhere else`() = testApplication {
+        setUp(count = 1)
+        installRoute()
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?has_labels=self").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?imap_account_ids=self").status)
+    }
+
+    @Test
+    fun `an account filter holds the mails that came through it`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val second = addAccount("imap.other.example.com", mails[0])
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?imap_account_ids=$second").ids())
+    }
+
+    @Test
+    fun `filters are read together, not as alternatives`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        val work = addLabel("Work", mails[0], mails[1])
+        markRead(mails[1])
+
+        assertEquals(
+            listOf(mails[1].toString()),
+            client.get("/api/emails/list?has_labels=$work&read_state=true").ids(),
+        )
     }
 
     @Test
@@ -212,14 +396,14 @@ class EmailListTest {
         setUp(count = 2)
         installRoute()
 
-        // Before the epoch: an empty page rather than an error, the length still reported.
-        val beyond = client.get("/api/emails/list?before=0&limit=5000").page()
-        assertEquals(2, beyond["total"]!!.jsonPrimitive.long)
-        assertEquals(0, beyond.ids().size)
-
         // The limit is clamped into what one request may ask for.
         assertEquals(1, client.get("/api/emails/list?limit=0").ids().size)
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?before=heute").status)
+        assertEquals(2, client.get("/api/emails/list?limit=5000").ids().size)
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?sort=oldest").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?by=day&group=heute").status)
+        // More keys than levels: a client that has the groups has the keys.
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?by=day&group=a,b").status)
     }
 
     private suspend fun io.ktor.client.statement.HttpResponse.page() =
@@ -241,12 +425,79 @@ class EmailListTest {
         }
     }
 
-    private suspend fun addMail(sentAt: kotlin.time.Instant): Uuid = database.query {
+    private suspend fun markRead(emailId: Uuid) {
+        database.query { Email.findById(emailId)!!.isRead = true }
+    }
+
+    /** A label of this user, put on [mails]. */
+    private suspend fun addLabel(name: String, vararg mails: Uuid): Uuid = database.query {
+        val label = Label.new {
+            owner = signedIn
+            this.name = name
+            color = "#000000"
+            createdByAgent = false
+        }
+        for (mailId in mails) {
+            EmailLabel.new {
+                email = Email.findById(mailId)!!
+                this.label = label
+                labeledByAgent = false
+            }
+        }
+        label.id.value
+    }
+
+    /** A second correspondent, as the sender of [mail]. */
+    private suspend fun addSender(address: String, mail: Uuid): Uuid = database.query {
+        val sender = EmailUser.new {
+            user = signedIn
+            this.address = address
+        }
+        Email.findById(mail)!!.sender = sender
+        sender.id.value
+    }
+
+    /** A second correspondent, as a recipient of [mail]. */
+    private suspend fun addRecipient(address: String, mail: Uuid): Uuid = database.query {
+        val recipient = EmailUser.new {
+            user = signedIn
+            this.address = address
+        }
+        EmailRecipient.new {
+            email = Email.findById(mail)!!
+            emailUser = recipient
+            type = EmailRecipientType.RECIPIENT
+        }
+        recipient.id.value
+    }
+
+    /** A second mailbox of this user, as the one [mail] came through. */
+    private suspend fun addAccount(host: String, mail: Uuid, login: String = "owner"): Uuid =
+        database.query {
+            val account = ImapAccount.new {
+                user = signedIn
+                this.host = host
+                port = 993
+                username = login
+                password = "secret"
+            }
+            Email.findById(mail)!!.imapAccount = account
+            account.id.value
+        }
+
+    /** What the fixture's mailbox logs in as, which is what `self` is matched against. */
+    private suspend fun setAccountLogin(login: String) {
+        database.query {
+            ImapAccount.all().first { it.user.id == signedIn.id }.username = login
+        }
+    }
+
+    private suspend fun addMail(sentAt: kotlin.time.Instant, subject: String? = null): Uuid = database.query {
         Email.new {
             imapAccount = ImapAccount.all().first { it.user.id == signedIn.id }
             sender = EmailUser.all().first()
             senderName = "The Sender"
-            subject = "Mail at $sentAt"
+            this.subject = subject ?: "Mail at $sentAt"
             sent = sentAt
             rawContent = ByteArray(0)
         }.id.value

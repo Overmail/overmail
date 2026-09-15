@@ -10,6 +10,7 @@ import {SharedEmailRepository} from "$lib/repository/SharedEmailRepository";
 import {ChatHistoryRepository} from "$lib/app/ai/ChatHistoryRepository";
 import {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import {HomeScreenRepository} from "$lib/repository/HomeScreenRepository.svelte";
+import {ViewRepository} from "$lib/repository/ViewRepository.svelte";
 import {
     createEmailRepository,
     createLabelRepository,
@@ -43,6 +44,8 @@ export type Repositories = {
     /** A shared mail as the page behind a link reads it -- the one repository with no session. */
     sharedEmail: SharedEmailRepository;
     home: HomeScreenRepository;
+    /** The views in the sidebar, live over their own socket. */
+    views: ViewRepository;
     chatHistory: ChatHistoryRepository;
     emails: EntityRepository<CachedEmail>;
     labels: EntityRepository<CachedLabel>;
@@ -62,6 +65,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     sharedEmail: () => new SharedEmailRepository(),
     chatHistory: () => new ChatHistoryRepository(),
     home: () => new HomeScreenRepository(),
+    views: () => new ViewRepository(),
     emails: createEmailRepository,
     labels: createLabelRepository,
     senders: createSenderRepository,

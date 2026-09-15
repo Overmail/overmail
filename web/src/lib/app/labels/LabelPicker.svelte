@@ -7,7 +7,7 @@
     input hands key events to [handleKey], because that is where they arrive.
 -->
 <script lang="ts">
-    import {PlusIcon, TagIcon} from "phosphor-svelte";
+    import {CheckIcon, PlusIcon, TagIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import {cn, scrollIntoViewWithin} from "$lib/utils.js";
     import {findLabels, type LabelSearchResult} from "$lib/app/labels/labelSearch";
@@ -15,6 +15,7 @@
     let {
         query,
         exclude = [],
+        selected = [],
         allowCreationOfNewLabels = false,
         onSelect,
         onCreate,
@@ -25,6 +26,12 @@
         query: string;
         /** Ids not worth offering -- the labels a mail already carries, say. */
         exclude?: string[];
+        /**
+         * Ids that are already on. They stay in the list and are ticked, rather than dropping out
+         * of it like [exclude]: picking one is what turns it off again, which is the difference
+         * between adding to something and choosing what is in it.
+         */
+        selected?: string[];
         /**
          * Whether making a new one is on the table here. With it, the last row is always
          * "create <what was typed>" -- even next to a label of that name, because the caller
@@ -139,6 +146,9 @@
             {#if option.type === "label"}
                 <TagIcon class="size-3.5 shrink-0" color={option.label.color}/>
                 <span class="truncate flex-1">{option.label.name}</span>
+                {#if selected.includes(option.label.id)}
+                    <CheckIcon class="size-3.5 shrink-0"/>
+                {/if}
                 <span class="ms-auto text-xs text-muted-foreground">
                     {$_('labels.emailCount', {values: {count: option.label.emailCount}})}
                 </span>

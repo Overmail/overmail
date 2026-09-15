@@ -76,10 +76,12 @@ function virtualizerRune<TScrollElement extends Element | Window, TItemElement e
 	// below hand out is copied off it whenever it reports a change.
 	let items = $state<VirtualItem[]>([]);
 	let totalSize = $state(0);
+	let scrollOffset = $state(0);
 
 	function publish() {
 		items = instance.getVirtualItems();
 		totalSize = instance.getTotalSize();
+		scrollOffset = instance.scrollOffset ?? 0;
 	}
 
 	const resolve = (): VirtualizerOptions<TScrollElement, TItemElement> => ({
@@ -109,6 +111,13 @@ function virtualizerRune<TScrollElement extends Element | Window, TItemElement e
 		/** How tall the full list is, which is what the scrollbar is sized from. */
 		get totalSize() {
 			return totalSize;
+		},
+		/**
+		 * How far the container is scrolled, in the same coordinates the items carry -- so a
+		 * caller can work out which of them the top edge of the viewport is in.
+		 */
+		get scrollOffset() {
+			return scrollOffset;
 		},
 		/** The instance itself, for `scrollToIndex` and friends. */
 		get virtualizer() {

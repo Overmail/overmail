@@ -15,11 +15,19 @@
     import * as Table from "$lib/components/ui/table";
     import {Button} from "$lib/components/ui/button";
     import {Toggle} from "$lib/components/ui/toggle";
-    import {ArchiveIcon} from "phosphor-svelte";
+    import {ArchiveIcon, UserIcon, UsersIcon} from "phosphor-svelte";
     import {createWindowVirtualizer} from "$lib/hooks/virtualizer.svelte";
     import {cn} from "$lib/utils";
     import {useRepositories} from "$lib/repository/repositories";
-    import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
+    import type {EmailMeta, EmailParticipant} from "$lib/repository/EmailRepository.svelte";
+    import type {
+        ViewArchivedState,
+        ViewGrouping,
+        ViewSorting,
+    } from "$lib/repository/ViewSocket";
+    import type {PickedLabel} from "$lib/app/labels/labelSearch";
+    import type {ReadState} from "$lib/app/filters/IsUnreadFilter.svelte";
+    import type {PickedInbox} from "$lib/app/filters/InboxFilter.svelte";
     import {COLUMN_WIDTHS, GHOST_SHAPES, columns, features, type MailTableRow} from "./columns";
     import {MailListViewModel, type MailStep} from "./MailListViewModel.svelte";
     import {MailSelection, setMailSelection} from "./mailSelection";
@@ -31,6 +39,12 @@
     import MailRowPreview from "./MailRowPreview.svelte";
     import MailSelectionBar from "./MailSelectionBar.svelte";
     import MailsEmpty from "./MailsEmpty.svelte";
+    import IsUnreadFilter from "$lib/app/filters/IsUnreadFilter.svelte";
+    import LabelFilter from "$lib/app/labels/LabelFilter.svelte";
+    import SenderFilter from "$lib/app/senders/SenderFilter.svelte";
+    import InboxFilter from "$lib/app/filters/InboxFilter.svelte";
+    import GroupingSettings from "$lib/app/views/GroupingSettings.svelte";
+    import IsArchiveFilter from "$lib/app/filters/IsArchiveFilter.svelte";
 
     /**
      * Not estimates but the heights: every row is one clipped line, so the scrollbar is sized
@@ -62,6 +76,26 @@
     let allMails = $state(false);
 
     $effect(() => list.setScope(allMails ? "all" : "unarchived"));
+
+    /**
+     * What the bar above the list is set to.
+     *
+     * Nothing reads it yet: the rows are still the mailbox as [MailListViewModel] knows it, and
+     * the scope below is what decides whether the archived ones are in it. These are here so the
+     * controls have somewhere to write while the view behind them is built -- a chip that cannot
+     * hold what it was set to would forget it on the next render.
+     *
+     * The starting values are what each control calls unset, so the bar comes up quiet; the
+     * grouping is what `createView` writes for a new view.
+     */
+    let filterLabels: PickedLabel[] = $state([]);
+    let filterRead: ReadState[] = $state([]);
+    let filterArchived: ViewArchivedState[] = $state(["Unarchive"]);
+    let filterFrom: EmailParticipant[] = $state([]);
+    let filterTo: EmailParticipant[] = $state([]);
+    let filterAccounts: PickedInbox[] = $state([]);
+    let groupings: ViewGrouping[] = $state([{kind: "date_smart", reversed: false}]);
+    let sorting: ViewSorting = $state({kind: "date", reversed: false});
 
     /**
      * Which mails are ticked. Handed to the cells through the context rather than as a prop: what
@@ -341,49 +375,67 @@
 <section class="flex flex-col">
     <!-- Stays under the app header while the rows run past it: this is the bar the filters go
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
-         header's height, and the background is its own -- rows would show through it. -->
+         header's height, and the background is its own -- rows would show through it.
+
+         Its last few pixels are a gradient rather than an edge: a row passing underneath
+         dissolves into the bar instead of being cut off by it, which is what says "header" and
+         not "first row of the list". Nothing is tinted while the list sits at the top -- what is
+         behind the fade there is the page itself. -->
     <!-- What is in it depends on what the reader is doing: which list this is, or -- while mails
          are picked -- what has been picked and what can be done to it. The same bar either way,
          and the same height, so the list below does not move as the two swap. The toggle and the
          buttons are both 2rem, which is what sets it. -->
-    <div class="bg-background sticky top-12 z-20 flex h-12 items-center px-4">
+    <div class="sticky top-12 z-20 flex h-20 items-center bg-linear-to-b from-background from-[calc(100%-0.75rem)] to-transparent px-4">
         {#if selection.active}
             <MailSelectionBar {selection}/>
         {:else}
-            <div class="flex w-full items-baseline gap-2">
-                <h2 class="font-heading text-sm font-medium">
-                    {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
-                </h2>
-                {#if list.initialized}
+            <div class="flex flex-col w-full gap-2">
+                <div class="flex w-full items-baseline gap-2">
+                    <h2 class="font-heading text-lg font-medium">
+                        {$_(allMails ? "mails.title.all" : "mails.title.unarchived")}
+                    </h2>
+                    {#if list.initialized}
                     <span class="text-muted-foreground text-xs tabular-nums">
                         {$_("mails.count", {values: {count: list.total}})}
                     </span>
-                {/if}
+                    {/if}
+                </div>
 
-                <!-- The filters live at this end of the bar, and this is the first of them. Not
-                     "archived yes or no" but which list it is: the mailbox, or everything that
-                     arrived. -->
-                <Toggle bind:pressed={allMails} size="sm" class="ms-auto text-xs">
-                    <ArchiveIcon data-icon="inline-start"/>
-                    {$_("mails.filters.allMails")}
-                </Toggle>
+                <div class="flex flex-row flex-wrap items-center gap-2">
+                    <LabelFilter bind:labels={filterLabels} />
+                    <IsUnreadFilter bind:selected={filterRead} />
+                    <IsArchiveFilter bind:selected={filterArchived} />
+                    <!-- The same control twice: who a mail came from, and who it went to. -->
+                    <SenderFilter title={$_("filters.from")} icon={UserIcon} bind:senders={filterFrom} />
+                    <SenderFilter title={$_("filters.to")} icon={UsersIcon} bind:senders={filterTo} />
+                    <InboxFilter bind:accounts={filterAccounts} />
+
+                    <!-- The other side of the row: what is shown is set on the left, how it is arranged here. -->
+                    <GroupingSettings bind:groupings bind:sorting class="ml-auto" />
+                </div>
             </div>
         {/if}
     </div>
 
-    <!-- No scroll container of its own: the page is the one, so the greeting and the heatmap
-         above scroll away before the rows begin to move. The table's own wrapper is kept from
-         scrolling as well, or it would clip the rows vertically along with sideways. -->
-    <div
-            bind:this={listElement}
-            class="[&>[data-slot=table-container]]:overflow-visible"
-    >
+    <!-- Vertically the page is the only scroller, so the greeting and the heatmap above scroll
+         away before the rows begin to move. Sideways is the table's own box: below its minimum
+         width the whole page used to slide, and the header with the filters slid out of reach
+         along with it. Nothing in the rows paints outside that box, so taking the scroll back
+         into it clips nothing. -->
+    <div bind:this={listElement}>
         <!-- The row count is stated for a screen reader, because the DOM no longer carries it: a
              windowed table holds the rows near the viewport and nothing else. -->
         <!-- The body reads back rather than at full contrast: a mailbox is a long list of rows nobody
              reads one by one, so what has been read stays quiet and the unread rows below step
              forward against it. -->
-        <Table.Root class="text-muted-foreground min-w-[52rem] table-fixed" aria-rowcount={list.total}>
+        <!-- `scroll-fade-x` on the box the table scrolls in: below 52rem the columns run past
+             the edge, and a column cut in half reads as a rendering fault rather than as
+             something to scroll to. -->
+        <Table.Root
+                class="text-muted-foreground min-w-[52rem] table-fixed"
+                containerClass="scroll-fade-x"
+                aria-rowcount={list.total}
+        >
             <colgroup>
                 {#each columns as column (column.id)}
                     {@const width = COLUMN_WIDTHS[column.id ?? ""]}

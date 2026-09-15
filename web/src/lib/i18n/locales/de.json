@@ -4,7 +4,8 @@
     "checkingSession": "Sitzung wird geprüft…",
     "nav": {
       "home": "Start",
-      "stack": "Stack"
+      "stack": "Stack",
+      "labels": "Labels"
     },
     "panel": {
       "resize": "Breite des Assistenten ändern"

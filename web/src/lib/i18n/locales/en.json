@@ -4,7 +4,8 @@
     "checkingSession": "Checking session…",
     "nav": {
       "home": "Home",
-      "stack": "Stack"
+      "stack": "Stack",
+      "labels": "Labels"
     },
     "panel": {
       "resize": "Resize the assistant"

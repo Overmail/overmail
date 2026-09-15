@@ -22,6 +22,7 @@ import es.jvbabi.overmail.server.http.email.list.emailListIds
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
+import es.jvbabi.overmail.server.http.labels.map.mapLabels
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
 import es.jvbabi.overmail.server.http.share.getShare
@@ -195,6 +196,10 @@ internal fun Application.configureRouting() {
             route("/labels") {
                 labelsByIds()
                 createLabel()
+
+                route("/map") {
+                    mapLabels()
+                }
 
                 route("/search") {
                     labelSearch()

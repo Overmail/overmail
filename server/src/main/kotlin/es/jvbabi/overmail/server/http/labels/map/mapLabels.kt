@@ -1,0 +1,99 @@
+package es.jvbabi.overmail.server.http.labels.map
+
+import es.jvbabi.overmail.server.database.models.EmailLabels
+import es.jvbabi.overmail.server.database.models.Emails
+import es.jvbabi.overmail.server.database.models.Labels
+import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import io.ktor.server.auth.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.Count
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.neq
+import org.jetbrains.exposed.v1.jdbc.andWhere
+import org.jetbrains.exposed.v1.jdbc.select
+import kotlin.uuid.Uuid
+
+fun Route.mapLabels() {
+    authenticate {
+        get {
+            val db = call.database()
+            val user = call.requireAuthenticatedUser()
+
+            db.query {
+                val emailCount = Count(EmailLabels.email, distinct = true)
+                val allLabelIds = EmailLabels
+                    .leftJoin(Labels)
+                    .select(emailCount, EmailLabels.label, Labels.color, Labels.name)
+                    .where { Labels.owner eq user.id }
+                    .groupBy(EmailLabels.label, Labels.color, Labels.name)
+                    .map { object  {
+                        val labelId = it[EmailLabels.label].value
+                        val emailCount = it[emailCount]
+                        val color = it[Labels.color]
+                        val name = it[Labels.name]
+                    } }
+
+                LabelMap(
+                    allLabelIds.map { label ->
+
+                        val emailIdsWithThisLabel = EmailLabels
+                            .select(EmailLabels.email)
+                            .where { EmailLabels.label eq label.labelId }
+                            .map { it[EmailLabels.email].value }
+                            .toSet()
+
+                        val otherLabels = EmailLabels
+                            .select(Count(EmailLabels.email), EmailLabels.label)
+                            .where { EmailLabels.email inList emailIdsWithThisLabel }
+                            .andWhere { EmailLabels.label neq label.labelId }
+                            .groupBy(EmailLabels.label)
+                            .map { row ->
+                                val otherLabelId = row[EmailLabels.label].value
+                                val count = row[Count(EmailLabels.email)]
+
+                                LabelMap.Label.Relation(
+                                    labelId = otherLabelId,
+                                    count = count
+                                )
+                            }
+
+                        LabelMap.Label(
+                            id = label.labelId,
+                            name = label.name,
+                            color = label.color,
+                            emailCount = label.emailCount,
+                            relations = otherLabels,
+                        )
+                    }
+                )
+            }.let {
+                call.respond(it)
+            }
+        }
+    }
+}
+
+@Serializable
+private data class LabelMap(
+    @SerialName("labels") val labels: List<Label>,
+) {
+    @Serializable
+    data class Label(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String,
+        @SerialName("color") val color: String,
+        @SerialName("email_count") val emailCount: Long,
+        @SerialName("relations") val relations: List<Relation>
+    ) {
+        @Serializable
+        data class Relation(
+            @SerialName("label_id") val labelId: Uuid,
+            @SerialName("count") val count: Long,
+        )
+    }
+}

@@ -1,5 +1,5 @@
 import type {Component} from "svelte";
-import {PaperPlaneTiltIcon, StackIcon, TrayIcon} from "phosphor-svelte";
+import {PaperPlaneTiltIcon, StackIcon, TagIcon, TrayIcon} from "phosphor-svelte";
 import {INBOX_VIEW, predefinedViews} from "$lib/app/views/predefinedViews";
 import {openViewId} from "$lib/app/views/viewPath";
 
@@ -46,6 +46,12 @@ export const navItems: NavItem[] = [
         href: "/my-stack",
         matches: (url: URL) => url.pathname.startsWith("/my-stack"),
     },
+    {
+        key: "app.nav.labels",
+        icon: TagIcon,
+        href: "/labels",
+        matches: (url: URL) => url.pathname.startsWith("/labels"),
+    }
 ];
 
 /** The page that is open, or null on a route the menu does not cover. */

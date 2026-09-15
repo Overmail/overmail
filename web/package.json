@@ -42,6 +42,7 @@
 		"@tanstack/svelte-table": "^9.2.4",
 		"@tanstack/svelte-virtual": "^3.13.36",
 		"@use-gesture/vanilla": "^10.3.1",
+		"d3": "^7.9.0",
 		"date-fns": "^4.4.0",
 		"dexie": "^4.4.5",
 		"mode-watcher": "^1.1.0",

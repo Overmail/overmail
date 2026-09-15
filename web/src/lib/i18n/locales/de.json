@@ -240,10 +240,17 @@
     }
   },
   "views": {
+    "predefined": {
+      "inbox": "Posteingang",
+      "sent": "Gesendet"
+    },
     "grouping": {
       "title": "Gruppierung",
       "none": "Keine Gruppierung"
-    }
+    },
+    "save": "Als Ansicht speichern",
+    "saving": "Wird gespeichert …",
+    "nameLabel": "Name der Ansicht"
   },
   "senders": {
     "empty": "Niemand gefunden",

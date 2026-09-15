@@ -131,3 +131,25 @@ test("a row is found the same way from both ends", () => {
     expect(layout.rowAt(4)).toEqual({kind: "mail", path: ["2"], offset: 0});
     expect(layout.mailsIn(0, layout.length)).toHaveLength(4);
 });
+
+test("a row knows the stretches it is under, and where each of them is drawn", () => {
+    const layout = buildLayout(
+        [
+            {keys: ["1", "a"], count: 1},
+            {keys: ["1", "b"], count: 2},
+        ],
+        [level("date_smart"), level("sender")]
+    );
+
+    // Rows: h0:1, h1:1/b, m, m, h1:1/a, m -- the last mail is under the day *and* its sender,
+    // although only the sender's header opens above it.
+    expect(layout.headersAt(5).map((node) => node.path.join("/"))).toEqual(["1", "1/a"]);
+
+    const [day, sender] = layout.headersAt(5);
+    expect(layout.headerRow(day)).toBe(0);
+    expect(layout.headerRow(sender)).toBe(4);
+});
+
+test("a listing without headers has none to pin", () => {
+    expect(buildLayout([{keys: [], count: 3}], []).headersAt(0)).toEqual([]);
+});

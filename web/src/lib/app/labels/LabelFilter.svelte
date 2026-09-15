@@ -18,26 +18,49 @@
     import LabelPicker from "$lib/app/labels/LabelPicker.svelte";
     import type {PickedLabel} from "$lib/app/labels/labelSearch";
     import {filterChip} from "$lib/app/filters/chip";
+    import {useRepositories} from "$lib/repository/repositories";
     import {summarisePicked} from "$lib/app/filters/summarise";
     import {cn} from "$lib/utils";
 
     let {
-        labels = $bindable([]),
+        ids = $bindable([]),
         onLabelAdded,
         onLabelRemoved,
         class: className,
     }: {
         /**
-         * The labels the filter is on, in the order they were picked. Written here as they are
-         * toggled, so a caller that only wants to read the selection can bind and stop there.
+         * The labels the filter is on, by id -- which is what a view holds, and the only thing
+         * that still means the same label after it was renamed. What they are called is looked up
+         * here, so a caller can hand over what it read out of a stored view and nothing else.
          */
-        labels?: PickedLabel[];
+        ids?: string[];
         /** One label was turned on. For a caller that saves a change rather than the whole list. */
         onLabelAdded?: (label: PickedLabel) => void;
         onLabelRemoved?: (label: PickedLabel) => void;
         /** Where the chip sits; it brings no margin of its own. */
         class?: string;
     } = $props();
+
+    const {labels: known} = useRepositories();
+
+    // In an effect, not while rendering: asking starts a load and writes state.
+    $effect(() => {
+        for (const id of ids) known.request(id);
+    });
+
+    /**
+     * The picked labels as far as they can be named right now.
+     *
+     * A label whose name has not arrived yet is still a chip -- it is in the filter either way,
+     * and a row that appears late would move everything beside it.
+     */
+    const labels = $derived(
+        ids.map((id) => {
+            const held = known.peek(id).value;
+
+            return {id, name: held?.name ?? "…", color: held?.color ?? "var(--muted)"};
+        })
+    );
 
     let open = $state(false);
     let query = $state("");
@@ -46,7 +69,7 @@
     let picker: ReturnType<typeof LabelPicker> | undefined = $state();
 
     /** Nothing picked is not a filter, and the chip says so by looking like every other one. */
-    const active = $derived(labels.length > 0);
+    const active = $derived(ids.length > 0);
 
     const summary = $derived(summarisePicked(labels.map((label) => label.name)));
 
@@ -82,14 +105,14 @@
     }
 
     function add(label: PickedLabel) {
-        // Only what a chip needs is kept: whatever else the picker hands out -- how much mail
-        // carries the label right now -- is a fact about the label, not about this filter.
-        labels = [...labels, {id: label.id, name: label.name, color: label.color}];
+        // The id alone: what the label is called is the label's business, and a filter that kept
+        // a copy of the name would show the old one after a rename.
+        ids = [...ids, label.id];
         onLabelAdded?.(label);
     }
 
     function remove(label: PickedLabel) {
-        labels = labels.filter((entry) => entry.id !== label.id);
+        ids = ids.filter((id) => id !== label.id);
         onLabelRemoved?.(label);
     }
 
@@ -170,7 +193,7 @@
                 bind:this={picker}
                 {query}
                 class="*:rounded-2xl"
-                selected={labels.map((label) => label.id)}
+                selected={ids}
                 onSelect={toggle}
                 onDismiss={() => (open = false)}
         />

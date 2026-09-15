@@ -96,6 +96,10 @@ export function coverHeaderEnd(cover: Cover, present: () => boolean) {
     $effect(() => {
         header.coveredEnd = {...cover, present: present()};
 
-        return () => (header.coveredEnd = {...cover, present: false});
+        // A block, not a concise body: an assignment as the body of an arrow reads as the value
+        // of the state after it, which it is not -- and a teardown has nothing to hand back.
+        return () => {
+            header.coveredEnd = {...cover, present: false};
+        };
     });
 }

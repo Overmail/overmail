@@ -30,16 +30,16 @@
     import {cn} from "$lib/utils";
 
     let {
-        accounts = $bindable([]),
+        ids = $bindable([]),
         onAccountAdded,
         onAccountRemoved,
         class: className,
     }: {
         /**
-         * The accounts the filter is on, in the order they were picked. Written here as they are
-         * toggled, so a caller that only wants to read the selection can bind and stop there.
+         * The accounts the filter is on, by id -- which is what a view holds. What they are
+         * called comes from the list below, so a caller hands over ids and nothing else.
          */
-        accounts?: PickedInbox[];
+        ids?: string[];
         /** One was turned on. For a caller that saves a change rather than the whole list. */
         onAccountAdded?: (account: PickedInbox) => void;
         onAccountRemoved?: (account: PickedInbox) => void;
@@ -55,7 +55,15 @@
     let listState: "loading" | "ready" | "failed" = $state("loading");
 
     /** No account picked is not a filter, and the chip says so by looking like every other one. */
-    const active = $derived(accounts.length > 0);
+    const active = $derived(ids.length > 0);
+
+    /** The picked accounts as far as the list can name them. */
+    const accounts = $derived(
+        ids.map((id) => ({
+            id,
+            username: available.find((inbox) => inbox.id === id)?.username ?? "…",
+        }))
+    );
 
     const summary = $derived(summarisePicked(accounts.map((account) => account.username)));
 
@@ -85,20 +93,20 @@
     });
 
     function toggle(account: PickedInbox) {
-        const picked = accounts.find((entry) => entry.id === account.id);
-        if (picked) remove(picked);
+        const picked = ids.includes(account.id);
+        if (picked) remove(account);
         else add(account);
     }
 
     function add(account: PickedInbox) {
-        // Only what a chip needs is kept: how much mail came through an account, and whether its
-        // importer is paused, are facts about the account and not about this filter.
-        accounts = [...accounts, {id: account.id, username: account.username}];
+        // The id alone: what an account is called is its own, and the list below is where this
+        // reads it from.
+        ids = [...ids, account.id];
         onAccountAdded?.(account);
     }
 
     function remove(account: PickedInbox) {
-        accounts = accounts.filter((entry) => entry.id !== account.id);
+        ids = ids.filter((id) => id !== account.id);
         onAccountRemoved?.(account);
     }
 </script>
@@ -161,7 +169,7 @@
                             <span class="truncate">{account.username}</span>
                             <span class="truncate text-xs text-muted-foreground">{account.host}</span>
                         </span>
-                        {#if accounts.some((entry) => entry.id === account.id)}
+                        {#if ids.includes(account.id)}
                             <CheckIcon class="size-3.5 shrink-0"/>
                         {/if}
                         <span class="ms-auto text-xs text-muted-foreground">

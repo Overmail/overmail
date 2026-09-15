@@ -54,6 +54,13 @@ type Block = {
     start: number;
     /** The headers opening here, outermost first: the levels this leaf is the first group of. */
     headers: MailGroupNode[];
+    /**
+     * Every header this stretch is under, outermost first -- the ones opening above it included.
+     *
+     * What [headers] leaves out: a second correspondent of the same day belongs to that day just
+     * as much as the first one does, it only does not open it. This is what a pinned header reads.
+     */
+    chain: MailGroupNode[];
     leaf: MailGroupNode;
     /** Where the leaf's first mail sits among all the mails of the listing. */
     mailStart: number;
@@ -77,6 +84,9 @@ export class MailLayout {
 
     private readonly blocks: Block[] = [];
 
+    /** Where each header is drawn, by the path of its group; see [headerRow]. */
+    private readonly headerRows = new Map<string, number>();
+
     /** How many rows the table has, headers included. */
     readonly length: number;
 
@@ -93,11 +103,13 @@ export class MailLayout {
         let row = 0;
         let mail = 0;
 
-        const walk = (node: MailGroupNode, opening: MailGroupNode[]) => {
+        const walk = (node: MailGroupNode, opening: MailGroupNode[], over: MailGroupNode[]) => {
             const headers = node.label === null ? [...opening] : [...opening, node];
+            const chain = node.label === null ? over : [...over, node];
 
             if (node.children.length === 0) {
-                this.blocks.push({start: row, headers, leaf: node, mailStart: mail});
+                this.blocks.push({start: row, headers, chain, leaf: node, mailStart: mail});
+                headers.forEach((header, index) => this.headerRows.set(pathKey(header.path), row + index));
                 row += headers.length + node.count;
                 mail += node.count;
                 return;
@@ -106,12 +118,12 @@ export class MailLayout {
             // The headers of this node open above the first of its children and nowhere else.
             let first = true;
             for (const child of node.children) {
-                walk(child, first ? headers : []);
+                walk(child, first ? headers : [], chain);
                 first = false;
             }
         };
 
-        for (const root of roots) walk(root, []);
+        for (const root of roots) walk(root, [], []);
 
         this.length = row;
         this.mailCount = mail;
@@ -123,6 +135,23 @@ export class MailLayout {
 
         // No label, so no header: the one stretch of an ungrouped listing is the mails alone.
         return new MailLayout([{path: [], level: 0, label: null, count: mails, children: []}], 0);
+    }
+
+    /**
+     * The headers the row at [index] sits under, outermost first.
+     *
+     * Not the ones drawn there -- the ones it *belongs* to, which is what stays on screen while
+     * the stretch is scrolled through. Empty for a listing without headers.
+     */
+    headersAt(index: number): MailGroupNode[] {
+        if (index < 0 || index >= this.length) return [];
+
+        return this.blockAt(index)?.chain ?? [];
+    }
+
+    /** Which row draws the header of [node]; every group has exactly one. */
+    headerRow(node: MailGroupNode): number | undefined {
+        return this.headerRows.get(pathKey(node.path));
     }
 
     rowAt(index: number): MailLayoutRow | undefined {
@@ -205,6 +234,11 @@ export class MailLayout {
 
         return found;
     }
+}
+
+/** How a group's path is held in a map. No separator a key of its own could carry. */
+function pathKey(path: string[]): string {
+    return path.join("\u0000");
 }
 
 /**

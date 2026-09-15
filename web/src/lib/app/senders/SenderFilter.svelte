@@ -16,13 +16,14 @@
     import {filterChip} from "$lib/app/filters/chip";
     import {summarisePicked} from "$lib/app/filters/summarise";
     import {displayName} from "$lib/app/mails/participants";
+    import {useRepositories} from "$lib/repository/repositories";
     import SenderPicker from "$lib/app/senders/SenderPicker.svelte";
     import type {EmailParticipant} from "$lib/repository/EmailRepository.svelte";
     import {SELF_ADDRESSES} from "$lib/repository/ViewSocket";
     import {cn} from "$lib/utils";
 
     let {
-        senders = $bindable([]),
+        ids = $bindable([]),
         title,
         icon = UserIcon,
         onSenderAdded,
@@ -30,10 +31,11 @@
         class: className,
     }: {
         /**
-         * Who the filter is on, in the order they were picked. Written here as they are toggled,
-         * so a caller that only wants to read the selection can bind and stop there.
+         * Who the filter is on, by id -- which is what a view holds. [SELF_ADDRESSES] is one of
+         * them and is not an id at all; what the rest are called is looked up here, so a caller
+         * can hand over what it read out of a stored view and nothing else.
          */
-        senders?: EmailParticipant[];
+        ids?: string[];
         /** What the chip calls itself -- "Von", "An". A colon is added while it is set. */
         title: string;
         icon?: Component;
@@ -63,6 +65,37 @@
 
     const isSelf = (sender: EmailParticipant) => sender.id === SELF_ADDRESSES;
 
+    const {senders: known} = useRepositories();
+
+    // In an effect, not while rendering: asking starts a load and writes state.
+    $effect(() => {
+        for (const id of ids) {
+            if (id !== SELF_ADDRESSES) known.request(id);
+        }
+    });
+
+    /**
+     * The picked correspondents as far as they can be named right now.
+     *
+     * One whose name has not arrived yet is still a chip -- they are in the filter either way,
+     * and a chip that appears late would move everything beside it.
+     */
+    const senders = $derived<EmailParticipant[]>(
+        ids.map((id) => {
+            if (id === SELF_ADDRESSES) return SELF;
+
+            const held = known.peek(id).value;
+
+            return {
+                id,
+                name: held?.name ?? null,
+                address: held?.address ?? "…",
+                avatarUrl: held?.avatarUrl ?? null,
+                avatarPadding: held?.avatarPadding ?? null,
+            };
+        })
+    );
+
     /** What a chip or the row of the list calls somebody. */
     const nameOf = (sender: EmailParticipant) =>
         isSelf(sender) ? $_("senders.self") : displayName(sender);
@@ -74,7 +107,7 @@
     let picker: ReturnType<typeof SenderPicker> | undefined = $state();
 
     /** Nobody picked is not a filter, and the chip says so by looking like every other one. */
-    const active = $derived(senders.length > 0);
+    const active = $derived(ids.length > 0);
 
     const summary = $derived(summarisePicked(senders.map(nameOf)));
 
@@ -85,7 +118,7 @@
         query.trim() === "" || $_("senders.self").toLowerCase().includes(query.trim().toLowerCase())
     );
 
-    const selfPicked = $derived(senders.some(isSelf));
+    const selfPicked = $derived(ids.includes(SELF_ADDRESSES));
 
     // Opening starts over: the query from the last time says nothing about this one. The focus
     // goes to the field, because that is what the list is driven by -- arrows and Enter are
@@ -111,23 +144,14 @@
     }
 
     function add(sender: EmailParticipant) {
-        // Only what a chip needs is kept: how much mail they have sent is a fact about them, not
-        // about this filter.
-        senders = [
-            ...senders,
-            {
-                id: sender.id,
-                name: sender.name,
-                address: sender.address,
-                avatarUrl: sender.avatarUrl,
-                avatarPadding: sender.avatarPadding,
-            },
-        ];
+        // The id alone: what somebody is called is theirs, and a filter that kept a copy of it
+        // would show the spelling of the day it was picked.
+        ids = [...ids, sender.id];
         onSenderAdded?.(sender);
     }
 
     function remove(sender: EmailParticipant) {
-        senders = senders.filter((entry) => entry.id !== sender.id);
+        ids = ids.filter((id) => id !== sender.id);
         onSenderRemoved?.(sender);
     }
 
@@ -229,7 +253,7 @@
                 bind:this={picker}
                 {query}
                 class="*:rounded-2xl"
-                selected={senders.map((sender) => sender.id)}
+                selected={ids}
                 onSelect={toggle}
                 onDismiss={() => (open = false)}
         />

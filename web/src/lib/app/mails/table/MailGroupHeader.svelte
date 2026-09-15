@@ -21,9 +21,16 @@
     let {
         node,
         list,
+        pinned = false,
     }: {
         node: MailGroupNode;
         list: MailListViewModel;
+        /**
+         * Whether this is the copy that stays under the bar while its stretch is scrolled
+         * through. The same header, without the air that sets a stretch off from the one above
+         * it -- there is nothing above it up there.
+         */
+        pinned?: boolean;
     } = $props();
 
     const selection = getMailSelection();
@@ -165,8 +172,8 @@
 -->
 <div
         class={cn(
-            "flex h-4 flex-row items-center gap-2.5 border-b pb-4",
-            node.level === 0 ? "mt-10 mb-1" : "mt-4 mb-1"
+            "flex h-4 flex-row items-center gap-2.5 border-b pb-4 mb-1",
+            pinned ? "mt-0" : node.level === 0 ? "mt-10" : "mt-4"
         )}
         style={`padding-left: ${0.75 + node.level * 0.75}rem`}
 >

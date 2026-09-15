@@ -43,3 +43,9 @@ test("a url without a view has none open", () => {
     expect(openViewId(new URL("http://localhost/"))).toBeNull();
     expect(openViewId(new URL("http://localhost/?view=beliebig"))).toBeNull();
 });
+
+test("the inbox is the bare listing, not a view in the query", () => {
+    // It is what the listing shows when nothing is asked for, so it has no parameter of its own.
+    expect(viewHref("inbox", null, new URL("http://localhost/?view=sent"))).toBe("/");
+    expect(viewHref("sent", null, new URL("http://localhost/"))).toBe("/?view=sent");
+});

@@ -13,11 +13,12 @@
 -->
 <script lang="ts">
     import {DotsThreeVerticalIcon, ListIcon, PencilSimpleIcon, TrashIcon} from "phosphor-svelte";
+    import {_} from "svelte-i18n";
     import {page} from "$app/state";
     import {Button} from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import {SidebarMenuButton, SidebarMenuTrailing} from "$lib/components/ui/sidebar";
-    import {renamedTo} from "$lib/app/views/rename";
+    import RenameInput from "$lib/app/views/RenameInput.svelte";
     import {viewHref} from "$lib/app/views/viewPath";
     import type {View} from "$lib/repository/ViewSocket";
 
@@ -52,8 +53,6 @@
     /** Set when the menu's rename was picked, so the closing menu leaves the input its focus. */
     let renameFromMenu = false;
 
-    /** Set once the editing is over, so the blur that follows does not submit a second time. */
-    let settled = false;
 
     $effect(() => {
         if (!menuOpen) {
@@ -77,85 +76,6 @@
         };
     });
 
-    /** The input while there is one, for the click outside that ends the editing. */
-    let input: HTMLInputElement | null = null;
-
-    /** The input as it appears: the name is there to be replaced, not to be clicked into. */
-    function edit(node: HTMLInputElement) {
-        settled = false;
-        input = node;
-
-        // On the next frame rather than straight away: an attachment runs while the fragment it
-        // belongs to is still being put into the document, and focus() on an element that is not
-        // in it yet does nothing -- the caret ends up nowhere and the first key press is lost.
-        const frame = requestAnimationFrame(() => {
-            node.focus();
-            node.select();
-        });
-
-        return () => {
-            cancelAnimationFrame(frame);
-            if (input === node) input = null;
-        };
-    }
-
-    /**
-     * A click anywhere else keeps what was typed, like Enter does.
-     *
-     * The click, not the input's own blur: the focus leaves the input without anybody having
-     * clicked -- SvelteKit puts it back on the body when a navigation ends, and the first of the
-     * two clicks that opened the editor started one. That blur used to end the editing the moment
-     * it began; here it is not a reason to, and the input takes the focus back instead.
-     */
-    $effect(() => {
-        if (!renaming) return;
-
-        const commit = (event: PointerEvent) => {
-            const node = input;
-            if (node === null) return;
-            if (event.target instanceof Node && node.contains(event.target)) return;
-
-            finish(renamedTo(view.name, node.value));
-        };
-
-        document.addEventListener("pointerdown", commit, true);
-
-        return () => document.removeEventListener("pointerdown", commit, true);
-    });
-
-    function onBlur(event: FocusEvent & {currentTarget: HTMLInputElement}) {
-        // Ended already -- by Enter, Escape or the click above, which runs before this.
-        if (settled) return;
-
-        // Nowhere in particular, which is the navigation's doing rather than the user's.
-        if (event.relatedTarget === null || event.relatedTarget === document.body) {
-            event.currentTarget.focus();
-            return;
-        }
-
-        // Something else took the focus, Tab for instance: keep what was typed.
-        finish(renamedTo(view.name, event.currentTarget.value));
-    }
-
-    function finish(name: string | null) {
-        if (settled) return;
-
-        settled = true;
-        onRenameEnd(name);
-    }
-
-    function onKeydown(event: KeyboardEvent & {currentTarget: HTMLInputElement}) {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            // Kept to the input: what was typed here is nobody else's key press.
-            event.stopPropagation();
-            finish(renamedTo(view.name, event.currentTarget.value));
-        } else if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            finish(null);
-        }
-    }
 </script>
 
 <!-- pr-8 leaves the room the trailing slot overlays. -->
@@ -166,13 +86,11 @@
         {#snippet child({props})}
             <div {...props}>
                 <ListIcon/>
-                <input
-                        {@attach edit}
+                <RenameInput
+                        name={view.name}
+                        onEnd={onRenameEnd}
+                        label={$_("views.nameLabel")}
                         class="w-full min-w-0 bg-transparent outline-hidden"
-                        value={view.name}
-                        aria-label="Name der Ansicht"
-                        onkeydown={onKeydown}
-                        onblur={onBlur}
                 />
             </div>
         {/snippet}

@@ -240,10 +240,17 @@
     }
   },
   "views": {
+    "predefined": {
+      "inbox": "Inbox",
+      "sent": "Sent"
+    },
     "grouping": {
       "title": "Grouping",
       "none": "No grouping"
-    }
+    },
+    "save": "Save as view",
+    "saving": "Saving …",
+    "nameLabel": "View name"
   },
   "senders": {
     "empty": "Nobody found",

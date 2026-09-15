@@ -36,7 +36,7 @@
                 {#each navItems as item (item.href)}
                     {@const Icon = item.icon}
                     <SidebarMenuItem>
-                        <SidebarMenuButton isActive={item.matches(page.url.pathname)}>
+                        <SidebarMenuButton isActive={item.matches(page.url)}>
                             {#snippet child({ props })}
                                 <a href={item.href} {...props}>
                                     <Icon />

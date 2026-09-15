@@ -1,4 +1,5 @@
 import {parseSlugId, slugParam} from "$lib/app/mails/emailPath";
+import {INBOX_VIEW, isPredefinedViewId} from "$lib/app/views/predefinedViews";
 
 /**
  * Which view the listing is showing: `/?view=<slug>`, which is what makes a view something you
@@ -13,11 +14,20 @@ export const VIEW_PARAM = "view";
  * same view, and [parseViewId] only looks at the id at the end.
  */
 export function viewSlug(id: string, name?: string | null): string {
+    // A view the app brings is named, not identified by a uuid: its id *is* readable, so there is
+    // nothing to put in front of it.
+    if (isPredefinedViewId(id)) return id;
+
     return slugParam(id, name);
 }
 
-/** The view a `?view=` value is about, as the uuid the repository knows. Null when it is none. */
+/**
+ * The view a `?view=` value is about: the name of one the app brings, or the uuid of a stored
+ * one. Null when it is neither, which is the listing nobody asked anything of.
+ */
 export function parseViewId(value: string | null | undefined): string | null {
+    if (isPredefinedViewId(value)) return value;
+
     return parseSlugId(value);
 }
 
@@ -35,7 +45,9 @@ export function openViewId(url: URL): string | null {
  */
 export function viewUrl(id: string, name: string | null | undefined, current: URL): URL {
     const url = new URL("/", current);
-    url.searchParams.set(VIEW_PARAM, viewSlug(id, name));
+    // The inbox is what the listing shows when nothing is asked for, so it is the bare root and
+    // not `?view=inbox`: one address for one listing, and the shortest one at that.
+    if (id !== INBOX_VIEW) url.searchParams.set(VIEW_PARAM, viewSlug(id, name));
 
     return url;
 }

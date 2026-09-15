@@ -24,6 +24,7 @@
     import {DndReorderElement, DndReorderZone} from "$lib/components/dnd";
     import {DndReorder} from "$lib/hooks/dnd-reorder.svelte";
     import {neighbourInOrder} from "$lib/app/views/reorder";
+    import {askToName} from "$lib/app/views/newView.svelte";
     import {openViewId, VIEW_PARAM, viewUrl} from "$lib/app/views/viewPath";
     import {useRepositories} from "$lib/repository/repositories";
     import type {View} from "$lib/repository/ViewSocket";
@@ -105,7 +106,9 @@
             const created = await views.create();
             // Straight into it: a view is created to be configured, and an empty one says
             // nothing until it is open. Through goto, not through an href -- which view it is
-            // is only known once the server has answered.
+            // is only known once the server has answered. The heading over the listing opens its
+            // editor when it gets there: the generated name is a placeholder, see `newView`.
+            askToName(created.id);
             await goto(viewUrl(created.id, created.name, page.url));
         } catch (error) {
             console.error(error);

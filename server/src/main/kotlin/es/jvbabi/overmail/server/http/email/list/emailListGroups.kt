@@ -12,6 +12,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.alias
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.select
@@ -59,15 +60,31 @@ fun Route.emailListGroups() {
                         )
                     )
                 } else {
-                    Emails
+                    // The keys are worked out in a subquery and counted outside it.
+                    //
+                    // Not `group by` on the expressions again: a key carries parameters -- the
+                    // boundaries of the date stretches, the actions of the archive log -- and a
+                    // database reads the placeholder in the group by as another one than the
+                    // placeholder in the select, however identical the text looks. Postgres says
+                    // so outright, H2 too. Named once and grouped by the name, both agree.
+                    val named = keys.mapIndexed { index, key -> key.alias("group_key_$index") }
+
+                    val mailsOf = Emails
                         .leftJoin(ImapAccounts)
-                        .select(keys + mails)
+                        .select(named + Emails.id)
                         .where { (ImapAccounts.user eq userId) and filter.predicate() }
-                        .groupBy(*keys.toTypedArray())
+                        .alias("grouped_mails")
+
+                    val counted = mailsOf[Emails.id].count()
+                    val columns = named.map { name -> mailsOf[name] }
+
+                    mailsOf
+                        .select(columns + counted)
+                        .groupBy(*columns.toTypedArray())
                         .map { row ->
                             EmailGroup(
-                                keys = keys.map { key -> row[key].toString() },
-                                count = row[mails],
+                                keys = columns.map { column -> row[column].toString() },
+                                count = row[counted],
                             )
                         }
                 }
@@ -100,3 +117,4 @@ private data class EmailGroup(
     @SerialName("keys") val keys: List<String>,
     @SerialName("count") val count: Long,
 )
+

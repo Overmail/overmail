@@ -31,6 +31,16 @@ export type ViewSorting = {
 };
 
 /**
+ * The one value in a correspondent filter that is not an id: the addresses this account sends
+ * from, which is what makes a "sent" listing a filter rather than a folder.
+ *
+ * Resolved by the server against the logins of the mail accounts -- of all of them, or of the
+ * ones `imapAccountIds` names. A name rather than the ids of the moment, because an address book
+ * entry for one's own address only appears once a mail of it has been imported.
+ */
+export const SELF_ADDRESSES = "self";
+
+/**
  * What a view leaves out, before anything is grouped or sorted.
  *
  * Null is no restriction on that attribute, which is not the same as an empty list: a list says
@@ -42,6 +52,7 @@ export type ViewFilter = {
     readState: boolean | null;
     archivedState: ViewArchivedState[] | null;
     imapAccountIds: string[] | null;
+    /** Address book ids, and [SELF_ADDRESSES] for this account's own addresses. */
     sentBy: string[] | null;
     sentTo: string[] | null;
     hasLabels: string[] | null;

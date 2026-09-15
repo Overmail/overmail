@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.data.avatar
 import es.jvbabi.overmail.server.data.avatar.resolver.BimiResolver
 import es.jvbabi.overmail.server.data.avatar.resolver.ProvidedResolver
 import es.jvbabi.overmail.server.util.maskEmail
+import es.jvbabi.overmail.server.util.withSvgNamespace
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -50,7 +51,9 @@ class AvatarLookup {
                 null
             }
 
-            if (bytes != null) return Result(resolver.identifier, bytes)
+            // Repaired here rather than in each resolver: every picture comes off somebody
+            // else's web server, and a namespace-less svg is unusable whichever one served it.
+            if (bytes != null) return Result(resolver.identifier, bytes.withSvgNamespace())
         }
 
         return null

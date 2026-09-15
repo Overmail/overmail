@@ -248,7 +248,8 @@
   "senders": {
     "empty": "Niemand gefunden",
     "emailCount": "{count, plural, one {# Mail} other {# Mails}}",
-    "search": "Personen suchen"
+    "search": "Personen suchen",
+    "self": "Meine Konten"
   },
   "filters": {
     "from": "Von",

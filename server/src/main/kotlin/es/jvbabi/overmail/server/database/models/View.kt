@@ -149,8 +149,13 @@ data class ViewSettings(
         @SerialName("read_state") val readState: Boolean? = null,
         @SerialName("archived_state") val archivedState: Set<EmailArchiveAction>? = null,
         @SerialName("imap_account_ids") val imapAccountIds: Set<Uuid>? = null,
-        @SerialName("sent_by") val sentByEmailUser: Set<Uuid>? = null,
-        @SerialName("sent_to") val sentToEmailUser: Set<Uuid>? = null,
+        /**
+         * Address book entries by id, and `self` for the addresses this account sends from --
+         * see `SELF_ADDRESSES` in `http/email/list/listFilter.kt`, which is what resolves it.
+         * Strings rather than ids for that one value: it is a name for something that has no id.
+         */
+        @SerialName("sent_by") val sentByEmailUser: Set<String>? = null,
+        @SerialName("sent_to") val sentToEmailUser: Set<String>? = null,
         @SerialName("has_labels") val hasLabels: Set<Uuid>? = null,
     ) {
         companion object {

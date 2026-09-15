@@ -248,7 +248,8 @@
   "senders": {
     "empty": "Nobody found",
     "emailCount": "{count, plural, one {# mail} other {# mails}}",
-    "search": "Search people"
+    "search": "Search people",
+    "self": "My accounts"
   },
   "filters": {
     "from": "From",

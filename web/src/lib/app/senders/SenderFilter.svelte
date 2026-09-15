@@ -7,7 +7,7 @@
     is the "from" and the "to" of a listing, and only the caller knows which.
 -->
 <script lang="ts">
-    import {CaretDownIcon, UserIcon} from "phosphor-svelte";
+    import {CaretDownIcon, CheckIcon, EnvelopeSimpleIcon, UserIcon} from "phosphor-svelte";
     import {tick, type Component} from "svelte";
     import {_} from "svelte-i18n";
     import {OvermailCircularAvatar} from "$lib/components/avatar";
@@ -18,6 +18,7 @@
     import {displayName} from "$lib/app/mails/participants";
     import SenderPicker from "$lib/app/senders/SenderPicker.svelte";
     import type {EmailParticipant} from "$lib/repository/EmailRepository.svelte";
+    import {SELF_ADDRESSES} from "$lib/repository/ViewSocket";
     import {cn} from "$lib/utils";
 
     let {
@@ -45,6 +46,27 @@
 
     const Icon = $derived(icon);
 
+    /**
+     * This account itself, as something the list can hold beside the correspondents.
+     *
+     * Not an address book entry and not an id: the server resolves it against the logins of the
+     * mail accounts, see [SELF_ADDRESSES]. It travels as one of them so that everything around it
+     * -- the chips, the ids a caller reads off them -- stays one list.
+     */
+    const SELF: EmailParticipant = {
+        id: SELF_ADDRESSES,
+        name: null,
+        address: "",
+        avatarUrl: null,
+        avatarPadding: null,
+    };
+
+    const isSelf = (sender: EmailParticipant) => sender.id === SELF_ADDRESSES;
+
+    /** What a chip or the row of the list calls somebody. */
+    const nameOf = (sender: EmailParticipant) =>
+        isSelf(sender) ? $_("senders.self") : displayName(sender);
+
     let open = $state(false);
     let query = $state("");
 
@@ -54,9 +76,16 @@
     /** Nobody picked is not a filter, and the chip says so by looking like every other one. */
     const active = $derived(senders.length > 0);
 
-    const summary = $derived(summarisePicked(senders.map(displayName)));
+    const summary = $derived(summarisePicked(senders.map(nameOf)));
 
     const chip = $derived(filterChip({active}));
+
+    /** Whether the account's own row is worth offering for what was typed. */
+    const selfMatches = $derived(
+        query.trim() === "" || $_("senders.self").toLowerCase().includes(query.trim().toLowerCase())
+    );
+
+    const selfPicked = $derived(senders.some(isSelf));
 
     // Opening starts over: the query from the last time says nothing about this one. The focus
     // goes to the field, because that is what the list is driven by -- arrows and Enter are
@@ -147,15 +176,21 @@
         <label class="flex min-h-22 flex-row flex-wrap content-start items-center gap-1 px-2 py-1.5">
             {#each senders as sender (sender.id)}
                 <Badge variant="secondary" class="font-normal" onremove={() => remove(sender)}>
-                    <!-- The face rather than a colour: it is what tells two chips apart here. -->
-                    <OvermailCircularAvatar
-                            url={sender.avatarUrl}
-                            padding={sender.avatarPadding}
-                            name={displayName(sender)}
-                            class="size-3.5"
-                            fallbackClass="text-[0.5rem]"
-                    />
-                    {displayName(sender)}
+                    {#if isSelf(sender)}
+                        <!-- No face: this one is not a person but every address this account
+                             sends from. -->
+                        <EnvelopeSimpleIcon class="size-3.5"/>
+                    {:else}
+                        <!-- The face rather than a colour: it is what tells two chips apart here. -->
+                        <OvermailCircularAvatar
+                                url={sender.avatarUrl}
+                                padding={sender.avatarPadding}
+                                name={displayName(sender)}
+                                class="size-3.5"
+                                fallbackClass="text-[0.5rem]"
+                        />
+                    {/if}
+                    {nameOf(sender)}
                 </Badge>
             {/each}
 
@@ -169,6 +204,26 @@
         </label>
 
         <div class="h-px w-full bg-border/50"></div>
+
+        <!-- The account's own addresses, above the correspondents: it is the one entry of this
+             list that is not somebody, and the one most listings are about. mousedown and
+             prevented, like the rows below, so the field keeps the caret. -->
+        {#if selfMatches}
+            <button
+                    type="button"
+                    class="flex w-full items-center gap-2 rounded-2xl px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+                    onmousedown={(event) => {
+                        event.preventDefault();
+                        toggle(SELF);
+                    }}
+            >
+                <EnvelopeSimpleIcon class="size-3.5 shrink-0"/>
+                <span class="flex-1 truncate">{$_("senders.self")}</span>
+                {#if selfPicked}
+                    <CheckIcon class="size-3.5 shrink-0"/>
+                {/if}
+            </button>
+        {/if}
 
         <SenderPicker
                 bind:this={picker}

@@ -259,6 +259,71 @@ class EmailListTest {
     }
 
     @Test
+    fun `self is this account's own addresses, not an id`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        // The fixture's account logs in as "owner"; a mail from that address is one this account
+        // sent, whatever the address book calls the entry.
+        val own = addSender("owner@example.com", mails[0])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=self").ids())
+        // And it reads together with the ids beside it, as any set of correspondents does.
+        assertEquals(
+            listOf(mails[0].toString()),
+            client.get("/api/emails/list?sent_by=self,$own").ids(),
+        )
+    }
+
+    @Test
+    fun `self is matched without regard to case`() = testApplication {
+        val mails = setUp(count = 1)
+        installRoute()
+        addSender("Owner@Example.com", mails[0])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?sent_by=self").ids())
+    }
+
+    @Test
+    fun `self on the receiving side is the mails written to this account`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        addRecipient("owner@example.com", mails[1])
+        setAccountLogin("owner@example.com")
+
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?sent_to=self").ids())
+    }
+
+    @Test
+    fun `an account filter narrows which of the own addresses self means`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        addSender("owner@example.com", mails[0])
+        setAccountLogin("owner@example.com")
+        // A second mailbox, with the second mail sent from its own address.
+        val second = addAccount("imap.other.example.com", mails[1], login = "other@example.com")
+        addSender("other@example.com", mails[1])
+
+        // Both addresses are this account's, so both mails are "sent".
+        assertEquals(2, client.get("/api/emails/list?sent_by=self").ids().size)
+        // With one mailbox named, only what went out through it.
+        assertEquals(
+            listOf(mails[1].toString()),
+            client.get("/api/emails/list?sent_by=self&imap_account_ids=$second").ids(),
+        )
+    }
+
+    @Test
+    fun `self is only a correspondent, nowhere else`() = testApplication {
+        setUp(count = 1)
+        installRoute()
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?has_labels=self").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?imap_account_ids=self").status)
+    }
+
+    @Test
     fun `an account filter holds the mails that came through it`() = testApplication {
         val mails = setUp(count = 2)
         installRoute()
@@ -407,16 +472,24 @@ class EmailListTest {
     }
 
     /** A second mailbox of this user, as the one [mail] came through. */
-    private suspend fun addAccount(host: String, mail: Uuid): Uuid = database.query {
-        val account = ImapAccount.new {
-            user = signedIn
-            this.host = host
-            port = 993
-            username = "owner"
-            password = "secret"
+    private suspend fun addAccount(host: String, mail: Uuid, login: String = "owner"): Uuid =
+        database.query {
+            val account = ImapAccount.new {
+                user = signedIn
+                this.host = host
+                port = 993
+                username = login
+                password = "secret"
+            }
+            Email.findById(mail)!!.imapAccount = account
+            account.id.value
         }
-        Email.findById(mail)!!.imapAccount = account
-        account.id.value
+
+    /** What the fixture's mailbox logs in as, which is what `self` is matched against. */
+    private suspend fun setAccountLogin(login: String) {
+        database.query {
+            ImapAccount.all().first { it.user.id == signedIn.id }.username = login
+        }
     }
 
     private suspend fun addMail(sentAt: kotlin.time.Instant, subject: String? = null): Uuid = database.query {

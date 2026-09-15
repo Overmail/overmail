@@ -57,7 +57,15 @@
      * above and below itself, so the two have to be changed together.
      */
     const ROW_HEIGHT = 40;
+
+    /**
+     * What a header row takes, by level. The outermost one brings the air that sets one stretch
+     * off from the one before it; a header under it is a smaller step, or the list would be more
+     * space than mail. Both have to match what `MailGroupHeader` actually draws, or the
+     * virtualizer sizes the rows from the wrong number and the list drifts.
+     */
     const HEADER_HEIGHT = 60;
+    const SUB_HEADER_HEIGHT = 38;
 
     /** How many rows around the viewport are held and kept up to date. */
     const OVERSCAN = 12;
@@ -81,9 +89,8 @@
     const {mails} = useRepositories();
     const list = new MailListViewModel(mails);
 
-    /** The listing is the view's filter; the view model reads it again when it says other mails. */
-    $effect(() => list.setFilter(view.filter));
-
+    /** The listing is the view: what it leaves out, how it is cut up, what orders it. */
+    $effect(() => list.setView(view));
 
     /**
      * Whether the listing is more than the mailbox. What the title says, and what a row that left
@@ -267,19 +274,8 @@
 
         // Stepping onto a row that is not on screen scrolls it into view; a highlighted row
         // nobody can see is the panel and the table saying different things.
-        const index = list.indexOf(next);
-        const row = index === undefined ? undefined : list.layout.rowOf(index);
+        const row = list.rowOf(next);
         if (row !== undefined) virtualizer.virtualizer.scrollToIndex(row, {align: "auto"});
-    }
-
-    /**
-     * Where the mails under a header start in the mailbox -- what its box needs to know which
-     * mails it is about. The row after a header is its first mail: a stretch with a header over
-     * it holds at least one, and there are never two headers in a row.
-     */
-    function groupStart(headerRow: number): number {
-        const first = list.layout.rowAt(headerRow + 1);
-        return first?.kind === "mail" ? first.index : 0;
     }
 
     /** The table's one preview, driven by the rows below; see MailRowPreview. */
@@ -322,8 +318,12 @@
         return {
             count: visibleRowCount,
             // Follows the layout: a stretch of headers appearing changes which rows are tall.
-            estimateSize: (index: number) =>
-                layout.rowAt(index)?.kind === "header" ? HEADER_HEIGHT : ROW_HEIGHT,
+            estimateSize: (index: number) => {
+                const row = layout.rowAt(index);
+                if (row?.kind !== "header") return ROW_HEIGHT;
+
+                return row.node.level === 0 ? HEADER_HEIGHT : SUB_HEADER_HEIGHT;
+            },
             overscan: OVERSCAN,
             scrollMargin,
         };
@@ -340,7 +340,7 @@
                 const entry = list.layout.rowAt(item.index);
                 if (entry?.kind === "header") return {item, entry, row: undefined};
 
-                const id = entry === undefined ? undefined : list.idAt(entry.index);
+                const id = entry === undefined ? undefined : list.idAt(entry);
                 const mail = id === undefined ? null : mails.peek(id).value;
                 return {
                     item,
@@ -491,12 +491,7 @@
                              header's own box comes out on hover, see selectionReveal. -->
                         <Table.Row class="group/mail-row border-0 hover:bg-transparent">
                             <Table.Cell colspan={columns.length} class="p-0 align-bottom">
-                                <MailGroupHeader
-                                        label={entry.label}
-                                        count={entry.count}
-                                        start={groupStart(item.index)}
-                                        {list}
-                                />
+                                <MailGroupHeader node={entry.node} {list}/>
                             </Table.Cell>
                         </Table.Row>
                     {:else if modelRow}

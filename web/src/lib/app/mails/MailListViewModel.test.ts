@@ -1,489 +1,224 @@
 import {expect, test} from "bun:test";
 import {MailListViewModel, everyMail} from "./MailListViewModel.svelte";
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
-import type {ViewFilter} from "$lib/repository/ViewSocket";
+import type {ViewSettings} from "$lib/app/views/viewSettings";
 
-/**
- * The two listings these tests use, by the one attribute that tells them apart: the mailbox is
- * what is not archived, "all" is that plus the archived ones. The fake below reads the filter the
- * same way the server does.
- */
-type MailScope = "unarchived" | "all";
+/** What was asked of the api, as the part of the url that says what for. */
+let requests: string[] = [];
 
-const filterFor = (scope: MailScope): ViewFilter => ({
-    ...everyMail(),
-    archivedState: scope === "unarchived" ? ["Unarchive"] : ["Archive", "Unarchive"],
-});
-
-type Request = {scope: string; before: string | null; beforeId: string | null; limit: string | null};
-
-/** What was asked of `GET /api/emails/list/ids`: a scope and the send times a stretch spans. */
-type StretchRequest = {scope: string; from: string | null; to: string | null};
-
-/** Reset by [mailbox], so a test reads the ones its own mailbox answered. */
-let stretchRequests: StretchRequest[] = [];
-
-/** `yyyy-mm-dd` of a day, [daysBack] days ago in local time -- the zone the server cuts days in. */
-function day(daysBack: number): string {
-    const date = new Date();
-    date.setDate(date.getDate() - daysBack);
-    return `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}-${`${date.getDate()}`.padStart(2, "0")}`;
-}
-
-const startOfDayAfter = (key: string) => {
-    const [year, month, dayOfMonth] = key.split("-").map(Number);
-    return new Date(year, month - 1, dayOfMonth + 1).getTime() / 1000;
-};
-
-const startOfDay = (key: string) => {
-    const [year, month, dayOfMonth] = key.split("-").map(Number);
-    return new Date(year, month - 1, dayOfMonth).getTime() / 1000;
-};
-
-/**
- * A mailbox of days, per scope. Ids are `<scope>-<row>`, so a test can see which listing a row
- * came out of, and a page starts wherever its cursor says.
- */
-function mailbox(scopes: Record<MailScope, {key: string; count: number}[]>) {
-    const requests: Request[] = [];
-    stretchRequests = [];
-
-    /** Every mail of a scope in row order, with the day it sits in. */
-    const rows = (scope: MailScope) =>
-        scopes[scope].flatMap((entry, dayIndex) =>
-            Array.from({length: entry.count}, () => ({day: entry.key, dayIndex}))
-        );
+/** A view of the mailbox: the groups it is cut into, and the mails of each of them in order. */
+function mailbox(groups: Record<string, string[]>, levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}]) {
+    requests = [];
 
     globalThis.fetch = (async (url: string) => {
         const target = new URL(url, "http://localhost");
-        // Sorted by `filterParams`, so "Archive,Unarchive" is the whole of it and "Unarchive"
-        // alone is the mailbox.
-        const scope: MailScope =
-            target.searchParams.get("archived_state") === "Unarchive" ? "unarchived" : "all";
-        const days = scopes[scope];
-        const all = rows(scope);
+        const group = target.searchParams.get("group");
+        requests.push(`${target.pathname}|${group ?? ""}|${target.searchParams.get("offset") ?? ""}`);
 
         if (target.pathname.endsWith("/groups")) {
-            return new Response(JSON.stringify({grouping: "date", groups: days}), {status: 200});
+            const counted = Object.entries(groups).map(([keys, ids]) => ({
+                keys: keys === "" ? [] : keys.split(","),
+                count: ids.length,
+            }));
+
+            return new Response(JSON.stringify({groupings: [], groups: counted}), {status: 200});
         }
 
-        // Every mail of a range of send times, which is what picking a whole stretch asks for.
+        // Every mail under the group asked for: fewer keys than levels is the level above, which
+        // is what a header of an outer level asks for.
+        const under = Object.entries(groups)
+            .filter(([keys]) => group === null || keys === group || keys.startsWith(group + ","))
+            .flatMap(([, ids]) => ids);
+
         if (target.pathname.endsWith("/ids")) {
-            const from = target.searchParams.get("from");
-            const to = target.searchParams.get("to");
-            stretchRequests.push({scope, from, to});
-
-            const ids = all
-                .map((row, index) => ({row, id: `${scope}-${index}`}))
-                .filter(({row}) => from === null || startOfDay(row.day) >= Number(from))
-                .filter(({row}) => to === null || startOfDayAfter(row.day) <= Number(to))
-                .map(({id}) => id);
-
-            return new Response(JSON.stringify({total: ids.length, ids}), {status: 200});
+            return new Response(JSON.stringify({total: under.length, ids: under}), {status: 200});
         }
 
-        const before = target.searchParams.get("before");
-        const beforeId = target.searchParams.get("before_id");
+        const offset = Number(target.searchParams.get("offset") ?? 0);
         const limit = Number(target.searchParams.get("limit") ?? 100);
-        requests.push({
-            scope,
-            before,
-            beforeId,
-            limit: target.searchParams.get("limit"),
-        });
 
-        // Where the page starts: the first row that is older than the cursor. A day boundary
-        // means "the first row of that day"; a row cursor means "the row after that one".
-        let start = 0;
-        if (beforeId !== null) {
-            start = all.findIndex((_, index) => `${scope}-${index}` === beforeId) + 1;
-        } else if (before !== null) {
-            start = all.findIndex((row) => startOfDayAfter(row.day) <= Number(before));
-            if (start < 0) start = all.length;
-        }
-
-        const ids = all.slice(start, start + limit).map((_, offset) => `${scope}-${start + offset}`);
-        const next =
-            start + ids.length < all.length && ids.length === limit
-                ? {before: startOfDayAfter(all[start + ids.length - 1].day), before_id: ids.at(-1)}
-                : null;
-
-        return new Response(JSON.stringify({total: all.length, ids, next}), {status: 200});
-    }) as unknown as typeof fetch;
-
-    return requests;
-}
-
-/** Only [subscribe] is asked of the repository here; what a row shows is its business. */
-function repository() {
-    const held = new Set<string>();
-    const subscribes: string[] = [];
-    const stub = {
-        subscribe(id: string) {
-            held.add(id);
-            subscribes.push(id);
-            return () => held.delete(id);
-        },
-    };
-    return {held, subscribes, repository: stub as unknown as EmailRepository};
-}
-
-const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
-
-test("the first window reports the length and fills the top of the list", async () => {
-    const requests = mailbox({
-        unarchived: [{key: day(0), count: 3}, {key: day(1), count: 2}],
-        all: [{key: day(0), count: 3}],
-    });
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 20);
-    await settle();
-
-    expect(list.total).toBe(5);
-    expect(list.initialized).toBe(true);
-    expect(list.idAt(0)).toBe("unarchived-0");
-    // Two days, so the layout is a header, three mails, a header, two mails.
-    expect(list.layout.length).toBe(7);
-    // The top of a list needs no cursor.
-    expect(requests[0]).toEqual({scope: "unarchived", before: null, beforeId: null, limit: "100"});
-});
-
-test("a jump lands on the day it jumped to, not on a walk down from the top", async () => {
-    // 150 mails today, 5 yesterday: the second day starts past the first page.
-    const requests = mailbox({
-        unarchived: [{key: day(0), count: 150}, {key: day(1), count: 5}],
-        all: [],
-    });
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 5);
-    await settle();
-
-    // The header of the second day sits at row 151; the rows under it are its mails.
-    list.window(151, 156);
-    await settle();
-
-    expect(list.idAt(150)).toBe("unarchived-150");
-    // One request for the top, one anchored at the day boundary -- no walk through the 150.
-    expect(requests.length).toBe(2);
-    expect(requests[1].before).toBe(String(startOfDayAfter(day(1))));
-});
-
-test("a gap inside a long day carries on from where the last page ended", async () => {
-    const requests = mailbox({unarchived: [{key: day(0), count: 250}], all: []});
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(1, 5);
-    await settle();
-    expect(list.idAt(99)).toBe("unarchived-99");
-
-    // Row 100 is the first one the page did not reach, and it is the same day -- so the cursor
-    // of that page is what continues, not the day boundary again.
-    list.window(101, 105);
-    await settle();
-
-    expect(list.idAt(100)).toBe("unarchived-100");
-    expect(requests.at(-1)!.beforeId).toBe("unarchived-99");
-});
-
-test("changing the filter keeps both listings and the subscriptions", async () => {
-    mailbox({
-        unarchived: [{key: day(0), count: 2}],
-        all: [{key: day(0), count: 2}, {key: day(1), count: 3}],
-    });
-    const {held, subscribes, repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 10);
-    await settle();
-    list.window(0, 10);
-    expect(list.total).toBe(2);
-    expect([...held].sort()).toEqual(["unarchived-0", "unarchived-1"]);
-
-    list.setFilter(filterFor("all"));
-    list.window(0, 10);
-    await settle();
-    list.window(0, 10);
-    expect(list.total).toBe(5);
-    expect(list.idAt(4)).toBe("all-4");
-
-    const askedSoFar = subscribes.length;
-
-    // Back again: the listing is still there, so nothing is fetched and nothing is subscribed
-    // that was not subscribed before.
-    list.setFilter(filterFor("unarchived"));
-    list.window(0, 10);
-    await settle();
-
-    expect(list.total).toBe(2);
-    expect(list.idAt(1)).toBe("unarchived-1");
-    expect(subscribes.length).toBe(askedSoFar + 2);
-});
-
-test("the same page is not asked for twice", async () => {
-    const requests = mailbox({unarchived: [{key: day(0), count: 250}], all: []});
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 5);
-    list.window(0, 5);
-    list.window(1, 6);
-    await settle();
-
-    // One page request, plus the one for the days.
-    expect(requests.length).toBe(1);
-});
-
-test("a failed page is reported and asked for again", async () => {
-    globalThis.fetch = (async () => new Response("nope", {status: 500})) as unknown as typeof fetch;
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 20);
-    await settle();
-
-    expect(list.failed).toBe(true);
-    expect(list.initialized).toBe(false);
-
-    mailbox({unarchived: [{key: day(0), count: 2}], all: []});
-    list.retry();
-    await settle();
-
-    expect(list.failed).toBe(false);
-    expect(list.idAt(0)).toBe("unarchived-0");
-});
-
-test("a mailbox whose shape cannot be read stays a flat list", async () => {
-    globalThis.fetch = (async (url: string) => {
-        if (new URL(url, "http://localhost").pathname.endsWith("/groups")) {
-            return new Response(JSON.stringify({grouping: "date"}), {status: 200});
-        }
         return new Response(
-            JSON.stringify({total: 2, ids: ["m-0", "m-1"], next: null}),
+            JSON.stringify({total: under.length, ids: under.slice(offset, offset + limit)}),
             {status: 200}
         );
     }) as unknown as typeof fetch;
 
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
+    return {levels};
+}
+
+/** A repository that only counts what is subscribed; what a mail *is* is not this test's. */
+function repository() {
+    const held = new Map<string, number>();
+
+    const stub = {
+        subscribe(id: string) {
+            held.set(id, (held.get(id) ?? 0) + 1);
+            return () => held.set(id, (held.get(id) ?? 1) - 1);
+        },
+        peek: () => ({value: null, isLoading: false}),
+    };
+
+    return {held, repository: stub as unknown as EmailRepository};
+}
+
+const view = (groupings: ViewSettings["groupings"], filter = everyMail()): ViewSettings => ({
+    groupings,
+    filter,
+    sorting: {kind: "date", reversed: false},
+});
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+test("the shape and the first page arrive, and the rows are the two together", async () => {
+    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
 
     list.window(0, 20);
     await settle();
 
-    // Without days there are no headers, and the rows are the mailbox itself.
-    expect(list.layout.length).toBe(2);
-    expect(list.layout.rowAt(0)).toEqual({kind: "mail", index: 0});
-});
-
-test("letting go releases every row", async () => {
-    mailbox({unarchived: [{key: day(0), count: 2}], all: []});
-    const {held, repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 10);
-    await settle();
-    list.window(0, 10);
-    expect(held.size).toBe(2);
-
-    list.dispose();
-    expect(held.size).toBe(0);
-});
-
-test("stepping is the row above and the row below, and asks for a page it does not hold", async () => {
-    mailbox({
-        unarchived: [{key: day(0), count: 150}],
-        all: [{key: day(0), count: 2}],
-    });
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 20);
-    await settle();
-
-    expect(list.indexOf("unarchived-5")).toBe(5);
-    expect(list.step("unarchived-5", -1)).toBe("unarchived-4");
-    expect(list.step("unarchived-5", 1)).toBe("unarchived-6");
-
-    // Either end of the listing.
-    expect(list.canStep("unarchived-0", -1)).toBe(false);
-    expect(list.step("unarchived-0", -1)).toBeUndefined();
-    expect(list.canStep("unarchived-0", 1)).toBe(true);
-    expect(list.canStep("unarchived-149", 1)).toBe(false);
-
-    // A mail of the other scope is not in this listing at all.
-    expect(list.indexOf("all-0")).toBeUndefined();
-    expect(list.canStep("all-0", 1)).toBe(false);
-
-    // Past the first page: nothing to hand out yet, but that page is on its way and the same
-    // step answers once it landed.
-    expect(list.canStep("unarchived-99", 1)).toBe(true);
-    expect(list.step("unarchived-99", 1)).toBeUndefined();
-    await settle();
-    expect(list.step("unarchived-99", 1)).toBe("unarchived-100");
-});
-
-test("a mail arriving is read again: the length, the days and the rows on screen", async () => {
-    // The fixture is read per request, so growing this array is a mail arriving.
-    const days = [{key: day(0), count: 3}];
-    mailbox({unarchived: days, all: [{key: day(0), count: 1}]});
-    const {repository: mails, held} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 20);
-    await settle();
-
-    expect(list.total).toBe(3);
-    // A header and three mails.
-    expect(list.layout.length).toBe(4);
-
-    days[0] = {key: day(0), count: 4};
-    list.refresh();
-
-    // Nothing goes blank in between: the shape and the rows stand until the answer is here, so a
-    // table does not collapse under a cursor while the mailbox is being re-read.
-    expect(list.total).toBe(3);
-    expect(list.idAt(0)).toBe("unarchived-0");
-
-    await settle();
-
-    expect(list.total).toBe(4);
+    // Two stretches: a header, two mails, a header, one mail.
     expect(list.layout.length).toBe(5);
-    expect(list.idAt(3)).toBe("unarchived-3");
-    expect(held.has("unarchived-3")).toBe(false);
-
-    // The rows on screen are subscribed again as they are read, which is what a table asking for
-    // its window does; here nothing asked, so the new row is only in the listing.
-    list.window(0, 20);
-    await settle();
-    expect(held.has("unarchived-3")).toBe(true);
+    expect(list.total).toBe(3);
+    expect(list.idAt({path: ["1"], offset: 0})).toBe("a");
+    expect(list.idAt({path: ["2"], offset: 0})).toBe("c");
+    expect(list.initialized).toBe(true);
 });
 
-test("the scope that was not on screen is read again when it is", async () => {
-    const all = [{key: day(0), count: 2}];
-    mailbox({unarchived: [{key: day(0), count: 2}], all});
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
+test("a group is asked for once, however many of its rows are on screen", async () => {
+    const {levels} = mailbox({"1": ["a", "b", "c"]});
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
 
     list.window(0, 20);
     await settle();
-    list.setFilter(filterFor("all"));
+    list.window(0, 20);
+    await settle();
+
+    const pages = requests.filter((request) => request.startsWith("/api/emails/list|"));
+    expect(pages).toEqual(["/api/emails/list|1|0"]);
+});
+
+test("a window that reaches into a second group asks for that one as well", async () => {
+    const {levels} = mailbox({"1": ["a"], "2": ["b"], "3": ["c"]});
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
+
+    // The first two stretches only: a header and a mail each.
+    list.window(0, 3);
+    await settle();
+
+    const pages = requests.filter((request) => request.startsWith("/api/emails/list|"));
+    expect(pages).toEqual(["/api/emails/list|1|0", "/api/emails/list|2|0"]);
+});
+
+test("a second level puts a header under the first", async () => {
+    const levels: ViewSettings["groupings"] = [
+        {kind: "date_smart", reversed: false},
+        {kind: "sender", reversed: false},
+    ];
+    mailbox({"1,alice": ["a"], "1,bob": ["b", "c"]}, levels);
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
+
+    list.window(0, 20);
+    await settle();
+
+    // The day's header, then bob (more mail, so first) with two, then alice with one.
+    expect(list.layout.length).toBe(6);
+    expect(list.layout.rowAt(0)).toMatchObject({kind: "header"});
+    expect(list.idAt({path: ["1", "bob"], offset: 0})).toBe("b");
+    expect(list.idAt({path: ["1", "alice"], offset: 0})).toBe("a");
+});
+
+test("ticking a header asks for every mail under it, and only once", async () => {
+    const levels: ViewSettings["groupings"] = [
+        {kind: "date_smart", reversed: false},
+        {kind: "sender", reversed: false},
+    ];
+    mailbox({"1,alice": ["a"], "1,bob": ["b"]}, levels);
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
+
+    list.window(0, 20);
+    await settle();
+
+    const day = list.layout.roots[0];
+    expect(await list.idsOfGroup(day)).toEqual(["a", "b"]);
+    await list.idsOfGroup(day);
+
+    // The outer header asks for its own path, and the answer is held for the second click.
+    const stretches = requests.filter((request) => request.startsWith("/api/emails/list/ids|"));
+    expect(stretches).toEqual(["/api/emails/list/ids|1|"]);
+});
+
+test("changing the view keeps what the old one read", async () => {
+    const levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}];
+    mailbox({"1": ["a", "b"]}, levels);
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
+
     list.window(0, 20);
     await settle();
     expect(list.total).toBe(2);
 
-    // Two arrive while the other listing is on screen.
-    list.setFilter(filterFor("unarchived"));
-    all[0] = {key: day(0), count: 4};
-    list.refresh();
+    // Another filter is another listing; the fake answers the same mails, which is enough to see
+    // that it was read again rather than shown from what the first one held.
+    list.setView(view(levels, {...everyMail(), readState: false}));
     await settle();
+    expect(list.total).toBe(2);
 
-    list.setFilter(filterFor("all"));
-    list.window(0, 20);
-    await settle();
-    expect(list.total).toBe(4);
-    expect(list.idAt(3)).toBe("all-3");
+    const shapes = requests.filter((request) => request.startsWith("/api/emails/list/groups"));
+    expect(shapes.length).toBe(2);
 });
 
-test("a stretch answers with the mails it holds, not with the ones it has not asked for", async () => {
-    // 150 mails today: the first page covers 100 of them, the rest of the day is still a gap.
-    mailbox({unarchived: [{key: day(0), count: 150}, {key: day(1), count: 2}], all: []});
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 5);
-    await settle();
-
-    const today = list.idsIn(0, 150);
-    expect(today.length).toBe(100);
-    expect(today[0]).toBe("unarchived-0");
-    expect(today.at(-1)).toBe("unarchived-99");
-
-    // Scrolling into the gap is what fills it, and the stretch then names those too.
-    list.window(101, 120);
-    await settle();
-    expect(list.idsIn(0, 150).length).toBe(150);
-
-    // The next stretch is its own mails and stops where it ends.
-    expect(list.idsIn(150, 2)).toEqual(["unarchived-150", "unarchived-151"]);
-});
-
-test("a stretch is one request, and it names the mails no page of the listing has", async () => {
-    // 150 mails today, so the first page is 100 of them and the rest of the day is still a gap.
-    mailbox({unarchived: [{key: day(0), count: 150}, {key: day(1), count: 2}], all: []});
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-
-    list.window(0, 5);
-    await settle();
-    expect(list.idsIn(0, 150).length).toBe(100);
-
-    const today = await list.idsOfStretch(0, 150);
-
-    expect(today.length).toBe(150);
-    expect(today.at(-1)).toBe("unarchived-149");
-    // The day the stretch spans, as the boundaries the server counted its days by.
-    expect(stretchRequests).toEqual([
-        {scope: "unarchived", from: String(startOfDay(day(0))), to: String(startOfDayAfter(day(0)))},
-    ]);
-
-    // Taking the stretch back again waits on the answer that is already here.
-    await list.idsOfStretch(0, 150);
-    expect(stretchRequests.length).toBe(1);
-
-    // A move means other mails sit at those positions, so it is asked again.
-    list.refresh();
-    await settle();
-    await list.idsOfStretch(0, 150);
-    expect(stretchRequests.length).toBe(2);
-});
-
-test("a stretch of several days spans all of them, and stops at its own boundaries", async () => {
-    mailbox({
-        unarchived: [
-            {key: day(0), count: 2},
-            {key: day(1), count: 1},
-            {key: day(2), count: 3},
-        ],
-        all: [],
-    });
-    const {repository: mails} = repository();
-    const list = new MailListViewModel(mails);
+test("stepping walks the mails, headers and groups alike", async () => {
+    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
 
     list.window(0, 20);
     await settle();
 
-    // The two older days as one stretch: rows 2 and 3 of the mailbox, three mails.
-    const older = await list.idsOfStretch(2, 4);
-
-    expect(older).toEqual(["unarchived-2", "unarchived-3", "unarchived-4", "unarchived-5"]);
-    expect(stretchRequests).toEqual([
-        {scope: "unarchived", from: String(startOfDay(day(2))), to: String(startOfDayAfter(day(1)))},
-    ]);
+    expect(list.step("a", 1)).toBe("b");
+    // Over the header of the next stretch, which is not a mail.
+    expect(list.step("b", 1)).toBe("c");
+    expect(list.step("c", 1)).toBeUndefined();
+    expect(list.canStep("c", -1)).toBe(true);
+    expect(list.canStep("a", -1)).toBe(false);
 });
 
-test("a stretch that cannot be read falls back to the mails the listing holds", async () => {
-    mailbox({unarchived: [{key: day(0), count: 150}], all: []});
-    const {repository: mails} = repository();
+test("what is on screen is subscribed, and what left it is let go", async () => {
+    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const {held, repository: mails} = repository();
     const list = new MailListViewModel(mails);
+    list.setView(view(levels));
 
-    list.window(0, 5);
+    list.window(0, 20);
+    await settle();
+    expect(held.get("a")).toBe(1);
+
+    // Only the second stretch is in the window now.
+    list.window(3, 4);
+    await settle();
+    expect(held.get("a")).toBe(0);
+    expect(held.get("c")).toBe(1);
+
+    list.dispose();
+    expect([...held.values()].every((count) => count === 0)).toBe(true);
+});
+
+test("a move reads the shape and the pages again", async () => {
+    const {levels} = mailbox({"1": ["a"]});
+    const list = new MailListViewModel(repository().repository);
+    list.setView(view(levels));
+
+    list.window(0, 20);
+    await settle();
+    const before = requests.length;
+
+    list.refresh();
     await settle();
 
-    const fetching = globalThis.fetch;
-    globalThis.fetch = (async (url: string) => {
-        if (new URL(url, "http://localhost").pathname.endsWith("/ids")) {
-            return new Response("no", {status: 500});
-        }
-        return fetching(url as unknown as Request as never);
-    }) as unknown as typeof fetch;
-
-    const today = await list.idsOfStretch(0, 150);
-
-    // The pages that are here, and the failure on the bar the listing reports through.
-    expect(today.length).toBe(100);
-    expect(list.failed).toBe(true);
+    expect(requests.length).toBeGreaterThan(before);
 });

@@ -32,7 +32,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonObject
@@ -66,45 +65,58 @@ class EmailListTest {
     }
 
     @Test
-    fun `the cursor of a page is where the next one carries on`() = testApplication {
+    fun `an offset carries on where the page before it ended`() = testApplication {
         val mails = setUp(count = 5)
         installRoute()
 
-        val first = client.get("/api/emails/list?limit=2").page()
-        val cursor = first["next"]!!.jsonObject
-        val second = client
-            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
-                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
-            .page()
+        val second = client.get("/api/emails/list?limit=2&offset=2").page()
 
         // Where the last page ended, not one mail earlier or later.
         assertEquals(mails.subList(2, 4).map { it.toString() }, second.ids())
     }
 
     @Test
-    fun `the last page says there is nothing after it`() = testApplication {
-        setUp(count = 2)
-        installRoute()
+    fun `an offset past the end is an empty page, and still says how long the group is`() =
+        testApplication {
+            setUp(count = 2)
+            installRoute()
 
-        val page = client.get("/api/emails/list?limit=10").page()
+            val page = client.get("/api/emails/list?offset=50").page()
 
-        assertEquals(JsonNull, page["next"])
-    }
+            assertEquals(2, page["total"]!!.jsonPrimitive.long)
+            assertEquals(0, page.ids().size)
+        }
 
     @Test
-    fun `a day boundary as the cursor lands between two days`() = testApplication {
+    fun `a group is the mails under it`() = testApplication {
         val mails = setUp(count = 4)
         installRoute()
 
-        // The fixture puts one mail per day, newest first, so midnight of the newest day is the
-        // boundary the second mail sits below -- which is how a table jumps to a date.
-        val startOfToday = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault()).date
-            .atStartOfDayIn(TimeZone.currentSystemDefault())
+        // The fixture puts one mail per day, newest first, so the day below today holds exactly
+        // the second one -- which is how a table asks for the rows of a stretch.
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val yesterday = kotlinx.datetime.LocalDate.fromEpochDays(today.toEpochDays() - 1)
 
-        val page = client.get("/api/emails/list?before=${startOfToday.epochSeconds}").page()
+        val page = client.get("/api/emails/list?by=day&group=$yesterday").page()
 
-        assertEquals(mails.drop(1).map { it.toString() }, page.ids())
+        assertEquals(1, page["total"]!!.jsonPrimitive.long)
+        assertEquals(listOf(mails[1].toString()), page.ids())
+    }
+
+    @Test
+    fun `a group of a deeper level is the mails under that path`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val other = addSender("other@example.com", mails[0])
+
+        // That day and that correspondent: the one mail of theirs.
+        assertEquals(
+            listOf(mails[0].toString()),
+            client.get("/api/emails/list?by=day,sender&group=$today,$other").ids(),
+        )
+        // One key alone is the level above it -- the whole day, whoever wrote.
+        assertEquals(1, client.get("/api/emails/list?by=day,sender&group=$today").ids().size)
     }
 
     @Test
@@ -113,21 +125,38 @@ class EmailListTest {
         installRoute()
         // Three mails in the same second: without the id as a tiebreaker their order is the
         // database's mood, and a page boundary inside them loses one or hands it out twice.
-        // Truncated, as every writer stores it -- see Emails.sent, which is a dedup key at
-        // second precision, and which is what lets the cursor be a second.
         val sameSecond = Clock.System.now().truncatedToSecond()
         repeat(3) { addMail(sameSecond) }
 
-        val first = client.get("/api/emails/list?limit=2").page()
-        val cursor = first["next"]!!.jsonObject
-        val second = client
-            .get("/api/emails/list?limit=2&before=${cursor["before"]!!.jsonPrimitive.long}" +
-                    "&before_id=${cursor["before_id"]!!.jsonPrimitive.content}")
-            .page()
+        val first = client.get("/api/emails/list?limit=2").ids()
+        val second = client.get("/api/emails/list?limit=2&offset=2").ids()
 
-        val seen = first.ids() + second.ids()
+        val seen = first + second
         assertEquals(3, seen.size)
         assertEquals(3, seen.toSet().size)
+    }
+
+    @Test
+    fun `the sort orders the mails inside the group`() = testApplication {
+        setUp(count = 0)
+        installRoute()
+        val now = Clock.System.now().truncatedToSecond()
+        val b = addMail(now, subject = "Bravo")
+        val a = addMail(now - 1.days, subject = "Alpha")
+
+        assertEquals(listOf(b, a).map { it.toString() }, client.get("/api/emails/list").ids())
+        assertEquals(
+            listOf(a, b).map { it.toString() },
+            client.get("/api/emails/list?sort=date:r").ids(),
+        )
+        assertEquals(
+            listOf(a, b).map { it.toString() },
+            client.get("/api/emails/list?sort=subject").ids(),
+        )
+        assertEquals(
+            listOf(b, a).map { it.toString() },
+            client.get("/api/emails/list?sort=subject:r").ids(),
+        )
     }
 
     @Test
@@ -302,14 +331,14 @@ class EmailListTest {
         setUp(count = 2)
         installRoute()
 
-        // Before the epoch: an empty page rather than an error, the length still reported.
-        val beyond = client.get("/api/emails/list?before=0&limit=5000").page()
-        assertEquals(2, beyond["total"]!!.jsonPrimitive.long)
-        assertEquals(0, beyond.ids().size)
-
         // The limit is clamped into what one request may ask for.
         assertEquals(1, client.get("/api/emails/list?limit=0").ids().size)
-        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?before=heute").status)
+        assertEquals(2, client.get("/api/emails/list?limit=5000").ids().size)
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?sort=oldest").status)
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?by=day&group=heute").status)
+        // More keys than levels: a client that has the groups has the keys.
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api/emails/list?by=day&group=a,b").status)
     }
 
     private suspend fun io.ktor.client.statement.HttpResponse.page() =
@@ -390,12 +419,12 @@ class EmailListTest {
         account.id.value
     }
 
-    private suspend fun addMail(sentAt: kotlin.time.Instant): Uuid = database.query {
+    private suspend fun addMail(sentAt: kotlin.time.Instant, subject: String? = null): Uuid = database.query {
         Email.new {
             imapAccount = ImapAccount.all().first { it.user.id == signedIn.id }
             sender = EmailUser.all().first()
             senderName = "The Sender"
-            subject = "Mail at $sentAt"
+            this.subject = subject ?: "Mail at $sentAt"
             sent = sentAt
             rawContent = ByteArray(0)
         }.id.value

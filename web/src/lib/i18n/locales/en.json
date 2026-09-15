@@ -56,7 +56,9 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "week": "This week",
-      "month": "This month"
+      "month": "This month",
+      "read": "Read",
+      "unread": "Unread"
     },
     "filters": {
       "allMails": "All mail"

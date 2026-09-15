@@ -3,57 +3,54 @@ package es.jvbabi.overmail.server.http.email.list
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
-import es.jvbabi.overmail.server.http.api.invalidRequest
-import es.jvbabi.overmail.server.http.api.queryParameter
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
-import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.datetime.Date
 import org.jetbrains.exposed.v1.jdbc.select
 
 /**
- * How the listing is cut into stretches: `GET /api/emails/list/groups?by=date`.
+ * What the listing is cut into: `GET /api/emails/list/groups?by=date_smart,sender`.
  *
  * Counts, not ids -- the groups are the *shape* of the list, so a windowed table can lay out its
- * headers and size its scrollbar before a single mail is loaded. The stretches come in the order
- * the listing itself has (newest first) and every mail is in exactly one of them, so the n-th
- * mail row of a layout built from these is the n-th mail of `GET /api/emails/list`.
+ * headers and size its scrollbar before a single mail is loaded. One row per combination of the
+ * levels that holds mail at all, with the keys outermost first; a mail is under exactly one of
+ * them, so the counts add up to the listing.
  *
  * Which mails it counts is the filter, the same one the listing itself is drawn with, see
  * [MailFilter]. A stretch that counted mails the rows do not show would be a header over the
  * wrong number.
  *
- * `by=date` is one stretch per calendar day. Folding those into what a reader is shown -- today,
- * yesterday, the rest of this week, the rest of this month, then month by month -- is the
- * client's, because it is a question of wording and of which day boundaries the reader lives in.
+ * The rows come in no particular order and carry no labels: what a group is called and where it
+ * goes is the client's, which is also the only side that can fold days into "today" or put
+ * senders in the order of the names it resolved. See [MailGroupingKind].
  *
- * Days are the server's days, like everywhere a date is grouped here (see `homeSocket`).
+ * No `by=` at all is one group over everything, as an ungrouped listing still has a shape.
  */
 fun Route.emailListGroups() {
     authenticate {
         get {
-            val grouping = call.emailGrouping()
+            val groupings = call.mailGroupings()
             val filter = call.mailFilter()
             val userId = call.requireAuthenticatedUserId()
 
             val groups = call.database().query {
                 val mails = Emails.id.count()
+                val keys: List<Expression<*>> = groupings.map { grouping -> grouping.groupKey() }
 
-                when (grouping) {
+                if (keys.isEmpty()) {
                     // One stretch over everything: a listing without headers, which is still a
                     // shape a client can lay out.
-                    EmailGrouping.NONE -> listOf(
+                    listOf(
                         EmailGroup(
-                            key = null,
+                            keys = emptyList(),
                             count = Emails
                                 .leftJoin(ImapAccounts)
                                 .select(Emails.id)
@@ -61,52 +58,45 @@ fun Route.emailListGroups() {
                                 .count(),
                         )
                     )
-
-                    EmailGrouping.DATE -> {
-                        // Suppressed, not outdated: kotlinx' `Instant` is a typealias of the one
-                        // in `kotlin.time` now, which makes the deprecated overload and its
-                        // replacement the same signature, and the call lands on the deprecated one.
-                        @Suppress("DEPRECATION")
-                        val day = Date(Emails.sent)
-
-                        Emails
-                            .leftJoin(ImapAccounts)
-                            .select(day, mails)
-                            .where { (ImapAccounts.user eq userId) and filter.predicate() }
-                            .groupBy(day)
-                            .orderBy(day, SortOrder.DESC)
-                            .map { row -> EmailGroup(key = row[day].toString(), count = row[mails]) }
-                    }
+                } else {
+                    Emails
+                        .leftJoin(ImapAccounts)
+                        .select(keys + mails)
+                        .where { (ImapAccounts.user eq userId) and filter.predicate() }
+                        .groupBy(*keys.toTypedArray())
+                        .map { row ->
+                            EmailGroup(
+                                keys = keys.map { key -> row[key].toString() },
+                                count = row[mails],
+                            )
+                        }
                 }
             }
 
-            call.respond(EmailGroupsResponse(grouping = grouping.wire, groups = groups))
+            call.respond(
+                EmailGroupsResponse(
+                    groupings = groupings.map { grouping -> grouping.wire },
+                    groups = groups,
+                )
+            )
         }
     }
 }
 
-/** What a listing can be cut by. `none` is the whole mailbox as one stretch. */
-private enum class EmailGrouping(val wire: String) {
-    NONE("none"),
-    DATE("date"),
-}
-
-/** What `?by=` asks for, or 400. One stretch over everything unless a cut is named. */
-private fun ApplicationCall.emailGrouping(): EmailGrouping {
-    val requested = queryParameter("by") ?: return EmailGrouping.NONE
-    return EmailGrouping.entries.firstOrNull { it.wire == requested }
-        ?: invalidRequest("by", "is not one of none, date", requested)
-}
-
 @Serializable
 private data class EmailGroupsResponse(
-    @SerialName("grouping") val grouping: String,
+    /** The levels these groups are cut by, outermost first -- what `by=` asked for. */
+    @SerialName("groupings") val groupings: List<String>,
     @SerialName("groups") val groups: List<EmailGroup>,
 )
 
 @Serializable
 private data class EmailGroup(
-    /** `yyyy-mm-dd` for a day, null for the one stretch of an ungrouped listing. */
-    @SerialName("key") val key: String?,
+    /**
+     * One key per level, outermost first: a day as `yyyy-mm-dd`, an id for a sender or an
+     * account, `true`/`false` for read, an archive state by name. Empty for the one stretch of an
+     * ungrouped listing.
+     */
+    @SerialName("keys") val keys: List<String>,
     @SerialName("count") val count: Long,
 )

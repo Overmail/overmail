@@ -56,7 +56,9 @@
       "today": "Heute",
       "yesterday": "Gestern",
       "week": "Diese Woche",
-      "month": "Dieser Monat"
+      "month": "Dieser Monat",
+      "read": "Gelesen",
+      "unread": "Ungelesen"
     },
     "filters": {
       "allMails": "Alle Mails"

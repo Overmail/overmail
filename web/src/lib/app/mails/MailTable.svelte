@@ -67,6 +67,18 @@
     const HEADER_HEIGHT = 60;
     const SUB_HEADER_HEIGHT = 38;
 
+    /**
+     * How far a mail row sits from the left, by how deep the group holding it is.
+     *
+     * One step per level, the same step the headers take: a row ends up exactly under the header
+     * it belongs to -- its avatar in the column that header's own box stands in. An ungrouped
+     * listing takes no step at all, because there is no header to line up with.
+     */
+    const INDENT_STEP_REM = 0.75;
+
+    const mailIndent = (depth: number) =>
+        depth === 0 ? undefined : `padding-left: ${depth * INDENT_STEP_REM}rem`;
+
     /** How many rows around the viewport are held and kept up to date. */
     const OVERSCAN = 12;
 
@@ -522,8 +534,15 @@
                                 onclick={() => showEmail(modelRow.id, "push")}
                                 ondblclick={() => openEmailPage(modelRow.id, row?.mail.subject)}
                         >
-                            {#each modelRow.getAllCells() as cell (cell.id)}
-                                <Table.Cell class="h-10 overflow-hidden py-0">
+                            <!-- The indent goes on the first cell: the columns are fixed, so a
+                                 row that steps in steps in where its avatar is. -->
+                            {#each modelRow.getAllCells() as cell, column (cell.id)}
+                                <Table.Cell
+                                        class="h-10 overflow-hidden py-0"
+                                        style={column === 0 && entry?.kind === "mail"
+                                            ? mailIndent(entry.path.length)
+                                            : undefined}
+                                >
                                     <FlexRender {cell}/>
                                 </Table.Cell>
                             {/each}
@@ -532,9 +551,16 @@
                         <!-- A mail the list has and does not hold yet: the shape of the row
                              without the content, so nothing shifts when it arrives. -->
                         <Table.Row aria-rowindex={item.index + 1} class="h-10 border-0 hover:bg-transparent">
-                            {#each columns as column (column.id)}
+                            {#each columns as column, index (column.id)}
                                 {@const ghost = GHOST_SHAPES[column.id ?? ""]}
-                                <Table.Cell class="h-10 overflow-hidden py-0">
+                                <!-- The same indent as the mail that lands here, so nothing
+                                     shifts sideways when it arrives. -->
+                                <Table.Cell
+                                        class="h-10 overflow-hidden py-0"
+                                        style={index === 0 && entry?.kind === "mail"
+                                            ? mailIndent(entry.path.length)
+                                            : undefined}
+                                >
                                     {#if ghost}
                                         <MailGhostCell widthClass={ghost.width} withAvatar={ghost.withAvatar}/>
                                     {/if}

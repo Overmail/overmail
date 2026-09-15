@@ -159,15 +159,16 @@
     virtualizer sizes the row from that number, so a taller header here drifts the list unless
     that one follows.
 
-    The indent is the level: a header that sits under another one starts where its parent's text
-    does.
+    One small step in per level, and the mails under it take the same step (see `mailIndent` in
+    MailTable): what says where a row belongs is the ladder the two make together, and a header
+    that steps in any further only pushes its own text away from the list it is about.
 -->
 <div
         class={cn(
             "flex h-4 flex-row items-center gap-2.5 border-b pb-4",
-            node.level === 0 ? "mt-10 mb-1 pl-3" : "mt-4 mb-1"
+            node.level === 0 ? "mt-10 mb-1" : "mt-4 mb-1"
         )}
-        style={node.level === 0 ? undefined : `padding-left: ${0.75 + node.level * 1.75}rem`}
+        style={`padding-left: ${0.75 + node.level * 0.75}rem`}
 >
     {#if selection !== null}
         <!-- The square the mails below keep their avatars in, so the stretch's box stands at the

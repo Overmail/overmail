@@ -14,6 +14,7 @@
     import Labels from "$lib/app/labels/Labels.svelte";
     import Content from "$lib/app/mails/detail_panel/Content.svelte";
     import {MAIL_DETAIL_TRANSITION} from "$lib/app/mails/mailViewTransition";
+    import Attachments from "$lib/app/mails/detail_panel/attachments/Attachments.svelte";
 
     let {mail}: {mail: EmailMeta} = $props();
 
@@ -42,6 +43,10 @@
                 onRemoveLabel={(label) => mails.detachLabel(mail.id, label.id)}
         />
     </div>
+
+    {#if mail.attachments.length > 0}
+        <Attachments mail={mail} class="px-6" />
+    {/if}
 
     <Content id={mail.id}/>
 </div>

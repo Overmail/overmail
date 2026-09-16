@@ -45,6 +45,7 @@
 		"d3": "^7.9.0",
 		"date-fns": "^4.4.0",
 		"dexie": "^4.4.5",
+		"filesize": "^11.0.24",
 		"mode-watcher": "^1.1.0",
 		"svelte-i18n": "^4.0.1",
 		"thinking-orbs": "^0.3.1"

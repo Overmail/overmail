@@ -26,6 +26,7 @@
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
     import {MAIL_BOX_TRANSITION, MAIL_SUBJECT_TRANSITION, isMorphing} from "$lib/app/mails/mailViewTransition";
     import ShareDialog from "$lib/app/mails/detail_panel/share/ShareDialog.svelte";
+    import Attachments from "$lib/app/mails/detail_panel/attachments/Attachments.svelte";
 
     /**
      * How far the content moves when the mail changes, and for how long.

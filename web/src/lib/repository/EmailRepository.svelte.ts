@@ -57,7 +57,15 @@ export type EmailMeta = {
     cc: EmailParticipant[];
     bcc: EmailParticipant[];
     labels: EmailLabel[];
+    attachments: Attachment[];
 };
+
+export type Attachment = {
+    id: string;
+    name: string;
+    size: number;
+    contentType: string;
+}
 
 /** What a caller sees for one id. Null value plus not loading means: not there (for us). */
 export type EmailEntry = {
@@ -100,6 +108,12 @@ type WireEmail = {
         assignment_reason: string | null;
         created_by_agent: boolean;
     }[];
+    attachments: {
+        id: string;
+        name: string;
+        size: number;
+        content_type: string;
+    }[]
 };
 
 /**
@@ -346,6 +360,47 @@ export class EmailRepository {
     }
 
     /**
+     * Saves one attachment of mail [mailId] under its own name, the same way as [downloadMail].
+     * [onProgress] gets the share already received, from 0 to 1.
+     */
+    async downloadAttachment(
+        mailId: string,
+        attachment: Attachment,
+        onProgress: (progress: number) => void = () => {},
+    ): Promise<void> {
+        const response = await fetch(`/api/emails/${mailId}/attachments/${attachment.id}`, {method: "GET"});
+        if (!response.ok || !response.body) {
+            throw new Error(`Could not download attachment ${attachment.id}: ${response.status} ${response.statusText}`);
+        }
+
+        // The stored size over Content-Length: a compressed response counts other bytes than the reader yields.
+        const total = attachment.size || Number(response.headers.get("content-length")) || 0;
+        const chunks: Uint8Array<ArrayBuffer>[] = [];
+        let received = 0;
+        onProgress(0);
+
+        const reader = response.body.getReader();
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            if (total > 0) onProgress(Math.min(received / total, 1));
+        }
+        onProgress(1);
+
+        const blob = new Blob(chunks, {type: response.headers.get("content-type") ?? undefined});
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = attachment.name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    /**
      * Hangs a label that exists on [id], or takes it off again.
      *
      * The pair of ids is the whole address of it -- see `EmailLabels` on the server -- so this
@@ -538,6 +593,12 @@ function parse(mail: WireEmail): EmailMeta {
             description: label.description,
             assignmentReason: label.assignment_reason,
             createdByAgent: label.created_by_agent,
+        })),
+        attachments: mail.attachments.map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+            size: attachment.size,
+            contentType: attachment.content_type,
         })),
     };
 }

@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
+import es.jvbabi.overmail.server.http.email.item.attachments.downloadAttachment
 import es.jvbabi.overmail.server.http.email.item.download.downloadEmail
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
@@ -136,6 +137,10 @@ internal fun Application.configureRouting() {
                     // The source itself, as a file; `/body` is the parsed halves of it.
                     route("/download") {
                         downloadEmail()
+                    }
+
+                    route("/attachments/{attachmentId}") {
+                        downloadAttachment()
                     }
 
                     route("/classify") {

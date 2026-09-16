@@ -111,6 +111,11 @@
       "copyLink": "Copy the mail’s link (only you can use it)",
       "openInThisTab": "Open in this tab"
     },
+    "attachments": {
+      "title": "Attachments",
+      "download": "Download {name}",
+      "progress": "{size} • {percent}"
+    },
     "share": {
       "title": "Share email",
       "description": "Give somebody else access to this email.",

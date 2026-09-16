@@ -111,6 +111,11 @@
       "copyLink": "E-Mail-Link kopieren (nur du kannst ihn verwenden)",
       "openInThisTab": "In diesem Tab öffnen"
     },
+    "attachments": {
+      "title": "Anhänge",
+      "download": "{name} herunterladen",
+      "progress": "{size} • {percent}"
+    },
     "share": {
       "title": "E-Mail teilen",
       "description": "Gib anderen Zugang zu dieser E-Mail.",

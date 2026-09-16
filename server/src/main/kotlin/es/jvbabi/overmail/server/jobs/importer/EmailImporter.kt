@@ -27,13 +27,22 @@ import es.jvbabi.overmail.core.Email.Attachment as KamelAttachment
 private val POLL_INTERVAL = 5.minutes
 
 /**
- * How often a watched folder re-issues its `IDLE`.
+ * How long a watch holds one connection before it builds a new one.
  *
  * RFC 2177 tells clients to renew at least every 29 minutes, and middleboxes drop an idle socket
  * long before a server would -- a watch that is never renewed goes quiet without ever failing,
  * which is the one way of breaking that nothing here would notice.
  */
 private val IDLE_RENEW_INTERVAL = 25.minutes
+
+/**
+ * How long one IMAP operation may take before its connection counts as gone.
+ *
+ * The mail library has no read timeout: a socket that stops answering without being closed -- a
+ * middlebox dropping it, a server that never greets -- suspends the command forever, and with it
+ * the whole importer. Generous, because fetching every envelope of a large folder is one operation.
+ */
+private val IMAP_OPERATION_TIMEOUT = 10.minutes
 
 /** How long a watch waits before reconnecting. The poll keeps running meanwhile, so mail is not lost. */
 private val IDLE_RETRY_INTERVAL = 30.seconds
@@ -138,11 +147,12 @@ class EmailImporter(
                     // only reacts to config changes), so an uncaught error would stop the import
                     // for good. Throwable for the same reason -- the mail library answers a value
                     // it does not have with TODO(), which is an Error, not an Exception.
+                    // That includes a CancellationException this job did not ask for: only
+                    // stopping the importer may end the loop.
                     try {
                         importOnce()
-                    } catch (e: CancellationException) {
-                        throw e
                     } catch (e: Throwable) {
+                        currentCoroutineContext().ensureActive()
                         logger.error("Import cycle failed for ${account.username}, retrying in $POLL_INTERVAL", e)
                     }
                     // Whichever comes first: the timer, or a watch saying a folder changed.
@@ -167,44 +177,43 @@ class EmailImporter(
     private suspend fun watch(sync: ImapConnection.FolderSync) {
         while (currentCoroutineContext().isActive) {
             try {
-                ImapClient(
-                    host = account.host,
-                    port = account.port,
-                    username = account.username,
-                    password = account.password,
-                    debug = false,
-                ).use { client ->
-                    val folders = client.getFolders()
-                    // An account has at least an INBOX, so an empty listing is not an account
-                    // without folders: it is a socket that answered nothing. Worth a retry,
-                    // where a folder that is really not there is not.
-                    if (folders.isEmpty()) throw ConnectionLostException("${account.username} listed no folders at all")
+                // Renewed by building a new connection, not by re-issuing IDLE on the old one: the
+                // library cannot end an IDLE that is still being read, so the next IDLE waited on
+                // it forever. The timeout also covers a connect that never gets an answer.
+                val folderExists = withTimeoutOrNull(IDLE_RENEW_INTERVAL) {
+                    ImapClient(
+                        host = account.host,
+                        port = account.port,
+                        username = account.username,
+                        password = account.password,
+                        debug = false,
+                    ).use { client ->
+                        val folders = client.getFolders()
+                        // An account has at least an INBOX, so an empty listing is not an account
+                        // without folders: it is a socket that answered nothing. Worth a retry,
+                        // where a folder that is really not there is not.
+                        if (folders.isEmpty()) throw ConnectionLostException("${account.username} listed no folders at all")
 
-                    val folder = folders.firstOrNull { it.fullName == sync.folder }
-                    if (folder == null) {
-                        logger.warn("Cannot watch ${sync.folder} for ${account.username}: no such folder")
-                        return
-                    }
+                        val folder = folders.firstOrNull { it.fullName == sync.folder } ?: return@use false
 
-                    folder.getIdleFolder().use { idleFolder ->
-                        while (currentCoroutineContext().isActive) {
-                            // Re-issued on a timer: an IDLE nobody renews is dropped by the
-                            // server or by whatever sits between, and it goes quiet rather than
-                            // failing, so nothing here would ever notice.
-                            withTimeoutOrNull(IDLE_RENEW_INTERVAL) {
-                                idleFolder.idle {
-                                    onNewMessage { wakeUps.trySend(Unit) }
-                                    onRemovedMessage { wakeUps.trySend(Unit) }
-                                    onFlagChanged { _, _ -> wakeUps.trySend(Unit) }
-                                }
+                        folder.getIdleFolder().use { idleFolder ->
+                            idleFolder.idle {
+                                onNewMessage { wakeUps.trySend(Unit) }
+                                onRemovedMessage { wakeUps.trySend(Unit) }
+                                onFlagChanged { _, _ -> wakeUps.trySend(Unit) }
                             }
-                            idleFolder.cancel()
                         }
+                        // Only the timeout ends a healthy IDLE. Reconnecting right away would
+                        // hammer a server that keeps dropping it, so this goes through the retry.
+                        throw ConnectionLostException("the IDLE on ${sync.folder} of ${account.username} ended by itself")
                     }
                 }
-            } catch (e: CancellationException) {
-                throw e
+                if (folderExists == false) {
+                    logger.warn("Cannot watch ${sync.folder} for ${account.username}: no such folder")
+                    return
+                }
             } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
                 // The poll keeps running regardless, so a watch that cannot hold its connection
                 // costs latency, not mail.
                 logger.warn("Watch on ${sync.folder} for ${account.username} failed, retrying in $IDLE_RETRY_INTERVAL", e)
@@ -273,12 +282,14 @@ class EmailImporter(
      * calls again, rather than walking the rest of the folder over a socket that answers nothing.
      */
     private suspend fun importFolder(client: ImapClient, sync: ImapConnection.FolderSync) {
-        val folders = try {
-            client.getFolders()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw ConnectionLostException("listing the folders of ${account.username} failed", e)
+        val folders = withImapTimeout("listing the folders") {
+            try {
+                client.getFolders()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw ConnectionLostException("listing the folders of ${account.username} failed", e)
+            }
         }
         // Same as in the watch: no folder at all is a connection that said nothing, and telling
         // that apart from a renamed folder is what decides between reconnecting and skipping.
@@ -322,8 +333,11 @@ class EmailImporter(
      */
     private suspend fun fetchMails(folder: ImapFolder): List<Email> {
         try {
-            return folder.getMails { importFields() }
+            return withImapTimeout("fetching ${folder.fullName}") { folder.getMails { importFields() } }
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: ConnectionLostException) {
+            // Timed out: the connection is stuck, and the fallback would run over the same one.
             throw e
         } catch (e: Exception) {
             logger.warn(
@@ -333,7 +347,7 @@ class EmailImporter(
             )
         }
 
-        val ids = folder.getMailIds()
+        val ids = withImapTimeout("listing the mails of ${folder.fullName}") { folder.getMailIds() }
         // The pass above got as far as reading a FETCH response, so this folder is not empty. An
         // empty listing now is therefore the connection answering nothing, and a fallback over it
         // would import zero mails and call that a success.
@@ -349,11 +363,15 @@ class EmailImporter(
     /** [batch] in one FETCH, or every id of it on its own once that failed. */
     private suspend fun fetchBatch(folder: ImapFolder, batch: List<Int>): List<Email> {
         try {
-            return folder.getMails {
-                getIds(batch.map { it.toLong() })
-                importFields()
+            return withImapTimeout("fetching mails ${batch.first()}:${batch.last()} of ${folder.fullName}") {
+                folder.getMails {
+                    getIds(batch.map { it.toLong() })
+                    importFields()
+                }
             }
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: ConnectionLostException) {
             throw e
         } catch (e: Exception) {
             logger.warn(
@@ -365,11 +383,15 @@ class EmailImporter(
 
         return batch.mapNotNull { id ->
             try {
-                folder.getMails {
-                    getId(id.toLong())
-                    importFields()
-                }.firstOrNull()
+                withImapTimeout("fetching mail $id of ${folder.fullName}") {
+                    folder.getMails {
+                        getId(id.toLong())
+                        importFields()
+                    }.firstOrNull()
+                }
             } catch (e: CancellationException) {
+                throw e
+            } catch (e: ConnectionLostException) {
                 throw e
             } catch (e: Exception) {
                 logger.error("Mail $id of ${folder.fullName} for ${account.username} cannot be fetched, skipping it", e)
@@ -395,15 +417,29 @@ class EmailImporter(
      */
     private suspend fun requireLiveConnection(folder: ImapFolder, mail: Email) {
         val uid = mail.uid.await()
-        val id = try {
-            folder.getIdByUid(uid)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw ConnectionLostException("the connection of ${account.username} failed on a uid lookup", e)
+        val id = withImapTimeout("looking up uid $uid in ${folder.fullName}") {
+            try {
+                folder.getIdByUid(uid)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw ConnectionLostException("the connection of ${account.username} failed on a uid lookup", e)
+            }
         }
 
         if (id == null) throw ConnectionLostException("${folder.fullName} of ${account.username} no longer answers for uid $uid")
+    }
+
+    /**
+     * [block] under [IMAP_OPERATION_TIMEOUT].
+     *
+     * @throws ConnectionLostException once it ran out -- the caller replaces the connection, which
+     * is also the only thing that ends the read still suspended on it.
+     */
+    private suspend fun <T> withImapTimeout(operation: String, block: suspend () -> T): T = try {
+        withTimeout(IMAP_OPERATION_TIMEOUT) { block() }
+    } catch (e: TimeoutCancellationException) {
+        throw ConnectionLostException("$operation for ${account.username} got no answer within $IMAP_OPERATION_TIMEOUT", e)
     }
 
     /** Closing is best effort: a socket that cannot be closed must not cost the cycle. */
@@ -466,7 +502,7 @@ class EmailImporter(
         // mail instead of failing, and half a mail would be stored as the whole of it.
         requireLiveConnection(folder, mail)
 
-        val content = mail.getContent(includeAttachments = true)
+        val content = withImapTimeout("downloading \"$subject\"") { mail.getContent(includeAttachments = true) }
 
         val storedId = insert(
             senderId = emailUsers.getValue(fromHeader.address),

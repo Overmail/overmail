@@ -82,8 +82,42 @@ export function startMorph(update: () => Promise<void>): ViewTransition | null {
 	if (start === undefined) return null;
 
 	document.documentElement.classList.add(MORPHING_CLASS);
-	const transition = start.call(document, update);
+	const transition = start.call(document, async () => {
+		await update();
+		await settleHolds();
+	});
 	void transition.finished.finally(() => document.documentElement.classList.remove(MORPHING_CLASS));
 
 	return transition;
+}
+
+/**
+ * The longest the new snapshot waits for what asked to be waited for. The old view stays frozen
+ * on screen meanwhile, so this is a cap on a stall, not a delay anyone should see.
+ */
+const HOLD_LIMIT_MS = 400;
+
+const holds = new Set<Promise<unknown>>();
+
+/**
+ * Keeps the browser from taking the new snapshot until [ready] settles, when called while a morph
+ * runs. For what is drawn a moment after the page is rendered -- the mail's html body, which is
+ * an iframe that parses and is measured on its own -- and would otherwise pop in mid-morph, or,
+ * in Firefox, be squashed into the size it had at the capture. A no-op outside a morph.
+ */
+export function holdMorph(ready: Promise<unknown>) {
+	if (!isMorphing()) return;
+
+	holds.add(ready);
+	void ready.finally(() => holds.delete(ready));
+}
+
+async function settleHolds() {
+	if (holds.size === 0) return;
+
+	await Promise.race([
+		Promise.allSettled([...holds]),
+		new Promise((resolve) => setTimeout(resolve, HOLD_LIMIT_MS)),
+	]);
+	holds.clear();
 }

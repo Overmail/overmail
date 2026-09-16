@@ -25,6 +25,9 @@ runs:
       uses: android-actions/setup-android@v4
       with:
         cmdline-tools-version: '15859902'
+        # The default also asks for `tools`, which the SDK repository no longer carries, and
+        # sdkmanager fails the step on it. AGP fetches the platforms it needs itself.
+        packages: 'platform-tools'
 
     - name: Restore Keystore and Configure Properties
       shell: bash

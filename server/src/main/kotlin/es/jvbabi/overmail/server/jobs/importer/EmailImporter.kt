@@ -27,7 +27,6 @@ import org.jetbrains.exposed.v1.jdbc.insertIgnoreAndGetId
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -476,20 +475,16 @@ class EmailImporter(
         // mail instead of failing, and half a mail would be stored as the whole of it.
         requireLiveConnection(folder, mail)
 
-        val raw = ByteArrayOutputStream()
-        val text = ByteArrayOutputStream()
-        val html = ByteArrayOutputStream()
-        // getContent parses through a piped stream and blocks the calling thread.
-        withContext(Dispatchers.IO) { mail.content.getContent(raw, text, html) }
+        val content = mail.getContent()
 
         val storedId = insert(
             senderId = emailUsers.getValue(fromHeader.address),
             senderName = fromHeader.name,
             subject = subject,
             sent = sentAt,
-            rawContent = raw.toByteArray(),
-            textContent = text.toByteArray().decodeMailPart("text", subject),
-            htmlContent = html.toByteArray().decodeMailPart("html", subject),
+            rawContent = content.raw,
+            textContent = content.text.checkMailPart("text", subject),
+            htmlContent = content.html.checkMailPart("html", subject),
             isRead = Flag.Seen in mail.flags.await(),
             recipients = recipients,
         )
@@ -517,21 +512,19 @@ class EmailImporter(
     }
 
     /**
-     * A body part as text. UTF-8, always: that is what the mail library hands over, whatever
-     * charset the part declared -- and the columns behind this are UTF-8 as well, so the bytes
-     * are decoded exactly once, here.
+     * A body part as the mail library decoded it, or null if it is blank.
      *
      * A part that does not decode cleanly comes back with replacement characters rather than
      * throwing, because half a mail beats no mail -- but it is worth a line in the log, or a
      * charset the library cannot read would quietly turn into a mailbox full of question marks.
      */
-    private fun ByteArray.decodeMailPart(part: String, subject: String): String? {
-        val decoded = decodeToString()
-        if (decoded.contains(REPLACEMENT_CHARACTER)) {
+    private fun String?.checkMailPart(part: String, subject: String): String? {
+        if (this == null) return null
+        if (contains(REPLACEMENT_CHARACTER)) {
             logger.warn("The $part part of \"$subject\" did not decode cleanly; it is stored as it came out")
         }
 
-        return decoded.takeIf { it.isNotBlank() }
+        return takeIf { it.isNotBlank() }
     }
 
     /**

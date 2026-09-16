@@ -5,6 +5,7 @@
     "": {
       "name": "web",
       "dependencies": {
+        "@castlenine/svelte-qrcode": "^2.3.0",
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@fontsource-variable/playfair-display": "^5.3.0",
         "@humanspeak/svelte-markdown": "^1.9.0",
@@ -46,6 +47,8 @@
     },
   },
   "packages": {
+    "@castlenine/svelte-qrcode": ["@castlenine/svelte-qrcode@2.3.0", "", { "peerDependencies": { "svelte": ">=3.54.0" } }, "sha512-1YO6tL63gjbCuBkhd/PyMMFbjFD6gO6TJjvq5Ucfs5+0s13oDfiUyxO15kjR11enG7O/A2R0WBuc4bfdMqjTJQ=="],
+
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.19.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-bmoCYyWdEL3wDQIVbcyzRyeKLgk2WtWLTWz1ZIAZF/EGbNOwSA6ew3PftJ1PqMiOOGu0OyFMzG53L0zqIpPeNA=="],
 
     "@esbuild/android-arm": ["@esbuild/android-arm@0.19.12", "", { "os": "android", "cpu": "arm" }, "sha512-qg/Lj1mu3CdQlDEEiWrlC4eaPZ1KztwGJ9B6J+/6G+/4ewxJg7gqj8eVYWvao1bXrqGiW2rsBZFSX3q2lcW05w=="],

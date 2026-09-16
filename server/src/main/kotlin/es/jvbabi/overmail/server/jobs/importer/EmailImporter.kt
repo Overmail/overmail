@@ -8,30 +8,21 @@ import es.jvbabi.overmail.core.ImapFolder
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
-import es.jvbabi.overmail.server.database.models.EmailRecipientType
-import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
-import es.jvbabi.overmail.server.database.models.EmailRecipients
-import es.jvbabi.overmail.server.database.models.EmailPreviews
-import es.jvbabi.overmail.server.database.models.EmailUsers
-import es.jvbabi.overmail.server.database.models.Emails
-import es.jvbabi.overmail.server.database.models.truncatedToSecond
+import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlin.coroutines.coroutineContext
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.insertAndGetId
-import org.jetbrains.exposed.v1.jdbc.insertIgnoreAndGetId
-import org.jetbrains.exposed.v1.jdbc.select
-import org.jetbrains.exposed.v1.jdbc.upsert
+import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
+import org.jetbrains.exposed.v1.jdbc.*
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import es.jvbabi.overmail.core.Email.Attachment as KamelAttachment
 
 private val POLL_INTERVAL = 5.minutes
 
@@ -475,7 +466,7 @@ class EmailImporter(
         // mail instead of failing, and half a mail would be stored as the whole of it.
         requireLiveConnection(folder, mail)
 
-        val content = mail.getContent()
+        val content = mail.getContent(includeAttachments = true)
 
         val storedId = insert(
             senderId = emailUsers.getValue(fromHeader.address),
@@ -485,6 +476,7 @@ class EmailImporter(
             rawContent = content.raw,
             textContent = content.text.checkMailPart("text", subject),
             htmlContent = content.html.checkMailPart("html", subject),
+            attachments = content.attachments,
             isRead = Flag.Seen in mail.flags.await(),
             recipients = recipients,
         )
@@ -559,6 +551,7 @@ class EmailImporter(
         rawContent: ByteArray,
         textContent: String?,
         htmlContent: String?,
+        attachments: List<KamelAttachment>,
         isRead: Boolean,
         recipients: List<NewRecipient>,
     ): Uuid? = database.query {
@@ -578,12 +571,23 @@ class EmailImporter(
             it[Emails.htmlContent] = htmlContent
             it[Emails.isRead] = isRead
         }.value
+        val email = es.jvbabi.overmail.server.database.models.Email[emailId]
 
         // Written here rather than left to the queue: the body is parsed anyway, so the preview
         // costs nothing at this point, and a mail is in a listing the moment it is imported.
         EmailPreviews.upsert {
-            it[email] = emailId
+            it[EmailPreviews.email] = emailId
             it[preview] = mailPreview(textContent, htmlContent)
+        }
+
+        attachments.forEachIndexed { index, attachment ->
+            Attachment.new {
+                this.email = email
+                this.filename = (attachment.fileName ?: "attachment-$index").take(255)
+                this.contentType = attachment.contentType.take(255)
+                this.data = ExposedBlob(attachment.data)
+                this.size = attachment.data.size.toLong()
+            }
         }
 
         recipients
@@ -593,7 +597,7 @@ class EmailImporter(
             .distinctBy { it.emailUserId to it.type }
             .forEach { recipient ->
                 EmailRecipients.insert {
-                    it[email] = emailId
+                    it[EmailRecipients.email] = emailId
                     it[emailUser] = recipient.emailUserId
                     it[name] = recipient.name
                     it[type] = recipient.type

@@ -11,12 +11,12 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.emailIsNotArchived
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlin.time.Clock
@@ -65,7 +65,7 @@ private val json = Json {
  */
 fun Route.stackSocket() {
     authenticate {
-        webSocket {
+        clientWebSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()

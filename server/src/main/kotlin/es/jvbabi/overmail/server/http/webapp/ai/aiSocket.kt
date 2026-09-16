@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChat
 import es.jvbabi.overmail.server.database.models.AiChats
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.*
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.*
@@ -38,7 +39,7 @@ private val json = Json {
 
 fun Route.aiSocket() {
     authenticate {
-        webSocket {
+        clientWebSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val chatNotifier = application.dependencies.resolve<AiChatNotifier>()
 

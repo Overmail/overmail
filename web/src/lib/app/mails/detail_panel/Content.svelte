@@ -10,26 +10,30 @@
 
     type MailBodyParts = {text: string | null; html: string | null};
 
-    let body = $state<MailBodyParts | null>(null);
-    let failed = $state(false);
+    /** What came back, with the mail it is for: an answer for the mail before is never shown. */
+    let loaded = $state<{id: string; body: MailBodyParts} | null>(null);
+    let failedId = $state<string | null>(null);
+
+    // Read from the cache on the first render: the panel and the page are separate mounts, and a
+    // body that is already here must not go through the skeleton again on the way between them.
+    const body = $derived(loaded?.id === id ? loaded.body : emailBody.peek(id));
+    const failed = $derived(failedId === id);
 
     // One request per mail, and the answer of the mail before it is dropped rather than shown:
     // stepping through a list is faster than a body comes back.
     $effect(() => {
         const current = id;
-
-        body = null;
-        failed = false;
+        if (emailBody.peek(current) !== null) return;
 
         let live = true;
         emailBody
             .getBody(current)
-            .then((loaded) => {
-                if (live) body = loaded;
+            .then((result) => {
+                if (live) loaded = {id: current, body: result};
             })
             .catch((error) => {
                 console.error(error);
-                if (live) failed = true;
+                if (live) failedId = current;
             });
 
         return () => (live = false);

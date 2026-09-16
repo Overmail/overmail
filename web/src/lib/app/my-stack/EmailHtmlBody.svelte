@@ -1,5 +1,21 @@
+<script module lang="ts">
+    /** Last measured height per mail, see [startHeight]. Bounded: the oldest is dropped. */
+    const measuredHeights = new Map<string, number>();
+    const MEASURED_HEIGHTS_SIZE = 50;
+
+    function rememberHeight(html: string, height: number) {
+        measuredHeights.delete(html);
+        measuredHeights.set(html, height);
+        if (measuredHeights.size > MEASURED_HEIGHTS_SIZE) {
+            measuredHeights.delete(measuredHeights.keys().next().value!);
+        }
+    }
+</script>
+
 <script lang="ts">
+    import {untrack} from "svelte";
     import {_} from "svelte-i18n";
+    import {holdMorph} from "$lib/app/mails/mailViewTransition";
 
     let {html, onReady}: {
         html: string;
@@ -8,6 +24,13 @@
     } = $props();
 
     let iframe = $state<HTMLIFrameElement | null>(null);
+
+    /**
+     * The height this mail had when it was last measured, to start at instead of zero. The same
+     * mail is mounted anew between the panel and its page; starting from nothing would collapse
+     * everything below it for the moment the iframe takes to parse.
+     */
+    const startHeight = untrack(() => measuredHeights.get(html) ?? 0);
 
     // Nothing a mail brings along may execute, phone home or navigate us away. The sandbox drops
     // `allow-scripts`, so no script in the mail runs at all; the CSP is the second lock and kills
@@ -69,8 +92,14 @@
         srcdoc; // re-attach when the mail changes and the iframe reloads
         if (!el) return;
 
+        const source = html;
         let observer: ResizeObserver | null = null;
         let reported = false;
+
+        // Mounted during the morph between the panel and the page: the new snapshot waits until
+        // the mail is measured, so it does not grow in while the morph runs.
+        let release: () => void = () => {};
+        holdMorph(new Promise<void>((resolve) => (release = resolve)));
 
         /**
          * Sizes the iframe to the mail. The height is set twice in the same turn: the frame is
@@ -84,6 +113,7 @@
             el!.style.height = `${probeHeight()}px`;
             const content = Math.ceil(root.scrollHeight);
             el!.style.height = `${content}px`;
+            rememberHeight(source, content);
         }
 
         function attach() {
@@ -106,6 +136,7 @@
             // waiting for it is only worth anything once there is a height to show.
             if (!reported) {
                 reported = true;
+                release();
                 onReady?.();
             }
         }
@@ -116,22 +147,25 @@
         return () => {
             el.removeEventListener("load", attach);
             observer?.disconnect();
+            release();
         };
     });
 </script>
 
 <!-- The height is the one thing here that is not bound: it is written by the measurement above,
-     which has to put the frame at two heights within a single turn. Starting at zero rather than
-     leaving it out keeps a mail that has not been measured yet from claiming the 150px an iframe
-     is worth by default. -->
+     which has to put the frame at two heights within a single turn. Starting at the last known
+     height, or zero rather than leaving it out, keeps a mail that has not been measured yet from
+     claiming the 150px an iframe is worth by default.
+
+     Not lazy: during a morph the browser renders nothing, so a lazy frame would never be seen
+     near the viewport and never load before the hold runs out. -->
 <iframe
         bind:this={iframe}
         title={$_('myStack.email.bodyTitle')}
         {srcdoc}
         sandbox={SANDBOX}
         referrerpolicy="no-referrer"
-        loading="lazy"
         scrolling="no"
         class="block w-full border-none overflow-hidden"
-        style="height: 0px"
+        style="height: {startHeight}px"
 ></iframe>

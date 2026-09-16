@@ -88,7 +88,7 @@
         requestClassification: async () => true,
     } as unknown as EmailRepository;
 
-    const emailBody = {getBody: async () => body} as unknown as EmailBodyRepository;
+    const emailBody = {getBody: async () => body, peek: () => body} as unknown as EmailBodyRepository;
 
     const currentUser = {
         get: async () => ({

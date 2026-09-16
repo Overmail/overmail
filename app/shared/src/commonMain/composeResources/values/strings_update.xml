@@ -1,0 +1,28 @@
+<resources>
+    <string name="update_title">Update available</string>
+    <string name="update_message">An update for Overmail is available. Please install it to get the latest features.</string>
+    <string name="update_not_now">Not now</string>
+    <string name="update_install">Install</string>
+
+    <string name="update_downloading">Downloading update…</string>
+    <!-- Label of the icon-only button that stops a download, so it says what it stops. -->
+    <string name="update_cancel_download">Cancel download</string>
+    <!-- How far the download has got: downloaded size, total size, percentage. -->
+    <string name="update_downloading_progress">%1$s / %2$s (%3$s)</string>
+
+    <string name="update_download_failed_title">Update failed</string>
+    <string name="update_download_failed_message">The update could not be downloaded. Please try again later.</string>
+
+    <string name="update_install_permission_title">Permission needed</string>
+    <string name="update_install_permission_message">To install the update itself, Overmail needs permission to install apps. Without it, you have to install the update by hand.</string>
+    <string name="update_install_permission_grant">Grant permission</string>
+    <string name="update_install_permission_manual">Install manually</string>
+    <string name="update_install_permission_always_manual">Always install manually</string>
+
+    <string name="update_changelog_loading">Loading changes…</string>
+    <string name="update_changelog_features">New features</string>
+    <string name="update_changelog_fixes">Fixes</string>
+    <string name="update_changelog_tasks">Other changes</string>
+    <!-- Link to the issue an entry was tracked in, e.g. "#17". -->
+    <string name="update_changelog_issue">#%1$s</string>
+</resources>

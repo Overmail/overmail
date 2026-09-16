@@ -3,6 +3,18 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lets the app install its own updates instead of handing the APK to a browser. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+      Only for saving an update to the user's Downloads folder, and only on the versions that had no
+      MediaStore to do it through. From Android 10 on the Downloads collection needs no permission
+      at all.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <application
         android:name=".MainApplication"
         android:allowBackup="true"
@@ -35,6 +47,22 @@
                     android:scheme="overmailapp" />
             </intent-filter>
         </activity>
+
+        <!--
+          Hands the downloaded APK to the system installer. A file:// URI would be a
+          FileUriExposedException from Android 7 on, so the update travels as a content URI that
+          carries a read grant with it. The paths it may share are deliberately just the updater's
+          own cache folder — see res/xml/file_paths.xml.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

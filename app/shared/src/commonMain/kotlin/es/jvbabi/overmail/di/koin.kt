@@ -1,7 +1,12 @@
 package es.jvbabi.overmail.di
 
+import androidx.room.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import es.jvbabi.overmail.BuildKonfig
+import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.remote.OvermailApi
+import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
+import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -11,6 +16,8 @@ import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.header
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
@@ -18,11 +25,15 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.KoinAppDeclaration
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import kotlin.time.Duration.Companion.seconds
 
+expect fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase>
+
 /**
- * Everything only one platform has, and that therefore cannot be declared in the shared module.
+ * Everything only one platform has, and that therefore cannot be declared in the shared module —
+ * the Android in-app updater, for instance, which iOS has no counterpart for.
  *
  * This is for dependencies whose *implementation as well as their interface* is platform-specific.
  * A dependency that the shared code uses through a common interface belongs in the module the
@@ -44,6 +55,13 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
     appDeclaration()
 
     modules(module {
+        single {
+            getDatabaseBuilder()
+                .setDriver(BundledSQLiteDriver())
+                .setQueryCoroutineContext(Dispatchers.IO)
+                .build()
+        }
+
         single<HttpClient> {
             HttpClient {
                 install(ContentNegotiation) {
@@ -81,6 +99,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         }
 
         singleOf(::OvermailApi)
+        singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
 
         viewModelOf(::HomeViewModel)
     })

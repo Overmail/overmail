@@ -1,0 +1,25 @@
+<resources>
+    <string name="update_title">Update verfügbar</string>
+    <string name="update_message">Ein Update für Overmail ist verfügbar. Bitte installiere das Update, um die neuesten Funktionen zu erhalten.</string>
+    <string name="update_not_now">Jetzt nicht</string>
+    <string name="update_install">Installieren</string>
+
+    <string name="update_downloading">Update wird heruntergeladen …</string>
+    <string name="update_cancel_download">Download abbrechen</string>
+    <string name="update_downloading_progress">%1$s / %2$s (%3$s)</string>
+
+    <string name="update_download_failed_title">Update fehlgeschlagen</string>
+    <string name="update_download_failed_message">Das Update konnte nicht heruntergeladen werden. Bitte versuche es später noch einmal.</string>
+
+    <string name="update_install_permission_title">Berechtigung erforderlich</string>
+    <string name="update_install_permission_message">Um das Update selbst zu installieren, braucht Overmail die Berechtigung, Apps zu installieren. Ohne sie musst du das Update von Hand installieren.</string>
+    <string name="update_install_permission_grant">Berechtigung erteilen</string>
+    <string name="update_install_permission_manual">Manuell installieren</string>
+    <string name="update_install_permission_always_manual">Immer manuell installieren</string>
+
+    <string name="update_changelog_loading">Änderungen werden geladen …</string>
+    <string name="update_changelog_features">Neue Funktionen</string>
+    <string name="update_changelog_fixes">Fehlerbehebungen</string>
+    <string name="update_changelog_tasks">Weitere Änderungen</string>
+    <string name="update_changelog_issue">#%1$s</string>
+</resources>

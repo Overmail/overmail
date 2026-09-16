@@ -4,17 +4,14 @@ import es.jvbabi.overmail.server.database.models.Attachments
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailIdFromUrl
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.encodeURLParameter
-import io.ktor.server.auth.authenticate
-import io.ktor.server.response.header
-import io.ktor.server.response.respondBytes
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
+import io.ktor.http.*
+import io.ktor.server.auth.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.select
+import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
 
 /**
@@ -51,6 +48,11 @@ fun Route.downloadAttachment() {
                 """attachment; filename="$asciiName"; filename*=UTF-8''${fileName.encodeURLParameter()}""",
             )
             call.response.header("X-Content-Type-Options", "nosniff")
+            call.response.cacheControl(
+                CacheControl.MaxAge(
+                maxAgeSeconds = 7.days.inWholeSeconds.toInt(),
+                visibility = CacheControl.Visibility.Private,
+            ))
 
             // The type is what the sender declared, so an unparsable one must not fail the download.
             val type = runCatching { ContentType.parse(contentType) }.getOrDefault(ContentType.Application.OctetStream)

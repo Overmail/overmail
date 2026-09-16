@@ -39,8 +39,18 @@ modules are entry points and nothing else.
 - **Build-time values come from BuildKonfig** (`app/shared/build.gradle.kts`): `SERVER_URL`,
   the werkbank token and `CURRENT_VERSION`. The version is defined once in the root build script
   and shared with `versionCode`/`versionName` in `:app:android`.
+- **Local storage is Room** (`data/database/OvermailDatabase.kt`), built from `di/koin.kt` with a
+  per-platform `getDatabaseBuilder()`. Schemas are exported to `app/shared/schemas/`; commit them
+  and bump the version with a migration on every schema change. Settings go through
+  `KeyValueRepository` rather than a table of their own.
+- **The in-app updater is Android-only** (`androidMain`, wired in `platformModule()`): it compares
+  `CURRENT_VERSION` against the latest GitHub release, shows the release changelogs and
+  downloads/installs the matching per-ABI APK. It relies on the release tags and asset names
+  `deploy.yaml` produces, so keep the two in step.
 - `local.properties` holds everything machine-specific: `sdk.dir`, `werkbank.access_token`,
   `app.server_url` and the `signing.default.*` keystore entries. Gitignored, never commit it.
+  For the updater: `app.check_for_updates.enable_in_debug=true` checks for updates in a debug
+  build, `app.dev.fake-update=true` swaps GitHub and the installer for fakes.
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 

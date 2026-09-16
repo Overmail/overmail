@@ -1,0 +1,10 @@
+{
+  "title": "Install updates in the app",
+  "description": "The app checks for a newer version whenever it is opened and shows what changed since your version. Updates are downloaded and installed by the app itself; the download's progress is visible and it can be cancelled at any time. If you would rather install updates by hand, the app can save them to your Downloads folder instead — either just this once or from now on.",
+  "localized": {
+    "de": {
+      "title": "Updates in der App installieren",
+      "description": "Die App sucht bei jedem Öffnen nach einer neueren Version und zeigt, was sich seit deiner Version geändert hat. Updates werden von der App selbst heruntergeladen und installiert; der Fortschritt ist sichtbar und der Download jederzeit abbrechbar. Wer Updates lieber selbst installiert, kann sie stattdessen in den Downloads-Ordner legen lassen — entweder einmalig oder von jetzt an immer."
+    }
+  }
+}

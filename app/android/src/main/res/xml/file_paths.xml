@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the app's FileProvider is allowed to hand out.
+
+  Only the folder the updater downloads its APKs into — nothing else in the cache has any business
+  leaving the app. The path has to match UPDATE_CACHE_DIRECTORY in UpdateRepositoryImpl.
+-->
+<paths>
+    <cache-path
+        name="updates"
+        path="updates/" />
+</paths>

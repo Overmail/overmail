@@ -6,12 +6,13 @@ import es.jvbabi.overmail.server.database.models.View
 import es.jvbabi.overmail.server.database.models.ViewSettings
 import es.jvbabi.overmail.server.database.models.Views
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
@@ -34,7 +35,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.viewsSocket() {
     authenticate {
-        webSocket {
+        clientWebSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val viewNotifier = application.dependencies.resolve<ViewNotifier>()
             val user = call.requireAuthenticatedUser()

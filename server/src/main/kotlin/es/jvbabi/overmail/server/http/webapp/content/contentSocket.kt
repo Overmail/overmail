@@ -4,13 +4,13 @@ import es.jvbabi.overmail.server.data.notifier.MailEvent
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import es.jvbabi.overmail.server.http.clientWebSocket
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlin.time.Duration.Companion.milliseconds
@@ -72,11 +72,13 @@ private val json = Json { ignoreUnknownKeys = true }
  */
 fun Route.contentSocket() {
     authenticate {
-        webSocket {
+        clientWebSocket {
             val database = application.dependencies.resolve<OvermailDatabase>()
             val mailNotifier = application.dependencies.resolve<MailNotifier>()
             val avatarQueue = application.dependencies.resolve<AvatarQueue>()
             val user = call.requireAuthenticatedUser()
+
+            val lock = Mutex()
 
             /** The ids this socket keeps up to date. Guarded by [lock]. */
             val subscribed = mutableSetOf<Uuid>()
@@ -87,7 +89,6 @@ fun Route.contentSocket() {
              * that it changed. Guarded by [lock].
              */
             val senderByEmail = mutableMapOf<Uuid, Uuid>()
-            val lock = Mutex()
 
             /** Ids to look at again, filled by the subscription and drained in bursts below. */
             val changes = Channel<Uuid>(Channel.UNLIMITED)

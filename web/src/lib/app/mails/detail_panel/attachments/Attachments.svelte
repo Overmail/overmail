@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type {EmailMeta} from "$lib/repository/EmailRepository.svelte.ts";
+    import type {Attachment, EmailMeta} from "$lib/repository/EmailRepository.svelte.ts";
     import { PaperclipIcon } from "phosphor-svelte";
-    import Attachment from "$lib/app/mails/detail_panel/attachments/Attachment.svelte";
+    import AttachmentItem from "$lib/app/mails/detail_panel/attachments/Attachment.svelte";
     import {cn} from "$lib/utils.ts";
     import {useRepositories} from "$lib/repository/repositories";
     import {_} from "svelte-i18n";
@@ -9,9 +9,12 @@
     let {
         mail,
         class: className = "",
+        onRestoreFocus,
     }: {
         mail: EmailMeta;
         class?: string;
+        /** Hands the keyboard back after a click, where it belongs to something around the row (the stack). */
+        onRestoreFocus?: () => void;
     } = $props();
 
     const {mails} = useRepositories();
@@ -21,7 +24,9 @@
     const downloads = new Map<string, AbortController>();
 
     /** Starts the download, or cancels it if it is already running. */
-    async function toggleDownload(attachment: EmailMeta["attachments"][number]) {
+    async function toggleDownload(attachment: Attachment) {
+        onRestoreFocus?.();
+
         const running = downloads.get(attachment.id);
         if (running) {
             running.abort();
@@ -54,8 +59,8 @@
     </h2>
 
     <div class="flex flex-row items-center flex-wrap gap-2">
-        {#each mail.attachments as attachment}
-            <Attachment
+        {#each mail.attachments as attachment (attachment.id)}
+            <AttachmentItem
                     attachment={attachment}
                     downloadProgress={progress[attachment.id] ?? null}
                     onclick={() => toggleDownload(attachment)}

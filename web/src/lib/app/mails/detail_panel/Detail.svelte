@@ -45,7 +45,7 @@
     </div>
 
     {#if mail.attachments.length > 0}
-        <Attachments mail={mail} class="px-6" />
+        <Attachments {mail} class="px-6" />
     {/if}
 
     <Content id={mail.id}/>

@@ -57,6 +57,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
+import es.jvbabi.overmail.server.http.webapp.devices.createAuthCode
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
 import es.jvbabi.overmail.server.http.webapp.views.viewsSocket
 import io.ktor.http.ContentType
@@ -314,6 +315,14 @@ internal fun Application.configureRouting() {
                 route("/content") {
                     route("/socket") {
                         contentSocket()
+                    }
+                }
+
+                route("/devices") {
+                    route("/auth") {
+                        route("/generate-auth-code") {
+                            createAuthCode()
+                        }
                     }
                 }
 

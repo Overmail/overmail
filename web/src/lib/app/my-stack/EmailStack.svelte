@@ -1,3 +1,7 @@
+<script lang="ts" module>
+    export type StackPosition = null | { type: "email", emailId: string } | { type: "done" };
+</script>
+
 <script lang="ts">
     import EmailCard from "$lib/app/my-stack/EmailCard.svelte";
     import {cn} from "$lib/utils.js";
@@ -6,14 +10,15 @@
 
     let {
         emails,
-        currentEmailId,
+        currentPosition,
         onTheirWay,
         onRequestReclassify,
         class: className,
     }: {
         /** Newest first: `emails[0]` is the card on top. */
         emails: StackEmail[];
-        currentEmailId: string | null;
+        /** The position of the current email in the stack. */
+        currentPosition: StackPosition;
         /** How many mails of the pile are still on their way; see [StackIntro]. */
         onTheirWay: number;
         onRequestReclassify: (email: StackEmail) => Promise<boolean>;
@@ -109,7 +114,10 @@
     const virtualizedStack = $derived.by(() => {
         // An unknown id means the stack has not been positioned yet, and the head of the list is
         // as good a guess as any.
-        const currentIndex = Math.max(0, emails.findIndex((email) => email.id === currentEmailId));
+        const currentIndex = Math.max(
+            0,
+            currentPosition?.type === "email" ? emails.findIndex((email) => email.id === currentPosition.emailId) : currentPosition?.type === "done" ? emails.length : 0
+        );
 
         return emails
             .map((email, index) => ({email, position: index - currentIndex}))
@@ -162,7 +170,7 @@
      The column is a card of 48rem with 2rem of shadow room on either side, and it gives way on a
      screen too narrow for that rather than pushing past the edge -- the cards are laid out
      against this box, so whatever it is wide is what they are wide. -->
-<div class={cn("relative isolate w-full max-w-[52rem]", className)}>
+<div class={cn("relative isolate w-full max-w-208", className)}>
     <!-- One wrapper shape for every card, current or not: moving up the stack or off it only
          changes style, so the same DOM node survives and the transition can run. Splitting the
          cases into two branches would tear the node down and rebuild it, and the card would

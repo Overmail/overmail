@@ -227,6 +227,22 @@
         "reclassify": "Reclassify",
         "view": "View"
       }
+    },
+    "allDone": {
+      "titles": {
+        "1": "All caught up",
+        "2": "You’re wonderful!",
+        "3": "That’s it for now.",
+        "4": "You did it.",
+        "5": "Time for a breather!"
+      },
+      "subtitles": {
+        "1": "Go get a coffee and step outside.",
+        "2": "May the day be kind to you.",
+        "3": "Now you can focus on the important things.",
+        "4": "An empty inbox feels pretty good.",
+        "5": "Take a moment to breathe before the next task."
+      }
     }
   },
   "labels": {

@@ -1,24 +1,26 @@
 <script lang="ts">
     import {Button} from "$lib/components/ui/button";
     import {HouseIcon} from "phosphor-svelte";
+    import { _ } from "svelte-i18n";
 
-    const titles = [
-        "Alles erledigt!",
-        "Du bist wunderbar!",
-        "Das war's (für jetzt).",
-        "Du hast es geschafft!",
-        "Zeit für eine Pause!",
-    ]
+    const titleKeys = [
+        "myStack.allDone.titles.1",
+        "myStack.allDone.titles.2",
+        "myStack.allDone.titles.3",
+        "myStack.allDone.titles.4",
+        "myStack.allDone.titles.5",
+    ];
 
-    const subtitles = [
-        "Gönn' dir einen Kaffee und geh raus.",
-        "Möge der Tag dir wohlgesonnen sein.",
-        "Jetzt kannst du dich um die wichtigen Dinge kümmern.",
-        "Ein leerer Posteingang fühlt sich doch gut an.",
-    ]
+    const subtitleKeys = [
+        "myStack.allDone.subtitles.1",
+        "myStack.allDone.subtitles.2",
+        "myStack.allDone.subtitles.3",
+        "myStack.allDone.subtitles.4",
+        "myStack.allDone.subtitles.5",
+    ];
 
-    const title = titles[Math.floor(Math.random() * titles.length)];
-    const subtitle = subtitles[Math.floor(Math.random() * subtitles.length)];
+    const title = $_(titleKeys[Math.floor(Math.random() * titleKeys.length)]);
+    const subtitle = $_(subtitleKeys[Math.floor(Math.random() * subtitleKeys.length)]);
 </script>
 
 <div class="flex flex-col items-center justify-center gap-2 p-4 text-center">
@@ -26,6 +28,6 @@
     <div class="text-gray-600">{subtitle}</div>
     <Button href="/" class="mt-2" variant="secondary">
         <HouseIcon/>
-        Startseite
+        {$_("app.nav.home")}
     </Button>
 </div>

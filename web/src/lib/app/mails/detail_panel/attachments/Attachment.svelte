@@ -2,7 +2,7 @@
     import type {Attachment} from "$lib/repository/EmailRepository.svelte.ts";
     import AttachmentIcon from "$lib/app/mails/detail_panel/attachments/AttachmentIcon.svelte";
     import {filesize} from "filesize";
-    import { DownloadIcon } from "phosphor-svelte";
+    import { DownloadIcon, XIcon } from "phosphor-svelte";
     import {_, locale} from "svelte-i18n";
 
     let {
@@ -21,6 +21,7 @@
     let isDownloading = $derived(downloadProgress != null);
     let showFiletypeIcon = $derived(!isDownloading && !isHovering);
     let showDownloadIcon = $derived(!showFiletypeIcon);
+    let showCancelIcon = $derived(isDownloading && isHovering);
 
     let size = $derived(filesize(attachment.size, {locale: $locale ?? true}));
     let percent = $derived(
@@ -39,7 +40,7 @@
         onpointerup={() => isClicking = false}
         class:scale-95={isClicking}
         onclick={onclick}
-        aria-label={$_('mails.attachments.download', {values: {name: attachment.name}})}
+        aria-label={$_(isDownloading ? 'mails.attachments.cancel' : 'mails.attachments.download', {values: {name: attachment.name}})}
 >
     <div
             class="relative size-8"
@@ -61,7 +62,11 @@
                 class:bottom-0={showDownloadIcon}
                 class:bottom-4={!showDownloadIcon}
         >
-            <DownloadIcon class="size-4" />
+            {#if showCancelIcon}
+                <XIcon class="size-4" />
+            {:else}
+                <DownloadIcon class="size-4" />
+            {/if}
             {#if isDownloading}
                 <svg class="absolute inset-0 size-8 -rotate-90" viewBox="0 0 32 32">
                     <circle cx="16" cy="16" r={RADIUS} fill="none" stroke-width="2" class="stroke-border" />

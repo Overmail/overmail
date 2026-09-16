@@ -361,14 +361,15 @@ export class EmailRepository {
 
     /**
      * Saves one attachment of mail [mailId] under its own name, the same way as [downloadMail].
-     * [onProgress] gets the share already received, from 0 to 1.
+     * [onProgress] gets the share already received, from 0 to 1. Aborting [signal] rejects with an `AbortError`.
      */
     async downloadAttachment(
         mailId: string,
         attachment: Attachment,
         onProgress: (progress: number) => void = () => {},
+        signal?: AbortSignal,
     ): Promise<void> {
-        const response = await fetch(`/api/emails/${mailId}/attachments/${attachment.id}`, {method: "GET"});
+        const response = await fetch(`/api/emails/${mailId}/attachments/${attachment.id}`, {method: "GET", signal});
         if (!response.ok || !response.body) {
             throw new Error(`Could not download attachment ${attachment.id}: ${response.status} ${response.statusText}`);
         }

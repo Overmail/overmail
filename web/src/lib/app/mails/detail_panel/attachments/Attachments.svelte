@@ -18,13 +18,30 @@
 
     /** Running downloads, by attachment id. */
     let progress = $state<Record<string, number>>({});
+    const downloads = new Map<string, AbortController>();
 
-    async function download(attachment: EmailMeta["attachments"][number]) {
-        if (attachment.id in progress) return;
+    /** Starts the download, or cancels it if it is already running. */
+    async function toggleDownload(attachment: EmailMeta["attachments"][number]) {
+        const running = downloads.get(attachment.id);
+        if (running) {
+            running.abort();
+            return;
+        }
+
+        const controller = new AbortController();
+        downloads.set(attachment.id, controller);
         progress[attachment.id] = 0;
         try {
-            await mails.downloadAttachment(mail.id, attachment, value => progress[attachment.id] = value);
+            await mails.downloadAttachment(
+                mail.id,
+                attachment,
+                value => progress[attachment.id] = value,
+                controller.signal,
+            );
+        } catch (e) {
+            if (!controller.signal.aborted) throw e;
         } finally {
+            downloads.delete(attachment.id);
             delete progress[attachment.id];
         }
     }
@@ -41,7 +58,7 @@
             <Attachment
                     attachment={attachment}
                     downloadProgress={progress[attachment.id] ?? null}
-                    onclick={() => download(attachment)}
+                    onclick={() => toggleDownload(attachment)}
             />
         {/each}
     </div>

@@ -114,6 +114,7 @@
     "attachments": {
       "title": "Anhänge",
       "download": "{name} herunterladen",
+      "cancel": "Download von {name} abbrechen",
       "progress": "{size} • {percent}"
     },
     "share": {

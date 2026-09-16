@@ -43,6 +43,7 @@ export class ShareFormViewModel {
     removePassword = $state(false);
     allowMetadataWithoutPassword = $state(true);
     includeLabels = $state(true);
+    includeAttachments = $state(true);
 
     saveState: SaveState = $state({type: "idle"});
 
@@ -125,6 +126,7 @@ export class ShareFormViewModel {
         this.removePassword = false;
         this.allowMetadataWithoutPassword = share?.allowMetadataWithoutPassword ?? true;
         this.includeLabels = share?.includeLabels ?? true;
+        this.includeAttachments = share?.includeAttachments ?? true;
         this.saveState = {type: "idle"};
     }
 
@@ -135,6 +137,7 @@ export class ShareFormViewModel {
         const draft: ShareDraft = {
             shareName: this.shareName.trim().length > 0 ? this.shareName.trim() : null,
             includeLabels: this.includeLabels,
+            includeAttachments: this.includeAttachments,
             validUntil: this.validUntil,
             password: this.password.length > 0 ? this.password : null,
             // Only where nothing was typed: a new password replaces the old one anyway, and

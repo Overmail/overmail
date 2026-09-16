@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.webapp.content
 
+import es.jvbabi.overmail.server.database.models.Attachments
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailArchives
 import es.jvbabi.overmail.server.database.models.EmailAvatars
@@ -54,6 +55,7 @@ data class EmailMeta(
     @SerialName("cc") val cc: List<Participant>,
     @SerialName("bcc") val bcc: List<Participant>,
     @SerialName("labels") val labels: List<Label>,
+    @SerialName("attachments") val attachments: List<Attachment>,
 ) {
     /** Somebody a mail is from or to, as the address book has them. */
     @Serializable
@@ -77,6 +79,14 @@ data class EmailMeta(
         /** Why the agent attached it, when it was the agent. */
         @SerialName("assignment_reason") val assignmentReason: String?,
         @SerialName("created_by_agent") val createdByAgent: Boolean,
+    )
+
+    @Serializable
+    data class Attachment(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String,
+        @SerialName("size") val size: Long,
+        @SerialName("content_type") val contentType: String,
     )
 }
 
@@ -133,6 +143,19 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
         .where { EmailRecipients.email inList wanted }
         .toList()
         .groupBy { row -> row[EmailRecipients.email].value }
+
+    val attachmentsByMail = Attachments
+        .select(Attachments.email, Attachments.id, Attachments.filename, Attachments.size, Attachments.contentType)
+        .where { Attachments.email inList wanted }
+        .toList()
+        .groupBy({ row -> row[Attachments.email].value }) { row ->
+            EmailMeta.Attachment(
+                id = row[Attachments.id].value,
+                name = row[Attachments.filename],
+                size = row[Attachments.size],
+                contentType = row[Attachments.contentType],
+            )
+        }
 
     // Read in order and collected into a map, so the last event of a mail is the one that stays:
     // the archive table is a log, and only its latest row says where the mail is now.
@@ -191,6 +214,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
                     avatarUrl = row.avatarUrlOrNull(),
                     avatarPadding = row.avatarPadding(),
                 ),
+                attachments = attachmentsByMail[id] ?: emptyList(),
                 to = participants(EmailRecipientType.RECIPIENT),
                 cc = participants(EmailRecipientType.CC),
                 bcc = participants(EmailRecipientType.BCC),

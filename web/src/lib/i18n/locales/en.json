@@ -111,6 +111,12 @@
       "copyLink": "Copy the mail’s link (only you can use it)",
       "openInThisTab": "Open in this tab"
     },
+    "attachments": {
+      "title": "Attachments",
+      "download": "Download {name}",
+      "cancel": "Cancel downloading {name}",
+      "progress": "{size} • {percent}"
+    },
     "share": {
       "title": "Share email",
       "description": "Give somebody else access to this email.",
@@ -126,6 +132,7 @@
         "removePassword": "Remove password",
         "metadata": "Show metadata without the password",
         "labels": "Share the labels of this email",
+        "attachments": "Share the attachments of this email",
         "expiry": "Valid until",
         "expiryOptions": {
           "1d": "1 day",
@@ -158,6 +165,7 @@
         "noExpiry": "No end date",
         "password": "Password protected",
         "labels": "With labels",
+        "attachments": "With attachments",
         "copy": "Copy link",
         "copied": "Copied",
         "copyFailed": "The link could not be copied.",

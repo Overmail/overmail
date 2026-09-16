@@ -16,6 +16,7 @@ class Share(id: EntityID<Uuid>): UuidEntity(id) {
     var sharedAt by Shares.sharedAt
     var shareName by Shares.shareName
     var includeLabels by Shares.includeLabels
+    var includeAttachments by Shares.includeAttachments
     var validUntil by Shares.validUntil
     var passwordHash by Shares.passwordHash
     var allowMetadataWithoutPassword by Shares.allowMetadataWithoutPassword
@@ -26,6 +27,7 @@ object Shares : UuidTable("shares") {
     val sharedAt = timestamp("shared_at").defaultExpression(CurrentTimestamp)
     val shareName = varchar("share_name", 255).nullable()
     val includeLabels = bool("include_labels")
+    val includeAttachments = bool("include_attachments")
     val validUntil = timestamp("valid_until").nullable()
 
     /**

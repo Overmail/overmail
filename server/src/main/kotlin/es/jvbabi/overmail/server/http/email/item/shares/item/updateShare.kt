@@ -43,6 +43,7 @@ fun Route.updateShare() {
             val input = readShareInput(
                 shareName = request.shareName,
                 includeLabels = request.includeLabels,
+                includeAttachments = request.includeAttachments,
                 validUntil = request.validUntil,
                 allowMetadataWithoutPassword = request.allowMetadataWithoutPassword,
             )
@@ -60,6 +61,7 @@ fun Route.updateShare() {
                 Shares.update({ Shares.id eq shareId }) {
                     it[shareName] = input.shareName
                     it[includeLabels] = input.includeLabels
+                    it[includeAttachments] = input.includeAttachments
                     it[validUntil] = input.validUntil
                     it[allowMetadataWithoutPassword] = input.allowMetadataWithoutPassword
                     it[passwordHash] = when {
@@ -82,6 +84,7 @@ fun Route.updateShare() {
 private data class UpdateShareRequest(
     @SerialName("share_name") val shareName: String? = null,
     @SerialName("include_labels") val includeLabels: Boolean = false,
+    @SerialName("include_attachments") val includeAttachments: Boolean = false,
     /** When the link stops working, as whole seconds since the epoch; null never runs out. */
     @SerialName("valid_until") val validUntil: Long? = null,
     /** A password to set from now on. Null leaves the one that is there, see [removePassword]. */

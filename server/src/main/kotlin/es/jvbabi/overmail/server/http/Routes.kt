@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
+import es.jvbabi.overmail.server.http.email.item.attachments.downloadAttachment
 import es.jvbabi.overmail.server.http.email.item.download.downloadEmail
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
@@ -25,6 +26,7 @@ import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.map.mapLabels
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
+import es.jvbabi.overmail.server.http.share.downloadSharedAttachment
 import es.jvbabi.overmail.server.http.share.getShare
 import es.jvbabi.overmail.server.http.share.openShare
 import es.jvbabi.overmail.server.http.senders.sendersByIds
@@ -138,6 +140,10 @@ internal fun Application.configureRouting() {
                         downloadEmail()
                     }
 
+                    route("/attachments/{attachmentId}") {
+                        downloadAttachment()
+                    }
+
                     route("/classify") {
                         classifyEmailRequest()
                     }
@@ -190,6 +196,10 @@ internal fun Application.configureRouting() {
 
                 route("/open") {
                     openShare()
+                }
+
+                route("/attachments/{attachmentId}") {
+                    downloadSharedAttachment()
                 }
             }
 

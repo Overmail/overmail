@@ -26,6 +26,8 @@ data class SharePayload(
     /** When the link stops working, or null for one that does not run out. */
     @SerialName("valid_until") val validUntil: Long?,
     @SerialName("include_labels") val includeLabels: Boolean,
+    /** Whether a visitor sees the attachments and can download them. */
+    @SerialName("include_attachments") val includeAttachments: Boolean,
     @SerialName("has_password") val hasPassword: Boolean,
     /** Whether subject, sender and date are shown before the password is entered. */
     @SerialName("allow_metadata_without_password") val allowMetadataWithoutPassword: Boolean,
@@ -38,6 +40,7 @@ internal fun ResultRow.toSharePayload() = SharePayload(
     sharedAt = this[Shares.sharedAt].epochSeconds,
     validUntil = this[Shares.validUntil]?.epochSeconds,
     includeLabels = this[Shares.includeLabels],
+    includeAttachments = this[Shares.includeAttachments],
     hasPassword = this[Shares.passwordHash] != null,
     allowMetadataWithoutPassword = this[Shares.allowMetadataWithoutPassword],
 )

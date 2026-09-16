@@ -85,6 +85,8 @@ class Email(id: EntityID<Id>) : UuidEntity(id) {
             .orderBy(EmailArchives.createdAt, SortOrder.DESC)
             .limit(1)
             .singleOrNull()?.get(EmailArchives.action) ?: EmailArchiveAction.Unarchive
+
+    val attachments by Attachment referrersOn Attachments.email
 }
 
 /**

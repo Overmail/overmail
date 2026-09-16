@@ -24,7 +24,7 @@ const OPEN: SharedEmail = {
     needsPassword: false,
     sharedBy: SHARED_BY,
     metadata: METADATA,
-    content: {text: "Hallo", html: "<p>Hallo</p>"},
+    content: {text: "Hallo", html: "<p>Hallo</p>", attachments: []},
 };
 
 const LOCKED: SharedEmail = {needsPassword: true, sharedBy: SHARED_BY, metadata: METADATA, content: null};
@@ -73,8 +73,32 @@ test("the password is sent and the mail takes the place of the question", async 
     expect((shares.open as any).mock.calls[0]).toEqual([SHARE, "hunter2"]);
     expect(viewModel.locked).toBe(false);
     expect(viewModel.shared?.content?.html).toBe("<p>Hallo</p>");
-    // Nothing left to send it with, so it is not kept around either.
+    // Out of the field; what opened the share is only kept for the attachments.
     expect(viewModel.password).toBe("");
+});
+
+test("attachments are downloaded with the password that opened the share", async () => {
+    const downloadAttachment = mock(async () => {});
+    const {viewModel} = page({read: mock(async () => LOCKED), downloadAttachment});
+    await viewModel.load();
+    viewModel.setPassword("hunter2");
+    await viewModel.unlock();
+
+    const attachment = {id: "a-1", name: "rechnung.pdf", size: 4, contentType: "application/pdf"};
+    const onProgress = () => {};
+    await viewModel.downloadAttachment(attachment, onProgress);
+
+    expect((downloadAttachment as any).mock.calls[0]).toEqual([SHARE, attachment, "hunter2", onProgress, undefined]);
+});
+
+test("attachments of a link without a password are downloaded without one", async () => {
+    const downloadAttachment = mock(async () => {});
+    const {viewModel} = page({downloadAttachment});
+    await viewModel.load();
+
+    await viewModel.downloadAttachment({id: "a-1", name: "a.txt", size: 1, contentType: "text/plain"}, () => {});
+
+    expect((downloadAttachment as any).mock.calls[0][2]).toBeNull();
 });
 
 test("a wrong password marks the field and leaves the page as it was", async () => {

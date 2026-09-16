@@ -1,3 +1,6 @@
+import type {Attachment} from "$lib/repository/EmailRepository.svelte";
+import {saveResponse} from "$lib/repository/download";
+
 /** A label on a shared mail. Name and colour only: a visitor has nothing to sort by them. */
 export type SharedLabel = {
     name: string;
@@ -20,6 +23,8 @@ export type SharedEmailMetadata = {
 export type SharedEmailContent = {
     text: string | null;
     html: string | null;
+    /** Only where the share was made with them; empty otherwise. */
+    attachments: Attachment[];
 };
 
 /** Who handed the link out -- the owner of the mail. */
@@ -91,6 +96,32 @@ export class SharedEmailRepository {
         return toShared(await this.request(response));
     }
 
+    /**
+     * Saves one attachment of the share under its own name. [password] is what opened the share,
+     * null for one that has none. Aborting [signal] rejects with an `AbortError`.
+     */
+    async downloadAttachment(
+        shareId: string,
+        attachment: Attachment,
+        password: string | null,
+        onProgress: (progress: number) => void = () => {},
+        signal?: AbortSignal,
+    ): Promise<void> {
+        // POST, like [open]: the password goes in the body, never into a url.
+        const response = await fetch(`${endpoint(shareId)}/attachments/${encodeURIComponent(attachment.id)}`, {
+            method: "POST",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify(password === null ? {} : {password}),
+            signal,
+        });
+        if (response.status === 410) throw new ShareExpiredError();
+        if (response.status === 404) throw new ShareNotFoundError();
+        if (response.status === 403) throw new WrongSharePasswordError();
+        if (!response.ok) throw new Error(`Could not download attachment ${attachment.id}: ${response.status}`);
+
+        await saveResponse(response, attachment.name, attachment.size, onProgress);
+    }
+
     /** The one place the api's failures become the three a share page can be in. */
     private async request(pending: Promise<Response>): Promise<any> {
         const response = await pending;
@@ -130,7 +161,16 @@ function toShared(shared: any): SharedEmail {
               }
             : null,
         content: content
-            ? {text: (content.text ?? null) as string | null, html: (content.html ?? null) as string | null}
+            ? {
+                  text: (content.text ?? null) as string | null,
+                  html: (content.html ?? null) as string | null,
+                  attachments: ((content.attachments ?? []) as any[]).map((attachment) => ({
+                      id: attachment.id as string,
+                      name: attachment.name as string,
+                      size: (attachment.size ?? 0) as number,
+                      contentType: (attachment.content_type ?? "application/octet-stream") as string,
+                  })),
+              }
             : null,
     };
 }

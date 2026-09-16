@@ -23,8 +23,11 @@
     let {
         viewModel,
         note,
+        hasAttachments,
     }: {
         viewModel: ShareFormViewModel,
+        /** Whether the mail has attachments, and so whether sharing them is a choice at all. */
+        hasAttachments: boolean,
         /** What the dialog wants said under the fields when nothing is wrong -- e.g. that the link was copied. */
         note?: string | null,
     } = $props();
@@ -130,6 +133,15 @@
             <Label for={"include-labels-" + id}>{$_("mails.share.form.labels")}</Label>
         </div>
     </Field.Field>
+
+    {#if hasAttachments}
+        <Field.Field class="flex flex-col gap-1">
+            <div class="flex items-center gap-3">
+                <Checkbox id={"include-attachments-" + id} bind:checked={viewModel.includeAttachments}/>
+                <Label for={"include-attachments-" + id}>{$_("mails.share.form.attachments")}</Label>
+            </div>
+        </Field.Field>
+    {/if}
 
     <div aria-live="polite" class="min-h-5 text-sm">
         {#if viewModel.saving}

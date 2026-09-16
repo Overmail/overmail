@@ -11,6 +11,7 @@ const SHARE: Share = {
 	sharedAt: 1772000000,
 	validUntil: null,
 	includeLabels: false,
+	includeAttachments: false,
 	hasPassword: false,
 	allowMetadataWithoutPassword: false
 };

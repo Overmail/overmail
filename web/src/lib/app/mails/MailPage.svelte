@@ -16,6 +16,7 @@
     import {MAIL_BOX_TRANSITION, MAIL_SUBJECT_TRANSITION} from "$lib/app/mails/mailViewTransition";
     import Head from "$lib/app/mails/detail_panel/Head.svelte";
     import Detail from "$lib/app/mails/detail_panel/Detail.svelte";
+    import ShareDialog from "$lib/app/mails/detail_panel/share/ShareDialog.svelte";
 
     let {
         id,
@@ -51,6 +52,8 @@
 
     const entry = $derived(id === null ? null : mails.peek(id));
     const mail = $derived(entry?.value ?? null);
+
+    let showShareDialog = $state(false);
 </script>
 
 <!-- The other end of the morph: this column is what the panel grows into, and the heading below
@@ -91,7 +94,7 @@
                     mail={mail}
                     showOpenInNewTab={false}
                     onChangeArchiveState={(newState) => mails.setArchiveState(mail.id, newState)}
-                    onShareMail={() => alert("Sharing is not yet supported. Note that sharing a mail is not the same as forwarding it.")}
+                    onShareMail={() => showShareDialog = true}
                     onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
                     onDownloadMail={() => mails.downloadMail(mail.id)}
                     onReclassify={() => mails.requestClassification(mail.id)}
@@ -112,3 +115,13 @@
         <p class="px-6 text-sm text-muted-foreground">{$_("mails.panel.missing")}</p>
     {/if}
 </div>
+
+<!-- Mounted only while it is open, so each mail gets a dialog on its own links. -->
+{#if showShareDialog && mail}
+    <ShareDialog
+            bind:open={showShareDialog}
+            emailId={mail.id}
+            subject={mail.subject}
+            hasAttachments={mail.attachments.length > 0}
+    />
+{/if}

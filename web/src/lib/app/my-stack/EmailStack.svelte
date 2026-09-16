@@ -228,7 +228,8 @@
                      show as a rectangle over nothing. -->
                 <div class={cn("relative", !shown && "invisible")}>
                     <EmailCard
-                            {...email}
+                            mail={email}
+                            body={email.body}
                             onRequestReclassify={() => onRequestReclassify(email)}
                             onReady={() => intro.onReady(id)}
                     />

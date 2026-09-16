@@ -95,7 +95,10 @@
                 </div>
             {:else if state.type === "shown" && viewModel}
                 <div class="flex flex-col gap-6">
-                    <SharedMail shared={state.shared} />
+                    <SharedMail
+                            shared={state.shared}
+                            downloadAttachment={(attachment, onProgress, signal) => viewModel.downloadAttachment(attachment, onProgress, signal)}
+                    />
 
                     {#if viewModel.locked}
                         <SharePasswordForm {viewModel} />

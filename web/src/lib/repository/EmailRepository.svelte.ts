@@ -1,3 +1,4 @@
+import {saveBlob, saveResponse} from "$lib/repository/download";
 import {ReconnectingSocket, type SocketLike} from "$lib/repository/ReconnectingSocket";
 
 const ENDPOINT = "/api/webapp/content/socket";
@@ -57,7 +58,15 @@ export type EmailMeta = {
     cc: EmailParticipant[];
     bcc: EmailParticipant[];
     labels: EmailLabel[];
+    attachments: Attachment[];
 };
+
+export type Attachment = {
+    id: string;
+    name: string;
+    size: number;
+    contentType: string;
+}
 
 /** What a caller sees for one id. Null value plus not loading means: not there (for us). */
 export type EmailEntry = {
@@ -100,6 +109,12 @@ type WireEmail = {
         assignment_reason: string | null;
         created_by_agent: boolean;
     }[];
+    attachments: {
+        id: string;
+        name: string;
+        size: number;
+        content_type: string;
+    }[]
 };
 
 /**
@@ -333,16 +348,25 @@ export class EmailRepository {
         const fromServer = /filename="([^"]*)"/.exec(disposition)?.[1];
         const fileName = fromServer || `${this.peek(id).value?.subject || "email"}.eml`;
 
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = fileName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        // Only after the click: revoking it first leaves the anchor pointing at nothing.
-        URL.revokeObjectURL(url);
+        saveBlob(await response.blob(), fileName);
+    }
+
+    /**
+     * Saves one attachment of mail [mailId] under its own name, the same way as [downloadMail].
+     * [onProgress] gets the share already received, from 0 to 1. Aborting [signal] rejects with an `AbortError`.
+     */
+    async downloadAttachment(
+        mailId: string,
+        attachment: Attachment,
+        onProgress: (progress: number) => void = () => {},
+        signal?: AbortSignal,
+    ): Promise<void> {
+        const response = await fetch(`/api/emails/${mailId}/attachments/${attachment.id}`, {method: "GET", signal});
+        if (!response.ok) {
+            throw new Error(`Could not download attachment ${attachment.id}: ${response.status} ${response.statusText}`);
+        }
+
+        await saveResponse(response, attachment.name, attachment.size, onProgress);
     }
 
     /**
@@ -538,6 +562,12 @@ function parse(mail: WireEmail): EmailMeta {
             description: label.description,
             assignmentReason: label.assignment_reason,
             createdByAgent: label.created_by_agent,
+        })),
+        attachments: mail.attachments.map((attachment) => ({
+            id: attachment.id,
+            name: attachment.name,
+            size: attachment.size,
+            contentType: attachment.content_type,
         })),
     };
 }

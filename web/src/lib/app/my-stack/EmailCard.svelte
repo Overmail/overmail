@@ -3,7 +3,8 @@
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import EmailHtmlBody from "$lib/app/my-stack/EmailHtmlBody.svelte";
     import {cn} from "$lib/utils.js";
-    import type {StackEmail} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import type {EmailBody} from "$lib/app/my-stack/EmailStackViewModel.svelte";
+    import type {EmailMeta} from "$lib/repository/EmailRepository.svelte";
     import Labels from "$lib/app/labels/Labels.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import {displayName, spelledOut} from "$lib/app/mails/participants";
@@ -14,21 +15,17 @@
     import {onMount} from "svelte";
     import {goto} from "$app/navigation";
     import {emailPath} from "$lib/app/mails/emailPath";
+    import Attachments from "$lib/app/mails/detail_panel/attachments/Attachments.svelte";
 
     let {
-        id,
-        sent,
-        sender,
-        to,
-        cc,
-        bcc,
-        subject,
+        mail,
         body,
-        labels,
         class: className,
         onRequestReclassify,
         onReady,
-    }: StackEmail & {
+    }: {
+        mail: EmailMeta;
+        body: EmailBody;
         class?: string;
         onRequestReclassify: () => Promise<boolean>;
         /** Fires once the card is laid out and worth showing; see below. */
@@ -80,9 +77,9 @@
     });
 
     const fields = $derived([
-        {key: "myStack.email.to", participants: to},
-        {key: "myStack.email.cc", participants: cc},
-        {key: "myStack.email.bcc", participants: bcc},
+        {key: "myStack.email.to", participants: mail.to},
+        {key: "myStack.email.cc", participants: mail.cc},
+        {key: "myStack.email.bcc", participants: mail.bcc},
     ].filter((field) => field.participants.length > 0));
 
 </script>
@@ -96,22 +93,22 @@
     <div class="flex flex-row items-center justify-between gap-6 px-4 pt-8 sm:px-8">
         <div class="flex min-w-0 flex-row gap-4 items-center">
             <OvermailAvatar
-                    url={sender.avatarUrl}
-                    name={displayName(sender)}
+                    url={mail.sender.avatarUrl}
+                    name={displayName(mail.sender)}
                     class="size-12"
                     fallbackClass="text-base"
             />
             <div class="flex min-w-0 flex-col">
-                <span class="truncate font-medium text-lg">{displayName(sender)}</span>
-                {#if sender.name}
-                    <span class="truncate font-light text-base">{sender.address}</span>
+                <span class="truncate font-medium text-lg">{displayName(mail.sender)}</span>
+                {#if mail.sender.name}
+                    <span class="truncate font-light text-base">{mail.sender.address}</span>
                 {/if}
             </div>
         </div>
 
         <div class="flex shrink-0 flex-row items-center gap-1">
             <!-- Unix seconds off the wire; the card is the only place that needs them as a date. -->
-            <span class="font-light text-accent-foreground">{new Date(sent * 1000).toLocaleString()}</span>
+            <span class="font-light text-accent-foreground">{new Date(mail.sent * 1000).toLocaleString()}</span>
 
             <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
@@ -150,7 +147,7 @@
 
                     <DropdownMenu.Group>
                         <DropdownMenu.Item onclick={() => {
-                            goto(emailPath(id, subject));
+                            goto(emailPath(mail.id, mail.subject));
                         }}>
                             {$_('myStack.email.menu.view')}
                         </DropdownMenu.Item>
@@ -170,20 +167,28 @@
     </div>
 
     <div class="px-4 pt-6 flex flex-row flex-wrap items-center gap-x-8 text-xl wrap-anywhere sm:px-8">
-        {subject}
+        {mail.subject}
     </div>
 
     <Labels
-            {labels}
+            labels={mail.labels}
             class="px-4 pt-3 sm:px-8"
-            onAddLabel={(label) => mails.attachLabel(id, label.id)}
-            onCreateLabel={(name) => mails.createLabelOn(id, name)}
+            onAddLabel={(label) => mails.attachLabel(mail.id, label.id)}
+            onCreateLabel={(name) => mails.createLabelOn(mail.id, name)}
             onRemoveLabel={(label) => {
-                void mails.detachLabel(id, label.id);
+                void mails.detachLabel(mail.id, label.id);
                 afterLabelChange();
             }}
             onRestoreFocus={afterLabelChange}
     />
+
+    {#if mail.attachments.length > 0}
+        <Attachments
+                {mail}
+                class="px-4 pt-3 sm:px-8"
+                onRestoreFocus={() => stackFocus?.restore()}
+        />
+    {/if}
 
     <div class="mx-4 my-4 h-px bg-accent"></div>
 

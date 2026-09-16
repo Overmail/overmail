@@ -1,6 +1,7 @@
 import type {EmailBodyRepository} from "$lib/repository/EmailBodyRepository";
 import type {EmailMeta, EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import {ReconnectingSocket, type SocketLike} from "$lib/repository/ReconnectingSocket";
+import type {StackPosition} from "$lib/app/my-stack/EmailStack.svelte";
 
 const ENDPOINT = "/api/stack";
 
@@ -52,7 +53,7 @@ export class EmailStackViewModel {
     private readonly releases = new Map<string, () => void>();
 
     /** What the reader picked, which may be a card that is not drawable (yet). */
-    private selectedId: string | null = $state(null);
+    currentPosition: StackPosition = $state(null);
 
     /** Every announced mail, in the order the pile handed it out; see [card]. */
     private readonly cards: StackCard[] = $derived(this.ids.map((id) => this.card(id)));
@@ -78,9 +79,9 @@ export class EmailStackViewModel {
      * there, with nothing to move on from.
      */
     currentEmailId: string | null = $derived(
-        this.emails.some((email) => email.id === this.selectedId)
-            ? this.selectedId
-            : (this.emails[0]?.id ?? null)
+        this.currentPosition?.type === "email" ? this.emails.some((email) => this.currentPosition?.type === "email" && email.id === this.currentPosition.emailId)
+            ? this.currentPosition.emailId
+            : (this.emails[0]?.id ?? null) : null
     );
 
     currentEmail = $derived(this.emails.find((email) => email.id === this.currentEmailId));
@@ -132,9 +133,14 @@ export class EmailStackViewModel {
     }
 
     onNextEmail() {
+        if (this.currentEmailIndex === this.emails.length - 1) {
+            this.currentPosition = {type: "done"};
+            return;
+        }
+
         if (this.currentEmailIndex === -1) return;
         if (this.currentEmailIndex + 1 >= this.emails.length) return;
-        this.selectedId = this.emails[this.currentEmailIndex + 1].id;
+        this.currentPosition = {type: "email", emailId: this.emails[this.currentEmailIndex + 1].id};
 
         const remainingEmails = this.emails.length - (this.currentEmailIndex + 1);
         if (remainingEmails <= MAX_EMAILS_BEFORE_REFETCH) {
@@ -143,9 +149,12 @@ export class EmailStackViewModel {
     }
 
     onPreviousEmail() {
-        if (this.currentEmailIndex === -1) return;
-        if (this.currentEmailIndex - 1 < 0) return;
-        this.selectedId = this.emails[this.currentEmailIndex - 1].id;
+        if (this.currentPosition?.type === "email" && this.currentEmailIndex === -1) return;
+        if (this.currentPosition?.type === "email") {
+            this.currentPosition = {type: "email", emailId: this.emails[this.currentEmailIndex - 1].id};
+        } else if (this.currentPosition?.type === "done") {
+            this.currentPosition = {type: "email", emailId: this.emails[this.emails.length - 1].id};
+        }
     }
 
     async onRequestEmailClassification(emailId: string) {
@@ -193,6 +202,10 @@ export class EmailStackViewModel {
      * mail the last one ended on, and after a reconnect the socket starts over from the top.
      */
     private receive(ids: string[]) {
+        if (ids.length === 0) {
+            if (this.currentPosition === null) this.currentPosition = {type: "done"};
+            return;
+        }
         for (const id of ids) {
             if (this.releases.has(id)) continue;
 
@@ -201,6 +214,7 @@ export class EmailStackViewModel {
             this.releases.set(id, this.mails.subscribe(id));
             void this.loadBody(id);
             this.ids.push(id);
+            if (this.currentPosition === null) this.currentPosition = {type: "email", emailId: id};
         }
     }
 

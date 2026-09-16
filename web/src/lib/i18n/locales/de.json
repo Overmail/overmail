@@ -227,6 +227,22 @@
         "reclassify": "Erneut klassifizieren",
         "view": "Ansehen"
       }
+    },
+    "allDone": {
+      "titles": {
+        "1": "Alle Mails erledigt",
+        "2": "Du bist wunderbar!",
+        "3": "Das war's (für jetzt).",
+        "4": "Du hast es geschafft.",
+        "5": "Zeit für eine Pause!"
+      },
+      "subtitles": {
+        "1": "Gönn' dir einen Kaffee und geh raus.",
+        "2": "Möge der Tag dir wohlgesonnen sein.",
+        "3": "Jetzt kannst du dich um die wichtigen Dinge kümmern.",
+        "4": "Ein leerer Posteingang fühlt sich doch gut an.",
+        "5": "Nimm dir kurz Zeit zum Durchatmen."
+      }
     }
   },
   "labels": {

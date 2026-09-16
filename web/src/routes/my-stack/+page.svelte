@@ -1,7 +1,7 @@
 <script lang="ts">
     import KeyCap from "$lib/components/key/KeyCap.svelte";
     import EmailStack from "$lib/app/my-stack/EmailStack.svelte";
-    import { ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon } from "phosphor-svelte";
+    import {ArchiveIcon, ArrowDownIcon, ArrowUpIcon, ChatsCircleIcon, TagIcon, WarningIcon} from "phosphor-svelte";
     import {onMount} from "svelte";
     import {EmailStackViewModel} from "$lib/app/my-stack/EmailStackViewModel.svelte";
     import {createHotkeyAttachment} from "@tanstack/svelte-hotkeys";
@@ -9,6 +9,8 @@
     import {setPageHeader} from "$lib/app/shell/pageHeader.svelte";
     import {_} from "svelte-i18n";
     import {useRepositories} from "$lib/repository/repositories";
+    import AllDone from "$lib/app/my-stack/AllDone.svelte";
+    import { fade } from "svelte/transition";
 
     const repositories = useRepositories();
     let viewModel: EmailStackViewModel = new EmailStackViewModel(
@@ -103,11 +105,20 @@
                 <EmailStack
                         emails={viewModel.emails ?? []}
                         onRequestReclassify={(email) => viewModel.onRequestEmailClassification(email.id)}
-                        currentEmailId={viewModel.currentEmailId}
+                        currentPosition={viewModel.currentPosition}
                         onTheirWay={viewModel.onTheirWay}
                         class="h-full"
                 />
             </div>
+
+            {#if viewModel.currentPosition?.type === "done"}
+                <div
+                        transition:fade
+                        class="absolute inset-0 flex flex-row items-center justify-center"
+                >
+                    <AllDone/>
+                </div>
+            {/if}
         </div>
 
 
@@ -125,9 +136,9 @@
                  other on a narrow screen, and a row that overflows here scrolls the whole page. -->
             <div class="relative flex h-full flex-row flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4">
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="A" class="size-10" />
+                    <KeyCap key="A" class="size-10"/>
                     <span class="flex flex-row items-center gap-1">
-                        <ArchiveIcon />
+                        <ArchiveIcon/>
                         {#if viewModel.currentEmail?.classification?.type === "archive"}
                             {$_('myStack.shortcuts.unarchive')}
                         {:else}
@@ -137,28 +148,28 @@
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="S" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><WarningIcon /> {$_('myStack.shortcuts.spam')}</span>
+                    <KeyCap key="S" class="size-10"/>
+                    <span class="flex flex-row items-center gap-1"><WarningIcon/> {$_('myStack.shortcuts.spam')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="R" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ChatsCircleIcon /> {$_('myStack.shortcuts.replyLater')}</span>
+                    <KeyCap key="R" class="size-10"/>
+                    <span class="flex flex-row items-center gap-1"><ChatsCircleIcon/> {$_('myStack.shortcuts.replyLater')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="#" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><TagIcon /> {$_('myStack.shortcuts.tag')}</span>
+                    <KeyCap key="#" class="size-10"/>
+                    <span class="flex flex-row items-center gap-1"><TagIcon/> {$_('myStack.shortcuts.tag')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="␣" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowDownIcon /> {$_('myStack.shortcuts.next')}</span>
+                    <KeyCap key="␣" class="size-10"/>
+                    <span class="flex flex-row items-center gap-1"><ArrowDownIcon/> {$_('myStack.shortcuts.next')}</span>
                 </div>
 
                 <div class="flex flex-row items-center justify-center gap-2">
-                    <KeyCap key="⌫" class="size-10" />
-                    <span class="flex flex-row items-center gap-1"><ArrowUpIcon /> {$_('myStack.shortcuts.previous')}</span>
+                    <KeyCap key="⌫" class="size-10"/>
+                    <span class="flex flex-row items-center gap-1"><ArrowUpIcon/> {$_('myStack.shortcuts.previous')}</span>
                 </div>
             </div>
         </div>

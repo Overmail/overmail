@@ -40,7 +40,7 @@ test("reads what the link shows", async () => {
             sent: 1772000000,
             labels: [{name: "Rechnungen", color: "#eeeeff"}],
         },
-        content: {text: "Hallo", html: "<p>Hallo</p>"},
+        content: {text: "Hallo", html: "<p>Hallo</p>", attachments: []},
     });
     expect((fetcher as any).mock.calls[0][0]).toBe(`/api/shares/${SHARE}`);
 });

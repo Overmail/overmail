@@ -72,6 +72,7 @@ class ShareRoutesTest {
                 {
                   "share_name": "  Projektgruppe  ",
                   "include_labels": true,
+                  "include_attachments": true,
                   "valid_until": $until,
                   "password": "hunter2",
                   "allow_metadata_without_password": true
@@ -86,6 +87,7 @@ class ShareRoutesTest {
         assertEquals("Projektgruppe", share["share_name"]!!.jsonPrimitive.content)
         assertEquals(until, share["valid_until"]!!.jsonPrimitive.content.toLong())
         assertTrue(share["include_labels"]!!.jsonPrimitive.content.toBoolean())
+        assertTrue(share["include_attachments"]!!.jsonPrimitive.content.toBoolean())
         // The password itself never leaves, only that there is one.
         assertTrue(share["has_password"]!!.jsonPrimitive.content.toBoolean())
         assertFalse(created.bodyAsText().contains("hunter2"))

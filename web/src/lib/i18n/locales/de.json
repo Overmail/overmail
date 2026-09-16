@@ -132,6 +132,7 @@
         "removePassword": "Passwort entfernen",
         "metadata": "Metadaten ohne Passwort erlauben",
         "labels": "Labels der E-Mail teilen",
+        "attachments": "Anhänge der E-Mail teilen",
         "expiry": "Gültig bis",
         "expiryOptions": {
           "1d": "1 Tag",
@@ -164,6 +165,7 @@
         "noExpiry": "Unbegrenzt gültig",
         "password": "Passwortgeschützt",
         "labels": "Mit Labels",
+        "attachments": "Mit Anhängen",
         "copy": "Link kopieren",
         "copied": "Kopiert",
         "copyFailed": "Der Link konnte nicht kopiert werden.",

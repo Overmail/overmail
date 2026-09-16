@@ -132,6 +132,7 @@
         "removePassword": "Remove password",
         "metadata": "Show metadata without the password",
         "labels": "Share the labels of this email",
+        "attachments": "Share the attachments of this email",
         "expiry": "Valid until",
         "expiryOptions": {
           "1d": "1 day",
@@ -164,6 +165,7 @@
         "noExpiry": "No end date",
         "password": "Password protected",
         "labels": "With labels",
+        "attachments": "With attachments",
         "copy": "Copy link",
         "copied": "Copied",
         "copyFailed": "The link could not be copied.",

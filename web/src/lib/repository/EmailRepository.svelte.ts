@@ -1,3 +1,4 @@
+import {saveBlob, saveResponse} from "$lib/repository/download";
 import {ReconnectingSocket, type SocketLike} from "$lib/repository/ReconnectingSocket";
 
 const ENDPOINT = "/api/webapp/content/socket";
@@ -347,16 +348,7 @@ export class EmailRepository {
         const fromServer = /filename="([^"]*)"/.exec(disposition)?.[1];
         const fileName = fromServer || `${this.peek(id).value?.subject || "email"}.eml`;
 
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = fileName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        // Only after the click: revoking it first leaves the anchor pointing at nothing.
-        URL.revokeObjectURL(url);
+        saveBlob(await response.blob(), fileName);
     }
 
     /**
@@ -370,35 +362,11 @@ export class EmailRepository {
         signal?: AbortSignal,
     ): Promise<void> {
         const response = await fetch(`/api/emails/${mailId}/attachments/${attachment.id}`, {method: "GET", signal});
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
             throw new Error(`Could not download attachment ${attachment.id}: ${response.status} ${response.statusText}`);
         }
 
-        // The stored size over Content-Length: a compressed response counts other bytes than the reader yields.
-        const total = attachment.size || Number(response.headers.get("content-length")) || 0;
-        const chunks: Uint8Array<ArrayBuffer>[] = [];
-        let received = 0;
-        onProgress(0);
-
-        const reader = response.body.getReader();
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            received += value.length;
-            if (total > 0) onProgress(Math.min(received / total, 1));
-        }
-        onProgress(1);
-
-        const blob = new Blob(chunks, {type: response.headers.get("content-type") ?? undefined});
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = attachment.name;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(url);
+        await saveResponse(response, attachment.name, attachment.size, onProgress);
     }
 
     /**

@@ -26,6 +26,7 @@ import es.jvbabi.overmail.server.http.labels.labelsByIds
 import es.jvbabi.overmail.server.http.labels.map.mapLabels
 import es.jvbabi.overmail.server.http.labels.search.labelSearch
 import es.jvbabi.overmail.server.http.senders.search.senderSearch
+import es.jvbabi.overmail.server.http.share.downloadSharedAttachment
 import es.jvbabi.overmail.server.http.share.getShare
 import es.jvbabi.overmail.server.http.share.openShare
 import es.jvbabi.overmail.server.http.senders.sendersByIds
@@ -195,6 +196,10 @@ internal fun Application.configureRouting() {
 
                 route("/open") {
                     openShare()
+                }
+
+                route("/attachments/{attachmentId}") {
+                    downloadSharedAttachment()
                 }
             }
 

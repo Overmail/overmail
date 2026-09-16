@@ -17,10 +17,12 @@
     let {
         viewModel,
         emailId,
+        hasAttachments,
     }: {
         /** The dialog around this one; `editing` is what opens and closes this window. */
         viewModel: ShareDialogViewModel,
         emailId: string,
+        hasAttachments: boolean,
     } = $props();
 
     const {shares} = useRepositories();
@@ -85,7 +87,7 @@
                     void save();
                 }}
         >
-            <ShareForm viewModel={form} />
+            <ShareForm viewModel={form} {hasAttachments} />
 
             <Dialog.Footer>
                 <Button type="button" variant="secondary" disabled={form.saving} onclick={close}>

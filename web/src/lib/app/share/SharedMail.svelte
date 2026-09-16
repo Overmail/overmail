@@ -10,9 +10,17 @@
     import {Separator} from "$lib/components/ui/separator";
     import MailBody from "$lib/app/mails/detail_panel/MailBody.svelte";
     import type {SharedEmail} from "$lib/repository/SharedEmailRepository";
+    import type {Attachment} from "$lib/repository/EmailRepository.svelte";
+    import AttachmentList from "$lib/app/mails/detail_panel/attachments/AttachmentList.svelte";
     import {_, locale} from "svelte-i18n";
 
-    let {shared}: {shared: SharedEmail} = $props();
+    let {
+        shared,
+        downloadAttachment,
+    }: {
+        shared: SharedEmail;
+        downloadAttachment: (attachment: Attachment, onProgress: (progress: number) => void, signal: AbortSignal) => Promise<void>;
+    } = $props();
 
     const metadata = $derived(shared.metadata);
 
@@ -65,6 +73,10 @@
         <!-- Between who wrote it and what they wrote: the head of the mail is a different kind of
              thing to the mail, and the rule is what says so without a second surface. -->
         <Separator />
+    {/if}
+
+    {#if shared.content && shared.content.attachments.length > 0}
+        <AttachmentList attachments={shared.content.attachments} download={downloadAttachment} />
     {/if}
 
     {#if shared.content}

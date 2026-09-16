@@ -25,12 +25,15 @@
         open = $bindable(true),
         emailId,
         subject,
+        hasAttachments = false,
     }: {
         open?: boolean,
         /** The mail the links are for. A dialog is opened on one mail and lives as long as it. */
         emailId: string,
         /** What the link says it is about, where the share lets a visitor see that anyway. */
         subject?: string | null,
+        /** Whether the mail has attachments; without any, there is nothing to share them for. */
+        hasAttachments?: boolean,
     } = $props();
 
     const {shares} = useRepositories();
@@ -87,7 +90,7 @@
                     void save();
                 }}
         >
-            <ShareForm viewModel={form} note={copyFailed ? $_("mails.share.list.copyFailed") : null} />
+            <ShareForm viewModel={form} {hasAttachments} note={copyFailed ? $_("mails.share.list.copyFailed") : null} />
 
             <Button type="submit" class="w-fit self-end" disabled={!form.canSubmit}>
                 <LinkSimpleIcon/>
@@ -97,10 +100,10 @@
 
         <div class="h-px w-full bg-muted my-3"></div>
 
-        <ShareList {viewModel} {subject} onCopyFailed={(failed) => (copyFailed = failed)} />
+        <ShareList {viewModel} {subject} {hasAttachments} onCopyFailed={(failed) => (copyFailed = failed)} />
     </Dialog.Content>
 </Dialog.Root>
 
 <!-- Outside the dialog above: they are two windows, and this one is what says an edit is an edit. -->
-<ShareEditDialog {viewModel} {emailId} />
+<ShareEditDialog {viewModel} {emailId} {hasAttachments} />
 <DeleteShareDialog {viewModel} />

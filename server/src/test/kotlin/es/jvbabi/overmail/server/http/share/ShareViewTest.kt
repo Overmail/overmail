@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.http.share
 
 import es.jvbabi.overmail.server.data.share.SharePassword
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.Attachment
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailLabel
 import es.jvbabi.overmail.server.database.models.EmailUser
@@ -15,6 +16,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -38,6 +40,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteAll
 
@@ -93,6 +96,7 @@ class ShareViewTest {
                 email = mail
                 sharedAt = Clock.System.now()
                 includeLabels = false
+                includeAttachments = false
             }.id.value
         }
         val none = Json.parseToJsonElement(client.get("/api/shares/$without").bodyAsText())
@@ -171,6 +175,69 @@ class ShareViewTest {
         assertEquals(HttpStatusCode.NotFound, client.get("/api/shares/nonsense").status)
     }
 
+    @Test
+    fun `attachments are listed and handed out only where the share was made with them`() = testApplication {
+        val share = setUp { includeAttachments = true }
+        val attachment = addAttachment()
+        installRoutes()
+
+        val listed = Json.parseToJsonElement(client.get("/api/shares/$share").bodyAsText())
+            .jsonObject["content"]!!.jsonObject["attachments"]!!.jsonArray
+        assertEquals("rechnung.pdf", listed.single().jsonObject["name"]!!.jsonPrimitive.content)
+
+        val download = client.post("/api/shares/$share/attachments/$attachment") {
+            contentType(ContentType.Application.Json)
+            setBody("{}")
+        }
+        assertEquals(HttpStatusCode.OK, download.status)
+        assertEquals("%PDF", download.readRawBytes().decodeToString())
+
+        val without = database.query {
+            Share.new {
+                email = mail
+                sharedAt = Clock.System.now()
+                includeLabels = false
+                includeAttachments = false
+            }.id.value
+        }
+        val none = Json.parseToJsonElement(client.get("/api/shares/$without").bodyAsText())
+            .jsonObject["content"]!!.jsonObject["attachments"]!!.jsonArray
+        assertTrue(none.isEmpty())
+        assertEquals(HttpStatusCode.NotFound, client.post("/api/shares/$without/attachments/$attachment") {
+            contentType(ContentType.Application.Json)
+            setBody("{}")
+        }.status)
+    }
+
+    @Test
+    fun `an attachment of a locked share needs the password`() = testApplication {
+        val share = setUp {
+            includeAttachments = true
+            passwordHash = SharePassword.hash("hunter2")
+        }
+        val attachment = addAttachment()
+        installRoutes()
+
+        suspend fun download(body: String) = client.post("/api/shares/$share/attachments/$attachment") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.status
+
+        assertEquals(HttpStatusCode.Forbidden, download("{}"))
+        assertEquals(HttpStatusCode.Forbidden, download("""{"password": "hunter3"}"""))
+        assertEquals(HttpStatusCode.OK, download("""{"password": "hunter2"}"""))
+    }
+
+    private suspend fun addAttachment(): Uuid = database.query {
+        Attachment.new {
+            email = mail
+            filename = "rechnung.pdf"
+            contentType = "application/pdf"
+            size = 4
+            data = ExposedBlob("%PDF".encodeToByteArray())
+        }.id.value
+    }
+
     /** A mail with a label on it, and a share of it that [share] shapes. */
     private suspend fun setUp(share: Share.() -> Unit): Uuid {
         database.init()
@@ -219,6 +286,7 @@ class ShareViewTest {
                 email = mail
                 sharedAt = Clock.System.now()
                 includeLabels = false
+                includeAttachments = false
                 share()
             }.id.value
         }
@@ -236,6 +304,10 @@ class ShareViewTest {
 
                     route("/open") {
                         openShare()
+                    }
+
+                    route("/attachments/{attachmentId}") {
+                        downloadSharedAttachment()
                     }
                 }
             }

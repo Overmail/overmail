@@ -17,6 +17,7 @@ internal data class ShareInput(
     /** Null where the owner did not name the share -- it is theirs to organize by, not required. */
     val shareName: String?,
     val includeLabels: Boolean,
+    val includeAttachments: Boolean,
     val validUntil: Instant?,
     val allowMetadataWithoutPassword: Boolean,
 )
@@ -31,6 +32,7 @@ internal data class ShareInput(
 internal fun readShareInput(
     shareName: String?,
     includeLabels: Boolean,
+    includeAttachments: Boolean,
     validUntil: Long?,
     allowMetadataWithoutPassword: Boolean,
 ): ShareInput {
@@ -51,6 +53,7 @@ internal fun readShareInput(
     return ShareInput(
         shareName = cleanName,
         includeLabels = includeLabels,
+        includeAttachments = includeAttachments,
         validUntil = until,
         allowMetadataWithoutPassword = allowMetadataWithoutPassword,
     )

@@ -9,6 +9,8 @@ export type Share = {
     /** When the link stops working, or null for one that does not run out. */
     validUntil: number | null;
     includeLabels: boolean;
+    /** Whether a visitor sees the attachments and can download them. */
+    includeAttachments: boolean;
     /**
      * Whether a visitor is asked for a password. The password itself never leaves the server, so
      * this is all an edit form can show -- see [ShareDraft.password].
@@ -25,6 +27,7 @@ export type Share = {
 export type ShareDraft = {
     shareName: string | null;
     includeLabels: boolean;
+    includeAttachments: boolean;
     validUntil: number | null;
     /** A password to set. Null on an edit leaves the one that is there, see [removePassword]. */
     password: string | null;
@@ -102,6 +105,7 @@ function toShare(share: any): Share {
         sharedAt: (share.shared_at ?? 0) as number,
         validUntil: (share.valid_until ?? null) as number | null,
         includeLabels: (share.include_labels ?? false) as boolean,
+        includeAttachments: (share.include_attachments ?? false) as boolean,
         hasPassword: (share.has_password ?? false) as boolean,
         allowMetadataWithoutPassword: (share.allow_metadata_without_password ?? false) as boolean,
     };
@@ -117,6 +121,7 @@ function toCreateBody(draft: ShareDraft) {
     return {
         share_name: draft.shareName,
         include_labels: draft.includeLabels,
+        include_attachments: draft.includeAttachments,
         valid_until: draft.validUntil,
         password: passwordOf(draft),
         allow_metadata_without_password: draft.allowMetadataWithoutPassword,

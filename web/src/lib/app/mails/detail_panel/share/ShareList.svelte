@@ -11,6 +11,7 @@
         CheckIcon,
         LinkSimpleIcon,
         LockSimpleIcon,
+        PaperclipIcon,
         PencilSimpleIcon,
         TagIcon,
         TrashIcon,
@@ -26,11 +27,14 @@
     let {
         viewModel,
         subject,
+        hasAttachments = false,
         onCopyFailed,
     }: {
         viewModel: ShareDialogViewModel,
         /** What the link says it is about, where the share lets a visitor see that anyway. */
         subject?: string | null,
+        /** Whether the mail has attachments; the paperclip means nothing on a mail without. */
+        hasAttachments?: boolean,
         /** The clipboard is the browser's to refuse, and the message for it sits in the dialog. */
         onCopyFailed?: (failed: boolean) => void,
     } = $props();
@@ -98,6 +102,9 @@
                             {/if}
                             {#if share.includeLabels}
                                 <TagIcon class="size-3 shrink-0" aria-label={$_("mails.share.list.labels")} />
+                            {/if}
+                            {#if hasAttachments && share.includeAttachments}
+                                <PaperclipIcon class="size-3 shrink-0" aria-label={$_("mails.share.list.attachments")} />
                             {/if}
                         </span>
                     </div>

@@ -15,6 +15,7 @@ const SHARE = {
     shared_at: 1772000000,
     valid_until: 1772600000,
     include_labels: true,
+    include_attachments: true,
     has_password: true,
     allow_metadata_without_password: true,
 };
@@ -22,6 +23,7 @@ const SHARE = {
 const DRAFT = {
     shareName: "Projektgruppe",
     includeLabels: true,
+    includeAttachments: true,
     validUntil: 1772600000,
     password: "hunter2",
     allowMetadataWithoutPassword: true,
@@ -37,6 +39,7 @@ test("reads the links that were made for a mail", async () => {
             sharedAt: 1772000000,
             validUntil: 1772600000,
             includeLabels: true,
+            includeAttachments: true,
             hasPassword: true,
             allowMetadataWithoutPassword: true,
         },
@@ -53,6 +56,7 @@ test("a share without a name, a date or a password is still a share", async () =
     // The dialog decides on these, so an absent flag must not read as true.
     expect(share.hasPassword).toBe(false);
     expect(share.includeLabels).toBe(false);
+    expect(share.includeAttachments).toBe(false);
     expect(share.allowMetadataWithoutPassword).toBe(false);
 });
 
@@ -73,6 +77,7 @@ test("creating sends the whole share and reads back what was stored", async () =
     expect(JSON.parse(request.body)).toEqual({
         share_name: "Projektgruppe",
         include_labels: true,
+        include_attachments: true,
         valid_until: 1772600000,
         password: "hunter2",
         allow_metadata_without_password: true,

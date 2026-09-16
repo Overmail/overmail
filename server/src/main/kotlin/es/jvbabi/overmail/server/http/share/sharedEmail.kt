@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.share
 
+import es.jvbabi.overmail.server.database.models.Attachments
 import es.jvbabi.overmail.server.database.models.EmailLabels
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
@@ -81,6 +82,16 @@ data class SharedEmailResponse(
     data class Content(
         @SerialName("text") val text: String?,
         @SerialName("html") val html: String?,
+        /** Only where the share was made with them; empty otherwise. */
+        @SerialName("attachments") val attachments: List<Attachment>,
+    )
+
+    @Serializable
+    data class Attachment(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String,
+        @SerialName("size") val size: Long,
+        @SerialName("content_type") val contentType: String,
     )
 }
 
@@ -88,6 +99,7 @@ data class SharedEmailResponse(
 internal data class SharedLink(
     val emailId: Uuid,
     val includeLabels: Boolean,
+    val includeAttachments: Boolean,
     val passwordHash: String?,
     val allowMetadataWithoutPassword: Boolean,
     /** The owner of the mail, which is who made the link. Read with the share, in one query. */
@@ -118,6 +130,7 @@ internal suspend fun ApplicationCall.requireLiveShareFromUrl(): SharedLink {
             .select(
                 Shares.email,
                 Shares.includeLabels,
+                Shares.includeAttachments,
                 Shares.passwordHash,
                 Shares.allowMetadataWithoutPassword,
                 Shares.validUntil,
@@ -141,6 +154,7 @@ internal suspend fun ApplicationCall.requireLiveShareFromUrl(): SharedLink {
     return SharedLink(
         emailId = share[Shares.email].value,
         includeLabels = share[Shares.includeLabels],
+        includeAttachments = share[Shares.includeAttachments],
         passwordHash = share[Shares.passwordHash],
         allowMetadataWithoutPassword = share[Shares.allowMetadataWithoutPassword],
         sharedBy = SharedEmailResponse.SharedBy(
@@ -181,6 +195,19 @@ internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked
             .where { EmailLabels.email eq share.emailId }
             .map { SharedEmailResponse.Label(name = it[Labels.name], color = it[Labels.color]) }
 
+        // Without the bytes: those are fetched one by one, see `downloadSharedAttachment`.
+        val attachments = if (!unlocked || !share.includeAttachments) emptyList() else Attachments
+            .select(Attachments.id, Attachments.filename, Attachments.size, Attachments.contentType)
+            .where { Attachments.email eq share.emailId }
+            .map {
+                SharedEmailResponse.Attachment(
+                    id = it[Attachments.id].value,
+                    name = it[Attachments.filename],
+                    size = it[Attachments.size],
+                    contentType = it[Attachments.contentType],
+                )
+            }
+
         SharedEmailResponse(
             needsPassword = !unlocked,
             sharedBy = share.sharedBy,
@@ -194,6 +221,7 @@ internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked
             content = if (!unlocked) null else SharedEmailResponse.Content(
                 text = row[Emails.textContent],
                 html = row[Emails.htmlContent],
+                attachments = attachments,
             ),
         )
     }

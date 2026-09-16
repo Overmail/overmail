@@ -13,6 +13,7 @@ const SHARE: Share = {
     sharedAt: NOW_SECONDS,
     validUntil: NOW_SECONDS + 7 * DAY,
     includeLabels: true,
+    includeAttachments: false,
     hasPassword: true,
     allowMetadataWithoutPassword: true,
 };
@@ -94,6 +95,7 @@ test("editing opens on the share, and leaves its password alone", async () => {
     expect(viewModel.isEditing).toBe(true);
     expect(viewModel.shareName).toBe("Projektgruppe");
     expect(viewModel.includeLabels).toBe(true);
+    expect(viewModel.includeAttachments).toBe(false);
     // Never handed out, so there is nothing to put in the field -- and the empty field is what
     // says "as it was".
     expect(viewModel.password).toBe("");

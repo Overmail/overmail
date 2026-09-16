@@ -1,3 +1,4 @@
+import type {Attachment} from "$lib/repository/EmailRepository.svelte";
 import {
     ShareExpiredError,
     ShareNotFoundError,
@@ -36,6 +37,12 @@ export class SharePageViewModel {
 
     /** What is in the password field. */
     password = $state("");
+
+    /**
+     * The password that opened the share, kept for the attachment downloads that need it again.
+     * Null while locked and for a share without one.
+     */
+    private openedWith: string | null = null;
 
     constructor(
         private readonly shareId: string,
@@ -86,7 +93,8 @@ export class SharePageViewModel {
             const shared = await this.shares.open(this.shareId, this.password);
             this.state = {type: "shown", shared};
             this.unlockState = {type: "idle"};
-            // Not kept: the mail is here, and there is nothing left to send it with.
+            // Out of the field, but kept for the attachments, which are fetched one by one.
+            this.openedWith = this.password;
             this.password = "";
             return true;
         } catch (error) {
@@ -106,6 +114,15 @@ export class SharePageViewModel {
             this.unlockState = {type: "failed"};
             return false;
         }
+    }
+
+    /** Saves one attachment of the open share. Rejects with an `AbortError` when [signal] aborts. */
+    async downloadAttachment(
+        attachment: Attachment,
+        onProgress: (progress: number) => void,
+        signal?: AbortSignal,
+    ): Promise<void> {
+        await this.shares.downloadAttachment(this.shareId, attachment, this.openedWith, onProgress, signal);
     }
 
     /** Typing is the answer to "that is not the password", so the message goes with it. */

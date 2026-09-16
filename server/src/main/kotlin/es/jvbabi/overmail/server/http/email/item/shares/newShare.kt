@@ -32,6 +32,7 @@ fun Route.newShare() {
             val input = readShareInput(
                 shareName = request.shareName,
                 includeLabels = request.includeLabels,
+                includeAttachments = request.includeAttachments,
                 validUntil = request.validUntil,
                 allowMetadataWithoutPassword = request.allowMetadataWithoutPassword,
             )
@@ -44,6 +45,7 @@ fun Route.newShare() {
                     it[sharedAt] = now
                     it[shareName] = input.shareName
                     it[includeLabels] = input.includeLabels
+                    it[includeAttachments] = input.includeAttachments
                     it[validUntil] = input.validUntil
                     it[passwordHash] = password
                     it[allowMetadataWithoutPassword] = input.allowMetadataWithoutPassword
@@ -62,6 +64,7 @@ private data class NewShareRequest(
     /** What the owner calls this share, to tell their own links apart. Optional. */
     @SerialName("share_name") val shareName: String? = null,
     @SerialName("include_labels") val includeLabels: Boolean = false,
+    @SerialName("include_attachments") val includeAttachments: Boolean = false,
     /** When the link stops working, as whole seconds since the epoch; null never runs out. */
     @SerialName("valid_until") val validUntil: Long? = null,
     /** What a visitor is asked for, in the clear. Null or blank is a link that asks for nothing. */

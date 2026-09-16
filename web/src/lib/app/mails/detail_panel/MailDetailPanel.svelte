@@ -261,5 +261,10 @@
 
 <!-- Mounted only while it is open, so each mail gets a dialog on its own links. -->
 {#if showShareDialog && mail}
-    <ShareDialog bind:open={showShareDialog} emailId={mail.id} subject={mail.subject} />
+    <ShareDialog
+            bind:open={showShareDialog}
+            emailId={mail.id}
+            subject={mail.subject}
+            hasAttachments={mail.attachments.length > 0}
+    />
 {/if}

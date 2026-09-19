@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Scanning the sign-in QR code. Entering the code by hand works without a camera. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <!-- Lets the app install its own updates instead of handing the APK to a browser. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

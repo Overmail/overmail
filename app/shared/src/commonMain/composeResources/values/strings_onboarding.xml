@@ -1,0 +1,25 @@
+<resources>
+    <string name="onboarding_welcome_title">Welcome to Overmail</string>
+    <string name="onboarding_welcome_message">Connect to your Overmail server to get started.</string>
+    <string name="onboarding_welcome_continue">Get started</string>
+
+    <string name="onboarding_login_title">Sign in</string>
+    <string name="onboarding_login_mode_scan">Scan code</string>
+    <string name="onboarding_login_mode_enter_code">Enter code</string>
+    <string name="onboarding_login_scan_message">In Overmail on the web, open Settings → Devices and scan the QR code shown there.</string>
+    <string name="onboarding_login_scan_invalid">This is not an Overmail sign-in code.</string>
+    <string name="onboarding_login_code_message">Enter the sign-in code from Settings → Devices in Overmail on the web.</string>
+    <string name="onboarding_login_code_label">Sign-in code</string>
+    <string name="onboarding_login_code_invalid">Invalid sign-in code</string>
+    <string name="onboarding_login_code_submit">Sign in</string>
+    <string name="onboarding_login_signing_in">Signing in…</string>
+    <string name="onboarding_login_error_unknown_code">This sign-in code is no longer valid. Generate a new one in Overmail on the web.</string>
+    <string name="onboarding_login_error_expired_code">This sign-in code has expired. Generate a new one in Overmail on the web.</string>
+    <string name="onboarding_login_error_unreachable">Could not reach the Overmail server.</string>
+    <string name="onboarding_login_error_failed">Signing in failed. Please try again with a new code.</string>
+
+    <string name="camera_permission_denied">Overmail needs access to the camera to scan the code.</string>
+    <string name="camera_permission_denied_always">Camera access is turned off. Allow it in the settings to scan the code.</string>
+    <string name="camera_permission_grant">Allow camera access</string>
+    <string name="camera_permission_open_settings">Open settings</string>
+</resources>

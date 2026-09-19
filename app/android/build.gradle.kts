@@ -69,7 +69,7 @@ android {
             }
         }
     } else {
-        println("Warning: signing configuration not found in local.properties, release builds will not be signed.")
+        logger.info("No signing configuration in local.properties, release builds will not be signed.")
     }
 
     defaultConfig {

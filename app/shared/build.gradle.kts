@@ -55,6 +55,12 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.app.androidx.browser)
             implementation(libs.ktor.client.cio)
+
+            implementation(libs.app.mlkit.barcode.scanning)
+            implementation(libs.app.androidx.camera.camera2)
+            implementation(libs.app.androidx.camera.lifecycle)
+            implementation(libs.app.androidx.camera.view)
+            implementation(libs.app.androidx.camera.mlkit.vision)
         }
 
         commonMain.dependencies {
@@ -85,6 +91,9 @@ kotlin {
             implementation(libs.app.haze.blur)
             implementation(libs.app.haze.blur.materials)
             implementation(libs.app.human.readable)
+
+            implementation(libs.app.moko.permissions.compose)
+            implementation(libs.app.moko.permissions.camera)
 
             api(libs.ktor.client.core)
             implementation(libs.app.ktor.client.content.negotiation)

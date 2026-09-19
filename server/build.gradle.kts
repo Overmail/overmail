@@ -120,6 +120,9 @@ tasks.register<JavaExec>("runServer") {
     group = "application"
     mainClass.set(providers.gradleProperty("mainClass").orElse("es.jvbabi.overmail.server.MainKt"))
     classpath = sourceSets["main"].runtimeClasspath
+    // JavaExec would otherwise launch on whatever JVM runs Gradle -- the IDE's JBR, for instance,
+    // which is older than the toolchain the classes are compiled to.
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
     // The server reads ./data/config.json, which lives at the repository root, not in this module.
     workingDir = rootProject.projectDir
     jvmArgs("-Djava.awt.headless=true")

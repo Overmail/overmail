@@ -11,10 +11,12 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.page.Screen
 import es.jvbabi.overmail.page.home.HomeScreen
+import es.jvbabi.overmail.page.onboarding.OnboardingNavigation
 import es.jvbabi.overmail.page.settings.SettingsScreen
 import es.jvbabi.overmail.ui.overlay.update_available.UpdateAvailableOverlay
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.SyncHumanReadableLocale
+import org.koin.compose.viewmodel.koinViewModel
 
 /** Opens a link in the platform's in-app browser rather than handing it to a browser app. */
 expect fun openUrl(url: String)
@@ -32,35 +34,48 @@ expect fun dynamicTheme(dark: Boolean): ColorScheme
 
 @Composable
 @Preview
-fun App() {
+fun App(
+    viewModel: AppViewModel = koinViewModel(),
+) {
     SyncHumanReadableLocale()
 
     AppTheme(
         dynamicColor = false,
         darkTheme = isSystemInDarkTheme(),
     ) {
-        // The back stack is the navigation state: pushing a screen onto it navigates, popping it
-        // goes back, and Navigation3 renders whatever is on top.
-        val backstack = remember { mutableStateListOf<Screen>(Screen.Home) }
-
         UpdateAvailableOverlay()
 
-        NavDisplay(
-            backStack = backstack,
-            onBack = { backstack.removeLastOrNull() },
-            entryProvider = { key ->
-                when (key) {
-                    is Screen.Home -> NavEntry(key = key) {
-                        HomeScreen(onOpenSettings = { backstack.add(Screen.Settings) })
-                    }
-
-                    is Screen.Settings -> NavEntry(key = key) {
-                        SettingsScreen(onBack = { backstack.removeLastOrNull() })
-                    }
-                }
-            },
-        )
+        when (viewModel.state) {
+            // Only lasts for a local database read; drawing nothing avoids flashing the onboarding
+            // for users who already have an account.
+            AppState.Loading -> Unit
+            AppState.Onboarding -> OnboardingNavigation()
+            AppState.Main -> MainNavigation()
+        }
     }
+}
+
+@Composable
+private fun MainNavigation() {
+    // The back stack is the navigation state: pushing a screen onto it navigates, popping it
+    // goes back, and Navigation3 renders whatever is on top.
+    val backstack = remember { mutableStateListOf<Screen>(Screen.Home) }
+
+    NavDisplay(
+        backStack = backstack,
+        onBack = { backstack.removeLastOrNull() },
+        entryProvider = { key ->
+            when (key) {
+                is Screen.Home -> NavEntry(key = key) {
+                    HomeScreen(onOpenSettings = { backstack.add(Screen.Settings) })
+                }
+
+                is Screen.Settings -> NavEntry(key = key) {
+                    SettingsScreen(onBack = { backstack.removeLastOrNull() })
+                }
+            }
+        },
+    )
 }
 
 class ThemeWrapper : PreviewWrapperProvider {

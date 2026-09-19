@@ -1,0 +1,25 @@
+<resources>
+    <string name="onboarding_welcome_title">Willkommen bei Overmail</string>
+    <string name="onboarding_welcome_message">Verbinde dich mit deinem Overmail-Server, um loszulegen.</string>
+    <string name="onboarding_welcome_continue">Los geht\'s</string>
+
+    <string name="onboarding_login_title">Anmelden</string>
+    <string name="onboarding_login_mode_scan">Code scannen</string>
+    <string name="onboarding_login_mode_enter_code">Code eingeben</string>
+    <string name="onboarding_login_scan_message">Öffne in Overmail im Browser Einstellungen → Geräte und scanne den dort angezeigten QR-Code.</string>
+    <string name="onboarding_login_scan_invalid">Das ist kein Overmail-Anmeldecode.</string>
+    <string name="onboarding_login_code_message">Gib den Anmeldecode aus Einstellungen → Geräte in Overmail im Browser ein.</string>
+    <string name="onboarding_login_code_label">Anmeldecode</string>
+    <string name="onboarding_login_code_invalid">Ungültiger Anmeldecode</string>
+    <string name="onboarding_login_code_submit">Anmelden</string>
+    <string name="onboarding_login_signing_in">Anmeldung läuft …</string>
+    <string name="onboarding_login_error_unknown_code">Dieser Anmeldecode ist nicht mehr gültig. Erzeuge in Overmail im Browser einen neuen.</string>
+    <string name="onboarding_login_error_expired_code">Dieser Anmeldecode ist abgelaufen. Erzeuge in Overmail im Browser einen neuen.</string>
+    <string name="onboarding_login_error_unreachable">Der Overmail-Server ist nicht erreichbar.</string>
+    <string name="onboarding_login_error_failed">Die Anmeldung ist fehlgeschlagen. Versuche es mit einem neuen Code erneut.</string>
+
+    <string name="camera_permission_denied">Overmail braucht Zugriff auf die Kamera, um den Code zu scannen.</string>
+    <string name="camera_permission_denied_always">Der Kamerazugriff ist deaktiviert. Erlaube ihn in den Einstellungen, um den Code zu scannen.</string>
+    <string name="camera_permission_grant">Kamerazugriff erlauben</string>
+    <string name="camera_permission_open_settings">Einstellungen öffnen</string>
+</resources>

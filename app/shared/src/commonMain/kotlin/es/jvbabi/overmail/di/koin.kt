@@ -2,12 +2,16 @@ package es.jvbabi.overmail.di
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import es.jvbabi.overmail.AppViewModel
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.remote.OvermailApi
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
+import es.jvbabi.overmail.data.repository.OvermailAccountRepositoryImpl
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
+import es.jvbabi.overmail.domain.repository.OvermailAccountRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
+import es.jvbabi.overmail.page.onboarding.login.LoginViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -100,8 +104,11 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         singleOf(::OvermailApi)
         singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
+        singleOf(::OvermailAccountRepositoryImpl) bind OvermailAccountRepository::class
 
+        viewModelOf(::AppViewModel)
         viewModelOf(::HomeViewModel)
+        viewModelOf(::LoginViewModel)
     })
 
     modules(platformModule())

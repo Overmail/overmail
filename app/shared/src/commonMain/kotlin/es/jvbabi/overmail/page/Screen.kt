@@ -3,7 +3,7 @@ package es.jvbabi.overmail.page
 import kotlinx.serialization.Serializable
 
 /**
- * Every destination the app can navigate to. Serializable so a back stack survives the process
+ * Every destination of the main app, once an account exists. Serializable so a back stack survives the process
  * being killed.
  */
 @Serializable

@@ -4,6 +4,8 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Overmail uses the camera to scan the sign-in QR code.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

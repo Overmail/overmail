@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "708ae2fcf022512dc2081904f4f518e4",
+    "identityHash": "07c3e18e23143157d450bff94aa88908",
     "entities": [
       {
         "tableName": "key_value",
@@ -38,11 +38,58 @@
             "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_key_value_key` ON `${TABLE_NAME}` (`key`)"
           }
         ]
+      },
+      {
+        "tableName": "overmail_account",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `server_url` TEXT NOT NULL, `username` TEXT NOT NULL, `access_token` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverUrl",
+            "columnName": "server_url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessToken",
+            "columnName": "access_token",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_overmail_account_id",
+            "unique": true,
+            "columnNames": [
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_overmail_account_id` ON `${TABLE_NAME}` (`id`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '708ae2fcf022512dc2081904f4f518e4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '07c3e18e23143157d450bff94aa88908')"
     ]
   }
 }

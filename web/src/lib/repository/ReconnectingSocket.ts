@@ -37,6 +37,15 @@ export class ReconnectingSocket<Message> {
     /** Set by [stop], so a close it caused is not answered with a reconnect. */
     private isStopped = true;
 
+    /**
+     * Whether the handshake is through, which is the only state a browser socket takes a message
+     * in -- sending into one that is still connecting throws.
+     *
+     * Its own flag rather than "there is a socket object": [connect] has one the moment it is
+     * called, and that is exactly the stretch a caller must not send in.
+     */
+    private connected = false;
+
     private readonly url: string;
     private readonly onMessage: (message: Message) => void;
     private readonly onOpen: () => void;
@@ -76,13 +85,14 @@ export class ReconnectingSocket<Message> {
         }
         const socket = this.socket;
         this.socket = null;
+        this.connected = false;
         this.failures = 0;
         socket?.close();
     }
 
     /** True while there is a connection to send on. */
     get isOpen(): boolean {
-        return this.socket !== null;
+        return this.connected;
     }
 
     /**
@@ -101,6 +111,9 @@ export class ReconnectingSocket<Message> {
         socket.onopen = () => {
             // Reached the server, so a later drop starts counting from the short delay again.
             this.failures = 0;
+            // Before the callback, not after: [onOpen] is where a caller says again what it
+            // wants, and it says it by sending.
+            this.connected = true;
             this.onOpen();
         };
 
@@ -111,6 +124,7 @@ export class ReconnectingSocket<Message> {
         socket.onclose = () => {
             if (this.socket !== socket) return; // an old socket reporting after a stop
             this.socket = null;
+            this.connected = false;
             if (this.isStopped) return;
 
             const delay = this.delays[Math.min(this.failures, this.delays.length - 1)];

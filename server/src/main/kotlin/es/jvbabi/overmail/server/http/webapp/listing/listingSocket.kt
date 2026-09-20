@@ -133,6 +133,7 @@ fun Route.listingSocket() {
                     send(
                         "groups",
                         ListingServerMessage.Groups(
+                            token = current.token,
                             groupings = groups.groupings,
                             groups = groups.groups.map { group -> ListingGroup(group.keys, group.count) },
                         ),
@@ -154,6 +155,7 @@ fun Route.listingSocket() {
                     send(
                         "page:" + page.group + ":" + page.offset,
                         ListingServerMessage.Page(
+                            token = current.token,
                             group = page.group,
                             offset = page.offset,
                             total = answer.total,
@@ -198,7 +200,7 @@ fun Route.listingSocket() {
                 try {
                     when (val message = json.decodeFromString<ListingClientMessage>(text)) {
                         is ListingClientMessage.WatchListing -> {
-                            val watched = WatchedListing.of(message.query)
+                            val watched = WatchedListing.of(message.query, message.token)
 
                             val wanted = lock.withLock {
                                 listing = watched
@@ -245,6 +247,8 @@ fun Route.listingSocket() {
 
 /** The listing a client named, read once so every answer about it is cut the same way. */
 private class WatchedListing(
+    /** What the client calls this watch; every answer about it carries it back. */
+    val token: Long,
     val filter: MailFilter,
     val groupings: List<MailGroupingKind>,
     val sorting: Pair<MailSorting, Boolean>,
@@ -253,10 +257,11 @@ private class WatchedListing(
 ) {
     companion object {
         /** Reads [query] the way the endpoints read a query string, or throws [ApiException]. */
-        fun of(query: String): WatchedListing {
+        fun of(query: String, token: Long): WatchedListing {
             val parameters = parseQueryString(query)
 
             return WatchedListing(
+                token = token,
                 filter = mailFilter(parameters),
                 groupings = mailGroupings(parameters),
                 sorting = mailSorting(parameters),
@@ -303,7 +308,15 @@ private sealed class ListingClientMessage {
      */
     @Serializable
     @SerialName("watch.listing")
-    data class WatchListing(@SerialName("query") val query: String) : ListingClientMessage()
+    data class WatchListing(
+        @SerialName("query") val query: String,
+        /**
+         * What the client calls this watch. Echoed by every answer about it, so an answer that
+         * was already on its way when the client moved on is filed under the listing it is
+         * actually about rather than under the one now on screen.
+         */
+        @SerialName("token") val token: Long = 0,
+    ) : ListingClientMessage()
 
     /**
      * The pages the client is looking at, which is what it wants kept up to date. The whole set
@@ -332,6 +345,7 @@ private sealed class ListingServerMessage {
     @Serializable
     @SerialName("data.listing.groups")
     data class Groups(
+        @SerialName("token") val token: Long,
         @SerialName("groupings") val groupings: List<String>,
         @SerialName("groups") val groups: List<ListingGroup>,
     ) : ListingServerMessage()
@@ -340,6 +354,7 @@ private sealed class ListingServerMessage {
     @Serializable
     @SerialName("data.listing.page")
     data class Page(
+        @SerialName("token") val token: Long,
         @SerialName("group") val group: String,
         @SerialName("offset") val offset: Int,
         /** How long the group is, not how much of it this carries. */

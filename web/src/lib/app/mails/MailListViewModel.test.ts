@@ -1,49 +1,128 @@
 import {expect, test} from "bun:test";
 import {MailListViewModel, everyMail} from "./MailListViewModel.svelte";
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import type {SocketLike} from "$lib/repository/ReconnectingSocket";
 import type {ViewSettings} from "$lib/app/views/viewSettings";
 
-/** What was asked of the api, as the part of the url that says what for. */
+/** What was asked of the `/ids` endpoint, which is the one thing still fetched. */
 let requests: string[] = [];
 
-/** A view of the mailbox: the groups it is cut into, and the mails of each of them in order. */
-function mailbox(groups: Record<string, string[]>, levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}]) {
-    requests = [];
+/**
+ * The server's side of the listing socket: it holds a mailbox, answers what is watched, and
+ * answers it again when [move] says the mailbox changed.
+ */
+class FakeListingServer implements SocketLike {
+    onopen: (() => void) | null = null;
+    onclose: ((event: {wasClean: boolean}) => void) | null = null;
+    onmessage: ((event: {data: string}) => void) | null = null;
 
+    /** Everything the client sent, parsed. */
+    readonly sent: Record<string, unknown>[] = [];
+
+    /** How often the shape and a page went out, so a test can see that it was answered again. */
+    answers = 0;
+
+    private token = 0;
+    private pages: {group: string; offset: number; limit: number}[] = [];
+
+    constructor(private groups: Record<string, string[]>) {}
+
+    send(data: string) {
+        const message = JSON.parse(data) as Record<string, unknown>;
+        this.sent.push(message);
+
+        if (message.type === "watch.listing") {
+            this.token = message.token as number;
+            this.pages = [];
+            this.sendGroups();
+        }
+
+        if (message.type === "watch.pages") {
+            this.pages = message.pages as typeof this.pages;
+            this.pages.forEach((page) => this.sendPage(page));
+        }
+    }
+
+    close() {
+        this.onclose?.({wasClean: true});
+    }
+
+    /** The mailbox moved: the shape and every watched page go out again, unasked. */
+    move(groups: Record<string, string[]>) {
+        this.groups = groups;
+        this.sendGroups();
+        this.pages.forEach((page) => this.sendPage(page));
+    }
+
+    /** The mails under a group key, which may name a level above the deepest one. */
+    private under(group: string): string[] {
+        return Object.entries(this.groups)
+            .filter(([keys]) => group === "" || keys === group || keys.startsWith(group + ","))
+            .flatMap(([, ids]) => ids);
+    }
+
+    private sendGroups() {
+        this.answers++;
+        const groups = Object.entries(this.groups).map(([keys, ids]) => ({
+            keys: keys === "" ? [] : keys.split(","),
+            count: ids.length,
+        }));
+
+        this.emit({type: "data.listing.groups", token: this.token, groupings: [], groups});
+    }
+
+    private sendPage(page: {group: string; offset: number; limit: number}) {
+        this.answers++;
+        const under = this.under(page.group);
+
+        this.emit({
+            type: "data.listing.page",
+            token: this.token,
+            group: page.group,
+            offset: page.offset,
+            total: under.length,
+            ids: under.slice(page.offset, page.offset + page.limit),
+        });
+    }
+
+    private emit(message: unknown) {
+        this.onmessage?.({data: JSON.stringify(message)});
+    }
+}
+
+/** A view of the mailbox: the groups it is cut into, and the mails of each of them in order. */
+function mailbox(
+    groups: Record<string, string[]>,
+    levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}]
+) {
+    requests = [];
+    const servers: FakeListingServer[] = [];
+
+    // The stretch endpoint is the one request left, see MailListViewModel.idsOfGroup.
     globalThis.fetch = (async (url: string) => {
         const target = new URL(url, "http://localhost");
         const group = target.searchParams.get("group");
-        requests.push(`${target.pathname}|${group ?? ""}|${target.searchParams.get("offset") ?? ""}`);
+        requests.push(`${target.pathname}|${group ?? ""}`);
 
-        if (target.pathname.endsWith("/groups")) {
-            const counted = Object.entries(groups).map(([keys, ids]) => ({
-                keys: keys === "" ? [] : keys.split(","),
-                count: ids.length,
-            }));
-
-            return new Response(JSON.stringify({groupings: [], groups: counted}), {status: 200});
-        }
-
-        // Every mail under the group asked for: fewer keys than levels is the level above, which
-        // is what a header of an outer level asks for.
         const under = Object.entries(groups)
             .filter(([keys]) => group === null || keys === group || keys.startsWith(group + ","))
             .flatMap(([, ids]) => ids);
 
-        if (target.pathname.endsWith("/ids")) {
-            return new Response(JSON.stringify({total: under.length, ids: under}), {status: 200});
-        }
-
-        const offset = Number(target.searchParams.get("offset") ?? 0);
-        const limit = Number(target.searchParams.get("limit") ?? 100);
-
-        return new Response(
-            JSON.stringify({total: under.length, ids: under.slice(offset, offset + limit)}),
-            {status: 200}
-        );
+        return new Response(JSON.stringify({total: under.length, ids: under}), {status: 200});
     }) as unknown as typeof fetch;
 
-    return {levels};
+    return {
+        levels,
+        servers,
+        latest: () => servers[servers.length - 1],
+        open: () => {
+            const server = new FakeListingServer(groups);
+            servers.push(server);
+            // The socket only says what it watches once it is open, like a real one.
+            queueMicrotask(() => server.onopen?.());
+            return server;
+        },
+    };
 }
 
 /** A repository that only counts what is subscribed; what a mail *is* is not this test's. */
@@ -69,11 +148,18 @@ const view = (groupings: ViewSettings["groupings"], filter = everyMail()): ViewS
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
-test("the shape and the first page arrive, and the rows are the two together", async () => {
-    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+/** A list on the mailbox above, already watching. */
+function listing(box: ReturnType<typeof mailbox>, mails = repository().repository) {
+    const list = new MailListViewModel(mails, {open: box.open, reconnectDelays: [1]});
+    list.setView(view(box.levels));
+    return list;
+}
 
+test("the shape and the first page arrive, and the rows are the two together", async () => {
+    const box = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const list = listing(box);
+
+    await settle();
     list.window(0, 20);
     await settle();
 
@@ -85,31 +171,37 @@ test("the shape and the first page arrive, and the rows are the two together", a
     expect(list.initialized).toBe(true);
 });
 
-test("a group is asked for once, however many of its rows are on screen", async () => {
-    const {levels} = mailbox({"1": ["a", "b", "c"]});
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+test("a group is watched once, however many of its rows are on screen", async () => {
+    const box = mailbox({"1": ["a", "b", "c"]});
+    const list = listing(box);
 
-    list.window(0, 20);
     await settle();
     list.window(0, 20);
     await settle();
+    list.window(0, 20);
+    await settle();
 
-    const pages = requests.filter((request) => request.startsWith("/api/emails/list|"));
-    expect(pages).toEqual(["/api/emails/list|1|0"]);
+    const watched = box.latest().sent.filter((message) => message.type === "watch.pages");
+    expect(watched).toEqual([{type: "watch.pages", pages: [{group: "1", offset: 0, limit: 100}]}]);
 });
 
-test("a window that reaches into a second group asks for that one as well", async () => {
-    const {levels} = mailbox({"1": ["a"], "2": ["b"], "3": ["c"]});
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+test("a window that reaches into a second group watches that one as well", async () => {
+    const box = mailbox({"1": ["a"], "2": ["b"], "3": ["c"]});
+    const list = listing(box);
 
+    await settle();
     // The first two stretches only: a header and a mail each.
     list.window(0, 3);
     await settle();
 
-    const pages = requests.filter((request) => request.startsWith("/api/emails/list|"));
-    expect(pages).toEqual(["/api/emails/list|1|0", "/api/emails/list|2|0"]);
+    const watched = box.latest().sent.filter((message) => message.type === "watch.pages").at(-1);
+    expect(watched).toEqual({
+        type: "watch.pages",
+        pages: [
+            {group: "1", offset: 0, limit: 100},
+            {group: "2", offset: 0, limit: 100},
+        ],
+    });
 });
 
 test("a second level puts a header under the first", async () => {
@@ -117,10 +209,10 @@ test("a second level puts a header under the first", async () => {
         {kind: "date_smart", reversed: false},
         {kind: "sender", reversed: false},
     ];
-    mailbox({"1,alice": ["a"], "1,bob": ["b", "c"]}, levels);
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+    const box = mailbox({"1,alice": ["a"], "1,bob": ["b", "c"]}, levels);
+    const list = listing(box);
 
+    await settle();
     list.window(0, 20);
     await settle();
 
@@ -136,10 +228,10 @@ test("ticking a header asks for every mail under it, and only once", async () =>
         {kind: "date_smart", reversed: false},
         {kind: "sender", reversed: false},
     ];
-    mailbox({"1,alice": ["a"], "1,bob": ["b"]}, levels);
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+    const box = mailbox({"1,alice": ["a"], "1,bob": ["b"]}, levels);
+    const list = listing(box);
 
+    await settle();
     list.window(0, 20);
     await settle();
 
@@ -148,35 +240,61 @@ test("ticking a header asks for every mail under it, and only once", async () =>
     await list.idsOfGroup(day);
 
     // The outer header asks for its own path, and the answer is held for the second click.
-    const stretches = requests.filter((request) => request.startsWith("/api/emails/list/ids|"));
-    expect(stretches).toEqual(["/api/emails/list/ids|1|"]);
+    expect(requests).toEqual(["/api/emails/list/ids|1"]);
 });
 
-test("changing the view keeps what the old one read", async () => {
+test("changing the view watches the other listing, and keeps what this one read", async () => {
     const levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}];
-    mailbox({"1": ["a", "b"]}, levels);
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+    const box = mailbox({"1": ["a", "b"]}, levels);
+    const list = listing(box);
 
+    await settle();
     list.window(0, 20);
     await settle();
     expect(list.total).toBe(2);
 
     // Another filter is another listing; the fake answers the same mails, which is enough to see
-    // that it was read again rather than shown from what the first one held.
+    // that it was watched again rather than shown from what the first one held.
     list.setView(view(levels, {...everyMail(), readState: false}));
     await settle();
     expect(list.total).toBe(2);
 
-    const shapes = requests.filter((request) => request.startsWith("/api/emails/list/groups"));
-    expect(shapes.length).toBe(2);
+    const watches = box.latest().sent.filter((message) => message.type === "watch.listing");
+    expect(watches.length).toBe(2);
+    // Each watch is its own, so an answer to the first is not filed under the second.
+    expect(watches[0].token).not.toBe(watches[1].token);
+});
+
+test("an answer to a watch that has been left behind is dropped", async () => {
+    const levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}];
+    const box = mailbox({"1": ["a", "b"]}, levels);
+    const list = listing(box);
+
+    await settle();
+    list.window(0, 20);
+    await settle();
+
+    list.setView(view(levels, {...everyMail(), readState: false}));
+    await settle();
+
+    // The old watch answering late, with three mails it never had: nothing on screen moves.
+    box.latest().onmessage?.({
+        data: JSON.stringify({
+            type: "data.listing.groups",
+            token: 1,
+            groupings: [],
+            groups: [{keys: ["1"], count: 3}],
+        }),
+    });
+
+    expect(list.total).toBe(2);
 });
 
 test("stepping walks the mails, headers and groups alike", async () => {
-    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+    const box = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const list = listing(box);
 
+    await settle();
     list.window(0, 20);
     await settle();
 
@@ -189,11 +307,11 @@ test("stepping walks the mails, headers and groups alike", async () => {
 });
 
 test("what is on screen is subscribed, and what left it is let go", async () => {
-    const {levels} = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const box = mailbox({"1": ["a", "b"], "2": ["c"]});
     const {held, repository: mails} = repository();
-    const list = new MailListViewModel(mails);
-    list.setView(view(levels));
+    const list = listing(box, mails);
 
+    await settle();
     list.window(0, 20);
     await settle();
     expect(held.get("a")).toBe(1);
@@ -208,17 +326,41 @@ test("what is on screen is subscribed, and what left it is let go", async () => 
     expect([...held.values()].every((count) => count === 0)).toBe(true);
 });
 
-test("a move reads the shape and the pages again", async () => {
-    const {levels} = mailbox({"1": ["a"]});
-    const list = new MailListViewModel(repository().repository);
-    list.setView(view(levels));
+test("a mail arriving is on screen without anybody having asked", async () => {
+    const box = mailbox({"1": ["a"]});
+    const list = listing(box);
 
+    await settle();
     list.window(0, 20);
     await settle();
-    const before = requests.length;
+    expect(list.total).toBe(1);
 
-    list.refresh();
+    const asked = box.latest().sent.length;
+
+    // The server's side of a move: it sends the shape and the watched pages again, unasked.
+    box.latest().move({"1": ["new", "a"]});
     await settle();
 
-    expect(requests.length).toBeGreaterThan(before);
+    expect(list.total).toBe(2);
+    expect(list.idAt({path: ["1"], offset: 0})).toBe("new");
+    // Nothing went out for it -- that is the whole point of pushing the index.
+    expect(box.latest().sent.length).toBe(asked);
+});
+
+test("a reconnect says again what is on screen", async () => {
+    const box = mailbox({"1": ["a", "b"]});
+    const list = listing(box);
+
+    await settle();
+    list.window(0, 20);
+    await settle();
+
+    const first = box.latest();
+    first.onclose?.({wasClean: false});
+    await settle();
+
+    const second = box.latest();
+    expect(second).not.toBe(first);
+    expect(second.sent.map((message) => message.type)).toEqual(["watch.listing", "watch.pages"]);
+    expect(list.total).toBe(2);
 });

@@ -1,12 +1,21 @@
 import {SvelteMap} from "svelte/reactivity";
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
+import type {SocketLike} from "$lib/repository/ReconnectingSocket";
+import {ListingSocket, type WantedPage} from "$lib/repository/ListingSocket";
 import type {ViewFilter} from "$lib/repository/ViewSocket";
 import {filterKey, filterParams} from "$lib/app/mails/mailFilterQuery";
 import {buildLayout, MailLayout, type MailGroupCount, type MailGroupNode} from "$lib/app/mails/mailLayout";
 import {mailboxView, type ViewSettings} from "$lib/app/views/viewSettings";
 
-/** How many mails one request asks for. The server caps this at 500. */
+/** How many mails one page holds. The server caps this at 500. */
 const PAGE_SIZE = 100;
+
+/**
+ * How many pages are watched at once. A window is a screen and some overscan, which spans a
+ * handful of groups at most; the server holds the same number, so asking for more would be
+ * asking for something that is quietly dropped.
+ */
+const MAX_PAGES = 16;
 
 /** One mail along the listing: -1 is up the table, which is the row before it. */
 export type MailStep = -1 | 1;
@@ -27,24 +36,12 @@ type Listing = {
 
     /** Whether anything has come back for this view yet. */
     initialized: boolean;
-
-    /**
-     * Bumped every time the mailbox moved -- see [MailListViewModel.refresh]. What was read
-     * before that was read of another listing, so an answer from an older one is dropped rather
-     * than filed at a place it no longer holds.
-     */
-    generation: number;
-
-    /** Which generation the groups were read at. Behind [generation] means: read them again. */
-    groupsGeneration: number;
 };
 
 const emptyListing = (): Listing => ({
     groups: null,
     entries: {},
     initialized: false,
-    generation: 0,
-    groupsGeneration: 0,
 });
 
 /**
@@ -61,6 +58,12 @@ const NOTHING_READ: Listing = emptyListing();
  */
 const pathKey = (path: string[]) => path.join("/");
 
+/** The same group as the api names it, which is what `group=` carries. */
+const groupWire = (path: string[]) => path.join(",");
+
+/** Back again: the path behind a group the server named. */
+const wirePath = (group: string) => (group === "" ? [] : group.split(","));
+
 /**
  * The listing by position: which mail sits where, and where the headers between them go.
  *
@@ -72,6 +75,11 @@ const pathKey = (path: string[]) => path.join("/");
  * every stretch is -- which is what lets a windowed table lay itself out before a single mail is
  * loaded. The pages say which mail sits at which offset of a group. A hole is a mail that exists
  * and has not been asked for; scrolling onto one is what asks.
+ *
+ * Nothing is fetched. Both answers come over [ListingSocket]: this says which listing it is on
+ * and which pages of it it is looking at, and the server sends those again on its own whenever
+ * the mailbox moves. A mail arriving is on screen without anybody here having to notice first --
+ * which is the whole reason the index is a socket and not three endpoints.
  *
  * Mails are addressed by group and offset, never by a position in the whole listing: that is what
  * the api pages by, it survives a group above growing, and it still means something when the
@@ -96,13 +104,26 @@ export class MailListViewModel {
 
     failed = $state(false);
 
-    /** Requests on their way, by what they ask for, so nothing is asked for twice. */
-    private readonly inFlight = new Set<string>();
+    /** The index, kept current by the server; see [ListingSocket]. */
+    private readonly socket: ListingSocket;
 
     /**
-     * The ids of a whole group as the server named them, by view, generation and group -- so
-     * ticking one and taking it back again is one request, not two. Promises rather than
-     * answers: a second click while the first is on its way waits for the same one.
+     * Which view the answers coming in are about.
+     *
+     * The socket watches one listing at a time and drops what an older watch still answers, so
+     * this is that watch's key -- written where the watch is sent, and read where an answer is
+     * filed. Reading [key] there instead would file an answer under whatever is on screen by the
+     * time it lands.
+     */
+    private watched: string;
+
+    /**
+     * The ids of a whole group as the server named them, by view and group -- so ticking one and
+     * taking it back again is one request, not two. Promises rather than answers: a second click
+     * while the first is on its way waits for the same one.
+     *
+     * Thrown away whenever the shape moves: a group is a set of positions, and a move is what
+     * makes them mean other mails.
      */
     private readonly stretches = new Map<string, Promise<string[]>>();
 
@@ -112,11 +133,32 @@ export class MailListViewModel {
     /** The last range a table asked for, so a move can read exactly that one again. */
     private lastWindow: {fromRow: number; toRow: number} | null = null;
 
-    constructor(private readonly mails: EmailRepository) {
+    constructor(
+        private readonly mails: EmailRepository,
+        config: {
+            /** Defaults to a real browser socket. */
+            open?: (url: string) => SocketLike;
+            /** Overridden in tests, which have no second to wait. */
+            reconnectDelays?: number[];
+        } = {}
+    ) {
+        this.socket = new ListingSocket({
+            open: config.open,
+            reconnectDelays: config.reconnectDelays,
+            onGroups: (groups) => this.receiveGroups(groups.groups),
+            onPage: (page) => this.receivePage(page.group, page.offset, page.ids),
+            onFailed: (message) => {
+                console.error("The listing could not be read: " + message);
+                this.failed = true;
+            },
+        });
+
         // The listing of the view this starts on, put in here: everything that reads it goes
         // through a derived, and a derived is not allowed to be the one that writes it into
         // existence -- see [listing].
+        this.watched = this.key;
         this.update(this.key, {});
+        this.socket.watch(this.query().toString());
     }
 
     /** What identifies the listing being shown: everything held is keyed by it. */
@@ -129,12 +171,11 @@ export class MailListViewModel {
      *
      * Reads only: a getter that started a listing would be writing state from inside whatever
      * derived asked for it, which Svelte refuses -- and rightly, the reader of a list is not what
-     * decides that it exists. [listingFor] is the writing side.
+     * decides that it exists. [update] is the writing side.
      */
     private get listing(): Listing {
         return this.listings.get(this.key) ?? NOTHING_READ;
     }
-
 
     /** What has been read under [key], and an empty listing when that is nothing. */
     private listingFor(key: string): Listing {
@@ -211,17 +252,19 @@ export class MailListViewModel {
      * What ticking a header means: the mails of a stretch, whether or not their rows were ever
      * drawn -- and a header of an outer level is every group under it, which is one request as
      * well. Held while it is on its way, and thrown away when the listing moves.
+     *
+     * The one thing here that is still a request: it is an answer to a click, not something a
+     * screen keeps up to date, and it asks for mails no row ever drew.
      */
     async idsOfGroup(node: MailGroupNode): Promise<string[]> {
         const key = this.key;
-        const listing = this.listingFor(key);
-        const stretchKey = key + ":" + listing.generation + ":" + pathKey(node.path);
+        const stretchKey = key + ":" + pathKey(node.path);
 
         const held = this.stretches.get(stretchKey);
         if (held !== undefined) return held;
 
         const query = this.query();
-        if (node.path.length > 0) query.set("group", node.path.join(","));
+        if (node.path.length > 0) query.set("group", groupWire(node.path));
 
         const request = (async () => {
             const response = await fetch("/api/emails/list/ids?" + query);
@@ -315,16 +358,18 @@ export class MailListViewModel {
      *
      * A view that asks for the same listing is not a change, whatever object it arrives in: the
      * caller builds a fresh one whenever anything around it moves, and every one of those would
-     * otherwise be a listing read again from the top.
+     * otherwise be a listing watched again from the top.
      */
     setView(view: ViewSettings) {
         if (viewKey(view) === this.key) return;
 
         this.view = view;
         // Started here rather than left to whoever reads it: a listing nobody has read yet is
-        // empty, and an empty one asks for nothing, so the table would sit at a length of zero
-        // waiting for a scroll that never comes.
+        // empty, and an empty one has no rows, so the table would sit at a length of zero waiting
+        // for a scroll that never comes.
+        this.watched = this.key;
         this.update(this.key, {});
+        this.socket.watch(this.query().toString());
 
         const last = this.lastWindow;
         if (last !== null) this.window(last.fromRow, last.toRow);
@@ -332,56 +377,76 @@ export class MailListViewModel {
 
     /**
      * Makes sure the rows between [fromRow] and [toRow] -- rows of the layout, headers included
-     * -- are on their way and stay up to date. Cheap to call on every scroll frame: it asks for
-     * what is missing and nothing else.
+     * -- are on their way and stay up to date. Cheap to call on every scroll frame: the socket
+     * drops a window that asks for what it is already watching.
      */
     window(fromRow: number, toRow: number) {
         this.lastWindow = {fromRow, toRow};
-        void this.loadGroups();
 
         const wanted = this.layout.mailsIn(fromRow, toRow - fromRow + 1);
 
-        for (const position of wanted) {
-            if (this.idAt(position) === undefined) void this.load(position);
-        }
-
+        this.socket.watchPages(pagesOf(wanted));
         this.subscribeRange(wanted);
-    }
-
-    /**
-     * Reads everything again, keeping what is on screen where it is.
-     *
-     * A mail arriving or being filed moves the listing under the reader: the counts change, and
-     * with them which mail sits at which offset. Rather than shifting rows about, the shape and
-     * the pages around the window are read again and replace what was there in one go.
-     */
-    refresh() {
-        // A group is a set of positions, and a move is what makes them mean other mails.
-        this.stretches.clear();
-
-        for (const [key, listing] of this.listings) {
-            this.listings.set(key, {...listing, generation: listing.generation + 1});
-        }
-
-        const last = this.lastWindow;
-        if (last !== null) this.window(last.fromRow, last.toRow);
     }
 
     /** Asks again after a failure -- what the retry button does. */
     retry() {
         this.failed = false;
         this.listings.set(this.key, emptyListing());
-        this.inFlight.clear();
         this.stretches.clear();
+        this.socket.rewatch();
 
         const last = this.lastWindow;
         this.window(last?.fromRow ?? 0, last?.toRow ?? 0);
     }
 
-    /** Lets go of every row. The table calls this when it goes away. */
+    /** Lets go of every row, and of the socket. The table calls this when it goes away. */
     dispose() {
         this.subscribed.forEach((release) => release());
         this.subscribed.clear();
+        this.socket.stop();
+    }
+
+    /**
+     * The shape of the listing, as the server has it now.
+     *
+     * A mail arriving or being filed moves the listing under the reader: the counts change, and
+     * with them which mail sits at which offset. This arrives unasked, and the pages around the
+     * window follow it -- so rather than shifting rows about, the table lays itself out again
+     * from what is now true.
+     */
+    private receiveGroups(groups: MailGroupCount[]) {
+        this.failed = false;
+        this.update(this.watched, {groups, initialized: true});
+
+        // A group is a set of positions, and a move is what makes them mean other mails.
+        this.stretches.clear();
+
+        // The shape is what says which rows there are, so the window that was asked for before it
+        // arrived is only now a range of mails.
+        const last = this.lastWindow;
+        if (last !== null && this.watched === this.key) this.window(last.fromRow, last.toRow);
+    }
+
+    /** One page, filed under its group. */
+    private receivePage(group: string, offset: number, ids: string[]) {
+        this.failed = false;
+
+        const key = pathKey(wirePath(group));
+        const held = this.listingFor(this.watched);
+        const page = {...(held.entries[key] ?? {})};
+        ids.forEach((id, index) => (page[offset + index] = id));
+
+        this.update(this.watched, {
+            entries: {...held.entries, [key]: page},
+            initialized: true,
+        });
+
+        // The rows that were waiting for this page are on screen now.
+        const last = this.lastWindow;
+        if (last !== null && this.watched === this.key) {
+            this.subscribeRange(this.layout.mailsIn(last.fromRow, last.toRow - last.fromRow + 1));
+        }
     }
 
     /**
@@ -408,100 +473,6 @@ export class MailListViewModel {
         }
     }
 
-    /** The page [position] sits in, read and filed under its group. */
-    private async load(position: MailPosition) {
-        const key = this.key;
-        const listing = this.listingFor(key);
-        const generation = listing.generation;
-
-        // Pages start at multiples of the page size, so two rows of the same page are one
-        // request and a window that moves by one row does not shift every boundary.
-        const start = Math.floor(position.offset / PAGE_SIZE) * PAGE_SIZE;
-        const group = pathKey(position.path);
-
-        // The generation is part of the key: a request that was cut for the listing as it stood
-        // before a move must not stand in the way of the one that reads it again.
-        const request = key + ":" + generation + ":" + group + ":" + start;
-        if (this.inFlight.has(request)) return;
-        this.inFlight.add(request);
-
-        try {
-            const query = this.query();
-            if (position.path.length > 0) query.set("group", position.path.join(","));
-            query.set("offset", String(start));
-            query.set("limit", String(PAGE_SIZE));
-
-            const response = await fetch("/api/emails/list?" + query);
-            if (!response.ok) throw new Error("Could not read the mailbox: " + response.status);
-
-            const answer = (await response.json()) as {ids: string[]};
-            if (!Array.isArray(answer.ids)) throw new Error("The page has no ids");
-
-            // The listing may have moved while this was out; then it is about mails that are no
-            // longer at these offsets.
-            const held = this.listingFor(key);
-            if (held.generation !== generation) return;
-
-            const page = {...(held.entries[group] ?? {})};
-            answer.ids.forEach((id, index) => (page[start + index] = id));
-            this.update(key, {
-                entries: {...held.entries, [group]: page},
-                initialized: true,
-            });
-            this.failed = false;
-
-            // The rows that were waiting for this page are on screen now.
-            const last = this.lastWindow;
-            if (last !== null) {
-                this.subscribeRange(this.layout.mailsIn(last.fromRow, last.toRow - last.fromRow + 1));
-            }
-        } catch (error) {
-            console.error(error);
-            this.failed = true;
-        } finally {
-            this.inFlight.delete(request);
-        }
-    }
-
-    /** The shape of the listing: how deep it is cut and how long every stretch is. */
-    private async loadGroups() {
-        const key = this.key;
-        const listing = this.listingFor(key);
-        const generation = listing.generation;
-
-        if (listing.groups !== null && listing.groupsGeneration === generation) return;
-
-        const request = key + ":" + generation + ":groups";
-        if (this.inFlight.has(request)) return;
-        this.inFlight.add(request);
-
-        try {
-            const response = await fetch("/api/emails/list/groups?" + this.query());
-            if (!response.ok) throw new Error("Could not read the mailbox shape: " + response.status);
-
-            const answer = (await response.json()) as {groups: MailGroupCount[]};
-            if (!Array.isArray(answer.groups)) throw new Error("The mailbox shape has no groups");
-            if (this.listingFor(key).generation !== generation) return;
-
-            this.update(key, {
-                groups: answer.groups,
-                groupsGeneration: generation,
-                initialized: true,
-            });
-            this.failed = false;
-
-            // The shape is what says which rows there are, so the window that was asked for
-            // before it arrived is only now a range of mails.
-            const last = this.lastWindow;
-            if (last !== null) this.window(last.fromRow, last.toRow);
-        } catch (error) {
-            console.error(error);
-            this.failed = true;
-        } finally {
-            this.inFlight.delete(request);
-        }
-    }
-
     /** What every request carries: the filter, the levels, and what orders the mails. */
     private query(): URLSearchParams {
         const query = filterParams(this.view.filter);
@@ -514,6 +485,26 @@ export class MailListViewModel {
 
         return query;
     }
+}
+
+/**
+ * The pages the rows in [wanted] sit on.
+ *
+ * Pages start at multiples of the page size, so two rows of the same page are one page and a
+ * window that moves by one row does not shift every boundary.
+ */
+function pagesOf(wanted: MailPosition[]): WantedPage[] {
+    const pages = new Map<string, WantedPage>();
+
+    for (const position of wanted) {
+        const group = groupWire(position.path);
+        const offset = Math.floor(position.offset / PAGE_SIZE) * PAGE_SIZE;
+        const key = group + ":" + offset;
+
+        if (!pages.has(key)) pages.set(key, {group, offset, limit: PAGE_SIZE});
+    }
+
+    return [...pages.values()].slice(0, MAX_PAGES);
 }
 
 /**

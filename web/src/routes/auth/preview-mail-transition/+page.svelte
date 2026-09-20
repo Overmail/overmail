@@ -78,8 +78,6 @@
     const mails = {
         peek: () => ({value: open, isLoading: false}),
         subscribe: () => () => {},
-        watchMoves: () => () => {},
-        revision: 0,
         setRead: async () => {},
         setArchiveState: async () => {},
         attachLabel: async () => {},

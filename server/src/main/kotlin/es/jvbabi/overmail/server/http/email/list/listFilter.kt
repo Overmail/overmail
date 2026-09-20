@@ -8,7 +8,7 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.emailArchiveStateIs
 import es.jvbabi.overmail.server.http.api.invalidRequest
-import io.ktor.server.application.ApplicationCall
+import io.ktor.http.Parameters
 import kotlin.uuid.Uuid
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.and
@@ -136,13 +136,15 @@ data class MailFilter(
 /**
  * What the query parameters ask for, or 400.
  *
+ * Takes the parameters rather than the call: the listing socket is handed the same names in a
+ * client message and has no query string to read them out of, and a filter that is built twice is
+ * a filter that drifts.
+ *
  * Read out by hand rather than through one helper per kind: the OpenAPI plugin walks into
  * everything a route handler reaches and falls over a project helper it meets there more than
  * once -- the same reason `http/api/` has a reader per kind instead of one generic one.
  */
-internal fun ApplicationCall.mailFilter(): MailFilter {
-    val parameters = request.queryParameters
-
+internal fun mailFilter(parameters: Parameters): MailFilter {
     // Absent is no restriction; present but empty is a set with nothing in it, and the two are
     // the difference between every mail and none.
     val idSets = mutableMapOf<String, Set<Uuid>>()

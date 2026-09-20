@@ -157,30 +157,7 @@ class ContentSocketTest {
     }
 
     @Test
-    fun `a mail that moved is announced, one that only reads differently is not`() = testApplication {
-        val mails = setUp()
-        installRoute()
-
-        val socket = openSocket()
-        socket.subscribe(mails[0])
-        socket.nextEmails()
-
-        // A flag on the mail: every listing still holds the same mails in the same order, so
-        // there is nothing for one to re-read.
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = false)
-        socket.nextEmails()
-        assertNull(withTimeoutOrNull(1_500) { socket.nextMessageOrNull("update.mails.moved") })
-
-        // Archiving takes it out of the mailbox, and no client can know that from a mail it
-        // never subscribed to -- which is what the announcement is for.
-        archive(mails[0], EmailArchiveAction.Archive)
-        mailNotifier.notifyMailChanged(signedIn.id.value, mails[0], movedListings = true)
-        assertEquals("update.mails.moved", socket.next("update.mails.moved")["type"]!!.jsonPrimitive.content)
-        socket.close()
-    }
-
-    @Test
-    fun `reading a mail sends it again and announces nothing`() = testApplication {
+    fun `reading a mail sends it again`() = testApplication {
         val mails = setUp()
         installRoute()
         val client = createClient { install(ClientWebSockets) }
@@ -193,15 +170,14 @@ class ContentSocketTest {
         assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/read").status)
         assertEquals(true, socket.nextEmails().single().jsonObject["is_read"]!!.jsonPrimitive.content.toBoolean())
 
-        // And the way back. Neither moved a mail, so no listing has anything to re-read: past
-        // the debounce of the announcement, nothing has been announced.
+        // And the way back.
         assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/unread").status)
         assertEquals(false, socket.nextEmails().single().jsonObject["is_read"]!!.jsonPrimitive.content.toBoolean())
-        assertNull(withTimeoutOrNull(1_500) { socket.nextMessageOrNull("update.mails.moved") })
 
-        // Archiving does move it, and that is what an announcement is for.
+        // Archiving is a change like any other here: the mail goes out again. Where it now sits
+        // is the listing socket's question, and it reads the index again for itself.
         assertEquals(HttpStatusCode.NoContent, client.post("/api/emails/${mails[0]}/archive").status)
-        assertEquals("update.mails.moved", socket.next("update.mails.moved")["type"]!!.jsonPrimitive.content)
+        assertEquals("archive", socket.nextEmails().single().jsonObject["archive_state"]!!.jsonPrimitive.content)
         socket.close()
     }
 

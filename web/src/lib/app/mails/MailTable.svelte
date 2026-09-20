@@ -208,23 +208,9 @@
         if (gone.length > 0) untrack(() => selection.setAll(gone, false));
     });
 
-    // An empty mailbox holds no rows and would therefore subscribe to nothing, which is when the
-    // announcement below matters most: this keeps the socket up for as long as the table is here.
-    $effect(() => mails.watchMoves());
-
-    // What the listing holds are positions, and a mail arriving or being archived moves them --
-    // including the ones of mails nobody has subscribed to, which is why this comes off the
-    // content socket as an announcement rather than as metadata (see EmailRepository.revision).
-    $effect(() => {
-        // Zero is "nothing announced yet": on mount there is nothing to read again.
-        if (mails.revision === 0) return;
-
-        // Untracked, and this is not optional: refreshing reads the listing to know what to ask
-        // for again, and what it asks for is then written into the very same state. Tracked,
-        // every answer would re-run this effect, refresh again, and ask again -- a listing that
-        // re-reads itself for as long as the tab is open.
-        untrack(() => list.refresh());
-    });
+    // Nothing here listens for a mail arriving or being archived: the listing socket sends the
+    // shape and the pages again on its own when that happens, so the rows are new before anything
+    // on this side could have noticed to ask. See MailListViewModel.
 
     /**
      * Which mail is open in the panel, which is what `?email=` says and nothing else -- so a

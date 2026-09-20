@@ -79,8 +79,7 @@ const MISSING: EmailEntry = {value: null, isLoading: false};
 
 type ContentServerMessage =
     | {type: "data.emails"; emails: WireEmail[]}
-    | {type: "data.emails.unknown"; ids: string[]}
-    | {type: "update.mails.moved"};
+    | {type: "data.emails.unknown"; ids: string[]};
 
 type WireParticipant = {
     id: string;
@@ -133,22 +132,8 @@ export class EmailRepository {
      *  are the one that a test can drive without a browser. */
     private entries: Record<string, EmailEntry> = $state({});
 
-    /**
-     * How often the server has said that this user's mail moved -- one arrived, or one left a
-     * listing by being archived or filed. Zero until the first announcement.
-     *
-     * A number rather than what changed, because that is all the server sends: what a listing is
-     * is a query, and a mail that just arrived is at the top of one without anybody having been
-     * able to subscribe to it. Whoever holds positions reads this and asks again; what a *mail*
-     * is arrives as metadata like everything else.
-     */
-    revision: number = $state(0);
-
     /** How many callers hold [id]. A mail is on the socket while this is above zero. */
     private readonly watchers = new Map<string, number>();
-
-    /** How many callers watch [revision] without holding a mail of their own; see [watchMoves]. */
-    private moveWatchers = 0;
 
     /** Ids whose grace period is running, with the timer that ends it. */
     private readonly releasing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -226,29 +211,6 @@ export class EmailRepository {
             if (released) return;
             released = true;
             this.release(id);
-        };
-    }
-
-    /**
-     * Keeps the socket up for [revision] alone, until the returned function is called. From an
-     * effect, like [subscribe].
-     *
-     * What a listing needs beyond the mails it shows: an empty mailbox subscribes to nothing at
-     * all, the socket would be closed, and that is exactly when the first mail arriving is the
-     * one worth hearing about.
-     */
-    watchMoves(): () => void {
-        this.moveWatchers++;
-        this.socket.start();
-
-        let released = false;
-        return () => {
-            if (released) return;
-            released = true;
-            this.moveWatchers--;
-            // Nothing may be left watching anything, and then the socket goes -- the same check
-            // the last released mail runs through.
-            this.scheduleFlush();
         };
     }
 
@@ -505,7 +467,7 @@ export class EmailRepository {
 
             // Nothing on screen any more: the connection goes with it, and the next subscription
             // opens a new one that starts by asking for what it wants.
-            if (this.moveWatchers === 0 && this.watchers.size === 0 && this.releasing.size === 0) {
+            if (this.watchers.size === 0 && this.releasing.size === 0) {
                 this.socket.stop();
             }
         });
@@ -524,9 +486,6 @@ export class EmailRepository {
                 // Gone, never existed, or not ours -- the same answer either way, and the same
                 // one a caller gets for an id it made up.
                 for (const id of message.ids) this.entries[id] = MISSING;
-                break;
-            case "update.mails.moved":
-                this.revision++;
                 break;
         }
     }

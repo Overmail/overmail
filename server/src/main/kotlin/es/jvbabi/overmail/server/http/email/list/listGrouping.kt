@@ -4,7 +4,7 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.emailArchiveStateIs
 import es.jvbabi.overmail.server.http.api.invalidRequest
-import io.ktor.server.application.ApplicationCall
+import io.ktor.http.Parameters
 import kotlin.uuid.Uuid
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -176,14 +176,14 @@ fun MailGroupingKind.groupPredicate(key: String): Op<Boolean> = when (this) {
 }
 
 /**
- * The levels `?by=` asks for, outermost first, or 400.
+ * The levels `by` asks for, outermost first, or 400.
  *
  * No directions and no order of the groups themselves: the client holds every group it was told
  * about, so it is the one that puts them in order -- by a name it resolved, or by a bucket it
  * folded days into. Sending a direction as well would be two places deciding the same thing.
  */
-internal fun ApplicationCall.mailGroupings(): List<MailGroupingKind> {
-    val raw = request.queryParameters["by"] ?: return emptyList()
+internal fun mailGroupings(parameters: Parameters): List<MailGroupingKind> {
+    val raw = parameters["by"] ?: return emptyList()
 
     val kinds = mutableListOf<MailGroupingKind>()
     for (part in raw.split(",")) {
@@ -201,15 +201,15 @@ internal fun ApplicationCall.mailGroupings(): List<MailGroupingKind> {
 }
 
 /**
- * The one group `?group=` names, as a predicate over [Emails]: one key per level of [groupings],
+ * The one group `group` names, as a predicate over [Emails]: one key per level of [groupings],
  * in the same order.
  *
  * Without the parameter it is the whole listing -- an ungrouped table asks for its rows that way,
  * and so does anything that wants a group's ancestors rather than the group itself. A key count
  * that does not match the levels is a 400: a client that has the groups has the keys.
  */
-internal fun ApplicationCall.mailGroup(groupings: List<MailGroupingKind>): Op<Boolean> {
-    val raw = request.queryParameters["group"] ?: return Op.TRUE
+internal fun mailGroup(parameters: Parameters, groupings: List<MailGroupingKind>): Op<Boolean> {
+    val raw = parameters["group"] ?: return Op.TRUE
 
     val keys = raw.split(",").map { part -> part.trim() }.filter { part -> part.isNotEmpty() }
     if (keys.size > groupings.size) {

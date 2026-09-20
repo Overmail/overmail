@@ -27,10 +27,8 @@ import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -39,15 +37,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.Op
-
-/**
- * How long a move waits for the ones behind it.
- *
- * The same reasoning as the content socket's own announcement, and the same number: answering
- * costs a count over the mailbox and a page query per window, so an import cycle that runs for a
- * minute must not be followed mail by mail.
- */
-private val MOVED_DEBOUNCE = 1000.milliseconds
 
 /**
  * The most pages one socket keeps up to date.
@@ -180,15 +169,15 @@ fun Route.listingSocket() {
                     }
             }
 
+            // No wait anywhere in here. A move is answered the moment it is announced, because
+            // waiting is the one thing this socket exists to take out -- and there is nothing to
+            // bundle: the channel is conflated, so everything that happens while an answer is
+            // being loaded is already one token behind it. What bounds a burst is that this
+            // reads one answer at a time, not a timer.
             launch {
                 while (true) {
                     moved.receive()
-                    delay(MOVED_DEBOUNCE)
-                    // Whatever arrived during the wait is covered by the answer about to go out.
-                    moved.tryReceive()
-
-                    val wanted = lock.withLock { pages }
-                    answer(shape = true, wanted = wanted)
+                    answer(shape = true, wanted = lock.withLock { pages })
                 }
             }
 

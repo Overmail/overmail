@@ -58,6 +58,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
+import es.jvbabi.overmail.server.http.webapp.listing.listingSocket
 import es.jvbabi.overmail.server.http.webapp.views.viewsSocket
 import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
@@ -320,6 +321,12 @@ internal fun Application.configureRouting() {
                 route("/home") {
                     route("/socket") {
                         homeSocket()
+                    }
+                }
+
+                route("/listing") {
+                    route("/socket") {
+                        listingSocket()
                     }
                 }
 

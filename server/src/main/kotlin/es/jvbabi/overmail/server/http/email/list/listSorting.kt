@@ -3,7 +3,7 @@ package es.jvbabi.overmail.server.http.email.list
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.http.api.invalidRequest
-import io.ktor.server.application.ApplicationCall
+import io.ktor.http.Parameters
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.SortOrder
 
@@ -41,9 +41,13 @@ fun MailSorting.orderBy(): Expression<*> = when (this) {
 /** Whether the sort needs the sender's address, which only a join has. */
 fun MailSorting.needsSender(): Boolean = this == MailSorting.SENDER
 
-/** What `?sort=` asks for, or 400. Newest first unless something else is named. */
-internal fun ApplicationCall.mailSorting(): Pair<MailSorting, Boolean> {
-    val raw = request.queryParameters["sort"] ?: return MailSorting.DATE to false
+/**
+ * What `sort` asks for, or 400. Newest first unless something else is named.
+ *
+ * The parameters rather than the call, see [mailFilter].
+ */
+internal fun mailSorting(parameters: Parameters): Pair<MailSorting, Boolean> {
+    val raw = parameters["sort"] ?: return MailSorting.DATE to false
 
     val reversed = raw.endsWith(":r")
     val name = if (reversed) raw.dropLast(2) else raw

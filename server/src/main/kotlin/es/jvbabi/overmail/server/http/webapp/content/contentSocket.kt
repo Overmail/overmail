@@ -14,7 +14,6 @@ import io.ktor.server.websocket.sendSerialized
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
@@ -33,15 +32,6 @@ import kotlinx.serialization.json.Json
  * into one message instead of one per write.
  */
 private val CHANGE_DEBOUNCE = 150.milliseconds
-
-/**
- * How long an announcement that the mail moved waits for the ones behind it.
- *
- * Longer than [CHANGE_DEBOUNCE], because it costs the other side more: a mail on screen is one
- * message, while a listing answers this by re-reading its length, its days and the page it is
- * looking at. An import cycle that runs for a minute does not have to be followed mail by mail.
- */
-private val MOVED_DEBOUNCE = 1.seconds
 
 /**
  * The most mails one socket keeps up to date.
@@ -66,9 +56,9 @@ private val json = Json { ignoreUnknownKeys = true }
  * over what it had, an update it missed is corrected by the next one, and a reconnect starts with
  * fresh snapshots because the subscriptions are asked for again.
  *
- * Alongside them goes one announcement for the mail this user has as a whole -- see
- * [ContentServerMessage.Moved]: what a listing holds are positions, and a mail arriving or leaving
- * moves them all, including the ones of mails nobody has subscribed to.
+ * The mails on screen and nothing else. Where a mail *sits* is a listing's question, and the
+ * listing socket answers it -- it reads the index again for itself when the mailbox moves, so
+ * there is nothing to announce from here.
  */
 fun Route.contentSocket() {
     authenticate {
@@ -92,12 +82,6 @@ fun Route.contentSocket() {
 
             /** Ids to look at again, filled by the subscription and drained in bursts below. */
             val changes = Channel<Uuid>(Channel.UNLIMITED)
-
-            /**
-             * That mail moved at all. Conflated: the announcement says nothing but that it
-             * happened, so a burst of them is one token and one message.
-             */
-            val moved = Channel<Unit>(Channel.CONFLATED)
 
             suspend fun sendMeta(ids: Collection<Uuid>) {
                 if (ids.isEmpty()) return
@@ -141,12 +125,9 @@ fun Route.contentSocket() {
                     .onSubscription { listening.complete(Unit) }
                     .collect { event ->
                         when (event) {
-                            is MailEvent.Changed -> {
-                                changes.send(event.emailId)
-                                // The mail itself goes out for every change; the announcement
-                                // only for the ones a listing has to re-read for.
-                                if (event.movedListings) moved.trySend(Unit)
-                            }
+                            // Whatever it was: this socket sends the mail again. Whether it also
+                            // moved a listing is the listing socket's business, not this one's.
+                            is MailEvent.Changed -> changes.send(event.emailId)
                             // Translated to the mails on screen here rather than sent on as an
                             // address: everything past this point deals in mail ids.
                             is MailEvent.SenderChanged -> {
@@ -170,18 +151,6 @@ fun Route.contentSocket() {
 
                     val wanted = lock.withLock { burst.filter { it in subscribed } }
                     sendMeta(wanted)
-                }
-            }
-
-            // Its own loop, on its own clock: this one is not about the mails on screen, and the
-            // listings behind them are read again for every announcement.
-            launch {
-                while (true) {
-                    moved.receive()
-                    delay(MOVED_DEBOUNCE)
-                    // Whatever arrived during the wait is covered by the message about to go out.
-                    moved.tryReceive()
-                    sendSerialized<ContentServerMessage>(ContentServerMessage.Moved)
                 }
             }
 
@@ -234,17 +203,6 @@ private sealed class ContentServerMessage {
     @Serializable
     @SerialName("data.emails.unknown")
     data class Unknown(@SerialName("ids") val ids: List<Uuid>) : ContentServerMessage()
-
-    /**
-     * This user's mail moved: one arrived, was archived, unarchived or filed as spam. Carries
-     * nothing -- what a listing is is a query, and this is only the word that its answer is old.
-     *
-     * Sent whatever is subscribed, which is the point: a mail that just arrived is at the top of
-     * a listing and no client can have asked for it yet.
-     */
-    @Serializable
-    @SerialName("update.mails.moved")
-    data object Moved : ContentServerMessage()
 }
 
 @Serializable

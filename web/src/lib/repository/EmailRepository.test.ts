@@ -31,9 +31,6 @@ class FakeSocket implements SocketLike {
         this.onmessage?.({data: JSON.stringify({type: "data.emails.unknown", ids})});
     }
 
-    deliverMoved() {
-        this.onmessage?.({data: JSON.stringify({type: "update.mails.moved"})});
-    }
 }
 
 function wireMail(id: string, subject = "Invoice 42") {
@@ -248,40 +245,6 @@ test("merge takes what another feed already knows", () => {
         value: expect.objectContaining({subject: "From a listing"}),
         isLoading: false,
     });
-});
-
-test("an announcement that the mail moved is counted, not looked up", async () => {
-    const {repo, latest} = repository();
-
-    repo.subscribe("m-1");
-    await settle();
-    expect(repo.revision).toBe(0);
-
-    latest().deliverMoved();
-    latest().deliverMoved();
-
-    // Nothing about a mail: what moved is where the mails sit, which is a listing's business.
-    expect(repo.revision).toBe(2);
-    expect(repo.peek("m-1")).toEqual({value: null, isLoading: true});
-});
-
-test("watching for moves keeps the socket up on its own", async () => {
-    const {repo, latest, opened} = repository();
-
-    const stop = repo.watchMoves();
-    await settle();
-    expect(opened.length).toBe(1);
-    // No mail is on screen, so there is nothing to ask the server for.
-    expect(latest().sent).toEqual([]);
-
-    // A mail that comes and goes does not take the connection with it while this is held.
-    repo.subscribe("m-1")();
-    await settle();
-    expect(latest().closed).toBe(false);
-
-    stop();
-    await settle();
-    expect(latest().closed).toBe(true);
 });
 
 test("a write goes out as it was asked for, and the mail is read again after it", async () => {

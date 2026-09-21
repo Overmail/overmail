@@ -7,28 +7,43 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthScreen
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
+import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsScreen
+import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
 import es.jvbabi.overmail.page.onboarding.start.OnboardingStartScreen
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.uuid.Uuid
 
 @Composable
 fun OnboardingRoot() {
     val backstack: OnboardingScreens.Backstack = remember { mutableStateListOf<OnboardingScreens>(OnboardingScreens.Start) }
 
+    val onboardingViewModel = koinViewModel<OnboardingViewModel>()
+    val onboardingState by onboardingViewModel.state.collectAsStateWithLifecycle()
+
     val authViewModel = koinViewModel<OnboardingAuthViewModel>()
+    val permissionsViewModel = koinViewModel<OnboardingPermissionsViewModel>()
     LaunchedEffect(Unit) {
-        authViewModel.onUserCreated = { user -> backstack.add(OnboardingScreens.Success(user.id)) }
+        authViewModel.onUserCreated = { user ->
+            onboardingViewModel.onUserCreated(user.id)
+            // Decided here rather than by the step itself, so notifications that are already
+            // allowed never show a screen asking for them.
+            val next =
+                if (permissionsViewModel.state.value.isDone) OnboardingScreens.Success
+                else OnboardingScreens.Permissions
+            backstack.add(next)
+        }
     }
 
     Box(
@@ -46,7 +61,18 @@ fun OnboardingRoot() {
             entryProvider = { key ->
                 when (key) {
                     is OnboardingScreens.Start -> NavEntry(key = key, metadata = transitionSpec) {
-                        OnboardingStartScreen(backstack = backstack)
+                        OnboardingStartScreen(
+                            onContinue = { backstack.add(OnboardingScreens.Auth) },
+                        )
+                    }
+                    is OnboardingScreens.Permissions -> NavEntry(key = key, metadata = transitionSpec) {
+                        OnboardingPermissionsScreen(
+                            viewModel = permissionsViewModel,
+                            contentPadding = contentPadding,
+                            // Replaces itself, so back from the last step does not lead to a
+                            // question that has been answered.
+                            onDone = { backstack[backstack.lastIndex] = OnboardingScreens.Success },
+                        )
                     }
                     is OnboardingScreens.Auth -> NavEntry(key = key, metadata = transitionSpec) {
                         OnboardingAuthScreen(
@@ -55,7 +81,7 @@ fun OnboardingRoot() {
                         )
                     }
                     is OnboardingScreens.Success -> NavEntry(key = key, metadata = transitionSpec) {
-                        Text("Hi, ${key.userId}")
+                        Text("Hi, ${onboardingState.userId}")
                     }
                 }
             },
@@ -72,7 +98,10 @@ sealed class OnboardingScreens {
     data object Auth : OnboardingScreens()
 
     @Serializable
-    data class Success(val userId: Uuid) : OnboardingScreens()
+    data object Permissions : OnboardingScreens()
+
+    @Serializable
+    data object Success : OnboardingScreens()
 
     typealias Backstack = SnapshotStateList<OnboardingScreens>
 }

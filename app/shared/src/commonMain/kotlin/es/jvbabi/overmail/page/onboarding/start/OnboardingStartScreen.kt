@@ -18,7 +18,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.ArrowRight
 import es.jvbabi.overmail.BuildKonfig
-import es.jvbabi.overmail.page.onboarding.OnboardingScreens
 import es.jvbabi.overmail.ui.components.Button
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.ui.theme.displayFontFamily
@@ -44,10 +42,10 @@ import overmail.app.shared.generated.resources.onboarding_welcome_title
 
 @Composable
 fun OnboardingStartScreen(
-    backstack: OnboardingScreens.Backstack,
+    onContinue: () -> Unit,
 ) {
     OnboardingStartContent(
-        onContinue = remember { { backstack.add(OnboardingScreens.Auth) } }
+        onContinue = onContinue,
     )
 }
 

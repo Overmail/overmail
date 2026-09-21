@@ -3,6 +3,10 @@
     <string name="onboarding_welcome_subtitle">Melde dich mit dem Overmail-Server an, den du schon im Web nutzt.</string>
     <string name="onboarding_welcome_continue">Los geht\'s</string>
 
+    <string name="onboarding_permissions_title">Benachrichtigungen erlauben</string>
+    <string name="onboarding_permissions_subtitle">Overmail sagt dir Bescheid, wenn neue E-Mails ankommen. Das kannst du jederzeit in den Systemeinstellungen ändern.</string>
+    <string name="onboarding_permissions_continue">Weiter</string>
+
     <string name="onboarding_auth_qr_title">Anmeldecode scannen</string>
     <string name="onboarding_auth_qr_subtitle">Öffne in Overmail im Web Einstellungen → Geräte.</string>
     <string name="onboarding_auth_code_title">Anmeldecode eingeben</string>

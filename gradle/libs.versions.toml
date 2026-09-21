@@ -137,6 +137,7 @@ app-human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "hum
 app-moko-permissions-api = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
 app-moko-permissions-compose = { module= "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }
 app-moko-permissions-camera  = { module= "dev.icerock.moko:permissions-camera", version.ref = "moko-permissions" }
+app-moko-permissions-notifications = { module = "dev.icerock.moko:permissions-notifications", version.ref = "moko-permissions" }
 app-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 app-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 app-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }

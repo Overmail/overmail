@@ -11,7 +11,9 @@ import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
+import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
+import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -116,6 +118,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         viewModelOf(::HomeViewModel)
         viewModelOf(::OnboardingAuthViewModel)
+        viewModelOf(::OnboardingPermissionsViewModel)
+        viewModelOf(::OnboardingViewModel)
     })
 
     modules(platformModule())

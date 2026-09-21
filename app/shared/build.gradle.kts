@@ -104,6 +104,7 @@ kotlin {
             api(libs.app.moko.permissions.api)
             implementation(libs.app.moko.permissions.compose)
             implementation(libs.app.moko.permissions.camera)
+            implementation(libs.app.moko.permissions.notifications)
         }
 
         iosMain.dependencies {

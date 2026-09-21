@@ -10,6 +10,8 @@ import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
+import es.jvbabi.overmail.page.home.components.filter.ReadState
+import es.jvbabi.overmail.page.home.components.filter.readStateOf
 import es.jvbabi.overmail.page.home.components.group.GroupingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -72,6 +74,12 @@ class ViewSettingsViewModel(
             is ViewSettingsEvent.SetGroupingSettings -> state.update {
                 it.copy(viewState = it.viewState.copy(groupings = event.settings.groupings, sorting = event.settings.sorting))
             }
+            is ViewSettingsEvent.SetReadSelection -> state.update {
+                it.copy(
+                    readSelection = event.selection,
+                    viewState = it.viewState.copy(filter = it.viewState.filter.copy(readState = readStateOf(event.selection))),
+                )
+            }
             is ViewSettingsEvent.SetLabelQuery -> state.update { it.copy(labelQuery = event.query) }
             is ViewSettingsEvent.RemoveLabel -> state.update { current ->
                 val filter = current.viewState.filter
@@ -96,6 +104,11 @@ class ViewSettingsViewModel(
 
 data class ViewSettingsState(
     val viewState: ViewState = ViewState.Mailbox,
+    /**
+     * What the read filter has ticked; the filter's `readState` follows it, but cannot tell both
+     * from neither.
+     */
+    val readSelection: List<ReadState> = emptyList(),
     /** What is typed into the label picker. */
     val labelQuery: String = "",
     /** The labels [labelQuery] turns up, most used first. */
@@ -112,6 +125,7 @@ data class ViewSettingsState(
 sealed class ViewSettingsEvent {
     data class SetFilter(val filter: ViewFilter) : ViewSettingsEvent()
     data class SetGroupingSettings(val settings: GroupingSettings) : ViewSettingsEvent()
+    data class SetReadSelection(val selection: List<ReadState>) : ViewSettingsEvent()
     data class SetLabelQuery(val query: String) : ViewSettingsEvent()
     /** Takes the label off the filter; unlike [ToggleLabel], what is typed stays. */
     data class RemoveLabel(val id: Uuid) : ViewSettingsEvent()

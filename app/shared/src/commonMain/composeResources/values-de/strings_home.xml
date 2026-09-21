@@ -12,6 +12,8 @@
     <string name="home_filter_archive_inbox">Posteingang</string>
     <string name="home_filter_archive_archived">Archiviert</string>
     <string name="home_filter_archive_spam">Spam</string>
+    <string name="home_filter_read_title">Lesestatus</string>
+    <string name="home_filter_archive_title">Ablage</string>
 
     <string name="home_filter_labels_active">Labels: %1$s</string>
     <plurals name="home_filter_more">

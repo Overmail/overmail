@@ -3,6 +3,10 @@
 package es.jvbabi.overmail.page.home.components.filter
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -90,6 +94,8 @@ fun LabelModal(
         sheetState = state,
         modifier = Modifier.fillMaxSize(),
         dragHandle = null,
+        // The bottom inset is the list's own, so it scrolls behind the navigation bar.
+        contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal) },
     ) {
         LabelPickerContent(
             picked = picked,
@@ -99,7 +105,7 @@ fun LabelModal(
             onQueryChange = onQueryChange,
             onToggle = onToggle,
             onRemove = onRemove,
-            modifier = Modifier.fillMaxSize().imePadding(),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
@@ -117,6 +123,7 @@ private fun LabelPickerContent(
     focusOnStart: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
+    val haptics = LocalHapticFeedback.current
 
     // The field holds an invisible character ahead of the query. A soft keyboard sends nothing
     // for Backspace in an empty field, but it does delete that character, and that is how the
@@ -162,7 +169,10 @@ private fun LabelPickerContent(
 
             picked.forEach { label ->
                 key(label.id) {
-                    LabelBadge(label = label, onRemove = { onRemove(label.id) })
+                    LabelBadge(label = label, onRemove = {
+                        haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                        onRemove(label.id)
+                    })
                 }
             }
 
@@ -183,7 +193,10 @@ private fun LabelPickerContent(
                     if (!changed.text.startsWith(BACKSPACE_SENTINEL)) {
                         // Backspace at the very start: it takes the label before the caret, the
                         // way every field that holds chips does. What was typed stays.
-                        picked.lastOrNull()?.let { onRemove(it.id) }
+                        picked.lastOrNull()?.let {
+                            haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                            onRemove(it.id)
+                        }
                         val text = changed.text.removePrefix(BACKSPACE_SENTINEL)
                         fieldValue = sentinelValue(text, TextRange(0))
                         if (text != query) onQueryChange(text)
@@ -242,7 +255,12 @@ private fun LabelPickerContent(
         // spot carries no mail to find.
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                end = 8.dp,
+                top = 8.dp,
+                bottom = 8.dp + WindowInsets.navigationBars.union(WindowInsets.ime).asPaddingValues().calculateBottomPadding(),
+            ),
         ) {
             // In the list rather than above it, so it takes the rows' place instead of pushing
             // them down while an answer is on its way.
@@ -260,7 +278,12 @@ private fun LabelPickerContent(
                 LabelRow(
                     label = label,
                     picked = label.id in pickedIds,
-                    onClick = { onToggle(label.id) },
+                    onClick = {
+                        haptics.performHapticFeedback(
+                            if (label.id in pickedIds) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
+                        )
+                        onToggle(label.id)
+                    },
                 )
             }
         }
@@ -327,11 +350,20 @@ private fun LabelRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // The tick takes the tag's place rather than a column of its own, flipping over to it and
+        // back. Past the halfway point the other face shows, turned round so it does not read
+        // mirrored.
+        val rotation by animateFloatAsState(targetValue = if (picked) 180f else 0f)
         Icon(
-            imageVector = PhIcons.Regular.Tag,
+            imageVector = if (rotation > 90f) PhIcons.Regular.Check else PhIcons.Regular.Tag,
             contentDescription = null,
             tint = label.color.labelContentColor(),
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier
+                .size(18.dp)
+                .graphicsLayer {
+                    rotationY = if (rotation > 90f) rotation - 180f else rotation
+                    cameraDistance = 12f * density
+                },
         )
         Text(
             text = label.name,
@@ -349,14 +381,6 @@ private fun LabelRow(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        // Always the room for it, so the counts stay in one column.
-        Box(modifier = Modifier.size(18.dp)) {
-            if (picked) Icon(
-                imageVector = PhIcons.Regular.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
     }
 }
 

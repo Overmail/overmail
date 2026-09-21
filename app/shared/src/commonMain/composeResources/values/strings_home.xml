@@ -14,6 +14,9 @@
     <string name="home_filter_archive_inbox">Inbox</string>
     <string name="home_filter_archive_archived">Archived</string>
     <string name="home_filter_archive_spam">Spam</string>
+    <!-- Over the states the read and archive filters can be ticked to. -->
+    <string name="home_filter_read_title">Read state</string>
+    <string name="home_filter_archive_title">Location</string>
 
     <!-- The label filter's chip once labels are picked: "Labels: Uni, Work and 2 more". -->
     <string name="home_filter_labels_active">Labels: %1$s</string>

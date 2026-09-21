@@ -4,6 +4,12 @@ package es.jvbabi.overmail.page.home.components.group
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -55,6 +61,8 @@ fun GroupModal(
         modifier = Modifier.fillMaxSize(),
         dragHandle = null,
         sheetGesturesEnabled = !draggingCategory,
+        // The bottom inset is the list's own, so it scrolls behind the navigation bar.
+        contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal) },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
@@ -70,7 +78,9 @@ fun GroupModal(
                 viewState = viewState,
                 onGroupingSettingsChanged = onGroupingSettingsChanged,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 16.dp),
+                contentPadding = PaddingValues(
+                    bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                ),
                 onDraggingChanged = { draggingCategory = it },
             )
         }

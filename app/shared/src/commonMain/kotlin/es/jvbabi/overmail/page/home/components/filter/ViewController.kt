@@ -15,7 +15,6 @@ import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.ui.theme.AppTheme
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.*
@@ -24,9 +23,9 @@ import kotlin.uuid.Uuid
 /**
  * The filter chips above a listing, each one showing what [viewState] has set for it.
  *
- * The read and archive chips take their one click themselves, the way the web app's do, and hand
- * the changed filter to [onFilterChange]. The labels chip names [pickedLabels] and leaves the
- * picking to whoever opens on [onLabelsClick]; the other pickers do not exist yet.
+ * The read and archive chips take their one click themselves, the way the web app's do; their
+ * carets and the labels chip leave the picking to whoever opens on [onReadMenuClick],
+ * [onArchiveMenuClick] and [onLabelsClick]. The other pickers do not exist yet.
  */
 @Composable
 fun ViewController(
@@ -36,6 +35,14 @@ fun ViewController(
     /** The labels of the filter's `hasLabels`, in its order. */
     pickedLabels: List<PickedLabel> = emptyList(),
     onLabelsClick: () -> Unit = {},
+    /**
+     * What the read chip has ticked. Kept apart from [ViewFilter.readState], which cannot tell
+     * both states from neither; see [readStateOf].
+     */
+    readSelection: List<ReadState> = emptyList(),
+    onReadSelectionChange: (List<ReadState>) -> Unit = {},
+    onReadMenuClick: () -> Unit = {},
+    onArchiveMenuClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val filter = viewState.filter
@@ -50,13 +57,23 @@ fun ViewController(
             picked = pickedLabels,
             onClick = onLabelsClick,
         )
-        ReadStateChip(
-            readState = filter.readState,
-            onChange = { onFilterChange(filter.copy(readState = it)) },
+        ToggleFilterChip(
+            states = readFilterStates(),
+            selected = readSelection,
+            onSelectedChange = onReadSelectionChange,
+            icon = PhIcons.Regular.Eyeglasses,
+            onMenuClick = onReadMenuClick,
         )
-        ArchivedStateChip(
-            archivedState = filter.archivedState,
-            onChange = { onFilterChange(filter.copy(archivedState = it)) },
+        ToggleFilterChip(
+            states = archiveFilterStates(),
+            // Null restricts nothing, so the chip reads it as nothing picked, the way the web does.
+            selected = filter.archivedState.orEmpty(),
+            onSelectedChange = { onFilterChange(filter.copy(archivedState = it.ifEmpty { null })) },
+            icon = PhIcons.Regular.Archive,
+            onMenuClick = onArchiveMenuClick,
+            unset = ARCHIVE_UNSET,
+            primary = ArchivedState.Archive,
+            quickLabel = stringResource(Res.string.home_filter_archive_quick),
         )
         PickerChip(
             text = stringResource(Res.string.home_filter_from),
@@ -86,16 +103,9 @@ private fun LabelsChip(
     onClick: () -> Unit,
 ) {
     val names = picked.map { it.name ?: "…" }
-    // One over the limit is spelled out rather than summarised: "A, B und ein weiteres" is longer
-    // than "A, B, C" and says less.
-    val shown = if (names.size <= SHOWN_NAMES + 1) names else names.take(SHOWN_NAMES)
-    val rest = names.size - shown.size
 
     val text = if (names.isEmpty()) stringResource(Res.string.home_filter_labels)
-    else stringResource(
-        Res.string.home_filter_labels_active,
-        shown.joinToString(", ") + if (rest == 0) "" else " " + pluralStringResource(Res.plurals.home_filter_more, rest, rest),
-    )
+    else stringResource(Res.string.home_filter_labels_active, summarisePicked(names))
 
     Chip(
         text = text,
@@ -128,80 +138,22 @@ private fun PickerChip(
 }
 
 /**
- * Unset offers "Ungelesen"; set, it names the one state that is on. Both states at once are no
- * restriction, so there is no third case to show -- see [ViewFilter.readState].
+ * What a chip says about what it is on: the first few by name and how many are left over, the web
+ * app's `summarisePicked`. Names rather than a count alone, since the chip is read at a glance;
+ * the rest is a number, since the chip sits in a row and cannot grow with the selection.
  */
 @Composable
-private fun ReadStateChip(
-    readState: Boolean?,
-    onChange: (Boolean?) -> Unit,
-) {
-    Chip(
-        text = stringResource(
-            if (readState == true) Res.string.home_filter_read_read else Res.string.home_filter_read_unread
-        ),
-        arrowDown = true,
-        segmented = true,
-        leading = { ChipIcon(PhIcons.Regular.Eyeglasses) },
-        active = readState != null,
-        // Unread is what the button is for; a second click takes back whatever is set.
-        onClick = { onChange(if (readState == null) false else null) },
-    )
+internal fun summarisePicked(names: List<String>): String {
+    // One over the limit is spelled out rather than summarised: "A, B und ein weiteres" is longer
+    // than "A, B, C" and says less.
+    if (names.size <= SHOWN_NAMES + 1) return names.joinToString(", ")
+    val rest = names.size - SHOWN_NAMES
+    return names.take(SHOWN_NAMES).joinToString(", ") + " " +
+        pluralStringResource(Res.plurals.home_filter_more, rest, rest)
 }
 
-/**
- * Unset is not "everything" here but the inbox alone: a mailbox is what is left to do. The button
- * adds the archived mails to that and says so, spam stays out of that one click. Anything else
- * names what is on beyond the inbox, and a filter set to nothing at all lets every mail through.
- */
 @Composable
-private fun ArchivedStateChip(
-    archivedState: List<ArchivedState>?,
-    onChange: (List<ArchivedState>?) -> Unit,
-) {
-    // Null restricts nothing, so the chip reads it as nothing picked, the way the web app does.
-    val selected = archivedState.orEmpty().toSet()
-    val active = selected != ARCHIVE_UNSET
-    val isQuick = selected == ARCHIVE_QUICK
-
-    val named = ARCHIVE_ORDER.filter { it in selected && it !in ARCHIVE_UNSET }
-        .ifEmpty { ARCHIVE_ORDER.filter { it in selected } }
-
-    val text = when {
-        !active || isQuick -> stringResource(Res.string.home_filter_archive_quick)
-        named.isEmpty() -> stringResource(Res.string.home_filter_all)
-        else -> named.map { stringResource(it.label) }.joinToString(", ")
-    }
-
-    Chip(
-        text = text,
-        arrowDown = true,
-        segmented = true,
-        leading = { ChipIcon(PhIcons.Regular.Archive) },
-        active = active,
-        // A second click on a set chip takes it back to the inbox, whatever the menu picked.
-        onClick = { onChange(ARCHIVE_ORDER.filter { it in (if (active) ARCHIVE_UNSET else ARCHIVE_QUICK) }) },
-    )
-}
-
-/** What the archive chip reads as not set: the inbox alone. */
-private val ARCHIVE_UNSET = setOf(ArchivedState.Unarchive)
-
-/** What the archive chip's one click turns on: the archived mails on top of the inbox. */
-private val ARCHIVE_QUICK = ARCHIVE_UNSET + ArchivedState.Archive
-
-/** The inbox first, spam last -- the order the chip names them in. */
-private val ARCHIVE_ORDER = listOf(ArchivedState.Unarchive, ArchivedState.Archive, ArchivedState.Spam)
-
-private val ArchivedState.label: StringResource
-    get() = when (this) {
-        ArchivedState.Unarchive -> Res.string.home_filter_archive_inbox
-        ArchivedState.Archive -> Res.string.home_filter_archive_archived
-        ArchivedState.Spam -> Res.string.home_filter_archive_spam
-    }
-
-@Composable
-private fun ChipIcon(icon: ImageVector) {
+internal fun ChipIcon(icon: ImageVector) {
     Icon(
         imageVector = icon,
         contentDescription = null,
@@ -215,6 +167,15 @@ private fun ChipIcon(icon: ImageVector) {
 @Composable
 private fun ViewControllerPreviewFrame(filter: ViewFilter, darkTheme: Boolean = false) {
     var viewState by remember { mutableStateOf(ViewState(filter = filter)) }
+    var readSelection by remember {
+        mutableStateOf(
+            when (filter.readState) {
+                true -> listOf(ReadState.Read)
+                false -> listOf(ReadState.Unread)
+                null -> emptyList()
+            }
+        )
+    }
 
     // Not the dynamic scheme: a preview should look the same wherever it is rendered.
     AppTheme(darkTheme = darkTheme, dynamicColor = false) {
@@ -223,6 +184,8 @@ private fun ViewControllerPreviewFrame(filter: ViewFilter, darkTheme: Boolean = 
             onFilterChange = { viewState = viewState.copy(filter = it) },
             contentPadding = PaddingValues(16.dp),
             pickedLabels = viewState.filter.hasLabels.orEmpty().map { PickedLabel(it, "Uni", null) },
+            readSelection = readSelection,
+            onReadSelectionChange = { readSelection = it },
         )
     }
 }

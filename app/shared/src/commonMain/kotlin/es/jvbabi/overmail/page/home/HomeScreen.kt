@@ -26,6 +26,9 @@ import com.phosphor.icons.regular.MagnifyingGlass
 import com.phosphor.icons.regular.TreeStructure
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.jvbabi.overmail.page.home.components.filter.Chip
+import es.jvbabi.overmail.page.home.components.filter.FilterStatesModal
+import es.jvbabi.overmail.page.home.components.filter.archiveFilterStates
+import es.jvbabi.overmail.page.home.components.filter.readFilterStates
 import es.jvbabi.overmail.page.home.components.filter.LabelModal
 import es.jvbabi.overmail.page.home.components.filter.PickedLabel
 import es.jvbabi.overmail.page.home.components.filter.ViewController
@@ -33,6 +36,8 @@ import es.jvbabi.overmail.page.home.components.group.GroupModal
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.home_filter_archive_title
+import overmail.app.shared.generated.resources.home_filter_read_title
 import overmail.app.shared.generated.resources.home_grouping_title
 
 @Composable
@@ -59,6 +64,8 @@ private fun HomeContent(
 
     var showGroupSettings by rememberSaveable { mutableStateOf(false) }
     var showLabelPicker by rememberSaveable { mutableStateOf(false) }
+    var showReadStates by rememberSaveable { mutableStateOf(false) }
+    var showArchiveStates by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -124,6 +131,10 @@ private fun HomeContent(
                         viewState = viewState,
                         onFilterChange = { onViewSettingsEvent(ViewSettingsEvent.SetFilter(it)) },
                         pickedLabels = pickedLabels,
+                        readSelection = viewSettingsState.readSelection,
+                        onReadSelectionChange = { onViewSettingsEvent(ViewSettingsEvent.SetReadSelection(it)) },
+                        onReadMenuClick = { showReadStates = true },
+                        onArchiveMenuClick = { showArchiveStates = true },
                         onLabelsClick = {
                             // Opening starts over: the query from last time says nothing about this one.
                             onViewSettingsEvent(ViewSettingsEvent.SetLabelQuery(""))
@@ -152,6 +163,27 @@ private fun HomeContent(
         onToggle = { onViewSettingsEvent(ViewSettingsEvent.ToggleLabel(it)) },
         onRemove = { onViewSettingsEvent(ViewSettingsEvent.RemoveLabel(it)) },
         onDismiss = { showLabelPicker = false },
+    )
+
+    FilterStatesModal(
+        visible = showReadStates,
+        title = stringResource(Res.string.home_filter_read_title),
+        states = readFilterStates(),
+        selected = viewSettingsState.readSelection,
+        onSelectedChange = { onViewSettingsEvent(ViewSettingsEvent.SetReadSelection(it)) },
+        onDismiss = { showReadStates = false },
+    )
+
+    FilterStatesModal(
+        visible = showArchiveStates,
+        title = stringResource(Res.string.home_filter_archive_title),
+        states = archiveFilterStates(),
+        selected = viewState.filter.archivedState.orEmpty(),
+        onSelectedChange = {
+            // Nothing ticked is the null that restricts nothing, see ViewFilter.
+            onViewSettingsEvent(ViewSettingsEvent.SetFilter(viewState.filter.copy(archivedState = it.ifEmpty { null })))
+        },
+        onDismiss = { showArchiveStates = false },
     )
 }
 

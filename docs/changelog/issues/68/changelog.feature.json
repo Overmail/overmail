@@ -1,0 +1,10 @@
+{
+  "title": "See and sign out your devices",
+  "description": "When you sign in, the app now tells Overmail which device it runs on. Under Settings → Devices in Overmail on the web you can see every device and browser you are signed in on, and sign out any of them with one click, for example a phone you no longer use.",
+  "localized": {
+    "de": {
+      "title": "Geräte einsehen und abmelden",
+      "description": "Beim Anmelden teilt die App Overmail jetzt mit, auf welchem Gerät sie läuft. Unter Einstellungen → Geräte in Overmail im Web siehst du alle Geräte und Browser, auf denen du angemeldet bist, und kannst jedes davon mit einem Klick abmelden, zum Beispiel ein Handy, das du nicht mehr benutzt."
+    }
+  }
+}

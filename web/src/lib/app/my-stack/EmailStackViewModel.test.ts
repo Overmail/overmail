@@ -190,7 +190,12 @@ test("walking back and forth stays inside the pile", async () => {
     expect(viewModel.currentEmailId).toBe("m-1");
 
     viewModel.onNextEmail();
+    expect(viewModel.currentEmailId).toBe("m-2");
+
+    // Past the last card is the done screen, and back from there is the last card again.
     viewModel.onNextEmail();
+    expect(viewModel.currentPosition).toEqual({type: "done"});
+    viewModel.onPreviousEmail();
     expect(viewModel.currentEmailId).toBe("m-2");
 });
 

@@ -32,4 +32,14 @@ export class SessionsRepository {
             isCurrentSession: session.is_current_session,
         }));
     }
+
+    /** Signs the session out; its token is refused from the next request on. */
+    async revoke(id: string, signal?: AbortSignal): Promise<void> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            credentials: "include",
+            signal,
+        });
+        if (!response.ok) throw new Error(`Could not revoke the session: ${response.status}`);
+    }
 }

@@ -1,8 +1,15 @@
 <script lang="ts">
-    import {_, locale} from "svelte-i18n";
+    import {_} from "svelte-i18n";
+    import {XIcon} from "phosphor-svelte";
+    import {Button} from "$lib/components/ui/button";
     import type {SessionClient, UserSession} from "$lib/repository/SessionsRepository";
 
-    let {sessions}: {sessions: UserSession[]} = $props();
+    let {sessions, revoking, onrevoke}: {
+        sessions: UserSession[];
+        /** Ids being signed out right now; their button is off meanwhile. */
+        revoking: Set<string>;
+        onrevoke: (session: UserSession) => void;
+    } = $props();
 
     /** What the session is, in a few words: the browser, or the phone for the app. */
     function title(client: SessionClient): string {
@@ -27,21 +34,26 @@
 {:else}
     <ul class="flex flex-col divide-y border rounded-lg">
         {#each sessions as session (session.id)}
-            <li class="flex flex-row gap-4 items-center justify-between p-4">
+            <li class="flex flex-row gap-2 items-center justify-between px-3 py-2">
                 <div class="flex flex-col min-w-0">
-                    <span class="truncate">{title(session.client)}</span>
-                    <span class="text-sm text-muted-foreground truncate">{subtitle(session.client)}</span>
-                </div>
-                <div class="flex flex-col items-end shrink-0 text-sm">
-                    {#if session.isCurrentSession}
-                        <span class="text-primary">{$_("settings.devices.sessions.current")}</span>
-                    {/if}
-                    <span class="text-muted-foreground">
-                        {$_("settings.devices.sessions.issuedAt", {
-                            values: {date: session.issuedAt.toLocaleString($locale ?? undefined, {dateStyle: "medium", timeStyle: "short"})},
-                        })}
+                    <span class="text-sm truncate">{title(session.client)}</span>
+                    <span class="text-xs text-muted-foreground truncate">
+                        {subtitle(session.client)}
+                        {#if session.isCurrentSession}
+                            · <span class="text-primary">{$_("settings.devices.sessions.current")}</span>
+                        {/if}
                     </span>
                 </div>
+                <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={$_("settings.devices.sessions.revoke")}
+                        title={$_("settings.devices.sessions.revoke")}
+                        disabled={revoking.has(session.id)}
+                        onclick={() => onrevoke(session)}
+                >
+                    <XIcon />
+                </Button>
             </li>
         {/each}
     </ul>

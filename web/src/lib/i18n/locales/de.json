@@ -520,18 +520,25 @@
     "devices": {
       "title": "Overmail-App verbinden",
       "scan": "Scanne diesen Code mit der Overmail-App, um dich anzumelden.",
+      "revealHint": "Fahre mit der Maus über den Code, um ihn anzuzeigen.",
       "download": "Overmail-App herunterladen",
       "copy": "Code kopieren",
       "copied": "Kopiert",
       "copyFailed": "Der Code konnte nicht kopiert werden.",
-      "loadFailed": "Der Code konnte nicht geladen werden.",
+      "loadFailed": "Ein Fehler ist aufgetreten",
       "retry": "Erneut versuchen",
       "sessions": {
         "title": "Aktive Sitzungen",
         "current": "Dieses Gerät",
-        "issuedAt": "Angemeldet am {date}",
+        "revoke": "Abmelden",
+        "signOut": {
+          "title": "Wirklich abmelden?",
+          "description": "Dieses Gerät wird von Overmail abgemeldet und du musst dich erneut anmelden.",
+          "cancel": "Abbrechen",
+          "confirm": "Abmelden"
+        },
         "empty": "Du bist nirgendwo sonst angemeldet.",
-        "loadFailed": "Die Sitzungen konnten nicht geladen werden. Neuer Versuch läuft…"
+        "loadFailed": "Ein Fehler ist aufgetreten"
       }
     }
   },

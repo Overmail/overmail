@@ -77,7 +77,7 @@ fun App() {
                         }
 
                         is Screen.Onboarding -> NavEntry(key = key) {
-                            OnboardingRoot()
+                            OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
                         }
                     }
                 },

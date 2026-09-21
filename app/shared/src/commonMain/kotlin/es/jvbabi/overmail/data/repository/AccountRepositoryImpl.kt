@@ -72,6 +72,10 @@ class AccountRepositoryImpl(
             homeserver = account.homeserver,
         ))
     }
+
+    override fun getById(id: Uuid): Flow<OvermailAccount?> {
+        return database.overmailAccountDao.findById(id).map { item -> item?.toModel() }
+    }
 }
 
 @Serializable

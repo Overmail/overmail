@@ -14,6 +14,7 @@ import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
+import es.jvbabi.overmail.page.onboarding.success.OnboardingSuccessViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -120,6 +121,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         viewModelOf(::OnboardingAuthViewModel)
         viewModelOf(::OnboardingPermissionsViewModel)
         viewModelOf(::OnboardingViewModel)
+        // Takes the id of the account to greet as a parameter.
+        viewModelOf(::OnboardingSuccessViewModel)
     })
 
     modules(platformModule())

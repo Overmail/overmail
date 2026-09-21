@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -22,11 +21,16 @@ import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsScreen
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
 import es.jvbabi.overmail.page.onboarding.start.OnboardingStartScreen
+import es.jvbabi.overmail.page.onboarding.success.OnboardingSuccessScreen
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
-fun OnboardingRoot() {
+fun OnboardingRoot(
+    /** Called once the last step is through; the onboarding is taken off the back stack then. */
+    onDone: () -> Unit,
+) {
     val backstack: OnboardingScreens.Backstack = remember { mutableStateListOf<OnboardingScreens>(OnboardingScreens.Start) }
 
     val onboardingViewModel = koinViewModel<OnboardingViewModel>()
@@ -81,7 +85,14 @@ fun OnboardingRoot() {
                         )
                     }
                     is OnboardingScreens.Success -> NavEntry(key = key, metadata = transitionSpec) {
-                        Text("Hi, ${onboardingState.userId}")
+                        val userId = onboardingState.userId ?: return@NavEntry
+                        OnboardingSuccessScreen(
+                            // Keyed, since the view model outlives this screen: signing in again
+                            // with another account must not greet the previous one.
+                            viewModel = koinViewModel(key = userId.toString()) { parametersOf(userId) },
+                            contentPadding = contentPadding,
+                            onDone = onDone,
+                        )
                     }
                 }
             },

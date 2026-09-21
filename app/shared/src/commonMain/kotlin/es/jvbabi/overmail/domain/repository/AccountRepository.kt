@@ -10,6 +10,8 @@ interface AccountRepository {
     suspend fun getUserInfo(homeserver: String, token: String): Result<UserinfoResponse>
 
     suspend fun saveAccount(account: OvermailAccount)
+
+    fun getById(id: Uuid): Flow<OvermailAccount?>
 }
 
 sealed class RedeemAuthCodeResponse {

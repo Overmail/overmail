@@ -5,6 +5,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import es.jvbabi.overmail.data.database.entity.DbOvermailAccount
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.Uuid
 
 @Dao
 interface OvermailAccountDao {
@@ -13,4 +14,7 @@ interface OvermailAccountDao {
 
     @Upsert
     suspend fun insert(account: DbOvermailAccount)
+
+    @Query("SELECT * FROM overmail_account WHERE id = :id")
+    fun findById(id: Uuid): Flow<DbOvermailAccount?>
 }

@@ -1,0 +1,10 @@
+{
+  "title": "Filter and group your mail",
+  "description": "Below the search field, a row of filters decides what your inbox shows: pick labels, senders and recipients by searching for them, choose whether to see unread or read mail, whether archived mail and spam are included, and which of your mail accounts to look at. Grouping sorts the mail into sections, for example by date or sender, in the order you arrange them. Labels, people and accounts are remembered on your phone, so the pickers open instantly and still work without a connection.",
+  "localized": {
+    "de": {
+      "title": "E-Mails filtern und gruppieren",
+      "description": "Unter dem Suchfeld legt eine Reihe von Filtern fest, was dein Posteingang zeigt: Wähle Labels, Absender und Empfänger per Suche aus, entscheide, ob du ungelesene oder gelesene E-Mails sehen willst, ob archivierte E-Mails und Spam dazugehören und welche deiner Mail-Konten angezeigt werden. Die Gruppierung teilt die E-Mails in Abschnitte, etwa nach Datum oder Absender, in der Reihenfolge, die du festlegst. Labels, Personen und Konten merkt sich dein Handy, sodass die Auswahl sofort aufgeht und auch ohne Verbindung funktioniert."
+    }
+  }
+}

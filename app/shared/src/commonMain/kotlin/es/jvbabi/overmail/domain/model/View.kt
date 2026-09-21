@@ -3,12 +3,61 @@ package es.jvbabi.overmail.domain.model
 import kotlin.uuid.Uuid
 
 /**
- * How a listing looks at the user's mail. Only the filter so far; groupings and sorting join it
- * once the app lists anything.
+ * How a listing looks at the user's mail: what it leaves out, how it is cut up and what orders
+ * the mails inside the deepest group.
  */
 data class ViewState(
     val filter: ViewFilter = ViewFilter(),
+    /** The categories the listing groups by, outermost first. Empty is an ungrouped listing. */
+    val groupings: List<ViewGrouping> = emptyList(),
+    val sorting: ViewSorting = ViewSorting(),
+) {
+    companion object {
+        /**
+         * The listing the mailbox itself is, the web app's `mailboxView()`: what has not been
+         * archived, by date, newest first. A mailbox is what is left to do, so its archive filter
+         * starts at the inbox rather than at nothing.
+         */
+        val Mailbox = ViewState(
+            filter = ViewFilter(archivedState = listOf(ArchivedState.Unarchive)),
+            groupings = listOf(ViewGrouping(ViewGroupingKind.DateSmart)),
+            sorting = ViewSorting(ViewSortingKind.Date),
+        )
+    }
+}
+
+/** One category a view groups by. [reversed] turns that category's order around. */
+data class ViewGrouping(
+    val kind: ViewGroupingKind,
+    val reversed: Boolean = false,
 )
+
+/** What a listing can be cut by. The server's `ViewSettings.Grouping` names are these in snake_case. */
+enum class ViewGroupingKind {
+    /** Today, yesterday, this week, this month, then by month. */
+    DateSmart,
+    Year,
+    Month,
+    Day,
+    Sender,
+    /** The mail account a mail was imported through. */
+    ImapAccount,
+    Read,
+    Archived,
+}
+
+/** What the mails inside the deepest group are ordered by. [reversed] turns it around. */
+data class ViewSorting(
+    val kind: ViewSortingKind = ViewSortingKind.Date,
+    val reversed: Boolean = false,
+)
+
+/** The server's `EmailSorting` names, in snake_case. */
+enum class ViewSortingKind {
+    Date,
+    Sender,
+    Subject,
+}
 
 /**
  * What a view leaves out, before anything is grouped or sorted.

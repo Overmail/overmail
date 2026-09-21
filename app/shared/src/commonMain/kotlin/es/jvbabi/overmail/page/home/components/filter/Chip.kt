@@ -2,7 +2,12 @@
 
 package es.jvbabi.overmail.page.home.components.filter
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -64,7 +69,14 @@ fun Chip(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 leading.invoke()
-                Text(text)
+                // A filter's chip says what it is set to, so its text changes under a tap; it
+                // fades over and the chip's width follows rather than jumping.
+                AnimatedContent(
+                    targetState = text,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() using SizeTransform(clip = false) },
+                ) { current ->
+                    Text(current)
+                }
                 if (arrowDown && !segmented) Icon(
                     imageVector = PhIcons.Regular.CaretDown,
                     contentDescription = null,

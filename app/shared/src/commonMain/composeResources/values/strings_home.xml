@@ -14,4 +14,47 @@
     <string name="home_filter_archive_inbox">Inbox</string>
     <string name="home_filter_archive_archived">Archived</string>
     <string name="home_filter_archive_spam">Spam</string>
+
+    <string name="home_grouping_title">Grouping</string>
+    <!-- The header over the categories that group the listing: how many there are, of how many allowed. -->
+    <string name="home_grouping_active">Active categories (%1$d/%2$d)</string>
+    <string name="home_grouping_inactive">Inactive categories</string>
+    <string name="home_grouping_active_empty">Drag here to group</string>
+    <string name="home_grouping_inactive_empty">All categories are active</string>
+    <!-- Over the sorting of the mails inside the deepest group. -->
+    <string name="home_grouping_mail_sort">Sort mails in here</string>
+
+    <string name="home_grouping_category_date_smart">Date (smart)</string>
+    <string name="home_grouping_category_read">Read</string>
+    <string name="home_grouping_category_month">Month</string>
+    <string name="home_grouping_category_year">Year</string>
+    <string name="home_grouping_category_day">Day</string>
+    <string name="home_grouping_category_sender">Sender</string>
+    <string name="home_grouping_category_imap_account">Email account</string>
+    <string name="home_grouping_category_archived">Archived</string>
+
+    <string name="home_grouping_mail_sort_date">Date</string>
+    <string name="home_grouping_mail_sort_sender">Sender</string>
+    <string name="home_grouping_mail_sort_subject">Subject</string>
+
+    <!-- A sort line reads "<what>, <direction>": the part that names what is ordered, the comma
+         with it, and the part that says which way round. Categories without a "what" have only
+         the direction. -->
+    <string name="home_grouping_sort_general">%1$s,</string>
+    <string name="home_grouping_sort_by_date">By date</string>
+    <string name="home_grouping_sort_by_month">By month</string>
+    <string name="home_grouping_sort_by_year">By year</string>
+    <string name="home_grouping_sort_by_day">By day</string>
+    <string name="home_grouping_sort_sender">Sender</string>
+    <string name="home_grouping_sort_account">Email account</string>
+    <string name="home_grouping_sort_subject">Subject</string>
+
+    <string name="home_grouping_sort_newest_first">newest first</string>
+    <string name="home_grouping_sort_oldest_first">oldest first</string>
+    <string name="home_grouping_sort_az">A–Z</string>
+    <string name="home_grouping_sort_za">Z–A</string>
+    <string name="home_grouping_sort_read_first">Read first</string>
+    <string name="home_grouping_sort_unread_first">Unread first</string>
+    <string name="home_grouping_sort_active_first">Active first</string>
+    <string name="home_grouping_sort_archived_first">Archived first</string>
 </resources>

@@ -4,10 +4,14 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
+import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.remote.OvermailApi
+import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
+import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
+import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -59,6 +63,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
             getDatabaseBuilder()
                 .setDriver(BundledSQLiteDriver())
                 .setQueryCoroutineContext(Dispatchers.IO)
+                .addTypeConverter(UuidConverter())
                 .build()
         }
 
@@ -100,8 +105,10 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         singleOf(::OvermailApi)
         singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
+        singleOf(::AccountRepositoryImpl) bind AccountRepository::class
 
         viewModelOf(::HomeViewModel)
+        viewModelOf(::OnboardingAuthViewModel)
     })
 
     modules(platformModule())

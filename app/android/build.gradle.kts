@@ -94,6 +94,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFile(getDefaultProguardFile("proguard-android-optimize.txt"))
+            proguardFile("proguard-rules.pro")
             signingConfig = signingConfigs.findByName("default")
         }
 

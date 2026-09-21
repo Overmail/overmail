@@ -38,8 +38,9 @@ suspend fun ApplicationCall.authenticatedUserOrNull(): User? {
 /**
  * The user the session token of this request was issued for.
  *
- * [JwtService] decides whether the token is genuine and unexpired; the user is then loaded, so a
- * token for a meanwhile deleted account authenticates nobody.
+ * [JwtService] decides whether the token is genuine and unexpired; [sessionUser] then loads the
+ * user and checks the session, so a token for a meanwhile deleted account or a revoked session
+ * authenticates nobody.
  */
 private suspend fun ApplicationCall.sessionUserFromToken(): User? {
     val token = sessionToken() ?: return null
@@ -47,7 +48,7 @@ private suspend fun ApplicationCall.sessionUserFromToken(): User? {
     // Resolved per call, not at install time: pulling the database out of the container eagerly
     // would create the schema while the application is still being set up.
     val userId = application.dependencies.resolve<JwtService>().userIdOf(token) ?: return null
-    return application.dependencies.resolve<OvermailDatabase>().query { User.findById(userId) }
+    return application.dependencies.resolve<OvermailDatabase>().sessionUser(token, userId)
 }
 
 /**

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "27e51109a9556c6f87da30308bd82dc2",
+    "identityHash": "f5c24c6b13d4ecc4f74126b8d64bd8b5",
     "entities": [
       {
         "tableName": "key_value",
@@ -261,11 +261,89 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "imap_accounts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `host` TEXT NOT NULL, `port` INTEGER NOT NULL, `username` TEXT NOT NULL, `is_paused` INTEGER NOT NULL, `email_count` INTEGER NOT NULL, `overmail_account_id` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`overmail_account_id`) REFERENCES `overmail_account`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "host",
+            "columnName": "host",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "port",
+            "columnName": "port",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPaused",
+            "columnName": "is_paused",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emailCount",
+            "columnName": "email_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overmailAccountId",
+            "columnName": "overmail_account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_imap_accounts_overmail_account_id",
+            "unique": false,
+            "columnNames": [
+              "overmail_account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_imap_accounts_overmail_account_id` ON `${TABLE_NAME}` (`overmail_account_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "overmail_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "overmail_account_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '27e51109a9556c6f87da30308bd82dc2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f5c24c6b13d4ecc4f74126b8d64bd8b5')"
     ]
   }
 }

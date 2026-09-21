@@ -3,6 +3,9 @@
     <string name="home_filter_from">From</string>
     <string name="home_filter_to">To</string>
     <string name="home_filter_accounts">Accounts</string>
+    <string name="home_filter_accounts_active">Accounts: %1$s</string>
+    <string name="home_accounts_empty">No accounts connected</string>
+    <string name="home_accounts_failed">The accounts could not be loaded.</string>
     <!-- A filter set to nothing at all, which lets every mail through. -->
     <string name="home_filter_all">All</string>
 

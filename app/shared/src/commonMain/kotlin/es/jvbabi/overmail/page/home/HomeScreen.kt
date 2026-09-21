@@ -31,6 +31,7 @@ import es.jvbabi.overmail.page.home.components.filter.archiveFilterStates
 import es.jvbabi.overmail.page.home.components.filter.readFilterStates
 import es.jvbabi.overmail.page.home.components.filter.LabelModal
 import es.jvbabi.overmail.domain.model.Correspondent
+import es.jvbabi.overmail.page.home.components.filter.ImapAccountsModal
 import es.jvbabi.overmail.page.home.components.filter.ParticipantModal
 import es.jvbabi.overmail.page.home.components.filter.PickedLabel
 import es.jvbabi.overmail.page.home.components.filter.ViewController
@@ -82,6 +83,7 @@ private fun HomeContent(
     var showArchiveStates by rememberSaveable { mutableStateOf(false) }
     var showFromPicker by rememberSaveable { mutableStateOf(false) }
     var showToPicker by rememberSaveable { mutableStateOf(false) }
+    var showAccounts by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -158,6 +160,14 @@ private fun HomeContent(
                             onViewSettingsEvent(ViewSettingsEvent.SetParticipantQuery(""))
                             showFromPicker = true
                         },
+                        accountNames = viewState.filter.imapAccountIds.orEmpty().map { id ->
+                            viewSettingsState.imapAccounts.firstOrNull { it.id == id }?.username ?: "…"
+                        },
+                        onAccountsClick = {
+                            // Read afresh as it opens: a mailbox connected elsewhere should be in it.
+                            onViewSettingsEvent(ViewSettingsEvent.RefreshImapAccounts)
+                            showAccounts = true
+                        },
                         onToClick = {
                             onViewSettingsEvent(ViewSettingsEvent.SetParticipantQuery(""))
                             showToPicker = true
@@ -211,6 +221,16 @@ private fun HomeContent(
             onViewSettingsEvent(ViewSettingsEvent.SetFilter(viewState.filter.copy(archivedState = it.ifEmpty { null })))
         },
         onDismiss = { showArchiveStates = false },
+    )
+
+    ImapAccountsModal(
+        visible = showAccounts,
+        accounts = viewSettingsState.imapAccounts,
+        selected = viewState.filter.imapAccountIds.orEmpty(),
+        isFetching = viewSettingsState.isFetchingImapAccounts,
+        failed = viewSettingsState.imapAccountsFailed,
+        onToggle = { onViewSettingsEvent(ViewSettingsEvent.ToggleImapAccount(it)) },
+        onDismiss = { showAccounts = false },
     )
 
     CorrespondentTarget.entries.forEach { target ->

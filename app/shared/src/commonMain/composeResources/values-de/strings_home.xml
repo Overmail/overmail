@@ -3,6 +3,9 @@
     <string name="home_filter_from">Von</string>
     <string name="home_filter_to">An</string>
     <string name="home_filter_accounts">Konten</string>
+    <string name="home_filter_accounts_active">Konten: %1$s</string>
+    <string name="home_accounts_empty">Keine Konten verbunden</string>
+    <string name="home_accounts_failed">Die Konten konnten nicht geladen werden.</string>
     <string name="home_filter_all">Alle</string>
 
     <string name="home_filter_read_unread">Ungelesen</string>

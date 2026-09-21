@@ -6,11 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.Correspondent
+import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.Label
 import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.page.home.components.filter.ReadState
@@ -29,9 +31,13 @@ class ViewSettingsViewModel(
     accountRepository: AccountRepository,
     private val labelsRepository: LabelsRepository,
     private val participantsRepository: ParticipantsRepository,
+    private val imapAccountsRepository: ImapAccountsRepository,
 ) : ViewModel() {
     val state: StateFlow<ViewSettingsState>
         field = MutableStateFlow(ViewSettingsState())
+
+    /** Bumped to read the mailboxes afresh; they are read at start and whenever their card opens. */
+    private val imapAccountsRefresh = MutableStateFlow(0)
 
     // There is no account switcher yet, so the settings are the first account's.
     private val account = accountRepository.getAccounts()
@@ -106,6 +112,27 @@ class ViewSettingsViewModel(
         }
     }
 
+    init {
+        viewModelScope.launch {
+            combine(account, imapAccountsRefresh, ::Pair)
+                .flatMapLatest { (account, _) ->
+                    if (account == null) flowOf(CacheableResource(emptyList(), CacheableResource.Source.Fallback))
+                    // Fresh rather than fast: the list is small, and it is what the chip names.
+                    // Until the answer or the timeout, what was read before stays in the state.
+                    else imapAccountsRepository.getAll(instantLocalEmission = false, overmailAccount = account)
+                }
+                .collect { accounts ->
+                    state.update {
+                        it.copy(
+                            imapAccounts = accounts.data,
+                            isFetchingImapAccounts = accounts.isFetching,
+                            imapAccountsFailed = accounts.source == CacheableResource.Source.Fallback,
+                        )
+                    }
+                }
+        }
+    }
+
     fun onEvent(event: ViewSettingsEvent) {
         when (event) {
             is ViewSettingsEvent.SetFilter -> state.update { it.copy(viewState = it.viewState.copy(filter = event.filter)) }
@@ -119,6 +146,17 @@ class ViewSettingsViewModel(
                 )
             }
             is ViewSettingsEvent.SetLabelQuery -> state.update { it.copy(labelQuery = event.query) }
+            ViewSettingsEvent.RefreshImapAccounts -> {
+                state.update { it.copy(isFetchingImapAccounts = true) }
+                imapAccountsRefresh.update { it + 1 }
+            }
+            is ViewSettingsEvent.ToggleImapAccount -> state.update { current ->
+                val filter = current.viewState.filter
+                val ids = filter.imapAccountIds.orEmpty()
+                val toggled = if (event.id in ids) ids - event.id else ids + event.id
+                // No mailbox picked is no filter, not one that lets nothing through.
+                current.copy(viewState = current.viewState.copy(filter = filter.copy(imapAccountIds = toggled.ifEmpty { null })))
+            }
             is ViewSettingsEvent.SetParticipantQuery -> state.update { it.copy(participantQuery = event.query) }
             is ViewSettingsEvent.ToggleCorrespondent -> state.update { current ->
                 val list = current.viewState.filter.correspondents(event.target)
@@ -194,6 +232,11 @@ data class ViewSettingsState(
     val isFetchingParticipants: Boolean = false,
     /** The contacts of the filter's `sentBy` and `sentTo`, as far as they are cached. */
     val knownParticipants: Map<Uuid, Participant> = emptyMap(),
+    /** Every mailbox of the account, as fresh as the last read. */
+    val imapAccounts: List<ImapAccount> = emptyList(),
+    val isFetchingImapAccounts: Boolean = true,
+    /** The last read could not reach the server; [imapAccounts] is what the cache had. */
+    val imapAccountsFailed: Boolean = false,
 )
 
 sealed class ViewSettingsEvent {
@@ -206,6 +249,9 @@ sealed class ViewSettingsEvent {
     /** Puts the label on the filter, or takes it off when it already is. */
     data class ToggleLabel(val id: Uuid) : ViewSettingsEvent()
     data class SetParticipantQuery(val query: String) : ViewSettingsEvent()
+    /** Reads the mailboxes afresh, as the accounts card opens. */
+    data object RefreshImapAccounts : ViewSettingsEvent()
+    data class ToggleImapAccount(val id: Uuid) : ViewSettingsEvent()
     /** Puts the correspondent on the [target] filter, or takes them off; empties the query. */
     data class ToggleCorrespondent(val target: CorrespondentTarget, val correspondent: Correspondent) : ViewSettingsEvent()
     /** Takes the correspondent off the [target] filter; what is typed stays. */

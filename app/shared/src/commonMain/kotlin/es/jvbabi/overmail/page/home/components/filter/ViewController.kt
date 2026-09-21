@@ -25,7 +25,7 @@ import kotlin.uuid.Uuid
  *
  * The read and archive chips take their one click themselves, the way the web app's do; their
  * carets and the labels chip leave the picking to whoever opens on [onReadMenuClick],
- * [onArchiveMenuClick] and [onLabelsClick]. The other pickers do not exist yet.
+ * [onArchiveMenuClick], [onLabelsClick], [onFromClick], [onToClick] and [onAccountsClick].
  */
 @Composable
 fun ViewController(
@@ -48,6 +48,9 @@ fun ViewController(
     toNames: List<String> = emptyList(),
     onFromClick: () -> Unit = {},
     onToClick: () -> Unit = {},
+    /** What the accounts chip calls the picked mailboxes, their logins. */
+    accountNames: List<String> = emptyList(),
+    onAccountsClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val filter = viewState.filter
@@ -94,10 +97,12 @@ fun ViewController(
             icon = PhIcons.Regular.Users,
             onClick = onToClick,
         )
-        PickerChip(
-            text = stringResource(Res.string.home_filter_accounts),
+        NamesChip(
+            names = accountNames,
+            title = stringResource(Res.string.home_filter_accounts),
+            activeTitle = { stringResource(Res.string.home_filter_accounts_active, it) },
             icon = PhIcons.Regular.Envelope,
-            active = filter.imapAccountIds != null,
+            onClick = onAccountsClick,
         )
     }
 }
@@ -143,24 +148,6 @@ private fun NamesChip(
         leading = { ChipIcon(icon) },
         active = names.isNotEmpty(),
         onClick = onClick,
-    )
-}
-
-/**
- * A chip over ids the app cannot name yet -- labels, people, accounts. It says whether the filter
- * is set, not what it is set to.
- */
-@Composable
-private fun PickerChip(
-    text: String,
-    icon: ImageVector,
-    active: Boolean,
-) {
-    Chip(
-        text = text,
-        arrowDown = true,
-        leading = { ChipIcon(icon) },
-        active = active,
     )
 }
 

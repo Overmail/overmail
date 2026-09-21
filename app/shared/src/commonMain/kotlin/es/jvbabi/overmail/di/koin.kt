@@ -10,9 +10,11 @@ import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
+import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
+import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
@@ -124,6 +126,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
         singleOf(::AccountRepositoryImpl) bind AccountRepository::class
         singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
+        singleOf(::ParticipantsRepositoryImpl) bind ParticipantsRepository::class
 
         viewModelOf(::HomeViewModel)
         viewModelOf(::ViewSettingsViewModel)

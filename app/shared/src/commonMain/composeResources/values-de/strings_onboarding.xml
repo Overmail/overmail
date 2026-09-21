@@ -1,0 +1,17 @@
+<resources>
+    <string name="onboarding_welcome_title">Willkommen bei Overmail</string>
+    <string name="onboarding_welcome_subtitle">Melde dich mit dem Overmail-Server an, den du schon im Web nutzt.</string>
+    <string name="onboarding_welcome_continue">Los geht\'s</string>
+
+    <string name="onboarding_auth_qr_title">Anmeldecode scannen</string>
+    <string name="onboarding_auth_qr_subtitle">Öffne in Overmail im Web Einstellungen → Geräte.</string>
+    <string name="onboarding_auth_code_title">Anmeldecode eingeben</string>
+    <string name="onboarding_auth_code_subtitle">Kopiere ihn in Overmail im Web unter Einstellungen → Geräte.</string>
+    <string name="onboarding_auth_code_placeholder">overmail://…</string>
+    <string name="onboarding_auth_submit">Anmelden</string>
+    <string name="onboarding_auth_use_code">Stattdessen Code eingeben</string>
+    <string name="onboarding_auth_use_qr">Stattdessen Code scannen</string>
+    <string name="onboarding_auth_error_bad_format">Das ist kein Overmail-Anmeldecode.</string>
+    <string name="onboarding_auth_error_not_exists">Diesen Code gibt es nicht, oder er ist abgelaufen.</string>
+    <string name="onboarding_auth_error_other">Anmeldung fehlgeschlagen: %1$s</string>
+</resources>

@@ -1,0 +1,17 @@
+<resources>
+    <string name="onboarding_welcome_title">Welcome to Overmail</string>
+    <string name="onboarding_welcome_subtitle">Sign in with the Overmail server you already use on the web.</string>
+    <string name="onboarding_welcome_continue">Let's go</string>
+
+    <string name="onboarding_auth_qr_title">Scan the sign-in code</string>
+    <string name="onboarding_auth_qr_subtitle">In Overmail on the web, open Settings → Devices.</string>
+    <string name="onboarding_auth_code_title">Enter the sign-in code</string>
+    <string name="onboarding_auth_code_subtitle">Copy it in Overmail on the web, under Settings → Devices.</string>
+    <string name="onboarding_auth_code_placeholder">overmail://…</string>
+    <string name="onboarding_auth_submit">Sign in</string>
+    <string name="onboarding_auth_use_code">Enter the code instead</string>
+    <string name="onboarding_auth_use_qr">Scan the code instead</string>
+    <string name="onboarding_auth_error_bad_format">This is not an Overmail sign-in code.</string>
+    <string name="onboarding_auth_error_not_exists">This code does not exist or has expired.</string>
+    <string name="onboarding_auth_error_other">Sign-in failed: %1$s</string>
+</resources>

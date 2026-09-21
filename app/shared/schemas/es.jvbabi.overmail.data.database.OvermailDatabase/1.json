@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "94672c76d0358caeb6c241ff8c7c9e14",
+    "identityHash": "27e51109a9556c6f87da30308bd82dc2",
     "entities": [
       {
         "tableName": "key_value",
@@ -186,11 +186,86 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "participants",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT, `email` TEXT NOT NULL, `avatar_url` TEXT, `avatar_padding` REAL, `email_count` INTEGER NOT NULL, `overmail_account_id` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`overmail_account_id`) REFERENCES `overmail_account`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avatarUrl",
+            "columnName": "avatar_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "avatarPadding",
+            "columnName": "avatar_padding",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "emailCount",
+            "columnName": "email_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overmailAccountId",
+            "columnName": "overmail_account_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_participants_overmail_account_id",
+            "unique": false,
+            "columnNames": [
+              "overmail_account_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_participants_overmail_account_id` ON `${TABLE_NAME}` (`overmail_account_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "overmail_account",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "overmail_account_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '94672c76d0358caeb6c241ff8c7c9e14')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '27e51109a9556c6f87da30308bd82dc2')"
     ]
   }
 }

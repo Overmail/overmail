@@ -30,6 +30,8 @@ import es.jvbabi.overmail.page.home.components.filter.FilterStatesModal
 import es.jvbabi.overmail.page.home.components.filter.archiveFilterStates
 import es.jvbabi.overmail.page.home.components.filter.readFilterStates
 import es.jvbabi.overmail.page.home.components.filter.LabelModal
+import es.jvbabi.overmail.domain.model.Correspondent
+import es.jvbabi.overmail.page.home.components.filter.ParticipantModal
 import es.jvbabi.overmail.page.home.components.filter.PickedLabel
 import es.jvbabi.overmail.page.home.components.filter.ViewController
 import es.jvbabi.overmail.page.home.components.group.GroupModal
@@ -37,6 +39,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_filter_archive_title
+import overmail.app.shared.generated.resources.home_filter_from
+import overmail.app.shared.generated.resources.home_filter_to
+import overmail.app.shared.generated.resources.home_participants_self
 import overmail.app.shared.generated.resources.home_filter_read_title
 import overmail.app.shared.generated.resources.home_grouping_title
 
@@ -57,6 +62,15 @@ private fun HomeContent(
     onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
 ) {
     val viewState = viewSettingsState.viewState
+    val selfName = stringResource(Res.string.home_participants_self)
+    val namesOf = { correspondents: List<Correspondent>? ->
+        correspondents.orEmpty().map { correspondent ->
+            when (correspondent) {
+                Correspondent.Self -> selfName
+                is Correspondent.Contact -> viewSettingsState.knownParticipants[correspondent.id]?.displayName ?: "…"
+            }
+        }
+    }
     val pickedLabels = viewState.filter.hasLabels.orEmpty().map { id ->
         val label = viewSettingsState.knownLabels[id]
         PickedLabel(id = id, name = label?.name, color = label?.color)
@@ -66,6 +80,8 @@ private fun HomeContent(
     var showLabelPicker by rememberSaveable { mutableStateOf(false) }
     var showReadStates by rememberSaveable { mutableStateOf(false) }
     var showArchiveStates by rememberSaveable { mutableStateOf(false) }
+    var showFromPicker by rememberSaveable { mutableStateOf(false) }
+    var showToPicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -135,6 +151,17 @@ private fun HomeContent(
                         onReadSelectionChange = { onViewSettingsEvent(ViewSettingsEvent.SetReadSelection(it)) },
                         onReadMenuClick = { showReadStates = true },
                         onArchiveMenuClick = { showArchiveStates = true },
+                        fromNames = namesOf(viewState.filter.sentBy),
+                        toNames = namesOf(viewState.filter.sentTo),
+                        onFromClick = {
+                            // Opening starts over, as with the labels.
+                            onViewSettingsEvent(ViewSettingsEvent.SetParticipantQuery(""))
+                            showFromPicker = true
+                        },
+                        onToClick = {
+                            onViewSettingsEvent(ViewSettingsEvent.SetParticipantQuery(""))
+                            showToPicker = true
+                        },
                         onLabelsClick = {
                             // Opening starts over: the query from last time says nothing about this one.
                             onViewSettingsEvent(ViewSettingsEvent.SetLabelQuery(""))
@@ -185,6 +212,22 @@ private fun HomeContent(
         },
         onDismiss = { showArchiveStates = false },
     )
+
+    CorrespondentTarget.entries.forEach { target ->
+        ParticipantModal(
+            visible = if (target == CorrespondentTarget.From) showFromPicker else showToPicker,
+            title = stringResource(if (target == CorrespondentTarget.From) Res.string.home_filter_from else Res.string.home_filter_to),
+            picked = if (target == CorrespondentTarget.From) viewState.filter.sentBy.orEmpty() else viewState.filter.sentTo.orEmpty(),
+            known = viewSettingsState.knownParticipants,
+            query = viewSettingsState.participantQuery,
+            results = viewSettingsState.participantResults,
+            isFetching = viewSettingsState.isFetchingParticipants,
+            onQueryChange = { onViewSettingsEvent(ViewSettingsEvent.SetParticipantQuery(it)) },
+            onToggle = { onViewSettingsEvent(ViewSettingsEvent.ToggleCorrespondent(target, it)) },
+            onRemove = { onViewSettingsEvent(ViewSettingsEvent.RemoveCorrespondent(target, it)) },
+            onDismiss = { if (target == CorrespondentTarget.From) showFromPicker = false else showToPicker = false },
+        )
+    }
 }
 
 @Composable

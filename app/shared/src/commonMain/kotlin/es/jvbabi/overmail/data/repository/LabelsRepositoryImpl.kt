@@ -8,7 +8,7 @@ import es.jvbabi.overmail.data.network.isResponseFromBackend
 import es.jvbabi.overmail.data.network.safeRequest
 import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.CacheableResource
-import es.jvbabi.overmail.domain.model.Labels
+import es.jvbabi.overmail.domain.model.Label
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.utils.fuzzyContains
@@ -37,7 +37,7 @@ class LabelsRepositoryImpl(
         query: String,
         instantLocalEmission: Boolean,
         overmailAccount: OvermailAccount,
-    ): Flow<CacheableResource<List<Labels>>> = CachedResource(
+    ): Flow<CacheableResource<List<Label>>> = CachedResource(
         local = {
             // Matched here rather than in SQL: the server matches fuzzily, and a LIKE would throw
             // out what it found.
@@ -53,7 +53,7 @@ class LabelsRepositoryImpl(
         persist = { labels -> overmailDatabase.labelsDao.upsert(labels) },
     ).stream(instantLocalEmission)
 
-    override fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Labels>> =
+    override fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Label>> =
         overmailDatabase.labelsDao.byIds(overmailAccount.id, ids).map { labels -> labels.map { it.toModel() } }
 
     private suspend fun fetchSearch(query: String, overmailAccount: OvermailAccount): Result<List<DbLabels>> = safeRequest {

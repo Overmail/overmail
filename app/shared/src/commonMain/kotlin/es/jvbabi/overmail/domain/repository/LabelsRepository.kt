@@ -1,7 +1,7 @@
 package es.jvbabi.overmail.domain.repository
 
 import es.jvbabi.overmail.domain.model.CacheableResource
-import es.jvbabi.overmail.domain.model.Labels
+import es.jvbabi.overmail.domain.model.Label
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
@@ -18,11 +18,11 @@ interface LabelsRepository {
         query: String = "",
         instantLocalEmission: Boolean = false,
         overmailAccount: OvermailAccount,
-    ): Flow<CacheableResource<List<Labels>>>
+    ): Flow<CacheableResource<List<Label>>>
 
     /**
      * The cached labels behind [ids], for naming what a filter holds. Local only: whatever was
      * picked came out of a [search], which put it in the cache. Unknown ids are left out.
      */
-    fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Labels>>
+    fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Label>>
 }

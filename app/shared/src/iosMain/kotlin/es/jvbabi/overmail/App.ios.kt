@@ -15,6 +15,12 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSURL
+import platform.Foundation.NSCachesDirectory
+import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDomainMask
+import coil3.PlatformContext
+import okio.Path
+import okio.Path.Companion.toPath
 import platform.SafariServices.SFSafariViewController
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
@@ -25,6 +31,11 @@ import platform.UIKit.UIScreen
 import platform.UIKit.popoverPresentationController
 import platform.posix.uname
 import platform.posix.utsname
+
+actual fun imageCacheDirectory(context: PlatformContext): Path {
+    val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
+    return "$caches/avatars".toPath()
+}
 
 actual fun openUrl(url: String) {
     val nsUrl = NSURL(string = url)

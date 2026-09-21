@@ -4,7 +4,7 @@ import androidx.room.Embedded
 import androidx.room.Relation
 import es.jvbabi.overmail.data.database.entity.DbLabels
 import es.jvbabi.overmail.data.database.entity.DbOvermailAccount
-import es.jvbabi.overmail.domain.model.Labels
+import es.jvbabi.overmail.domain.model.Label
 
 data class EmbeddedLabel(
     @Embedded val label: DbLabels,
@@ -14,7 +14,7 @@ data class EmbeddedLabel(
         entityColumn = "id",
     ) val account: DbOvermailAccount
 ) {
-    fun toModel(): Labels = Labels(
+    fun toModel(): Label = Label(
         id = label.id,
         name = label.name,
         color = label.color,

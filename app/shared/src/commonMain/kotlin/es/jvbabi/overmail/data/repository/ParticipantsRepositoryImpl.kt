@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.data.repository
 
-import androidx.compose.ui.graphics.ImageBitmap
 import es.jvbabi.overmail.data.cache.CachedResource
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.entity.DbParticipant
@@ -16,17 +15,13 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
-import io.ktor.client.statement.readRawBytes
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.jetbrains.compose.resources.decodeToImageBitmap
 import kotlin.uuid.Uuid
 
 /** How many correspondents a search asks for, with or without a query. */
@@ -36,10 +31,6 @@ class ParticipantsRepositoryImpl(
     private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
 ) : ParticipantsRepository {
-
-    /** Decoded pictures by homeserver and path; null for one that failed, so it is not asked for again. */
-    private val avatars = mutableMapOf<String, ImageBitmap?>()
-    private val avatarsLock = Mutex()
 
     override fun search(
         query: String,
@@ -68,29 +59,6 @@ class ParticipantsRepositoryImpl(
 
     override fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Participant>> =
         overmailDatabase.participantsDao.byIds(overmailAccount.id, ids).map { participants -> participants.map { it.toModel() } }
-
-    override suspend fun loadAvatar(participant: Participant): ImageBitmap? {
-        val path = participant.avatarUrl ?: return null
-        val account = participant.overmailAccount
-        val key = account.homeserver + path
-
-        avatarsLock.withLock { if (key in avatars) return avatars[key] }
-
-        // The picture sits behind the session like everything else, so it goes through this
-        // client rather than an image loader of its own.
-        val bitmap = safeRequest {
-            val response = httpClient.get(URLBuilder(urlString = account.homeserver).apply {
-                appendPathSegments(path.trimStart('/').split('/'))
-            }.build()) {
-                bearerAuth(account.token)
-            }
-            if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
-            response.readRawBytes().decodeToImageBitmap()
-        }.getOrNull()
-
-        avatarsLock.withLock { avatars[key] = bitmap }
-        return bitmap
-    }
 
     private suspend fun fetchSearch(query: String, overmailAccount: OvermailAccount): Result<List<DbParticipant>> = safeRequest {
         val response = httpClient.get(URLBuilder(urlString = overmailAccount.homeserver).apply {

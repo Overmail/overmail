@@ -95,6 +95,10 @@ kotlin {
             // Only the weight in use: every weight is a module of its own, and each holds the whole set.
             implementation(libs.app.phosphor.regular)
 
+            // Avatars: loaded through the app's own HttpClient, kept in a disk cache.
+            implementation(libs.app.coil.compose)
+            implementation(libs.app.coil.network.ktor)
+
             api(libs.ktor.client.core)
             implementation(libs.app.ktor.client.content.negotiation)
             implementation(libs.app.ktor.client.websockets)

@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.domain.repository
 
-import androidx.compose.ui.graphics.ImageBitmap
 import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.Participant
@@ -23,7 +22,4 @@ interface ParticipantsRepository {
 
     /** The cached correspondents behind [ids], for naming what a filter holds. Local only. */
     fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Participant>>
-
-    /** Their picture, kept in memory once loaded; null when there is none or it cannot be read. */
-    suspend fun loadAvatar(participant: Participant): ImageBitmap?
 }

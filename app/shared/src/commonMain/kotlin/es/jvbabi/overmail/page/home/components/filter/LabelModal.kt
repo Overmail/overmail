@@ -16,7 +16,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Label
 import es.jvbabi.overmail.domain.model.OvermailAccount
-import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.page.home.components.filter.label_search.Item
 import es.jvbabi.overmail.page.home.components.filter.label_search.LabelTextField
 import es.jvbabi.overmail.page.home.components.filter.label_search.PickedItem
@@ -26,6 +25,7 @@ import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_filter_labels
 import overmail.app.shared.generated.resources.home_labels_empty
+import overmail.app.shared.generated.resources.home_labels_search
 import kotlin.uuid.Uuid
 
 /** A label the filter is on, as far as it can be named; see [ViewController]. */
@@ -129,6 +129,7 @@ fun LabelPickerContent(
                     color = it.color ?: MaterialTheme.colorScheme.secondary
                 )
             },
+            placeholder = stringResource(Res.string.home_labels_search),
             query = query,
             onRemove = onRemove,
             onQueryChange = onQueryChange,
@@ -165,6 +166,7 @@ fun LabelPickerContent(
                 Item(
                     name = label.name,
                     color = label.color,
+                    subtitle = null,
                     emailCount = label.emailCount,
                     picked = label.id in pickedIds,
                     onClick = {
@@ -179,33 +181,33 @@ fun LabelPickerContent(
     }
 }
 
+private data class PreviewLabel(val name: String, val color: Color, val count: Long)
+
 @Composable
 @Preview
 private fun LabelPickerContentPreview() {
-    val participants = listOf(
-        PreviewParticipant("uninews", "uninews@uwaterloo.co", 128),
-        PreviewParticipant("Google", "emails@google.com", 42),
-        PreviewParticipant("Nathan Smith", "smith@hotmail.com", 1),
-    ).mapIndexed { index, (name, email, count) ->
-        Participant(
+    val labels = listOf(
+        PreviewLabel("Uni", Color(0xFFD6E4F5), 128),
+        PreviewLabel("Rechnungen", Color(0xFFF5DDD6), 42),
+        PreviewLabel("HPI", Color(0xFFDDF5D6), 1),
+    ).mapIndexed { index, (name, color, count) ->
+        Label(
             id = Uuid.fromLongs(0, index.toLong()),
             name = name,
+            color = color,
             emailCount = count,
-            email = email,
-            avatarUrl = null,
-            avatarPadding = null,
             overmailAccount = PREVIEW_ACCOUNT,
         )
     }
-    var picked by remember { mutableStateOf(setOf(participants[0].id)) }
+    var picked by remember { mutableStateOf(setOf(labels[0].id)) }
     var query by remember { mutableStateOf("") }
 
     AppTheme(dynamicColor = false) {
         Surface {
-            ParticipantPickerContent(
-                picked = participants.filter { it.id in picked }.map { PickedParticipants(it.id, it.name!!) },
+            LabelPickerContent(
+                picked = labels.filter { it.id in picked }.map { PickedLabel(it.id, it.name, it.color) },
                 query = query,
-                results = participants,
+                results = labels,
                 isFetching = true,
                 onQueryChange = { query = it },
                 onToggle = { id -> picked = if (id in picked) picked - id else picked + id },
@@ -216,8 +218,6 @@ private fun LabelPickerContentPreview() {
         }
     }
 }
-
-private data class PreviewParticipant(val name: String, val email: String, val count: Long)
 
 private val PREVIEW_ACCOUNT = OvermailAccount(
     id = Uuid.fromLongs(0, 0),

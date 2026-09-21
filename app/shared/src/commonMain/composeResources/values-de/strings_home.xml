@@ -28,6 +28,12 @@
         <item quantity="other">%1$d Mails</item>
     </plurals>
 
+    <string name="home_filter_from_active">Von: %1$s</string>
+    <string name="home_filter_to_active">An: %1$s</string>
+    <string name="home_participants_search">Personen suchen</string>
+    <string name="home_participants_empty">Niemand gefunden</string>
+    <string name="home_participants_self">Meine Konten</string>
+
     <string name="home_grouping_title">Gruppierung</string>
     <string name="home_grouping_active">Aktive Kategorien (%1$d/%2$d)</string>
     <string name="home_grouping_inactive">Inaktive Kategorien</string>

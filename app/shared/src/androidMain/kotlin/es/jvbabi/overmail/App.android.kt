@@ -1,6 +1,9 @@
 package es.jvbabi.overmail
 
 import android.content.Context
+import coil3.PlatformContext
+import okio.Path
+import okio.Path.Companion.toPath
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -23,6 +26,9 @@ const val KOIN_ACTIVITY_CONTEXT = "koin_activity_context"
 
 private fun activityContext(): Context =
     KoinPlatformTools.defaultContext().get().get(named(KOIN_ACTIVITY_CONTEXT))
+
+actual fun imageCacheDirectory(context: PlatformContext): Path =
+    context.cacheDir.resolve("avatars").absolutePath.toPath()
 
 actual fun openUrl(url: String) {
     val customTabsIntent = CustomTabsIntent.Builder()

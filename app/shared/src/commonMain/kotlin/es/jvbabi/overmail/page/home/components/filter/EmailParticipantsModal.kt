@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package es.jvbabi.overmail.page.home.components.filter
 
@@ -7,57 +7,57 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import es.jvbabi.overmail.domain.model.Label
+import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.Envelope
+import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.page.home.components.filter.label_search.Item
 import es.jvbabi.overmail.page.home.components.filter.label_search.LabelTextField
+import es.jvbabi.overmail.page.home.components.filter.label_search.PickedItem
 import es.jvbabi.overmail.page.home.components.filter.label_search.SearchDivider
+import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
+import es.jvbabi.overmail.utils.fuzzyContains
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
-import overmail.app.shared.generated.resources.home_filter_labels
-import overmail.app.shared.generated.resources.home_labels_empty
-import kotlin.collections.minus
-import kotlin.collections.plus
+import overmail.app.shared.generated.resources.home_participants_empty
+import overmail.app.shared.generated.resources.home_participants_search
+import overmail.app.shared.generated.resources.home_participants_self
 import kotlin.uuid.Uuid
 
-/** A label the filter is on, as far as it can be named; see [ViewController]. */
-data class PickedLabel(
-    val id: Uuid,
-    /** Null while the label is not in the cache yet. */
-    val name: String?,
-    val color: Color?,
-)
-
 /**
- * Picks the labels a filter is on, the web app's `LabelFilter`: the picked ones sit in the search
- * field as removable chips, and the list below toggles rather than adds -- a label that is on has
- * to be pickable to turn it off again.
+ * Picks who a from or to filter is on, the web app's `SenderFilter`: the label picker with people
+ * in it -- the picked ones as removable badges in the field, a list below that toggles. A row
+ * shows a face, the name and the address under it, and above the correspondents sits the
+ * account's own addresses, [Correspondent.Self].
  *
- * Nothing about views: it is handed the picked labels and the search, and says what was toggled.
+ * Nothing about views: it is told what it is called ([title]) and says what was toggled.
+ *
+ * @param known the picked correspondents as far as they are cached, by id.
  */
 @Composable
-fun LabelModal(
+fun ParticipantModal(
     visible: Boolean,
-    picked: List<PickedLabel>,
+    title: String,
+    picked: List<Correspondent>,
+    known: Map<Uuid, Participant>,
     query: String,
-    results: List<Label>,
+    results: List<Participant>,
     /** Whether the server's answer is still on its way; [results] are the cache's until then. */
     isFetching: Boolean,
     onQueryChange: (String) -> Unit,
     /** A row of the list was picked. */
-    onToggle: (Uuid) -> Unit,
+    onToggle: (Correspondent) -> Unit,
     /** A badge was taken out of the field, by its X or Backspace. */
-    onRemove: (Uuid) -> Unit,
+    onRemove: (Correspondent) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -77,8 +77,10 @@ fun LabelModal(
         // The bottom inset is the list's own, so it scrolls behind the navigation bar.
         contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal) },
     ) {
-        LabelPickerContent(
+        ParticipantPickerContent(
+            title = title,
             picked = picked,
+            known = known,
             query = query,
             results = results,
             isFetching = isFetching,
@@ -90,15 +92,31 @@ fun LabelModal(
     }
 }
 
+/**
+ * Where [Correspondent.Self] stands among the ids the shared field works with. Not an address
+ * book id, and no server id is ever nil.
+ */
+private val SELF_ID = Uuid.NIL
+
+private fun Correspondent.pickerId(): Uuid = when (this) {
+    is Correspondent.Contact -> id
+    Correspondent.Self -> SELF_ID
+}
+
+private fun correspondentOf(id: Uuid): Correspondent =
+    if (id == SELF_ID) Correspondent.Self else Correspondent.Contact(id)
+
 @Composable
-fun LabelPickerContent(
-    picked: List<PickedLabel>,
+fun ParticipantPickerContent(
+    title: String,
+    picked: List<Correspondent>,
+    known: Map<Uuid, Participant>,
     query: String,
-    results: List<Label>,
+    results: List<Participant>,
     isFetching: Boolean,
     onQueryChange: (String) -> Unit,
-    onToggle: (Uuid) -> Unit,
-    onRemove: (Uuid) -> Unit,
+    onToggle: (Correspondent) -> Unit,
+    onRemove: (Correspondent) -> Unit,
     modifier: Modifier = Modifier,
     focusOnStart: Boolean = true,
 ) {
@@ -108,34 +126,60 @@ fun LabelPickerContent(
     // The list is driven by the field, so opening lands in it.
     if (focusOnStart) LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    val pickedIds = remember(picked) { picked.map { it.id }.toSet() }
+    val pickedIds = remember(picked) { picked.map { it.pickerId() }.toSet() }
+    val selfName = stringResource(Res.string.home_participants_self)
+    // The account's own entry is offered like a search result: while nothing is typed, or when
+    // what is typed matches it.
+    val selfMatches = query.isBlank() || selfName fuzzyContains query.trim()
+
+    val toggle = { correspondent: Correspondent ->
+        haptics.performHapticFeedback(
+            if (correspondent.pickerId() in pickedIds) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
+        )
+        onToggle(correspondent)
+    }
 
     Column(modifier = modifier) {
         Text(
-            text = stringResource(Res.string.home_filter_labels),
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         )
 
-        // The picked labels and the field share one box, so the selection is where the typing
-        // happens rather than somewhere above it. Only its height animates, since the list below
-        // moves with it; the badges themselves come and go at once, as in the web app.
         LabelTextField(
             focusRequester = focusRequester,
-            picked = picked,
+            picked = picked.map { correspondent ->
+                when (correspondent) {
+                    Correspondent.Self -> PickedItem(
+                        id = SELF_ID,
+                        name = selfName,
+                        color = MaterialTheme.colorScheme.secondary,
+                        // No face: this one is not a person but every address the account sends from.
+                        leading = { SelfIcon(Modifier.size(14.dp)) },
+                    )
+                    is Correspondent.Contact -> {
+                        val participant = known[correspondent.id]
+                        val name = participant?.displayName ?: "…"
+                        PickedItem(
+                            id = correspondent.id,
+                            name = name,
+                            color = MaterialTheme.colorScheme.secondary,
+                            // The face rather than a color: it is what tells two badges apart here.
+                            leading = { ParticipantAvatar(participant, size = 14.dp, fallbackName = name) },
+                        )
+                    }
+                }
+            },
+            placeholder = stringResource(Res.string.home_participants_search),
             query = query,
-            onRemove = onRemove,
+            onRemove = { onRemove(correspondentOf(it)) },
             onQueryChange = onQueryChange,
         )
 
-        SearchDivider(
-            isFetching = isFetching,
-        )
+        SearchDivider(isFetching = isFetching)
 
-        // No creating from here: a filter picks among the labels there are, and one made on the
-        // spot carries no mail to find.
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(
@@ -145,30 +189,41 @@ fun LabelPickerContent(
                 bottom = 8.dp + WindowInsets.navigationBars.union(WindowInsets.ime).asPaddingValues().calculateBottomPadding(),
             ),
         ) {
-            // In the list rather than above it, so it takes the rows' place instead of pushing
-            // them down while an answer is on its way.
-            // Not while the server may still find something the cache does not have.
+            // Above the correspondents: the one entry that is not somebody, and the one most
+            // listings are about.
+            if (selfMatches) item(key = "self") {
+                Item(
+                    name = selfName,
+                    color = MaterialTheme.colorScheme.primary,
+                    subtitle = null,
+                    emailCount = null,
+                    picked = SELF_ID in pickedIds,
+                    onClick = { toggle(Correspondent.Self) },
+                    leading = { SelfIcon(Modifier.size(20.dp)) },
+                )
+            }
+
+            // Not while the server may still find somebody the cache does not have.
             if (results.isEmpty() && !isFetching) item(key = "empty") {
                 Text(
-                    text = stringResource(Res.string.home_labels_empty),
+                    text = stringResource(Res.string.home_participants_empty),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
 
-            items(results, key = { it.id.toString() }) { label ->
+            items(results, key = { it.id.toString() }) { participant ->
                 Item(
-                    name = label.name,
-                    color = label.color,
-                    emailCount = label.emailCount,
-                    picked = label.id in pickedIds,
-                    onClick = {
-                        haptics.performHapticFeedback(
-                            if (label.id in pickedIds) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
-                        )
-                        onToggle(label.id)
-                    },
+                    name = participant.displayName,
+                    color = MaterialTheme.colorScheme.primary,
+                    // The address under the name, because two people share a name more often
+                    // than an address; one without a name is their address alone.
+                    subtitle = if (participant.name != null) participant.email else null,
+                    emailCount = participant.emailCount,
+                    picked = participant.id in pickedIds,
+                    onClick = { toggle(Correspondent.Contact(participant.id)) },
+                    leading = { ParticipantAvatar(participant, size = 24.dp) },
                 )
             }
         }
@@ -176,34 +231,43 @@ fun LabelPickerContent(
 }
 
 @Composable
+private fun SelfIcon(modifier: Modifier) {
+    Icon(imageVector = PhIcons.Regular.Envelope, contentDescription = null, modifier = modifier)
+}
+
+@Composable
 @Preview
-private fun LabelPickerContentPreview() {
-    val labels = listOf(
-        PreviewLabel("Uni", Color(0xFFD6E4F5), 128),
-        PreviewLabel("Rechnungen", Color(0xFFF5DDD6), 42),
-        PreviewLabel("HPI", Color(0xFFDDF5D6), 1),
-    ).mapIndexed { index, (name, color, count) ->
-        Label(
-            id = Uuid.fromLongs(0, index.toLong()),
+private fun ParticipantPickerContentPreview() {
+    val participants = listOf(
+        PreviewParticipant("University of Waterloo", "uninews@uwaterloo.com", 128),
+        PreviewParticipant("Google Account", "account@google.com", 42),
+        PreviewParticipant(null, "nsmith@hotmail.com", 1),
+    ).mapIndexed { index, (name, email, count) ->
+        Participant(
+            id = Uuid.fromLongs(0, index.toLong() + 1),
             name = name,
-            color = color,
+            email = email,
             emailCount = count,
+            avatarUrl = null,
+            avatarPadding = null,
             overmailAccount = PREVIEW_ACCOUNT,
         )
     }
-    var picked by remember { mutableStateOf(setOf(labels[0].id)) }
+    var picked by remember { mutableStateOf(listOf<Correspondent>(Correspondent.Self, Correspondent.Contact(participants[0].id))) }
     var query by remember { mutableStateOf("") }
 
     AppTheme(dynamicColor = false) {
         Surface {
-            LabelPickerContent(
-                picked = labels.filter { it.id in picked }.map { PickedLabel(it.id, it.name, it.color) },
+            ParticipantPickerContent(
+                title = "From",
+                picked = picked,
+                known = participants.associateBy { it.id },
                 query = query,
-                results = labels,
+                results = participants,
                 isFetching = true,
                 onQueryChange = { query = it },
-                onToggle = { id -> picked = if (id in picked) picked - id else picked + id },
-                onRemove = { id -> picked = picked - id },
+                onToggle = { c -> picked = if (c in picked) picked - c else picked + c },
+                onRemove = { c -> picked = picked - c },
                 modifier = Modifier.height(400.dp),
                 focusOnStart = false,
             )
@@ -211,7 +275,7 @@ private fun LabelPickerContentPreview() {
     }
 }
 
-private data class PreviewLabel(val name: String, val color: Color, val count: Long)
+private data class PreviewParticipant(val name: String?, val email: String, val count: Long)
 
 private val PREVIEW_ACCOUNT = OvermailAccount(
     id = Uuid.fromLongs(0, 0),

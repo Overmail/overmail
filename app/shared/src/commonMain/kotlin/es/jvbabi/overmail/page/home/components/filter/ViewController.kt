@@ -43,6 +43,11 @@ fun ViewController(
     onReadSelectionChange: (List<ReadState>) -> Unit = {},
     onReadMenuClick: () -> Unit = {},
     onArchiveMenuClick: () -> Unit = {},
+    /** What the from and to chips call the picked correspondents, in the filter's order. */
+    fromNames: List<String> = emptyList(),
+    toNames: List<String> = emptyList(),
+    onFromClick: () -> Unit = {},
+    onToClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val filter = viewState.filter
@@ -75,15 +80,19 @@ fun ViewController(
             primary = ArchivedState.Archive,
             quickLabel = stringResource(Res.string.home_filter_archive_quick),
         )
-        PickerChip(
-            text = stringResource(Res.string.home_filter_from),
+        NamesChip(
+            names = fromNames,
+            title = stringResource(Res.string.home_filter_from),
+            activeTitle = { stringResource(Res.string.home_filter_from_active, it) },
             icon = PhIcons.Regular.User,
-            active = filter.sentBy != null,
+            onClick = onFromClick,
         )
-        PickerChip(
-            text = stringResource(Res.string.home_filter_to),
+        NamesChip(
+            names = toNames,
+            title = stringResource(Res.string.home_filter_to),
+            activeTitle = { stringResource(Res.string.home_filter_to_active, it) },
             icon = PhIcons.Regular.Users,
-            active = filter.sentTo != null,
+            onClick = onToClick,
         )
         PickerChip(
             text = stringResource(Res.string.home_filter_accounts),
@@ -118,6 +127,24 @@ private fun LabelsChip(
 
 /** How many picked names a chip spells out before it counts the rest. */
 private const val SHOWN_NAMES = 2
+
+/** Like [LabelsChip], for the from and to filters: says who they are on, the first few by name. */
+@Composable
+private fun NamesChip(
+    names: List<String>,
+    title: String,
+    activeTitle: @Composable (String) -> String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Chip(
+        text = if (names.isEmpty()) title else activeTitle(summarisePicked(names)),
+        arrowDown = true,
+        leading = { ChipIcon(icon) },
+        active = names.isNotEmpty(),
+        onClick = onClick,
+    )
+}
 
 /**
  * A chip over ids the app cannot name yet -- labels, people, accounts. It says whether the filter

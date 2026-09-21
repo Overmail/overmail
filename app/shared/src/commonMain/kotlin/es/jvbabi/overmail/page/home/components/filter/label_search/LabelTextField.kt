@@ -3,31 +3,19 @@ package es.jvbabi.overmail.page.home.components.filter.label_search
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
@@ -39,19 +27,24 @@ import androidx.compose.ui.unit.dp
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.MagnifyingGlass
 import com.phosphor.icons.regular.X
-import es.jvbabi.overmail.page.home.components.filter.BACKSPACE_SENTINEL
-import es.jvbabi.overmail.page.home.components.filter.PickedLabel
-import es.jvbabi.overmail.page.home.components.filter.sentinelValue
 import es.jvbabi.overmail.utils.labelContainerColor
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_labels_remove
-import overmail.app.shared.generated.resources.home_labels_search
 import kotlin.uuid.Uuid
+
+data class PickedItem(
+    val id: Uuid,
+    val name: String,
+    val color: Color,
+    /** In front of the name, a person's face say; nothing for a label. */
+    val leading: (@Composable () -> Unit)? = null,
+)
 
 @Composable
 fun LabelTextField(
-    picked: List<PickedLabel>,
+    picked: List<PickedItem>,
+    placeholder: String,
     focusRequester: FocusRequester,
     query: String,
     onRemove: (Uuid) -> Unit,
@@ -83,18 +76,17 @@ fun LabelTextField(
                 .size(18.dp),
         )
 
-        picked.forEach { label ->
-            key(label.id) {
-                LabelBadge(label = label, onRemove = {
+        picked.forEach { item ->
+            key(item.id) {
+                ItemBadge(item = item, onRemove = {
                     haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
-                    onRemove(label.id)
+                    onRemove(item.id)
                 })
             }
         }
 
         // At least as wide as its placeholder, so the placeholder never wraps: where it does
         // not fit beside the badges any more, the field goes on a line of its own instead.
-        val placeholder = stringResource(Res.string.home_labels_search)
         val placeholderStyle = MaterialTheme.typography.bodyLarge
         val textMeasurer = rememberTextMeasurer()
         val density = LocalDensity.current
@@ -157,26 +149,29 @@ fun LabelTextField(
  * tag in the label's hue, the name in the normal text color and an X to take it out.
  */
 @Composable
-private fun LabelBadge(label: PickedLabel, onRemove: () -> Unit) {
-    val name = label.name ?: "…"
+private fun ItemBadge(
+    item: PickedItem,
+    onRemove: () -> Unit
+) {
     Row(
         modifier = Modifier
             .height(22.dp)
             .clip(RoundedCornerShape(2.dp))
-            .background(label.color?.labelContainerColor() ?: MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(start = 6.dp, end = 4.dp),
+            .background(item.color.labelContainerColor())
+            .padding(start = if (item.leading == null) 6.dp else 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        item.leading?.invoke()
         Text(
-            text = name,
+            text = item.name,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
         )
         Icon(
             imageVector = PhIcons.Regular.X,
-            contentDescription = stringResource(Res.string.home_labels_remove, name),
+            contentDescription = stringResource(Res.string.home_labels_remove, item.name),
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f),
             modifier = Modifier
                 .clip(RoundedCornerShape(2.dp))

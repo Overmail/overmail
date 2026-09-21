@@ -99,8 +99,12 @@ export class ReconnectingSocket<Message> {
      * Sends [message] if there is a connection, and drops it if there is none -- a caller that
      * has state to keep in sync re-sends it from [onOpen] rather than queueing it here, because
      * what was worth sending before a reconnect is rarely still worth sending after one.
+     *
+     * A socket that is still connecting is none: the browser throws on a send before the
+     * handshake is through, and [onOpen] follows it anyway.
      */
     send(message: unknown) {
+        if (!this.connected) return;
         this.socket?.send(JSON.stringify(message));
     }
 
@@ -109,6 +113,7 @@ export class ReconnectingSocket<Message> {
         this.socket = socket;
 
         socket.onopen = () => {
+            if (this.socket !== socket) return; // an old socket opening after a stop
             // Reached the server, so a later drop starts counting from the short delay again.
             this.failures = 0;
             // Before the callback, not after: [onOpen] is where a caller says again what it

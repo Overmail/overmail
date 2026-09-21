@@ -9,6 +9,14 @@ class FakeSocket implements SocketLike {
     onmessage: ((event: {data: string}) => void) | null = null;
     closed = false;
 
+    constructor() {
+        // Connecting when it is handed back, open a moment later -- like a real one, which takes
+        // no message in between.
+        setTimeout(() => {
+            if (!this.closed) this.onopen?.();
+        });
+    }
+
     readonly sent: Record<string, unknown>[] = [];
 
     send(data: string) {
@@ -44,6 +52,7 @@ function wireMail(id: string, archiveState = "unarchive") {
         cc: [],
         bcc: [],
         labels: [],
+        attachments: [],
     };
 }
 

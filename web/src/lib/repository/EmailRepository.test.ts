@@ -8,6 +8,14 @@ class FakeSocket implements SocketLike {
     onmessage: ((event: {data: string}) => void) | null = null;
     closed = false;
 
+    constructor() {
+        // Connecting when it is handed back, open a moment later -- like a real one, which takes
+        // no message in between.
+        setTimeout(() => {
+            if (!this.closed) this.onopen?.();
+        });
+    }
+
     readonly sent: {type: string; ids: string[]}[] = [];
 
     send(data: string) {
@@ -69,6 +77,7 @@ function wireMail(id: string, subject = "Invoice 42") {
                 created_by_agent: true,
             },
         ],
+        attachments: [],
     };
 }
 
@@ -197,11 +206,9 @@ test("after a reconnect everything on screen is asked for again", async () => {
     repo.subscribe("m-1");
     repo.subscribe("m-2");
     await settle();
-    latest().onopen?.();
 
     latest().drop();
     await settle();
-    latest().onopen?.();
 
     expect(opened.length).toBe(2);
     // The server's side of the subscription died with the connection, so the new one is told
@@ -238,6 +245,7 @@ test("merge takes what another feed already knows", () => {
             cc: [],
             bcc: [],
             labels: [],
+            attachments: [],
         },
     ]);
 

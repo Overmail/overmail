@@ -24,6 +24,17 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.SyncHumanReadableLocale
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.disk.DiskCache
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import es.jvbabi.overmail.data.network.ServerImageCacheStrategy
+import io.ktor.client.HttpClient
+import okio.Path
+
+/** Avatars are small; this holds thousands of them. */
+private const val IMAGE_DISK_CACHE_BYTES = 64L * 1024 * 1024
 
 /** Opens a link in the platform's in-app browser rather than handing it to a browser app. */
 expect fun openUrl(url: String)
@@ -35,6 +46,12 @@ expect fun getClipboardText(): String?
 expect fun deviceInfo(): DeviceInfo
 
 /**
+ * Where downloaded pictures are kept on disk: a directory of their own inside the platform's
+ * cache, so the system may clear it when space runs out.
+ */
+expect fun imageCacheDirectory(context: PlatformContext): Path
+
+/**
  * The color scheme the system suggests -- Material You on Android 12 and up, the app's own scheme
  * everywhere else. Only consulted when [AppTheme] is asked for a dynamic theme.
  */
@@ -44,6 +61,28 @@ expect fun dynamicTheme(dark: Boolean): ColorScheme
 @Composable
 @Preview
 fun App() {
+    // One loader for the whole app. It goes through the app's own client, so a picture carries
+    // the werkbank headers like every other request; the session token is added per request.
+    val httpClient = koinInject<HttpClient>()
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components {
+                add(
+                    KtorNetworkFetcherFactory(
+                        httpClient = { httpClient },
+                        cacheStrategy = { ServerImageCacheStrategy() },
+                    )
+                )
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(imageCacheDirectory(context))
+                    .maxSizeBytes(IMAGE_DISK_CACHE_BYTES)
+                    .build()
+            }
+            .build()
+    }
+
     SyncHumanReadableLocale()
 
     AppTheme(
@@ -72,11 +111,7 @@ fun App() {
                 entryProvider = { key ->
                     when (key) {
                         is Screen.Home -> NavEntry(key = key) {
-                            HomeScreen(onOpenSettings = { backstack.add(Screen.Settings) })
-                        }
-
-                        is Screen.Settings -> NavEntry(key = key) {
-                            SettingsScreen(onBack = { backstack.removeLastOrNull() })
+                            HomeScreen()
                         }
 
                         is Screen.Onboarding -> NavEntry(key = key) {

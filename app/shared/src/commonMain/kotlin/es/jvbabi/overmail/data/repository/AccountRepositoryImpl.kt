@@ -77,6 +77,7 @@ class AccountRepositoryImpl(
             firstName = account.firstName,
             lastName = account.lastName,
             homeserver = account.homeserver,
+            token = account.token,
         ))
     }
 

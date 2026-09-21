@@ -1,0 +1,77 @@
+<resources>
+    <string name="home_filter_labels">Labels</string>
+    <string name="home_filter_from">Von</string>
+    <string name="home_filter_to">An</string>
+    <string name="home_filter_accounts">Konten</string>
+    <string name="home_filter_accounts_active">Konten: %1$s</string>
+    <string name="home_accounts_empty">Keine Konten verbunden</string>
+    <string name="home_accounts_failed">Die Konten konnten nicht geladen werden.</string>
+    <string name="home_filter_all">Alle</string>
+
+    <string name="home_filter_read_unread">Ungelesen</string>
+    <string name="home_filter_read_read">Gelesen</string>
+
+    <string name="home_filter_archive_quick">Auch archivierte</string>
+    <string name="home_filter_archive_inbox">Posteingang</string>
+    <string name="home_filter_archive_archived">Archiviert</string>
+    <string name="home_filter_archive_spam">Spam</string>
+    <string name="home_filter_read_title">Lesestatus</string>
+    <string name="home_filter_archive_title">Ablage</string>
+
+    <string name="home_filter_labels_active">Labels: %1$s</string>
+    <plurals name="home_filter_more">
+        <item quantity="one">und ein weiteres</item>
+        <item quantity="other">und %1$d weitere</item>
+    </plurals>
+    <string name="home_labels_search">Labels suchen</string>
+    <string name="home_labels_empty">Keine Labels gefunden</string>
+    <string name="home_labels_remove">%1$s entfernen</string>
+    <plurals name="home_labels_email_count">
+        <item quantity="one">%1$d Mail</item>
+        <item quantity="other">%1$d Mails</item>
+    </plurals>
+
+    <string name="home_filter_from_active">Von: %1$s</string>
+    <string name="home_filter_to_active">An: %1$s</string>
+    <string name="home_participants_search">Personen suchen</string>
+    <string name="home_participants_empty">Niemand gefunden</string>
+    <string name="home_participants_self">Meine Konten</string>
+
+    <string name="home_grouping_title">Gruppierung</string>
+    <string name="home_grouping_active">Aktive Kategorien (%1$d/%2$d)</string>
+    <string name="home_grouping_inactive">Inaktive Kategorien</string>
+    <string name="home_grouping_active_empty">Zum Gruppieren hierher ziehen</string>
+    <string name="home_grouping_inactive_empty">Alle Kategorien sind aktiv</string>
+    <string name="home_grouping_mail_sort">E-Mails hierin sortieren</string>
+
+    <string name="home_grouping_category_date_smart">Datum (intelligent)</string>
+    <string name="home_grouping_category_read">Gelesen</string>
+    <string name="home_grouping_category_month">Monat</string>
+    <string name="home_grouping_category_year">Jahr</string>
+    <string name="home_grouping_category_day">Tag</string>
+    <string name="home_grouping_category_sender">Absender</string>
+    <string name="home_grouping_category_imap_account">E-Mail-Konto</string>
+    <string name="home_grouping_category_archived">Archiviert</string>
+
+    <string name="home_grouping_mail_sort_date">Datum</string>
+    <string name="home_grouping_mail_sort_sender">Absender</string>
+    <string name="home_grouping_mail_sort_subject">Betreff</string>
+
+    <string name="home_grouping_sort_general">%1$s,</string>
+    <string name="home_grouping_sort_by_date">Nach Datum</string>
+    <string name="home_grouping_sort_by_month">Nach Monat</string>
+    <string name="home_grouping_sort_by_year">Nach Jahr</string>
+    <string name="home_grouping_sort_by_day">Nach Tag</string>
+    <string name="home_grouping_sort_sender">Absender</string>
+    <string name="home_grouping_sort_account">E-Mail-Konto</string>
+    <string name="home_grouping_sort_subject">Betreff</string>
+
+    <string name="home_grouping_sort_newest_first">neueste zuerst</string>
+    <string name="home_grouping_sort_oldest_first">älteste zuerst</string>
+    <string name="home_grouping_sort_az">A–Z</string>
+    <string name="home_grouping_sort_za">Z–A</string>
+    <string name="home_grouping_sort_read_first">Gelesene zuerst</string>
+    <string name="home_grouping_sort_unread_first">Ungelesene zuerst</string>
+    <string name="home_grouping_sort_active_first">Aktive zuerst</string>
+    <string name="home_grouping_sort_archived_first">Archivierte zuerst</string>
+</resources>

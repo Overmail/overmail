@@ -93,6 +93,7 @@ class OnboardingAuthViewModel(
                         lastName = userInfo.lastName,
                         email = userInfo.email,
                         homeserver = homeserver,
+                        token = resultData.jwt,
                     )
                     accountRepository.saveAccount(user)
                     onUserCreated(user)

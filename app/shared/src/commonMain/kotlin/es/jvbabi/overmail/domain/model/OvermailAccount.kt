@@ -9,4 +9,5 @@ data class OvermailAccount(
     val lastName: String,
     val email: String,
     val homeserver: String,
+    val token: String,
 )

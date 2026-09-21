@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.http.senders.search
 
 import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.intQueryParameter
 import es.jvbabi.overmail.server.http.api.queryParameter
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
@@ -20,7 +21,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.max
 import org.jetbrains.exposed.v1.jdbc.select
 
-private const val MAX_RESULTS = 10
+/** What a search answers when the caller does not say how many. */
+private const val DEFAULT_LIMIT = 10
 
 /**
  * One display name a sender used, with how often and how recently. The same address can appear
@@ -34,11 +36,16 @@ private data class NameVariant(val name: String?, val emailCount: Long, val last
  */
 private data class SenderAvatar(val address: String, val url: String?, val padding: Double?)
 
+/**
+ * The user's correspondents, most written to them first: `GET /api/senders/search?query=anna&limit=30`.
+ * `limit` defaults to 10.
+ */
 fun Route.senderSearch() {
     authenticate {
         get {
             val userId = call.requireAuthenticatedUserId()
             val query = call.queryParameter("query").orEmpty()
+            val limit = call.intQueryParameter("limit", default = DEFAULT_LIMIT, range = 1..Int.MAX_VALUE)
 
             val senders = call.database().query {
                 val count = Count(Emails.id).alias("email_count")
@@ -98,7 +105,7 @@ fun Route.senderSearch() {
             else senders.filter { sender ->
                 sender.address.lowercase() fuzzyContains query.lowercase() ||
                         sender.name?.lowercase()?.fuzzyContains(query.lowercase()) == true
-            }).take(MAX_RESULTS)
+            }).take(limit)
 
             call.respond(SenderSearchResponse(filtered))
         }

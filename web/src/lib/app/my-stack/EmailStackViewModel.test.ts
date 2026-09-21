@@ -9,6 +9,14 @@ class FakeSocket implements SocketLike {
     onmessage: ((event: {data: string}) => void) | null = null;
     closed = false;
 
+    constructor() {
+        // Connecting when it is handed back, open a moment later -- like a real one, which takes
+        // no message in between.
+        setTimeout(() => {
+            if (!this.closed) this.onopen?.();
+        });
+    }
+
     readonly sent: Record<string, unknown>[] = [];
 
     send(data: string) {
@@ -44,6 +52,7 @@ function wireMail(id: string, archiveState = "unarchive") {
         cc: [],
         bcc: [],
         labels: [],
+        attachments: [],
     };
 }
 
@@ -181,7 +190,12 @@ test("walking back and forth stays inside the pile", async () => {
     expect(viewModel.currentEmailId).toBe("m-1");
 
     viewModel.onNextEmail();
+    expect(viewModel.currentEmailId).toBe("m-2");
+
+    // Past the last card is the done screen, and back from there is the last card again.
     viewModel.onNextEmail();
+    expect(viewModel.currentPosition).toEqual({type: "done"});
+    viewModel.onPreviousEmail();
     expect(viewModel.currentEmailId).toBe("m-2");
 });
 

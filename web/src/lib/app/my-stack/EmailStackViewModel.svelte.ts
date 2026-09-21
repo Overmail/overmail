@@ -149,7 +149,8 @@ export class EmailStackViewModel {
     }
 
     onPreviousEmail() {
-        if (this.currentPosition?.type === "email" && this.currentEmailIndex === -1) return;
+        // Nothing above the first card, and nothing to walk from on one that is not drawn.
+        if (this.currentPosition?.type === "email" && this.currentEmailIndex <= 0) return;
         if (this.currentPosition?.type === "email") {
             this.currentPosition = {type: "email", emailId: this.emails[this.currentEmailIndex - 1].id};
         } else if (this.currentPosition?.type === "done") {

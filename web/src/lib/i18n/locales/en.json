@@ -523,7 +523,10 @@
       "download": "Download the Overmail app",
       "copy": "Copy code",
       "copied": "Copied",
-      "copyFailed": "The code could not be copied."
+      "copyFailed": "The code could not be copied.",
+      "sessions": {
+        "title": "Active sessions"
+      }
     }
   },
   "ai": {

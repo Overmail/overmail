@@ -1,22 +1,13 @@
 package es.jvbabi.overmail.page.onboarding
 
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -29,12 +20,16 @@ import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.start.OnboardingStartScreen
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 @Composable
 fun OnboardingRoot() {
     val backstack: OnboardingScreens.Backstack = remember { mutableStateListOf<OnboardingScreens>(OnboardingScreens.Start) }
 
     val authViewModel = koinViewModel<OnboardingAuthViewModel>()
+    LaunchedEffect(Unit) {
+        authViewModel.onUserCreated = { user -> backstack.add(OnboardingScreens.Success(user.id)) }
+    }
 
     Box(
         modifier = Modifier
@@ -59,6 +54,9 @@ fun OnboardingRoot() {
                             contentPadding = contentPadding,
                         )
                     }
+                    is OnboardingScreens.Success -> NavEntry(key = key, metadata = transitionSpec) {
+                        Text("Hi, ${key.userId}")
+                    }
                 }
             },
         )
@@ -68,10 +66,13 @@ fun OnboardingRoot() {
 @Serializable
 sealed class OnboardingScreens {
     @Serializable
-    object Start : OnboardingScreens()
+    data object Start : OnboardingScreens()
 
     @Serializable
-    object Auth : OnboardingScreens()
+    data object Auth : OnboardingScreens()
+
+    @Serializable
+    data class Success(val userId: Uuid) : OnboardingScreens()
 
     typealias Backstack = SnapshotStateList<OnboardingScreens>
 }

@@ -62,6 +62,7 @@ fun Route.getCurrentUser() {
             call.respond(
                 CurrentUserResponse(
                     id = user.id.value,
+                    username = user.username,
                     firstname = user.firstname,
                     lastname = user.lastname,
                     email = user.email,
@@ -75,6 +76,8 @@ fun Route.getCurrentUser() {
 @Serializable
 private data class CurrentUserResponse(
     @SerialName("id") val id: Uuid,
+    /** What they sign in with, next to their address. */
+    @SerialName("username") val username: String,
     @SerialName("firstname") val firstname: String,
     @SerialName("lastname") val lastname: String,
     /** The address of the account, as they wrote it. */

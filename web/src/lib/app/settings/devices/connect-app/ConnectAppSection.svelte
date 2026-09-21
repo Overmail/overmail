@@ -21,6 +21,7 @@
         <AuthQrCode state={authCode.state} onretry={() => void authCode.renew()} />
         <div class="flex flex-col gap-2">
             <span>{$_("settings.devices.scan")}</span>
+            <span class="text-sm text-muted-foreground">{$_("settings.devices.revealHint")}</span>
             <a href="https://github.com/overmail/overmail/releases/latest" target="_blank" class="text-primary hover:underline">{$_("settings.devices.download")}</a>
             <CopyAuthCodeButton url={authCode.state.type === "ready" ? authCode.state.url : null} />
         </div>

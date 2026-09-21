@@ -1,6 +1,6 @@
 <script lang="ts">
     import QRCode from '@castlenine/svelte-qrcode';
-    import {ArrowClockwiseIcon} from "phosphor-svelte";
+    import {ArrowClockwiseIcon, WarningCircleIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import {Button} from "$lib/components/ui/button";
     import type {AuthCodeState} from "$lib/repository/DevicesSettingsRepository";
@@ -15,13 +15,21 @@
         </div>
     {:else if state.type === "error"}
         <div class="flex flex-col gap-2 items-center justify-center w-full h-full p-4 bg-accent rounded-md text-center">
-            <span class="text-sm text-destructive">{$_("settings.devices.loadFailed")}</span>
+            <WarningCircleIcon class="size-6 text-muted-foreground" />
+            <span class="text-sm text-muted-foreground">{$_("settings.devices.loadFailed")}</span>
             <Button variant="outline" size="sm" onclick={onretry}>
                 <ArrowClockwiseIcon />
                 {$_("settings.devices.retry")}
             </Button>
         </div>
     {:else}
-        <QRCode data={state.url} size={192} />
+        <!--
+          Blurred until hovered, so a code on an open settings screen cannot be scanned over
+          somebody's shoulder. Focusable, so the keyboard can reveal it too.
+        -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div tabindex="0" class="rounded-md outline-none blur-md transition hover:blur-none focus-visible:blur-none">
+            <QRCode data={state.url} size={192} />
+        </div>
     {/if}
 </div>

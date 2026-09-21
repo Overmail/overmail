@@ -1,0 +1,10 @@
+{
+  "title": "Sign in with a QR code",
+  "description": "You sign in to the app with a code from the web app: open Settings → Devices in Overmail on the web and scan the code shown there, or paste it if the camera is not an option. Afterwards the app asks whether it may notify you about new mail and takes you straight to your inbox.",
+  "localized": {
+    "de": {
+      "title": "Anmelden per QR-Code",
+      "description": "Du meldest dich in der App mit einem Code aus der Web-App an: Öffne in Overmail im Web Einstellungen → Geräte und scanne den Code, der dort angezeigt wird, oder füge ihn ein, falls die Kamera keine Option ist. Danach fragt die App, ob sie dich über neue E-Mails benachrichtigen darf, und bringt dich direkt zu deinem Posteingang."
+    }
+  }
+}

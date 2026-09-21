@@ -15,5 +15,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Overmail uses the camera to scan the sign-in QR code.</string>
 </dict>
 </plist>

@@ -39,14 +39,6 @@ fun HomeScreen(
             text = "Overmail",
             style = MaterialTheme.typography.headlineMedium,
         )
-        Text(
-            text = when (viewModel.serverState) {
-                ServerState.Checking -> "Checking ${BuildKonfig.SERVER_URL}…"
-                ServerState.Reachable -> "${BuildKonfig.SERVER_URL} is up"
-                ServerState.Unreachable -> "${BuildKonfig.SERVER_URL} is not answering"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-        )
         Button(onClick = viewModel::checkServer) {
             Text("Check again")
         }

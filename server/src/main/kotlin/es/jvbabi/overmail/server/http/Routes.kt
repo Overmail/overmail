@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.http
 
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
+import es.jvbabi.overmail.server.http.auth.redeem.redeemAuthCode
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
@@ -57,6 +58,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
+import es.jvbabi.overmail.server.http.webapp.devices.createAuthCode
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
 import es.jvbabi.overmail.server.http.webapp.listing.listingSocket
 import es.jvbabi.overmail.server.http.webapp.views.viewsSocket
@@ -88,6 +90,12 @@ internal fun Application.configureRouting() {
              */
             get("/health") {
                 call.respondText("ok")
+            }
+
+            route("/auth") {
+                route("redeem") {
+                    redeemAuthCode()
+                }
             }
 
             route("/avatars") {
@@ -315,6 +323,14 @@ internal fun Application.configureRouting() {
                 route("/content") {
                     route("/socket") {
                         contentSocket()
+                    }
+                }
+
+                route("/devices") {
+                    route("/auth") {
+                        route("/generate-auth-code") {
+                            createAuthCode()
+                        }
                     }
                 }
 

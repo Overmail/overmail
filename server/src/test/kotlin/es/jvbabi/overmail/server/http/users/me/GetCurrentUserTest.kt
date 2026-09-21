@@ -50,6 +50,7 @@ class GetCurrentUserTest {
 
         val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
         assertEquals(user.id.value.toString(), body["id"]!!.jsonPrimitive.content)
+        assertEquals(user.username, body["username"]!!.jsonPrimitive.content)
         assertEquals("Julius", body["firstname"]!!.jsonPrimitive.content)
         assertEquals("Babies", body["lastname"]!!.jsonPrimitive.content)
         assertEquals(user.email, body["email"]!!.jsonPrimitive.content)

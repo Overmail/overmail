@@ -516,6 +516,14 @@
         "saving": "Saving…",
         "failed": "The change could not be saved."
       }
+    },
+    "devices": {
+      "title": "Connect the Overmail app",
+      "scan": "Scan this code with the Overmail app to sign in.",
+      "download": "Download the Overmail app",
+      "copy": "Copy code",
+      "copied": "Copied",
+      "copyFailed": "The code could not be copied."
     }
   },
   "ai": {

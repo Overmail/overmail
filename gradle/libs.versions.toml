@@ -32,12 +32,16 @@ material3 = "1.10.0-alpha05"
 navigation3 = "1.1.1"
 koin = "4.2.2"
 kermit = "2.2.0"
-buildkonfig = "0.22.0"
+buildkonfig = "0.23.0"
 ksp = "2.3.11"
 room = "2.8.5"
 sqlite = "2.7.1"
-haze = "2.0.0-rc01"
+haze = "2.0.0-rc02"
+phosphor = "1.0.5"
 human-readable = "2.0.0-alpha02"
+moko-permissions = "0.20.1"
+camerax = "1.6.2"
+mlkit-barcode-scanning = "17.3.0"
 
 [libraries]
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
@@ -62,6 +66,7 @@ ktor-server-routing-openapi = { module = "io.ktor:ktor-server-routing-openapi", 
 ktor-server-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
 ktor-server-di = { module = "io.ktor:ktor-server-di", version.ref = "ktor" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
@@ -116,6 +121,7 @@ app-koin-compose-navigation3 = { module = "io.insert-koin:koin-compose-navigatio
 app-ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 app-ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 app-ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+app-ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 
 # App - Room
 app-androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -126,7 +132,16 @@ app-androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", versi
 app-kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 app-haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 app-haze-blur-materials = { module = "dev.chrisbanes.haze:haze-blur-materials", version.ref = "haze" }
+app-phosphor-regular = { module = "io.github.dev778g-me:phosphoricons-regular", version.ref = "phosphor" }
 app-human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "human-readable" }
+app-moko-permissions-api = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
+app-moko-permissions-compose = { module= "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }
+app-moko-permissions-camera  = { module= "dev.icerock.moko:permissions-camera", version.ref = "moko-permissions" }
+app-moko-permissions-notifications = { module = "dev.icerock.moko:permissions-notifications", version.ref = "moko-permissions" }
+app-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+app-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+app-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+app-mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode-scanning" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

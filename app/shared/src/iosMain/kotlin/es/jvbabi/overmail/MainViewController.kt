@@ -1,6 +1,8 @@
 package es.jvbabi.overmail
 
 import androidx.compose.ui.window.ComposeUIViewController
+import dev.icerock.moko.permissions.PermissionsController
+import dev.icerock.moko.permissions.ios.PermissionsController as IosPermissionsController
 import es.jvbabi.overmail.data.repository.IosApplicationRepository
 import es.jvbabi.overmail.di.initKoin
 import es.jvbabi.overmail.domain.repository.ApplicationRepository
@@ -13,6 +15,8 @@ fun MainViewController(): UIViewController {
     initKoin {
         modules(module {
             single<ApplicationRepository> { IosApplicationRepository() }
+            // Android builds its controller in MainActivity, bound to the activity; iOS needs none.
+            single<PermissionsController> { IosPermissionsController() }
         })
     }
 

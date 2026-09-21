@@ -4,19 +4,27 @@ package es.jvbabi.overmail
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
+import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.ui.theme.darkScheme
 import es.jvbabi.overmail.ui.theme.lightScheme
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSURL
 import platform.SafariServices.SFSafariViewController
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
+import platform.UIKit.UIDevice
 import platform.UIKit.UIPasteboard
 import platform.UIKit.UIPopoverArrowDirectionAny
 import platform.UIKit.UIScreen
 import platform.UIKit.popoverPresentationController
+import platform.posix.uname
+import platform.posix.utsname
 
 actual fun openUrl(url: String) {
     val nsUrl = NSURL(string = url)
@@ -62,6 +70,18 @@ actual fun shareUrl(url: String, title: String?) {
 }
 
 actual fun getClipboardText(): String? = UIPasteboard.generalPasteboard.string
+
+/** `UIDevice.model` is only "iPhone"; the machine name is the exact model, e.g. "iPhone16,2". */
+actual fun deviceInfo(): DeviceInfo = DeviceInfo(
+    platform = "ios",
+    device = memScoped {
+        val system = alloc<utsname>()
+        uname(system.ptr)
+        system.machine.toKString()
+    },
+    manufacturer = "Apple",
+    os = "${UIDevice.currentDevice.systemName} ${UIDevice.currentDevice.systemVersion}",
+)
 
 /** iOS has no system-wide accent to derive a scheme from, so this is the app's own. */
 @Composable

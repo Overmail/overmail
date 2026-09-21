@@ -9,6 +9,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.ui.theme.darkScheme
 import es.jvbabi.overmail.ui.theme.lightScheme
 import org.koin.core.qualifier.named
@@ -59,3 +60,10 @@ actual fun getClipboardText(): String? {
         .getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
     return clipboard?.primaryClip?.getItemAt(0)?.text?.toString()
 }
+
+actual fun deviceInfo(): DeviceInfo = DeviceInfo(
+    platform = "android",
+    device = Build.MODEL,
+    manufacturer = Build.MANUFACTURER,
+    os = "Android ${Build.VERSION.RELEASE}",
+)

@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.data.repository
 
 import es.jvbabi.overmail.data.database.OvermailDatabase
+import es.jvbabi.overmail.deviceInfo
 import es.jvbabi.overmail.data.database.entity.DbOvermailAccount
 import es.jvbabi.overmail.data.network.isResponseFromBackend
 import es.jvbabi.overmail.data.network.safeRequest
@@ -32,6 +33,12 @@ class AccountRepositoryImpl(
         val response = httpClient.get(URLBuilder(urlString = homeserver).apply {
             appendPathSegments("api", "auth", "redeem")
             parameters.append("code", code)
+            // Recorded with the session the code turns into, so it can be recognized in a list.
+            val device = deviceInfo()
+            parameters.append("platform", device.platform)
+            parameters.append("device", device.device)
+            parameters.append("manufacturer", device.manufacturer)
+            parameters.append("os", device.os)
         }.build())
 
         // Checked first: a 404 from anything but the server is a wrong homeserver, not a used code.

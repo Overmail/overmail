@@ -520,10 +520,26 @@
     "devices": {
       "title": "Connect the Overmail app",
       "scan": "Scan this code with the Overmail app to sign in.",
+      "revealHint": "Hover over the code to reveal it.",
       "download": "Download the Overmail app",
       "copy": "Copy code",
       "copied": "Copied",
-      "copyFailed": "The code could not be copied."
+      "copyFailed": "The code could not be copied.",
+      "loadFailed": "An error occurred",
+      "retry": "Try again",
+      "sessions": {
+        "title": "Active sessions",
+        "current": "This device",
+        "revoke": "Sign out",
+        "signOut": {
+          "title": "Really sign out?",
+          "description": "This device will be signed out of Overmail and you will have to sign in again.",
+          "cancel": "Cancel",
+          "confirm": "Sign out"
+        },
+        "empty": "You are not signed in anywhere else.",
+        "loadFailed": "An error occurred"
+      }
     }
   },
   "ai": {

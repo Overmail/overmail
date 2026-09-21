@@ -1,5 +1,3 @@
-import * as url from "node:url";
-
 export class DevicesSettingsRepository {
     async fetchAuthCode(): Promise<AuthCodeState> {
         try {
@@ -15,10 +13,11 @@ export class DevicesSettingsRepository {
             };
         } catch (error) {
             console.error('Error fetching auth code:', error);
-            return { type: "loading" };
+            return { type: "error" };
         }
     }
 }
 
 export type AuthCodeState = { type: "loading" } |
-{ type: "ready", url: string, validUntil: Date }
+{ type: "ready", url: string, validUntil: Date } |
+{ type: "error" }

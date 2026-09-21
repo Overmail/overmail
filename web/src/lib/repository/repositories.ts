@@ -19,6 +19,7 @@ import {
 } from "$lib/app/entities/EntityRepository.svelte";
 import type {CachedEmail, CachedLabel, CachedSender} from "$lib/app/entities/cache";
 import {DevicesSettingsRepository} from "$lib/repository/DevicesSettingsRepository.ts";
+import {SessionsRepository} from "$lib/repository/SessionsRepository";
 
 /**
  * Every repository the app talks to, in one place.
@@ -52,6 +53,8 @@ export type Repositories = {
     labels: EntityRepository<CachedLabel>;
     senders: EntityRepository<CachedSender>;
     deviceSettingsRepository: DevicesSettingsRepository;
+    /** Where the user is signed in, as the devices settings list it. */
+    sessions: SessionsRepository;
 };
 
 /** One builder per key, so nothing is constructed before somebody asks for it. */
@@ -69,6 +72,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     home: () => new HomeScreenRepository(),
     views: () => new ViewRepository(),
     deviceSettingsRepository: () => new DevicesSettingsRepository(),
+    sessions: () => new SessionsRepository(),
     emails: createEmailRepository,
     labels: createLabelRepository,
     senders: createSenderRepository,

@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.PreviewWrapperProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.page.Screen
 import es.jvbabi.overmail.page.home.HomeScreen
@@ -30,6 +31,8 @@ expect fun openUrl(url: String)
 expect fun shareUrl(url: String, title: String?)
 
 expect fun getClipboardText(): String?
+
+expect fun deviceInfo(): DeviceInfo
 
 /**
  * The color scheme the system suggests -- Material You on Android 12 and up, the app's own scheme

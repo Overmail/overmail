@@ -6,6 +6,7 @@ import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
@@ -17,11 +18,13 @@ import io.ktor.http.appendPathSegments
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.request.userAgent
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.util.AttributeKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
@@ -32,6 +35,9 @@ import kotlin.time.Duration.Companion.days
 const val AUTH_API_PREFIX = "/api/auth"
 
 val SESSION_VALIDITY = 30.days
+
+/** The browser that started a sign-in flow, kept on it until the done step issues the session. */
+private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 
 /**
  * Two steps: identify the account by username or email, then prove control of its mailbox with a
@@ -58,14 +64,20 @@ fun Application.installOvermailAuthentikt() {
     val verificationPlugin = EmailVerificationPlugin(smtpConfig)
 
     val donePlugin = DonePlugin<User> {
-        onSuccess { _, user ->
+        onSuccess { session, user ->
+            // The done step does not see the request, so the browser is the one that started the flow.
+            val token = jwtService.issueSession(
+                database = dependencies.resolve<OvermailDatabase>(),
+                userId = user.id.value,
+                client = webClientOf(session.attributes[FLOW_USER_AGENT]),
+            )
             cookie(
                 Cookie(
                     name = SESSION_COOKIE_NAME,
                     // A JWT is already URL safe; the default encoding would only add Ktor's
                     // $x-enc marker to the Set-Cookie header.
                     encoding = CookieEncoding.RAW,
-                    value = jwtService.issue(user.id.value, SESSION_VALIDITY),
+                    value = token,
                     path = "/",
                     maxAge = SESSION_VALIDITY.inWholeSeconds.toInt(),
                     // Not readable from JavaScript, and only sent back over the proxied https origin.
@@ -102,7 +114,9 @@ fun Application.installOvermailAuthentikt() {
              * /api/auth/authentikt/flow/{session_id}.
              */
             post("/login") {
-                call.respond(LoginResponse(instance.createNewSession().sessionId))
+                val session = instance.createNewSession()
+                call.request.userAgent()?.let { session.attributes[FLOW_USER_AGENT] = it }
+                call.respond(LoginResponse(session.sessionId))
             }
 
             authenticate {

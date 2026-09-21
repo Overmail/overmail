@@ -10,6 +10,8 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.Label
 import es.jvbabi.overmail.server.database.models.Labels
+import es.jvbabi.overmail.server.database.models.Session
+import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
@@ -39,6 +41,7 @@ internal val URL_EMAIL_ID = AttributeKey<Uuid>("overmail.url.email-id")
 internal val URL_LABEL = AttributeKey<Label>("overmail.url.label")
 internal val URL_CHAT = AttributeKey<AiChat>("overmail.url.chat")
 internal val URL_CHAT_MESSAGE = AttributeKey<AiChatMessage>("overmail.url.chat-message")
+internal val URL_SESSION = AttributeKey<Session>("overmail.url.session")
 
 /** Which resources this call already established belong to the caller. */
 internal val URL_OWNED = AttributeKey<MutableSet<String>>("overmail.url.owned")
@@ -202,4 +205,32 @@ suspend fun ApplicationCall.requireOwnedChatMessageFromUrl(): AiChatMessage {
 suspend fun ApplicationCall.requireAvatarFromUrl(): EmailAvatar {
     val id = idFromUrl("avatarId", "avatar")
     return database().query { EmailAvatar.findById(id) } ?: notFound("avatar", id.toString())
+}
+
+/**
+ * `{sessionId}` as a session that still signs somebody in. A revoked one is gone as far as the api
+ * is concerned, like a deleted row would be.
+ */
+suspend fun ApplicationCall.requireSessionFromUrl(): Session {
+    attributes.getOrNull(URL_SESSION)?.let { return it }
+
+    val id = idFromUrl("sessionId", "session")
+    val session = database().query { Session.findById(id) }
+        ?.takeIf { it.revokedAt == null }
+        ?: notFound("session", id.toString())
+
+    attributes.put(URL_SESSION, session)
+    return session
+}
+
+suspend fun ApplicationCall.requireOwnedSessionFromUrl(): Session {
+    val session = requireSessionFromUrl()
+    if (isKnownOwned("session")) return session
+
+    if (session.readValues[Sessions.user].value != requireAuthenticatedUserId()) {
+        forbidden("session", session.id.value.toString())
+    }
+
+    rememberOwned("session")
+    return session
 }

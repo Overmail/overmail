@@ -36,6 +36,9 @@ class JwtService(storageDirectory: String = defaultStorageDirectory) {
         .withIssuer(ISSUER)
         .withAudience(AUDIENCE)
         .withSubject(userId.toString())
+        // Without it, two sign-ins of one user in the same second would get the same token, and
+        // with it the same row in `sessions`.
+        .withJWTId(Uuid.random().toString())
         .withExpiresAt(Date(System.currentTimeMillis() + validFor.inWholeMilliseconds))
         .sign(algorithm)
 

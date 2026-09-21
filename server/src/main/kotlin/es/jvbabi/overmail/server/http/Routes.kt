@@ -48,6 +48,8 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
+import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.views.createView
 import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
 import es.jvbabi.overmail.server.http.users.me.views.item.updateView
@@ -238,6 +240,15 @@ internal fun Application.configureRouting() {
                         route("/{knowledgeId}") {
                             updateKnowledgeEntry()
                             deleteKnowledgeEntry()
+                        }
+                    }
+
+                    // Where this user is signed in, and signing a device out again.
+                    route("/sessions") {
+                        getSessions()
+
+                        route("/{sessionId}") {
+                            revokeSession()
                         }
                     }
 

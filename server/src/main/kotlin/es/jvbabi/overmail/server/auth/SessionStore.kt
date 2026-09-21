@@ -5,8 +5,8 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.uuid.Uuid
 
@@ -33,17 +33,30 @@ suspend fun JwtService.issueSession(database: OvermailDatabase, userId: Uuid, cl
  * A genuine token without a row was issued before sessions were recorded. It is adopted with an
  * unknown client instead of being rejected, so nobody is signed out by the table appearing.
  */
-internal suspend fun OvermailDatabase.sessionUser(token: String, userId: Uuid): User? = query {
-    val user = User.findById(userId) ?: return@query null
-    val session = Sessions.select(Sessions.revokedAt).where { Sessions.token eq token }.firstOrNull()
-
-    when {
-        session == null -> Sessions.insertIgnore {
-            it[Sessions.user] = userId
-            it[Sessions.client] = Session.Client.Web(Session.Client.UNKNOWN, Session.Client.UNKNOWN, Session.Client.UNKNOWN)
-            it[Sessions.token] = token
-        }
-        session[Sessions.revokedAt] != null -> return@query null
+internal suspend fun OvermailDatabase.sessionUser(token: String, userId: Uuid): User? {
+    val (user, session) = query {
+        val user = User.findById(userId) ?: return@query null to null
+        user to Sessions.select(Sessions.revokedAt).where { Sessions.token eq token }.firstOrNull()
     }
-    user
+    if (user == null) return null
+    if (session != null) return user.takeIf { session[Sessions.revokedAt] == null }
+
+    // A transaction of its own: a parallel request of the same client may insert the row first, and
+    // Postgres would not let the losing transaction go on after the conflict. Either row is the same
+    // unrevoked session, so losing the race is fine.
+    try {
+        query {
+            Sessions.insert {
+                it[Sessions.user] = userId
+                it[Sessions.client] = Session.Client.Web(Session.Client.UNKNOWN, Session.Client.UNKNOWN, Session.Client.UNKNOWN)
+                it[Sessions.token] = token
+            }
+        }
+    } catch (e: ExposedSQLException) {
+        if (e.sqlState != UNIQUE_VIOLATION) throw e
+    }
+    return user
 }
+
+/** The SQLSTATE of a unique index violation, the same in Postgres and H2. */
+private const val UNIQUE_VIOLATION = "23505"

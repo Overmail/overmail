@@ -527,7 +527,11 @@
       "loadFailed": "The code could not be loaded.",
       "retry": "Try again",
       "sessions": {
-        "title": "Active sessions"
+        "title": "Active sessions",
+        "current": "This device",
+        "issuedAt": "Signed in {date}",
+        "empty": "You are not signed in anywhere else.",
+        "loadFailed": "The sessions could not be loaded. Trying again…"
       }
     }
   },

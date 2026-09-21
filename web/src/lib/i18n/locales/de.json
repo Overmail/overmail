@@ -527,7 +527,11 @@
       "loadFailed": "Der Code konnte nicht geladen werden.",
       "retry": "Erneut versuchen",
       "sessions": {
-        "title": "Aktive Sitzungen"
+        "title": "Aktive Sitzungen",
+        "current": "Dieses Gerät",
+        "issuedAt": "Angemeldet am {date}",
+        "empty": "Du bist nirgendwo sonst angemeldet.",
+        "loadFailed": "Die Sitzungen konnten nicht geladen werden. Neuer Versuch läuft…"
       }
     }
   },

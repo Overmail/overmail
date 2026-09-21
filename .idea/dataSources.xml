@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="overmail_overmail@postgres18.werkbank.studio" uuid="6b16d2fb-c7f0-4db7-a5c7-24d87b09f154">
+    <data-source source="LOCAL" name="overmail_overmail@postgres18.werkbank.local" uuid="6b16d2fb-c7f0-4db7-a5c7-24d87b09f154">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>

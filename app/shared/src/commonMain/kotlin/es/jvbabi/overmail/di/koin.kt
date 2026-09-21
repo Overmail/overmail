@@ -5,7 +5,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.converter.UuidConverter
-import es.jvbabi.overmail.data.remote.OvermailApi
+import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
@@ -69,6 +69,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         single<HttpClient> {
             HttpClient {
+                installClientDefaults()
+
                 install(ContentNegotiation) {
                     // Keeps ContentNegotiation from trying to (de)serialize the WebSocket session
                     // itself during the WS handshake
@@ -83,6 +85,10 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                 }
 
                 defaultRequest {
+                    // Lets the server tell which build a request comes from.
+                    header("X-App", "Overmail")
+                    header("X-App-Version", BuildKonfig.CURRENT_VERSION)
+
                     // Werkbank answers an unauthenticated request with its login page, which an app
                     // cannot get through. Only ever set on a developer build.
                     if (BuildKonfig.WERKBANK_TOKEN != null) {
@@ -97,13 +103,14 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         // so the access token can never leak to a host outside our own infrastructure.
         single<HttpClient>(named(KOIN_HTTP_CLIENT_THIRD_PARTY)) {
             HttpClient {
+                installClientDefaults()
+
                 install(ContentNegotiation) {
                     json(jsonInstance)
                 }
             }
         }
 
-        singleOf(::OvermailApi)
         singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
         singleOf(::AccountRepositoryImpl) bind AccountRepository::class
 

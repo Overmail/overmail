@@ -10,7 +10,7 @@ export class DevicesSettingsRepository {
             const data = await response.json();
             return {
                 type: "ready",
-                url: "overmail://" + window.location.origin + "/auth?code=" + data.code,
+                url: "overmail://" + encodeURIComponent(window.location.origin) + "/auth?code=" + data.code,
                 validUntil: new Date(data.valid_until * 1000),
             };
         } catch (error) {

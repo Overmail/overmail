@@ -3,6 +3,11 @@
     import {useRepositories} from "$lib/repository/repositories.ts";
     import type {AuthCodeState} from "$lib/repository/DevicesSettingsRepository.ts";
     import {onMount} from "svelte";
+    import {Button} from "$lib/components/ui/button";
+    import {CheckIcon, CopyIcon} from "phosphor-svelte";
+    import {_} from "svelte-i18n";
+
+    const COPIED_FLASH_MS = 2000;
 
     const {deviceSettingsRepository} = useRepositories();
 
@@ -20,12 +25,34 @@
             }
 
             const now = new Date();
-            const expiresAt = currentAuthQrState.validUntil;
+            const expiresAt = authCodeState.validUntil;
             const timeLeft = expiresAt.getTime() - now.getTime();
             if (timeLeft > 0) {
                 renewAuthCodeTimeout = setTimeout(renewAuthCode, timeLeft);
             }
         });
+    }
+
+    let copied = $state(false);
+    let copyFailed = $state(false);
+    let copiedTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    async function copyAuthCode() {
+        if (currentAuthQrState.type !== "ready") return;
+        try {
+            await navigator.clipboard.writeText(currentAuthQrState.url);
+        } catch {
+            copied = false;
+            copyFailed = true;
+            return;
+        }
+        copyFailed = false;
+        copied = true;
+        if (copiedTimeout) clearTimeout(copiedTimeout);
+        copiedTimeout = setTimeout(() => {
+            copied = false;
+            copiedTimeout = null;
+        }, COPIED_FLASH_MS);
     }
 
     onMount(() => {
@@ -35,13 +62,16 @@
             if (renewAuthCodeTimeout) {
                 clearTimeout(renewAuthCodeTimeout);
             }
+            if (copiedTimeout) {
+                clearTimeout(copiedTimeout);
+            }
         };
     });
 </script>
 
 <div class="flex min-w-0 flex-1 flex-col grow">
     <div class="flex flex-col gap-1">
-        <h2 class="text-xl">Overmail-App verbinden</h2>
+        <h2 class="text-xl">{$_("settings.devices.title")}</h2>
 
         <div class="flex flex-row flrx-wrap gap-4 items-center">
             <div class="size-56">
@@ -54,8 +84,25 @@
                 {/if}
             </div>
             <div class="flex flex-col gap-2">
-                <span>Scanne diesen Code mit der Overmail-App, um dich anzumelden.</span>
-                <a href="https://github.com/overmail/overmail/releases/latest" target="_blank" class="text-primary hover:underline">Overmail-App herunterladen</a>
+                <span>{$_("settings.devices.scan")}</span>
+                <a href="https://github.com/overmail/overmail/releases/latest" target="_blank" class="text-primary hover:underline">{$_("settings.devices.download")}</a>
+                <Button
+                        class="self-start"
+                        variant="outline"
+                        disabled={currentAuthQrState.type !== "ready"}
+                        onclick={() => void copyAuthCode()}
+                >
+                    {#if copied}
+                        <CheckIcon />
+                        {$_("settings.devices.copied")}
+                    {:else}
+                        <CopyIcon />
+                        {$_("settings.devices.copy")}
+                    {/if}
+                </Button>
+                {#if copyFailed}
+                    <span class="text-sm text-destructive">{$_("settings.devices.copyFailed")}</span>
+                {/if}
             </div>
         </div>
     </div>

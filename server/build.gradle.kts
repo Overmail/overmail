@@ -57,6 +57,8 @@ dependencies {
     implementation(libs.ktor.server.di)
     // One error shape for the whole api, see http/api/ApiErrorHandling.kt.
     implementation(libs.ktor.server.status.pages)
+    // Marks every response as ours, see http/api/BackendHeaders.kt.
+    implementation(libs.ktor.server.default.headers)
     // Authentikt calls call.receive<T>() in its built-in plugins, so this is not optional.
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)

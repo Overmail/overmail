@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.http
 
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
+import es.jvbabi.overmail.server.http.auth.redeem.redeemAuthCode
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
@@ -89,6 +90,12 @@ internal fun Application.configureRouting() {
              */
             get("/health") {
                 call.respondText("ok")
+            }
+
+            route("/auth") {
+                route("redeem") {
+                    redeemAuthCode()
+                }
             }
 
             route("/avatars") {

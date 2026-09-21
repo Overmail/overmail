@@ -95,6 +95,7 @@ kotlin {
             api(libs.ktor.client.core)
             implementation(libs.app.ktor.client.content.negotiation)
             implementation(libs.app.ktor.client.websockets)
+            implementation(libs.app.ktor.client.logging)
             implementation(libs.ktor.serialization.kotlinx.json)
 
             api(libs.app.moko.permissions.api)
@@ -126,15 +127,6 @@ buildkonfig {
     packageName = "es.jvbabi.overmail"
 
     defaultConfigs {
-        // Where the app looks for the api. Overridable per machine, so a device can be pointed at
-        // a laptop's werkbank instance instead of the deployed one.
-        buildConfigField(
-            type = Type.STRING,
-            name = "SERVER_URL",
-            value = localProperties["app.server_url"]?.toString() ?: "https://overmail.wb.local",
-            nullable = false,
-            const = true,
-        )
         // Werkbank puts a login page in front of every request that does not carry this token,
         // which an app cannot get through. Absent outside a developer machine.
         buildConfigField(
@@ -160,6 +152,15 @@ buildkonfig {
                 ?.toString()
                 .toBoolean()
                 .toString(),
+            nullable = false,
+            const = true,
+        )
+        // Logs every request and response with its headers (credentials masked), on by default.
+        // A developer machine that finds it too noisy switches it off.
+        buildConfigField(
+            type = Type.BOOLEAN,
+            name = "LOG_HTTP_REQUESTS",
+            value = (localProperties["app.dev.log_http_requests"]?.toString()?.toBoolean() ?: true).toString(),
             nullable = false,
             const = true,
         )

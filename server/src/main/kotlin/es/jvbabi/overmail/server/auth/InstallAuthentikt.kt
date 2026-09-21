@@ -31,7 +31,7 @@ import kotlin.time.Duration.Companion.days
 /** Mounted below the `/api` prefix Caddy forwards, so the flow routes end up under `/api/auth`. */
 const val AUTH_API_PREFIX = "/api/auth"
 
-private val SESSION_VALIDITY = 30.days
+val SESSION_VALIDITY = 30.days
 
 /**
  * Two steps: identify the account by username or email, then prove control of its mailbox with a

@@ -516,6 +516,14 @@
         "saving": "Wird gespeichert …",
         "failed": "Die Änderung konnte nicht gespeichert werden."
       }
+    },
+    "devices": {
+      "title": "Overmail-App verbinden",
+      "scan": "Scanne diesen Code mit der Overmail-App, um dich anzumelden.",
+      "download": "Overmail-App herunterladen",
+      "copy": "Code kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Der Code konnte nicht kopiert werden."
     }
   },
   "ai": {

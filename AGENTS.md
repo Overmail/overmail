@@ -43,6 +43,12 @@ modules are entry points and nothing else.
   per-platform `getDatabaseBuilder()`. Schemas are exported to `app/shared/schemas/`; commit them
   and bump the version with a migration on every schema change. Settings go through
   `KeyValueRepository` rather than a table of their own.
+- **Requests to the server go through `safeRequest { }`** (`data/network/`), which turns every
+  failure into a `NetworkException` with a `NetworkErrorKind`. A status only counts as the
+  server's answer when the response carries `X-Backend-Family: Overmail` -- the server sets it on
+  everything it writes (`http/api/BackendHeaders.kt`), a proxy or werkbank's login page does not,
+  so a 404 from them is a wrong homeserver rather than a missing resource. Both clients get
+  retries and request logging from `installClientDefaults()`.
 - **The in-app updater is Android-only** (`androidMain`, wired in `platformModule()`): it compares
   `CURRENT_VERSION` against the latest GitHub release, shows the release changelogs and
   downloads/installs the matching per-ABI APK. It relies on the release tags and asset names
@@ -51,6 +57,7 @@ modules are entry points and nothing else.
   `app.server_url` and the `signing.default.*` keystore entries. Gitignored, never commit it.
   For the updater: `app.check_for_updates.enable_in_debug=true` checks for updates in a debug
   build, `app.dev.fake-update=true` swaps GitHub and the installer for fakes.
+  `app.dev.log_http_requests=false` silences the request log, which is on by default.
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 

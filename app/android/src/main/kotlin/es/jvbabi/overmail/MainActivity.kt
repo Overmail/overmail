@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import dev.icerock.moko.permissions.PermissionsController
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.core.component.KoinComponent
 import org.koin.core.context.loadKoinModules
@@ -24,9 +25,16 @@ class MainActivity : ComponentActivity(), KoinComponent {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val permissionsController = PermissionsController(
+            applicationContext = applicationContext
+        )
+
+        permissionsController.bind(this)
+
         // Custom Tabs and the share sheet need an activity, not the application context.
         loadKoinModules(module {
             single(named(KOIN_ACTIVITY_CONTEXT)) { this@MainActivity as Context }
+            single { permissionsController }
         })
 
         isVisible.value = true

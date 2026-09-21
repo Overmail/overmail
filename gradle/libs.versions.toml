@@ -38,6 +38,9 @@ room = "2.8.5"
 sqlite = "2.7.1"
 haze = "2.0.0-rc02"
 human-readable = "2.0.0-alpha02"
+moko-permissions = "0.20.1"
+camerax = "1.6.2"
+mlkit-barcode-scanning = "17.3.0"
 
 [libraries]
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
@@ -127,6 +130,13 @@ app-kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 app-haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 app-haze-blur-materials = { module = "dev.chrisbanes.haze:haze-blur-materials", version.ref = "haze" }
 app-human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "human-readable" }
+app-moko-permissions-api = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
+app-moko-permissions-compose = { module= "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }
+app-moko-permissions-camera  = { module= "dev.icerock.moko:permissions-camera", version.ref = "moko-permissions" }
+app-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+app-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+app-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+app-mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode-scanning" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

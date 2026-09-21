@@ -55,6 +55,12 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.app.androidx.browser)
             implementation(libs.ktor.client.cio)
+
+            // The QR scanner in onboarding, see QrScanner.android.kt.
+            implementation(libs.app.androidx.camera.camera2)
+            implementation(libs.app.androidx.camera.lifecycle)
+            implementation(libs.app.androidx.camera.view)
+            implementation(libs.app.mlkit.barcode.scanning)
         }
 
         commonMain.dependencies {
@@ -90,6 +96,10 @@ kotlin {
             implementation(libs.app.ktor.client.content.negotiation)
             implementation(libs.app.ktor.client.websockets)
             implementation(libs.ktor.serialization.kotlinx.json)
+
+            api(libs.app.moko.permissions.api)
+            implementation(libs.app.moko.permissions.compose)
+            implementation(libs.app.moko.permissions.camera)
         }
 
         iosMain.dependencies {

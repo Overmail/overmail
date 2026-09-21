@@ -66,9 +66,13 @@
 <meta http-equiv="Content-Security-Policy" content="${CSP}">
 <base target="_blank" rel="noopener noreferrer">
 <style>
-  html { overflow: hidden; }
-  /* Transparent, so the card background shows through instead of a white block in dark mode. */
-  html, body { margin: 0; padding: 0; background: transparent; }
+  /* A mail is written for a white page and brings colours for that page, so it is shown on one
+     in both themes. The theme is not handed in: a mail sets its text colour, its background or
+     both, and whichever it leaves out has to be the one it was written against -- light text on
+     the mail's own white table was the result otherwise. color-scheme too, or the browser puts
+     an opaque canvas of its own under a frame whose scheme differs from the page's. */
+  html { overflow: hidden; color-scheme: light; background: #fff; color: #111; }
+  html, body { margin: 0; padding: 0; }
   /* The box the mail is measured by. It contains what would otherwise escape it and be missed:
      flow-root keeps the margins of the mail's outermost elements inside instead of letting them
      collapse out through the body, and position keeps anything absolutely positioned from
@@ -81,10 +85,10 @@
 </style>
 </head><body><div id="${ROOT}">${html}</div></body></html>`);
 
-    /** Mails rarely set a colour for plain text, so hand them the card's. */
+    /** Mails rarely set a font for plain text, so hand them the card's. Not its colour, see above. */
     function inherit(el: HTMLIFrameElement, doc: Document) {
-        const {color, fontFamily, fontSize, lineHeight} = getComputedStyle(el);
-        Object.assign(doc.documentElement.style, {color, fontFamily, fontSize, lineHeight});
+        const {fontFamily, fontSize, lineHeight} = getComputedStyle(el);
+        Object.assign(doc.documentElement.style, {fontFamily, fontSize, lineHeight});
     }
 
     $effect(() => {
@@ -166,6 +170,6 @@
         sandbox={SANDBOX}
         referrerpolicy="no-referrer"
         scrolling="no"
-        class="block w-full border-none overflow-hidden"
+        class="block w-full border-none overflow-hidden rounded-md bg-white"
         style="height: {startHeight}px"
 ></iframe>

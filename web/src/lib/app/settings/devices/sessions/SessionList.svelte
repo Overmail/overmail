@@ -1,7 +1,8 @@
 <script lang="ts">
-    import {_} from "svelte-i18n";
+    import {_, locale} from "svelte-i18n";
     import {XIcon} from "phosphor-svelte";
     import {Button} from "$lib/components/ui/button";
+    import RelativeTime from "$lib/components/time/RelativeTime.svelte";
     import type {SessionClient, UserSession} from "$lib/repository/SessionsRepository";
 
     let {sessions, revoking, onrevoke}: {
@@ -38,7 +39,11 @@
                 <div class="flex flex-col min-w-0">
                     <span class="text-sm truncate">{title(session.client)}</span>
                     <span class="text-xs text-muted-foreground truncate">
-                        {subtitle(session.client)}
+                        {subtitle(session.client)} ·
+                        <RelativeTime
+                                date={session.issuedAt}
+                                title={session.issuedAt.toLocaleString($locale ?? undefined, {dateStyle: "medium", timeStyle: "short"})}
+                        />
                         {#if session.isCurrentSession}
                             · <span class="text-primary">{$_("settings.devices.sessions.current")}</span>
                         {/if}

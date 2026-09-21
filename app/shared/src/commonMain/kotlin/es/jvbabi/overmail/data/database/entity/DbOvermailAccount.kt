@@ -20,6 +20,8 @@ data class DbOvermailAccount(
     @ColumnInfo(name = "last_name") val lastName: String,
     @ColumnInfo(name = "email") val email: String,
     @ColumnInfo(name = "homeserver") val homeserver: String,
+    /** The session JWT the homeserver issued, sent as `Authorization: Bearer`. */
+    @ColumnInfo(name = "token") val token: String,
 ) {
     fun toModel(): OvermailAccount = OvermailAccount(
         id = id,
@@ -28,5 +30,6 @@ data class DbOvermailAccount(
         lastName = lastName,
         email = email,
         homeserver = homeserver,
+        token = token,
     )
 }

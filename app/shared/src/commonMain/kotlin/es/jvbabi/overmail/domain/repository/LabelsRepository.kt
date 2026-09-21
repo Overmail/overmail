@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.domain.repository
 
+import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.Labels
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +18,7 @@ interface LabelsRepository {
         query: String = "",
         instantLocalEmission: Boolean = false,
         overmailAccount: OvermailAccount,
-    ): Flow<List<Labels>>
+    ): Flow<CacheableResource<List<Labels>>>
 
     /**
      * The cached labels behind [ids], for naming what a filter holds. Local only: whatever was

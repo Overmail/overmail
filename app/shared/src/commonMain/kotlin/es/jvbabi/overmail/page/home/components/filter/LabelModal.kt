@@ -2,8 +2,11 @@
 
 package es.jvbabi.overmail.page.home.components.filter
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +23,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,7 +39,6 @@ import com.phosphor.icons.regular.X
 import es.jvbabi.overmail.domain.model.Labels
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.ui.theme.AppTheme
-import es.jvbabi.overmail.utils.animatePlacement
 import es.jvbabi.overmail.utils.labelContainerColor
 import es.jvbabi.overmail.utils.labelContentColor
 import org.jetbrains.compose.resources.pluralStringResource
@@ -60,8 +67,13 @@ fun LabelModal(
     picked: List<PickedLabel>,
     query: String,
     results: List<Labels>,
+    /** Whether the server's answer is still on its way; [results] are the cache's until then. */
+    isFetching: Boolean,
     onQueryChange: (String) -> Unit,
+    /** A row of the list was picked. */
     onToggle: (Uuid) -> Unit,
+    /** A badge was taken out of the field, by its X or Backspace. */
+    onRemove: (Uuid) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -83,8 +95,10 @@ fun LabelModal(
             picked = picked,
             query = query,
             results = results,
+            isFetching = isFetching,
             onQueryChange = onQueryChange,
             onToggle = onToggle,
+            onRemove = onRemove,
             modifier = Modifier.fillMaxSize().imePadding(),
         )
     }
@@ -95,12 +109,21 @@ private fun LabelPickerContent(
     picked: List<PickedLabel>,
     query: String,
     results: List<Labels>,
+    isFetching: Boolean,
     onQueryChange: (String) -> Unit,
     onToggle: (Uuid) -> Unit,
+    onRemove: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
     focusOnStart: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
+
+    // The field holds an invisible character ahead of the query. A soft keyboard sends nothing
+    // for Backspace in an empty field, but it does delete that character, and that is how the
+    // field tells a Backspace in front of the text from one inside it.
+    var fieldValue by remember { mutableStateOf(sentinelValue(query, TextRange(query.length))) }
+    // The query can change from outside too -- emptied after a label was picked.
+    if (fieldValue.text.drop(1) != query) fieldValue = sentinelValue(query, TextRange(query.length))
     // The list is driven by the field, so opening lands in it.
     if (focusOnStart) LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -116,66 +139,82 @@ private fun LabelPickerContent(
         )
 
         // The picked labels and the field share one box, so the selection is where the typing
-        // happens rather than somewhere above it. The box grows and shrinks with the rows rather
-        // than jumping, since the list below moves with it.
+        // happens rather than somewhere above it. Only its height animates, since the list below
+        // moves with it; the badges themselves come and go at once, as in the web app.
         FlowRow(
             modifier = Modifier
-                .padding(16.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable(interactionSource = null, indication = null) { focusRequester.requestFocus() }
                 .animateContentSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(vertical = 16.dp, horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            // Only the empty field says what it is for; once chips are in it, they do.
-            // Fading and scaling only: a width that animates makes the row wrap anew on every
-            // frame. What the change moves glides there instead, see animatePlacement.
-            AnimatedVisibility(
-                visible = picked.isEmpty(),
-                enter = fadeIn() + scaleIn(initialScale = .6f),
-                exit = fadeOut() + scaleOut(targetScale = .6f),
-                modifier = Modifier.animatePlacement(),
-            ) {
-                Icon(
-                    imageVector = PhIcons.Regular.MagnifyingGlass,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            // Only the empty field says what it is for; once labels are in it, they do.
+            if (picked.isEmpty()) Icon(
+                imageVector = PhIcons.Regular.MagnifyingGlass,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(horizontal = 6.dp)
+                    .size(18.dp),
+            )
 
-            AnimatedChips(picked) { label, visibility ->
-                AnimatedVisibility(
-                    visibleState = visibility,
-                    enter = fadeIn() + scaleIn(initialScale = .8f),
-                    exit = fadeOut() + scaleOut(targetScale = .8f),
-                    modifier = Modifier.animatePlacement(),
-                ) {
-                    PickedLabelChip(label = label, onRemove = { onToggle(label.id) })
+            picked.forEach { label ->
+                key(label.id) {
+                    LabelBadge(label = label, onRemove = { onRemove(label.id) })
                 }
             }
 
+            // At least as wide as its placeholder, so the placeholder never wraps: where it does
+            // not fit beside the badges any more, the field goes on a line of its own instead.
+            val placeholder = stringResource(Res.string.home_labels_search)
+            val placeholderStyle = MaterialTheme.typography.bodyLarge
+            val textMeasurer = rememberTextMeasurer()
+            val density = LocalDensity.current
+            val minFieldWidth = remember(placeholder, placeholderStyle, density) {
+                // A little over, for the caret behind it.
+                with(density) { textMeasurer.measure(placeholder, placeholderStyle).size.width.toDp() } + 4.dp
+            }
+
             BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
+                value = fieldValue,
+                onValueChange = { changed ->
+                    if (!changed.text.startsWith(BACKSPACE_SENTINEL)) {
+                        // Backspace at the very start: it takes the label before the caret, the
+                        // way every field that holds chips does. What was typed stays.
+                        picked.lastOrNull()?.let { onRemove(it.id) }
+                        val text = changed.text.removePrefix(BACKSPACE_SENTINEL)
+                        fieldValue = sentinelValue(text, TextRange(0))
+                        if (text != query) onQueryChange(text)
+                        return@BasicTextField
+                    }
+                    // The caret never goes before the sentinel, or typing would land in front of it.
+                    fieldValue = changed.copy(
+                        selection = TextRange(
+                            changed.selection.start.coerceAtLeast(1),
+                            changed.selection.end.coerceAtLeast(1),
+                        ),
+                    )
+                    val text = changed.text.drop(1)
+                    if (text != query) onQueryChange(text)
+                },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 modifier = Modifier
-                    .widthIn(min = 96.dp)
+                    .widthIn(min = minFieldWidth)
                     .weight(1f)
-                    .animatePlacement()
                     .padding(vertical = 8.dp)
                     .focusRequester(focusRequester),
                 decorationBox = { field ->
                     Box {
                         if (query.isEmpty()) Text(
-                            text = stringResource(Res.string.home_labels_search),
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = placeholder,
+                            style = placeholderStyle,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                         field()
                     }
@@ -183,7 +222,21 @@ private fun LabelPickerContent(
             )
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+        // The divider swells into the progress while the server is asked, and back once it
+        // answered.
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isFetching,
+                enter = expandVertically(expandFrom = Alignment.CenterVertically) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.CenterVertically) + fadeOut(),
+            ) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
 
         // No creating from here: a filter picks among the labels there are, and one made on the
         // spot carries no mail to find.
@@ -193,14 +246,13 @@ private fun LabelPickerContent(
         ) {
             // In the list rather than above it, so it takes the rows' place instead of pushing
             // them down while an answer is on its way.
-            if (results.isEmpty()) item(key = "empty") {
+            // Not while the server may still find something the cache does not have.
+            if (results.isEmpty() && !isFetching) item(key = "empty") {
                 Text(
                     text = stringResource(Res.string.home_labels_empty),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .animateItem()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
 
@@ -209,86 +261,53 @@ private fun LabelPickerContent(
                     label = label,
                     picked = label.id in pickedIds,
                     onClick = { onToggle(label.id) },
-                    // The server's answer following the cache reorders rows; they slide there.
-                    modifier = Modifier.animateItem(),
                 )
             }
         }
     }
 }
 
+/** Zero width, so the field looks empty with it; see where [LabelPickerContent] uses it. */
+private const val BACKSPACE_SENTINEL = "\u200B"
+
+/** [query] behind the sentinel, with [selection] counted in the query. */
+private fun sentinelValue(query: String, selection: TextRange) = TextFieldValue(
+    text = BACKSPACE_SENTINEL + query,
+    selection = TextRange(selection.start + 1, selection.end + 1),
+)
+
 /**
- * [picked] with the ones just taken out kept around until they have animated away, in the order
- * they were picked. [content] gets each label with the state its visibility should follow.
+ * A picked label in the field, the web app's removable tinted `Badge`: a small square-cornered
+ * tag in the label's hue, the name in the normal text color and an X to take it out.
  */
 @Composable
-private fun AnimatedChips(
-    picked: List<PickedLabel>,
-    content: @Composable (PickedLabel, MutableTransitionState<Boolean>) -> Unit,
-) {
-    // What is on screen at first is there already, not animated in: the sheet opening is motion
-    // enough.
-    val shown = remember { mutableStateListOf<PickedLabel>().apply { addAll(picked) } }
-    val visibility = remember {
-        mutableStateMapOf<Uuid, MutableTransitionState<Boolean>>().apply {
-            picked.forEach { put(it.id, MutableTransitionState(true)) }
-        }
-    }
-
-    LaunchedEffect(picked) {
-        val ids = picked.map { it.id }.toSet()
-        picked.forEach { label ->
-            val index = shown.indexOfFirst { it.id == label.id }
-            if (index >= 0) shown[index] = label else shown.add(label)
-            visibility.getOrPut(label.id) { MutableTransitionState(false) }.targetState = true
-        }
-        shown.forEach { if (it.id !in ids) visibility[it.id]?.targetState = false }
-    }
-
-    shown.forEach { label ->
-        val state = visibility[label.id] ?: return@forEach
-        key(label.id) {
-            content(label, state)
-            if (state.isIdle && !state.currentState) LaunchedEffect(Unit) {
-                shown.removeAll { it.id == label.id }
-                visibility.remove(label.id)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PickedLabelChip(label: PickedLabel, onRemove: () -> Unit) {
+private fun LabelBadge(label: PickedLabel, onRemove: () -> Unit) {
     val name = label.name ?: "…"
-    InputChip(
-        selected = false,
-        onClick = onRemove,
-        label = { Text(name) },
-        leadingIcon = {
-            Icon(
-                imageVector = PhIcons.Regular.Tag,
-                contentDescription = null,
-                modifier = Modifier.size(InputChipDefaults.IconSize),
-            )
-        },
-        // The fill is the whole edge, as on the web's tinted badge.
-        border = null,
-        colors = InputChipDefaults.inputChipColors(
-            containerColor = label.color?.labelContainerColor()
-                ?: MaterialTheme.colorScheme.surfaceContainerHigh,
-            labelColor = MaterialTheme.colorScheme.onSurface,
-            leadingIconColor = label.color?.labelContentColor()
-                ?: MaterialTheme.colorScheme.onSurfaceVariant,
-            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        trailingIcon = {
-            Icon(
-                imageVector = PhIcons.Regular.X,
-                contentDescription = stringResource(Res.string.home_labels_remove, name),
-                modifier = Modifier.size(InputChipDefaults.IconSize),
-            )
-        },
-    )
+    Row(
+        modifier = Modifier
+            .height(22.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(label.color?.labelContainerColor() ?: MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(start = 6.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Icon(
+            imageVector = PhIcons.Regular.X,
+            contentDescription = stringResource(Res.string.home_labels_remove, name),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f),
+            modifier = Modifier
+                .clip(RoundedCornerShape(2.dp))
+                .clickable(onClick = onRemove)
+                .size(14.dp),
+        )
+    }
 }
 
 /** One row of the list: menu-sized rather than a full list item, so a screen holds many. */
@@ -332,17 +351,11 @@ private fun LabelRow(
         )
         // Always the room for it, so the counts stay in one column.
         Box(modifier = Modifier.size(18.dp)) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = picked,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
-            ) {
-                Icon(
-                    imageVector = PhIcons.Regular.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+            if (picked) Icon(
+                imageVector = PhIcons.Regular.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -372,8 +385,10 @@ private fun LabelPickerContentPreview() {
                 picked = labels.filter { it.id in picked }.map { PickedLabel(it.id, it.name, it.color) },
                 query = query,
                 results = labels,
+                isFetching = true,
                 onQueryChange = { query = it },
                 onToggle = { id -> picked = if (id in picked) picked - id else picked + id },
+                onRemove = { id -> picked = picked - id },
                 modifier = Modifier.height(400.dp),
                 focusOnStart = false,
             )

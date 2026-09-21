@@ -4,13 +4,18 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
+import es.jvbabi.overmail.data.database.converter.ColorConverter
+import es.jvbabi.overmail.data.database.converter.InstantConverter
 import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
+import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.page.home.HomeViewModel
+import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
@@ -67,6 +72,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                 .setDriver(BundledSQLiteDriver())
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .addTypeConverter(UuidConverter())
+                .addTypeConverter(InstantConverter())
+                .addTypeConverter(ColorConverter())
                 .build()
         }
 
@@ -116,8 +123,10 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         singleOf(::KeyValueRepositoryImpl) bind KeyValueRepository::class
         singleOf(::AccountRepositoryImpl) bind AccountRepository::class
+        singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
 
         viewModelOf(::HomeViewModel)
+        viewModelOf(::ViewSettingsViewModel)
         viewModelOf(::OnboardingAuthViewModel)
         viewModelOf(::OnboardingPermissionsViewModel)
         viewModelOf(::OnboardingViewModel)

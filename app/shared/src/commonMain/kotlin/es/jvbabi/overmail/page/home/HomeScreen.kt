@@ -147,8 +147,10 @@ private fun HomeContent(
         picked = pickedLabels,
         query = viewSettingsState.labelQuery,
         results = viewSettingsState.labelResults,
+        isFetching = viewSettingsState.isFetchingLabels,
         onQueryChange = { onViewSettingsEvent(ViewSettingsEvent.SetLabelQuery(it)) },
         onToggle = { onViewSettingsEvent(ViewSettingsEvent.ToggleLabel(it)) },
+        onRemove = { onViewSettingsEvent(ViewSettingsEvent.RemoveLabel(it)) },
         onDismiss = { showLabelPicker = false },
     )
 }

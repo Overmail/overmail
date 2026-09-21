@@ -15,6 +15,21 @@
     <string name="home_filter_archive_archived">Archived</string>
     <string name="home_filter_archive_spam">Spam</string>
 
+    <!-- The label filter's chip once labels are picked: "Labels: Uni, Work and 2 more". -->
+    <string name="home_filter_labels_active">Labels: %1$s</string>
+    <!-- What a filter chip adds after the names it has room for. -->
+    <plurals name="home_filter_more">
+        <item quantity="one">and one more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <string name="home_labels_search">Search labels</string>
+    <string name="home_labels_empty">No labels found</string>
+    <string name="home_labels_remove">Remove %1$s</string>
+    <plurals name="home_labels_email_count">
+        <item quantity="one">%1$d mail</item>
+        <item quantity="other">%1$d mails</item>
+    </plurals>
+
     <string name="home_grouping_title">Grouping</string>
     <!-- The header over the categories that group the listing: how many there are, of how many allowed. -->
     <string name="home_grouping_active">Active categories (%1$d/%2$d)</string>

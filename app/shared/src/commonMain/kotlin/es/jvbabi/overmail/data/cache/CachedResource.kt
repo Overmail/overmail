@@ -1,9 +1,12 @@
 package es.jvbabi.overmail.data.cache
 
 import co.touchlab.kermit.Logger
+import es.jvbabi.overmail.domain.model.CacheableResource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
@@ -32,7 +35,7 @@ class CachedResource<Local, Remote>(
 ) {
     /**
      * Fetches from the server once per collection and emits the cache for as long as it is
-     * collected.
+     * collected, each emission saying whether the server's answer is in it yet.
      *
      * With [instantLocalEmission] the cache is emitted right away and the server's answer follows
      * as a second emission. Without it the first emission waits for the answer -- until it is
@@ -40,14 +43,21 @@ class CachedResource<Local, Remote>(
      * does not cancel the request: when the answer turns up later it still lands in the cache,
      * and from there in the flow.
      */
-    fun stream(instantLocalEmission: Boolean): Flow<Local> = channelFlow {
+    fun stream(instantLocalEmission: Boolean): Flow<CacheableResource<Local>> = channelFlow {
         val remoteSettled = CompletableDeferred<Unit>()
+        val source = MutableStateFlow(CacheableResource.Source.Cache)
 
         launch {
             try {
                 fetch()
-                    .onSuccess { persist(it) }
-                    .onFailure { logger.w(it) { "Fetching from the server failed, staying on the cache" } }
+                    .onSuccess {
+                        persist(it)
+                        source.value = CacheableResource.Source.Network
+                    }
+                    .onFailure {
+                        logger.w(it) { "Fetching from the server failed, staying on the cache" }
+                        source.value = CacheableResource.Source.Fallback
+                    }
             } finally {
                 remoteSettled.complete(Unit)
             }
@@ -55,6 +65,6 @@ class CachedResource<Local, Remote>(
 
         if (!instantLocalEmission) withTimeoutOrNull(remoteTimeout) { remoteSettled.await() }
 
-        local().collect { send(it) }
+        combine(local(), source, ::CacheableResource).collect { send(it) }
     }
 }

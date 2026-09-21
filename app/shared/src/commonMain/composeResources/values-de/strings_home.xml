@@ -13,6 +13,19 @@
     <string name="home_filter_archive_archived">Archiviert</string>
     <string name="home_filter_archive_spam">Spam</string>
 
+    <string name="home_filter_labels_active">Labels: %1$s</string>
+    <plurals name="home_filter_more">
+        <item quantity="one">und ein weiteres</item>
+        <item quantity="other">und %1$d weitere</item>
+    </plurals>
+    <string name="home_labels_search">Labels suchen</string>
+    <string name="home_labels_empty">Keine Labels gefunden</string>
+    <string name="home_labels_remove">%1$s entfernen</string>
+    <plurals name="home_labels_email_count">
+        <item quantity="one">%1$d Mail</item>
+        <item quantity="other">%1$d Mails</item>
+    </plurals>
+
     <string name="home_grouping_title">Gruppierung</string>
     <string name="home_grouping_active">Aktive Kategorien (%1$d/%2$d)</string>
     <string name="home_grouping_inactive">Inaktive Kategorien</string>

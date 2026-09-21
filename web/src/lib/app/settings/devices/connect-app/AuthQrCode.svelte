@@ -28,7 +28,7 @@
           somebody's shoulder. Focusable, so the keyboard can reveal it too.
         -->
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div tabindex="0" class="rounded-md outline-none blur-xs transition hover:blur-none focus-visible:blur-none">
+        <div tabindex="0" class="rounded-md outline-none blur-xs opacity-60 transition hover:blur-none focus-visible:blur-none hover:opacity-100 focus-visible:opacity-100">
             <QRCode data={state.url} size={192} />
         </div>
     {/if}

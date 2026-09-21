@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import es.jvbabi.overmail.ui.theme.displayFontFamily
 
 /** Title and explanation at the top of every onboarding step after the welcome screen. */
 @Composable
@@ -22,6 +23,7 @@ fun OnboardingHeader(
     Column(modifier) {
         Text(
             text = title,
+            fontFamily = displayFontFamily(),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.fillMaxWidth(),

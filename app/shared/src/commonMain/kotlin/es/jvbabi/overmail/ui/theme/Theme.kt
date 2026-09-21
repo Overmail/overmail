@@ -149,7 +149,7 @@ fun AppTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = AppTypography,
+        typography = appTypography(),
         content = {
             CompositionLocalProvider(LocalContentColor provides colorScheme.onSurface) {
                 Box(Modifier.fillMaxSize()) {

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package es.jvbabi.overmail.page.onboarding.start
 
 import androidx.compose.foundation.Image
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +31,7 @@ import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.page.onboarding.OnboardingScreens
 import es.jvbabi.overmail.ui.components.Button
 import es.jvbabi.overmail.ui.theme.AppTheme
+import es.jvbabi.overmail.ui.theme.displayFontFamily
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
@@ -81,7 +85,8 @@ private fun OnboardingStartContent(
             Spacer(Modifier.size(24.dp))
             Text(
                 text = stringResource(Res.string.onboarding_welcome_title),
-                style = MaterialTheme.typography.displaySmall,
+                fontFamily = displayFontFamily(),
+                style = MaterialTheme.typography.displaySmallEmphasized,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
             )

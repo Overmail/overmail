@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.page.onboarding
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -27,7 +26,6 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthScreen
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
-import es.jvbabi.overmail.page.onboarding.components.BlurredBackground
 import es.jvbabi.overmail.page.onboarding.start.OnboardingStartScreen
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel

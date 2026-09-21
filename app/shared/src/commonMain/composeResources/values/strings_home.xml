@@ -1,0 +1,17 @@
+<resources>
+    <string name="home_filter_labels">Labels</string>
+    <string name="home_filter_from">From</string>
+    <string name="home_filter_to">To</string>
+    <string name="home_filter_accounts">Accounts</string>
+    <!-- A filter set to nothing at all, which lets every mail through. -->
+    <string name="home_filter_all">All</string>
+
+    <string name="home_filter_read_unread">Unread</string>
+    <string name="home_filter_read_read">Read</string>
+
+    <!-- The one click on the archive filter: the archived mails on top of the inbox. -->
+    <string name="home_filter_archive_quick">Archived too</string>
+    <string name="home_filter_archive_inbox">Inbox</string>
+    <string name="home_filter_archive_archived">Archived</string>
+    <string name="home_filter_archive_spam">Spam</string>
+</resources>

@@ -1,0 +1,15 @@
+<resources>
+    <string name="home_filter_labels">Labels</string>
+    <string name="home_filter_from">Von</string>
+    <string name="home_filter_to">An</string>
+    <string name="home_filter_accounts">Konten</string>
+    <string name="home_filter_all">Alle</string>
+
+    <string name="home_filter_read_unread">Ungelesen</string>
+    <string name="home_filter_read_read">Gelesen</string>
+
+    <string name="home_filter_archive_quick">Auch archivierte</string>
+    <string name="home_filter_archive_inbox">Posteingang</string>
+    <string name="home_filter_archive_archived">Archiviert</string>
+    <string name="home_filter_archive_spam">Spam</string>
+</resources>

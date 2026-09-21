@@ -72,11 +72,7 @@ fun App() {
                 entryProvider = { key ->
                     when (key) {
                         is Screen.Home -> NavEntry(key = key) {
-                            HomeScreen(onOpenSettings = { backstack.add(Screen.Settings) })
-                        }
-
-                        is Screen.Settings -> NavEntry(key = key) {
-                            SettingsScreen(onBack = { backstack.removeLastOrNull() })
+                            HomeScreen()
                         }
 
                         is Screen.Onboarding -> NavEntry(key = key) {

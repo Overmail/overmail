@@ -13,8 +13,5 @@ sealed class Screen {
     data object Home : Screen()
 
     @Serializable
-    data object Settings : Screen()
-
-    @Serializable
     data object Onboarding : Screen()
 }

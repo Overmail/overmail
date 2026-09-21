@@ -16,6 +16,7 @@ import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.*
 import kotlin.uuid.Uuid
@@ -24,13 +25,17 @@ import kotlin.uuid.Uuid
  * The filter chips above a listing, each one showing what [viewState] has set for it.
  *
  * The read and archive chips take their one click themselves, the way the web app's do, and hand
- * the changed filter to [onFilterChange]. The pickers behind the carets do not exist yet.
+ * the changed filter to [onFilterChange]. The labels chip names [pickedLabels] and leaves the
+ * picking to whoever opens on [onLabelsClick]; the other pickers do not exist yet.
  */
 @Composable
 fun ViewController(
     viewState: ViewState,
     onFilterChange: (ViewFilter) -> Unit,
     modifier: Modifier = Modifier,
+    /** The labels of the filter's `hasLabels`, in its order. */
+    pickedLabels: List<PickedLabel> = emptyList(),
+    onLabelsClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val filter = viewState.filter
@@ -41,10 +46,9 @@ fun ViewController(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PickerChip(
-            text = stringResource(Res.string.home_filter_labels),
-            icon = PhIcons.Regular.Tag,
-            active = filter.hasLabels != null,
+        LabelsChip(
+            picked = pickedLabels,
+            onClick = onLabelsClick,
         )
         ReadStateChip(
             readState = filter.readState,
@@ -71,6 +75,39 @@ fun ViewController(
         )
     }
 }
+
+/**
+ * Says which labels the filter is on, the first few by name: "Labels: Uni, HPI und 2 weitere"
+ * answers what is filtered at a glance, a count only that something is.
+ */
+@Composable
+private fun LabelsChip(
+    picked: List<PickedLabel>,
+    onClick: () -> Unit,
+) {
+    val names = picked.map { it.name ?: "…" }
+    // One over the limit is spelled out rather than summarised: "A, B und ein weiteres" is longer
+    // than "A, B, C" and says less.
+    val shown = if (names.size <= SHOWN_NAMES + 1) names else names.take(SHOWN_NAMES)
+    val rest = names.size - shown.size
+
+    val text = if (names.isEmpty()) stringResource(Res.string.home_filter_labels)
+    else stringResource(
+        Res.string.home_filter_labels_active,
+        shown.joinToString(", ") + if (rest == 0) "" else " " + pluralStringResource(Res.plurals.home_filter_more, rest, rest),
+    )
+
+    Chip(
+        text = text,
+        arrowDown = true,
+        leading = { ChipIcon(PhIcons.Regular.Tag) },
+        active = names.isNotEmpty(),
+        onClick = onClick,
+    )
+}
+
+/** How many picked names a chip spells out before it counts the rest. */
+private const val SHOWN_NAMES = 2
 
 /**
  * A chip over ids the app cannot name yet -- labels, people, accounts. It says whether the filter
@@ -185,6 +222,7 @@ private fun ViewControllerPreviewFrame(filter: ViewFilter, darkTheme: Boolean = 
             viewState = viewState,
             onFilterChange = { viewState = viewState.copy(filter = it) },
             contentPadding = PaddingValues(16.dp),
+            pickedLabels = viewState.filter.hasLabels.orEmpty().map { PickedLabel(it, "Uni", null) },
         )
     }
 }

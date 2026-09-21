@@ -14,7 +14,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,24 +24,41 @@ import androidx.compose.ui.unit.dp
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.MagnifyingGlass
 import com.phosphor.icons.regular.TreeStructure
-import es.jvbabi.overmail.domain.model.ViewState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.jvbabi.overmail.page.home.components.filter.Chip
+import es.jvbabi.overmail.page.home.components.filter.LabelModal
+import es.jvbabi.overmail.page.home.components.filter.PickedLabel
 import es.jvbabi.overmail.page.home.components.filter.ViewController
 import es.jvbabi.overmail.page.home.components.group.GroupModal
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_grouping_title
 
 @Composable
 fun HomeScreen() {
-    HomeContent()
+    val viewSettingsViewModel = koinViewModel<ViewSettingsViewModel>()
+    val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
+
+    HomeContent(
+        viewSettingsState = viewSettingsState,
+        onViewSettingsEvent = viewSettingsViewModel::onEvent,
+    )
 }
 
 @Composable
-private fun HomeContent() {
-    var viewState by remember { mutableStateOf(ViewState.Mailbox) }
+private fun HomeContent(
+    viewSettingsState: ViewSettingsState,
+    onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
+) {
+    val viewState = viewSettingsState.viewState
+    val pickedLabels = viewState.filter.hasLabels.orEmpty().map { id ->
+        val label = viewSettingsState.knownLabels[id]
+        PickedLabel(id = id, name = label?.name, color = label?.color)
+    }
 
     var showGroupSettings by rememberSaveable { mutableStateOf(false) }
+    var showLabelPicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -106,7 +122,13 @@ private fun HomeContent() {
 
                     ViewController(
                         viewState = viewState,
-                        onFilterChange = { viewState = viewState.copy(filter = it) },
+                        onFilterChange = { onViewSettingsEvent(ViewSettingsEvent.SetFilter(it)) },
+                        pickedLabels = pickedLabels,
+                        onLabelsClick = {
+                            // Opening starts over: the query from last time says nothing about this one.
+                            onViewSettingsEvent(ViewSettingsEvent.SetLabelQuery(""))
+                            showLabelPicker = true
+                        },
                     )
                 }
             }
@@ -116,15 +138,23 @@ private fun HomeContent() {
     GroupModal(
         visible = showGroupSettings,
         viewState = viewState,
-        onGroupingSettingsChanged = {
-            viewState = viewState.copy(groupings = it.groupings, sorting = it.sorting)
-        },
+        onGroupingSettingsChanged = { onViewSettingsEvent(ViewSettingsEvent.SetGroupingSettings(it)) },
         onDismiss = { showGroupSettings = false },
+    )
+
+    LabelModal(
+        visible = showLabelPicker,
+        picked = pickedLabels,
+        query = viewSettingsState.labelQuery,
+        results = viewSettingsState.labelResults,
+        onQueryChange = { onViewSettingsEvent(ViewSettingsEvent.SetLabelQuery(it)) },
+        onToggle = { onViewSettingsEvent(ViewSettingsEvent.ToggleLabel(it)) },
+        onDismiss = { showLabelPicker = false },
     )
 }
 
 @Composable
 @Preview
 private fun HomeContentPreview() {
-    HomeContent()
+    HomeContent(viewSettingsState = ViewSettingsState(), onViewSettingsEvent = {})
 }

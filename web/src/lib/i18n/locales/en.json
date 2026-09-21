@@ -524,6 +524,8 @@
       "copy": "Copy code",
       "copied": "Copied",
       "copyFailed": "The code could not be copied.",
+      "loadFailed": "The code could not be loaded.",
+      "retry": "Try again",
       "sessions": {
         "title": "Active sessions"
       }

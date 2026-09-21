@@ -36,3 +36,32 @@ test("stops renewing once disposed", async () => {
 
     expect(fetchAuthCode).toHaveBeenCalledTimes(1);
 });
+
+test("tries again on its own after a failed fetch", async () => {
+    const answers: AuthCodeState[] = [{type: "error"}, readyFor(60_000)];
+    const fetchAuthCode = mock(async () => answers.shift()!);
+    const viewModel = new AuthCodeViewModel(fetchAuthCode, 10);
+
+    await viewModel.renew();
+    expect(viewModel.state.type).toBe("error");
+
+    await Bun.sleep(50);
+    viewModel.dispose();
+
+    expect(fetchAuthCode).toHaveBeenCalledTimes(2);
+    expect(viewModel.state.type).toBe("ready");
+});
+
+test("an answer that arrives after disposing schedules nothing", async () => {
+    let answer: (state: AuthCodeState) => void = () => {};
+    const fetchAuthCode = mock(() => new Promise<AuthCodeState>((resolve) => (answer = resolve)));
+    const viewModel = new AuthCodeViewModel(fetchAuthCode, 10);
+
+    const renewing = viewModel.renew();
+    viewModel.dispose();
+    answer({type: "error"});
+    await renewing;
+    await Bun.sleep(50);
+
+    expect(fetchAuthCode).toHaveBeenCalledTimes(1);
+});

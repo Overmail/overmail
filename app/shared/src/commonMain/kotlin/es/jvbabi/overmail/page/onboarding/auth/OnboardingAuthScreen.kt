@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.ArrowRight
 import es.jvbabi.overmail.page.onboarding.components.OnboardingHeader
 import es.jvbabi.overmail.ui.components.Button
 import es.jvbabi.overmail.ui.components.ButtonState
@@ -51,7 +53,6 @@ import es.jvbabi.overmail.ui.components.QrScanner
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
-import overmail.app.shared.generated.resources.move_right
 import overmail.app.shared.generated.resources.onboarding_auth_code_placeholder
 import overmail.app.shared.generated.resources.onboarding_auth_code_subtitle
 import overmail.app.shared.generated.resources.onboarding_auth_code_title
@@ -190,7 +191,7 @@ private fun OnboardingAuthContent(
                 OnboardingAuthState.Mode.Code -> Column {
                     Button(
                         text = stringResource(Res.string.onboarding_auth_submit),
-                        icon = Res.drawable.move_right,
+                        icon = PhIcons.Regular.ArrowRight,
                         state = when {
                             isProcessing -> ButtonState.Loading
                             code.isBlank() -> ButtonState.Disabled

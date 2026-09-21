@@ -22,10 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
 
 /**
  * The app's full-width action button: label on the left, an optional icon on the right, and a
@@ -38,7 +37,7 @@ import org.jetbrains.compose.resources.painterResource
 fun Button(
     modifier: Modifier = Modifier,
     text: String,
-    icon: DrawableResource? = null,
+    icon: ImageVector? = null,
     state: ButtonState = ButtonState.Enabled,
     size: ButtonSize = ButtonSize.Big,
     type: ButtonType = ButtonType.Primary,
@@ -83,7 +82,7 @@ fun Button(
                             modifier = Modifier.weight(1f),
                         )
                         if (icon != null) Icon(
-                            painter = painterResource(icon),
+                            imageVector = icon,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp).padding(2.dp),
                         )

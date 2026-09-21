@@ -92,6 +92,9 @@ kotlin {
             implementation(libs.app.haze.blur.materials)
             implementation(libs.app.human.readable)
 
+            // Only the weight in use: every weight is a module of its own, and each holds the whole set.
+            implementation(libs.app.phosphor.regular)
+
             api(libs.ktor.client.core)
             implementation(libs.app.ktor.client.content.negotiation)
             implementation(libs.app.ktor.client.websockets)

@@ -27,6 +27,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.ArrowRight
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.page.onboarding.OnboardingScreens
 import es.jvbabi.overmail.ui.components.Button
@@ -36,7 +38,6 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.app_icon
-import overmail.app.shared.generated.resources.move_right
 import overmail.app.shared.generated.resources.onboarding_welcome_continue
 import overmail.app.shared.generated.resources.onboarding_welcome_subtitle
 import overmail.app.shared.generated.resources.onboarding_welcome_title
@@ -101,7 +102,7 @@ private fun OnboardingStartContent(
 
         Button(
             text = stringResource(Res.string.onboarding_welcome_continue),
-            icon = Res.drawable.move_right,
+            icon = PhIcons.Regular.ArrowRight,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(horizontal = 16.dp)

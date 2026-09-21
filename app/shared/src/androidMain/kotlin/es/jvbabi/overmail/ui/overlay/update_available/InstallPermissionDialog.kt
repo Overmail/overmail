@@ -11,11 +11,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.WarningCircle
 import es.jvbabi.overmail.ThemeWrapper
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
-import overmail.app.shared.generated.resources.circle_alert
 import overmail.app.shared.generated.resources.update_install_permission_always_manual
 import overmail.app.shared.generated.resources.update_install_permission_grant
 import overmail.app.shared.generated.resources.update_install_permission_manual
@@ -37,7 +37,7 @@ fun InstallPermissionDialog(
         onDismissRequest = { onEvent(UpdateAvailableEvent.DismissInstallPermission) },
         icon = {
             Icon(
-                painter = painterResource(Res.drawable.circle_alert),
+                imageVector = PhIcons.Regular.WarningCircle,
                 contentDescription = null,
             )
         },

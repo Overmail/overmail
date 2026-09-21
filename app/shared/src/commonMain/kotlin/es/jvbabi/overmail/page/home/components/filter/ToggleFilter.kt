@@ -9,12 +9,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.ui.components.Checkbox
 import es.jvbabi.overmail.ui.components.FloatingModal
+import es.jvbabi.overmail.ui.components.FloatingModalDefaults
 import es.jvbabi.overmail.utils.pressable
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.*
@@ -96,22 +99,24 @@ fun <T> FilterStatesModal(
     FloatingModal(visible = visible, onDismiss = onDismiss) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         )
         states.forEach { state ->
             val checked = state.value in selected
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(FloatingModalDefaults.ItemCornerRadius))
                     .pressable(haptic = { if (checked) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn }) {
                         onSelectedChange(states.ordered(if (checked) selected - state.value else selected + state.value))
                     }
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(15.dp))
+                Checkbox(checked = checked, onCheckedChange = null)
                 Text(text = state.label, style = MaterialTheme.typography.bodyLarge)
             }
         }

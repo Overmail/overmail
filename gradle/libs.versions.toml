@@ -32,11 +32,11 @@ material3 = "1.10.0-alpha05"
 navigation3 = "1.1.1"
 koin = "4.2.2"
 kermit = "2.2.0"
-buildkonfig = "0.22.0"
+buildkonfig = "0.23.0"
 ksp = "2.3.11"
 room = "2.8.5"
 sqlite = "2.7.1"
-haze = "2.0.0-rc01"
+haze = "2.0.0-rc02"
 human-readable = "2.0.0-alpha02"
 
 [libraries]

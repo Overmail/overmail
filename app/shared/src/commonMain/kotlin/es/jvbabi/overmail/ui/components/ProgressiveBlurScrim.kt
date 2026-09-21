@@ -13,11 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeProgressive
-import dev.chrisbanes.haze.blur.blurEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.blur.materials.HazeMaterials
-import dev.chrisbanes.haze.hazeEffect
 
 /** Which side of the scrolling content a scrim sits on, and therefore which way it fades out. */
 enum class ScrimEdge {
@@ -43,21 +44,22 @@ fun ProgressiveBlurScrim(
     containerColor: Color = BottomSheetDefaults.ContainerColor,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val hazeStyle = HazeMaterials.thin(containerColor = containerColor)
+    val hazeStyle = HazeBlurStyle {
+        progressive(
+            HazeProgressive.verticalGradient(
+                startIntensity = 1f,
+                endIntensity = 0f,
+            ),
+        )
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .hazeEffect(hazeState) {
-                blurEffect {
-                    blurRadius = BLUR_RADIUS
-                    style = hazeStyle
-                    progressive = when (edge) {
-                        ScrimEdge.Top -> HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
-                        ScrimEdge.Bottom -> HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f)
-                    }
-                }
-            }
+            .hazeBlur(
+                input = HazeInput.Backdrop(hazeState),
+                style = hazeStyle,
+            )
             .background(
                 when (edge) {
                     // Opaque behind the content itself, transparent where the scrolling area shows

@@ -98,6 +98,10 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "commerzbank.com" to "https://companieslogo.com/img/orig/CBK.F-b8815dc3.svg?t=1747071979&download=true",
             "mail.anthropic.com" to "https://svgl.app/library/anthropic_black.svg",
             "stwwb.de" to "https://www.stwwb.de/typo3conf/ext/ddfbasic/Resources/Public/Icons/favicon.ico",
+            "noreply@deutschebahn.com" to "https://upload.wikimedia.org/wikipedia/commons/d/d5/Deutsche_Bahn_AG-Logo.svg",
+            "immowelt.de" to "https://play-lh.googleusercontent.com/D6all3dWgccLFkV9lwuf8RMt7saiBcOUr4powggxcwbyb1dMbuWgHEvnPuCvWVJ-FBgc",
+            "*.immowelt.de" to "https://play-lh.googleusercontent.com/D6all3dWgccLFkV9lwuf8RMt7saiBcOUr4powggxcwbyb1dMbuWgHEvnPuCvWVJ-FBgc",
+            "studentendorf.berlin" to "https://www.studentendorf.berlin/wp-content/uploads/2018/07/cropped-studentendorf_favicon-1-192x192.png",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

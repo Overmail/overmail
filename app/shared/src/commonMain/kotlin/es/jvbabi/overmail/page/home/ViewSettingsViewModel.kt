@@ -9,23 +9,20 @@ import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.Label
 import es.jvbabi.overmail.domain.model.Participant
-import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.page.home.components.filter.ReadState
-import es.jvbabi.overmail.page.home.components.filter.readStateOf
-import es.jvbabi.overmail.page.home.components.group.GroupingSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 /**
- * The view the listing shows -- filter, groupings, sorting -- and what its settings need loaded to
- * be edited, such as the labels a filter can be put on.
+ * What the settings of a view need loaded to be edited, such as the labels a filter can be put on.
+ * The view is not this one's: it is told the current one through [ViewSettingsEvent.SetView].
  */
 class ViewSettingsViewModel(
     accountRepository: AccountRepository,
@@ -35,6 +32,9 @@ class ViewSettingsViewModel(
 ) : ViewModel() {
     val state: StateFlow<ViewSettingsState>
         field = MutableStateFlow(ViewSettingsState())
+
+    /** The view the settings are shown for; the labels and contacts it names are loaded. */
+    private val view = MutableStateFlow(ViewState.Mailbox)
 
     /** Bumped to read the mailboxes afresh; they are read at start and whenever their card opens. */
     private val imapAccountsRefresh = MutableStateFlow(0)
@@ -67,7 +67,7 @@ class ViewSettingsViewModel(
         viewModelScope.launch {
             combine(
                 account,
-                state.map { it.viewState.filter.hasLabels.orEmpty() }.distinctUntilChanged(),
+                view.map { it.filter.hasLabels.orEmpty() }.distinctUntilChanged(),
                 ::Pair,
             )
                 .flatMapLatest { (account, ids) ->
@@ -94,8 +94,8 @@ class ViewSettingsViewModel(
         viewModelScope.launch {
             combine(
                 account,
-                state.map { current ->
-                    (current.viewState.filter.sentBy.orEmpty() + current.viewState.filter.sentTo.orEmpty())
+                view.map { current ->
+                    (current.filter.sentBy.orEmpty() + current.filter.sentTo.orEmpty())
                         .filterIsInstance<Correspondent.Contact>()
                         .map { it.id }
                         .distinct()
@@ -135,81 +135,19 @@ class ViewSettingsViewModel(
 
     fun onEvent(event: ViewSettingsEvent) {
         when (event) {
-            is ViewSettingsEvent.SetFilter -> state.update { it.copy(viewState = it.viewState.copy(filter = event.filter)) }
-            is ViewSettingsEvent.SetGroupingSettings -> state.update {
-                it.copy(viewState = it.viewState.copy(groupings = event.settings.groupings, sorting = event.settings.sorting))
-            }
-            is ViewSettingsEvent.SetReadSelection -> state.update {
-                it.copy(
-                    readSelection = event.selection,
-                    viewState = it.viewState.copy(filter = it.viewState.filter.copy(readState = readStateOf(event.selection))),
-                )
-            }
+            is ViewSettingsEvent.SetView -> view.value = event.view
+            is ViewSettingsEvent.SetReadSelection -> state.update { it.copy(readSelection = event.selection) }
             is ViewSettingsEvent.SetLabelQuery -> state.update { it.copy(labelQuery = event.query) }
+            is ViewSettingsEvent.SetParticipantQuery -> state.update { it.copy(participantQuery = event.query) }
             ViewSettingsEvent.RefreshImapAccounts -> {
                 state.update { it.copy(isFetchingImapAccounts = true) }
                 imapAccountsRefresh.update { it + 1 }
-            }
-            is ViewSettingsEvent.ToggleImapAccount -> state.update { current ->
-                val filter = current.viewState.filter
-                val ids = filter.imapAccountIds.orEmpty()
-                val toggled = if (event.id in ids) ids - event.id else ids + event.id
-                // No mailbox picked is no filter, not one that lets nothing through.
-                current.copy(viewState = current.viewState.copy(filter = filter.copy(imapAccountIds = toggled.ifEmpty { null })))
-            }
-            is ViewSettingsEvent.SetParticipantQuery -> state.update { it.copy(participantQuery = event.query) }
-            is ViewSettingsEvent.ToggleCorrespondent -> state.update { current ->
-                val list = current.viewState.filter.correspondents(event.target)
-                val toggled = if (event.correspondent in list) list - event.correspondent else list + event.correspondent
-                current.copy(
-                    // Nobody picked is no filter, not one that lets nothing through.
-                    viewState = current.viewState.withCorrespondents(event.target, toggled.ifEmpty { null }),
-                    participantQuery = "",
-                )
-            }
-            is ViewSettingsEvent.RemoveCorrespondent -> state.update { current ->
-                val list = current.viewState.filter.correspondents(event.target) - event.correspondent
-                current.copy(viewState = current.viewState.withCorrespondents(event.target, list.ifEmpty { null }))
-            }
-            is ViewSettingsEvent.RemoveLabel -> state.update { current ->
-                val filter = current.viewState.filter
-                val hasLabels = filter.hasLabels.orEmpty().minus(event.id).ifEmpty { null }
-                current.copy(viewState = current.viewState.copy(filter = filter.copy(hasLabels = hasLabels)))
-            }
-            is ViewSettingsEvent.ToggleLabel -> state.update { current ->
-                val filter = current.viewState.filter
-                val ids = filter.hasLabels.orEmpty()
-                val toggled = if (event.id in ids) ids - event.id else ids + event.id
-                // Nothing picked is no label filter, not one that lets nothing through.
-                val hasLabels = toggled.ifEmpty { null }
-                current.copy(
-                    viewState = current.viewState.copy(filter = filter.copy(hasLabels = hasLabels)),
-                    // What was typed has done its job once its label is picked, as in the web app.
-                    labelQuery = "",
-                )
             }
         }
     }
 }
 
-/** Which side of a mail a correspondent filter is about. */
-enum class CorrespondentTarget { From, To }
-
-private fun ViewFilter.correspondents(target: CorrespondentTarget): List<Correspondent> = when (target) {
-    CorrespondentTarget.From -> sentBy
-    CorrespondentTarget.To -> sentTo
-}.orEmpty()
-
-private fun ViewState.withCorrespondents(target: CorrespondentTarget, correspondents: List<Correspondent>?): ViewState =
-    copy(
-        filter = when (target) {
-            CorrespondentTarget.From -> filter.copy(sentBy = correspondents)
-            CorrespondentTarget.To -> filter.copy(sentTo = correspondents)
-        }
-    )
-
 data class ViewSettingsState(
-    val viewState: ViewState = ViewState.Mailbox,
     /**
      * What the read filter has ticked; the filter's `readState` follows it, but cannot tell both
      * from neither.
@@ -240,20 +178,11 @@ data class ViewSettingsState(
 )
 
 sealed class ViewSettingsEvent {
-    data class SetFilter(val filter: ViewFilter) : ViewSettingsEvent()
-    data class SetGroupingSettings(val settings: GroupingSettings) : ViewSettingsEvent()
+    data class SetView(val view: ViewState) : ViewSettingsEvent()
+    /** Only what the read chip shows ticked; the filter it makes is the caller's to set. */
     data class SetReadSelection(val selection: List<ReadState>) : ViewSettingsEvent()
     data class SetLabelQuery(val query: String) : ViewSettingsEvent()
-    /** Takes the label off the filter; unlike [ToggleLabel], what is typed stays. */
-    data class RemoveLabel(val id: Uuid) : ViewSettingsEvent()
-    /** Puts the label on the filter, or takes it off when it already is. */
-    data class ToggleLabel(val id: Uuid) : ViewSettingsEvent()
     data class SetParticipantQuery(val query: String) : ViewSettingsEvent()
     /** Reads the mailboxes afresh, as the accounts card opens. */
     data object RefreshImapAccounts : ViewSettingsEvent()
-    data class ToggleImapAccount(val id: Uuid) : ViewSettingsEvent()
-    /** Puts the correspondent on the [target] filter, or takes them off; empties the query. */
-    data class ToggleCorrespondent(val target: CorrespondentTarget, val correspondent: Correspondent) : ViewSettingsEvent()
-    /** Takes the correspondent off the [target] filter; what is typed stays. */
-    data class RemoveCorrespondent(val target: CorrespondentTarget, val correspondent: Correspondent) : ViewSettingsEvent()
 }

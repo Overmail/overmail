@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.models.Shares
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailIdFromUrl
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -25,6 +26,19 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.newShare() {
     authenticate {
+        /**
+         * Share a mail through a link.
+         *
+         * Description: The `id` of the answer is what the link is built from.
+         *
+         * Tag: Shares
+         *
+         * Body: [NewShareRequest] The share
+         *
+         * Responses:
+         *   - 201 [SharePayload] The new share
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A name that is too long, a password shorter than 4 characters, or a `valid_until` in the past
+         */
         post {
             val emailId = call.requireOwnedEmailIdFromUrl()
             val request = call.receive<NewShareRequest>()
@@ -61,13 +75,13 @@ fun Route.newShare() {
 
 @Serializable
 private data class NewShareRequest(
-    /** What the owner calls this share, to tell their own links apart. Optional. */
+    @JsonSchema.Description("What the owner calls the share, to tell their links apart; optional")
     @SerialName("share_name") val shareName: String? = null,
     @SerialName("include_labels") val includeLabels: Boolean = false,
     @SerialName("include_attachments") val includeAttachments: Boolean = false,
-    /** When the link stops working, as whole seconds since the epoch; null never runs out. */
+    @JsonSchema.Description("When the link stops working, in whole seconds since the epoch; null for never")
     @SerialName("valid_until") val validUntil: Long? = null,
-    /** What a visitor is asked for, in the clear. Null or blank is a link that asks for nothing. */
+    @JsonSchema.Description("What a visitor has to type, in the clear; null or blank for none")
     @SerialName("password") val password: String? = null,
     @SerialName("allow_metadata_without_password") val allowMetadataWithoutPassword: Boolean = false,
 )

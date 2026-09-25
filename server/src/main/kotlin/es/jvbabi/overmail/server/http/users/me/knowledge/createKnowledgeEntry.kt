@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.http.api.conflict
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -31,6 +32,20 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.createKnowledgeEntry() {
     authenticate {
+        /**
+         * Add a knowledge entry.
+         *
+         * Description: Written as the user's own, not the assistant's. Names are unique per user, ignoring case.
+         *
+         * Tag: Knowledge
+         *
+         * Body: [CreateKnowledgeRequest] The entry
+         *
+         * Responses:
+         *   - 201 [KnowledgeEntryPayload] The new entry
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank or too long name, a blank description, or a `relevant_on` that is not a date
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] There is an entry of that name
+         */
         post {
             val userId = call.requireAuthenticatedUserId()
             val request = call.receive<CreateKnowledgeRequest>()
@@ -75,6 +90,6 @@ private data class CreateKnowledgeRequest(
     @SerialName("name") val name: String,
     @SerialName("description") val description: String,
     @SerialName("keywords") val keywords: List<String> = emptyList(),
-    /** `YYYY-MM-DD`, or null for the entries that are not about a day -- which is most of them. */
+    @JsonSchema.Description("`YYYY-MM-DD`, or null for an entry that is not about a day")
     @SerialName("relevant_on") val relevantOn: String? = null,
 )

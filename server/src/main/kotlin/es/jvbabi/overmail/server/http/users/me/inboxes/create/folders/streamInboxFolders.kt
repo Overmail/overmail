@@ -5,6 +5,7 @@ import es.jvbabi.overmail.core.ImapFolder
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.ContentType
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respondTextWriter
@@ -56,6 +57,19 @@ private val SCAN_TIMEOUT = 5.minutes
  */
 fun Route.streamInboxFolders() {
     authenticate {
+        /**
+         * Scan the folders of a mailbox.
+         *
+         * Description: Server-sent events. `folders` with the whole tree first, then `stats` per folder as it is counted, then `done` -- or `error` when the mailbox cannot be opened.
+         *
+         * Tag: Setup
+         *
+         * Body: [InboxFoldersRequest] The connection
+         *
+         * Responses:
+         *   - 200 text/event-stream [FolderStreamEvent] The events
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, or an invalid port
+         */
         post {
             call.requireAuthenticatedUser()
             val request = call.receive<InboxFoldersRequest>()
@@ -214,14 +228,14 @@ internal data class InboxFoldersRequest(
 /** One folder as `LIST` reports it, before anything has been counted. */
 @Serializable
 internal data class FolderNode(
-    /** The segments of the name, which is what the tree is built from. */
+    @JsonSchema.Description("The segments of the name, which the tree is built from")
     @SerialName("path") val path: List<String>,
-    /** [path] joined by [delimiter]; the id a `stats` event refers back to. */
+    @JsonSchema.Description("The segments joined by `delimiter`; what a `stats` event refers to")
     @SerialName("full_name") val fullName: String,
-    /** The last segment -- what a row shows. */
+    @JsonSchema.Description("The last segment, what a row shows")
     @SerialName("name") val name: String,
     @SerialName("delimiter") val delimiter: String,
-    /** `INBOX`, `SENT`, `SPAM`, `TRASH`, `DRAFTS`, or null for an ordinary folder. */
+    @JsonSchema.Description("`INBOX`, `SENT`, `SPAM`, `TRASH`, `DRAFTS`, or null for an ordinary folder")
     @SerialName("special_type") val specialType: String?,
 )
 
@@ -237,9 +251,11 @@ internal sealed class FolderStreamEvent {
     @Serializable
     @SerialName("stats")
     data class Stats(
+        @JsonSchema.Description("The folder, as the `folders` event named it")
         @SerialName("full_name") val fullName: String,
+        @JsonSchema.Description("Null when the folder could not be read")
         @SerialName("mail_count") val mailCount: Int?,
-        /** ISO-8601, or null for an empty folder and for one that could not be read. */
+        @JsonSchema.Description("When its oldest mail was sent, as ISO-8601; null for an empty folder or one that could not be read")
         @SerialName("oldest_mail_at") val oldestMailAt: String?,
     ) : FolderStreamEvent()
 
@@ -251,5 +267,6 @@ internal sealed class FolderStreamEvent {
     /** The mailbox could not be opened. Nothing follows this. */
     @Serializable
     @SerialName("error")
+    @JsonSchema.Description("`mailbox_unavailable`")
     data class Failed(@SerialName("outcome") val outcome: String) : FolderStreamEvent()
 }

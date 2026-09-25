@@ -37,6 +37,14 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.setInboxPaused(paused: Boolean) {
     authenticate {
+        /**
+         * Description: Only the importer stops or starts; nothing that was imported is touched.
+         *
+         * Tag: Inboxes
+         *
+         * Responses:
+         *   - 200 [InboxPausedResponse] Whether the inbox is paused now
+         */
         post {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()

@@ -8,8 +8,17 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** The model the assistant runs on, from the config: `GET /api/webapp/ai/current-config`. */
 fun Route.currentAiConfig() {
     authenticate {
+        /**
+         * Get the model the assistant runs on.
+         *
+         * Tag: Assistant
+         *
+         * Responses:
+         *   - 200 [CurrentAiConfigResponse] The model
+         */
         get {
             val config = call.dependency<ApplicationConfig>()
             call.respond(CurrentAiConfigResponse(modelId = config.ai.model))

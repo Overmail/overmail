@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.http.email.item.shares.hashSharePassword
 import es.jvbabi.overmail.server.http.email.item.shares.readShareInput
 import es.jvbabi.overmail.server.http.email.item.shares.toSharePayload
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -35,6 +36,20 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.updateShare() {
     authenticate {
+        /**
+         * Change a share link.
+         *
+         * Description: The whole share is sent. `password` sets a new one, `remove_password` removes it, neither keeps it. The link itself stays the same.
+         *
+         * Tag: Shares
+         *
+         * Body: [UpdateShareRequest] The share
+         *
+         * Responses:
+         *   - 200 [es.jvbabi.overmail.server.http.email.item.shares.SharePayload] The changed share
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A name that is too long, a password shorter than 4 characters, or a `valid_until` in the past
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail, or no such share of it
+         */
         put {
             val emailId = call.requireOwnedEmailIdFromUrl()
             val shareId = shareIdFromPath(call.parameters["shareId"])
@@ -85,11 +100,11 @@ private data class UpdateShareRequest(
     @SerialName("share_name") val shareName: String? = null,
     @SerialName("include_labels") val includeLabels: Boolean = false,
     @SerialName("include_attachments") val includeAttachments: Boolean = false,
-    /** When the link stops working, as whole seconds since the epoch; null never runs out. */
+    @JsonSchema.Description("When the link stops working, in whole seconds since the epoch; null for never")
     @SerialName("valid_until") val validUntil: Long? = null,
-    /** A password to set from now on. Null leaves the one that is there, see [removePassword]. */
+    @JsonSchema.Description("A new password; null keeps the one there is")
     @SerialName("password") val password: String? = null,
-    /** Takes the password off, so the link opens without one. Ignored when [password] is set. */
+    @JsonSchema.Description("Removes the password; ignored when `password` is set")
     @SerialName("remove_password") val removePassword: Boolean = false,
     @SerialName("allow_metadata_without_password") val allowMetadataWithoutPassword: Boolean = false,
 )

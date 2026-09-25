@@ -110,8 +110,14 @@ fun Application.installOvermailAuthentikt() {
     routing {
         route(AUTH_API_PREFIX) {
             /**
-             * Starts a sign-in flow and hands back its id. Everything after this happens under
-             * /api/auth/authentikt/flow/{session_id}.
+             * Start a sign-in flow.
+             *
+             * Description: Answers the id of the flow; every step after this happens under `/api/auth/authentikt/flow/{session_id}`.
+             *
+             * Tag: Authentication
+             *
+             * Responses:
+             *   - 200 [LoginResponse] The flow
              */
             post("/login") {
                 val session = instance.createNewSession()
@@ -121,8 +127,15 @@ fun Application.installOvermailAuthentikt() {
 
             authenticate {
                 /**
-                 * Who the session cookie belongs to, or 401. This is what the frontend asks
-                 * before rendering anything.
+                 * Get who the session belongs to.
+                 *
+                 * Description: What the web app asks before it renders anything.
+                 *
+                 * Tag: Authentication
+                 *
+                 * Responses:
+                 *   - 200 [SessionResponse] The signed-in user
+                 *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
                  */
                 get("/session") {
                     val user = call.requireAuthenticatedUser()
@@ -130,7 +143,16 @@ fun Application.installOvermailAuthentikt() {
                 }
             }
 
-            /** Drops the cookie. The flow sessions themselves are short lived anyway. */
+            /**
+             * Sign the browser out.
+             *
+             * Description: Drops the session cookie. The session itself stays valid until it runs out or is revoked through `/api/users/me/sessions`.
+             *
+             * Tag: Authentication
+             *
+             * Responses:
+             *   - 204 The cookie is dropped
+             */
             post("/logout") {
                 call.response.cookies.append(
                     Cookie(

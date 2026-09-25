@@ -21,6 +21,16 @@ import kotlin.time.Clock
  */
 fun Route.revokeSession() {
     authenticate {
+        /**
+         * Sign a session out.
+         *
+         * Description: Its token is refused from the next request on. Revoking the current session signs the caller out.
+         *
+         * Tag: Sessions
+         *
+         * Responses:
+         *   - 204 The session is revoked
+         */
         delete {
             val session = call.requireOwnedSessionFromUrl()
 

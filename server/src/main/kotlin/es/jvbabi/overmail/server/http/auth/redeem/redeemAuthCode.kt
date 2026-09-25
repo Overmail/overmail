@@ -13,6 +13,7 @@ import es.jvbabi.overmail.server.http.api.queryParameter
 import es.jvbabi.overmail.server.http.webapp.devices.authCodeSessions
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -26,6 +27,26 @@ import kotlin.time.Clock
  * and are recorded with the session.
  */
 fun Route.redeemAuthCode() {
+    /**
+     * Trade a device sign-in code for a session token.
+     *
+     * Description: How the app signs in. The code comes from `GET /api/webapp/devices/auth/generate-auth-code` and works once. The device fields are recorded with the session.
+     *
+     * Tag: Authentication
+     *
+     * Query parameters:
+     *   - code [String] The code the web app showed
+     *   - platform [String] `android` or `ios`; anything else is recorded as Android
+     *   - device [String] The device model
+     *   - manufacturer [String] The device manufacturer, Android only
+     *   - os [String] The operating system and its version
+     *
+     * Responses:
+     *   - 200 [RedeemResponse] The session token
+     *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No code was sent
+     *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such code, or it was redeemed already
+     *   - 410 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The code has run out
+     */
     get {
         val code = call.queryParameter("code") ?: invalidRequest("code", "is required")
 
@@ -66,5 +87,6 @@ private fun appClientOf(parameters: Parameters): Session.Client {
 
 @Serializable
 data class RedeemResponse(
+    @JsonSchema.Description("The session token, for `Authorization: Bearer`")
     @SerialName("jwt") val jwt: String,
 )

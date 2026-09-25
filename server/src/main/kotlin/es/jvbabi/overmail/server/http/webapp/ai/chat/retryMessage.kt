@@ -26,6 +26,18 @@ import kotlin.time.Clock
  */
 fun Route.retryMessage() {
     authenticate {
+        /**
+         * Answer a question again.
+         *
+         * Description: Empties the answer and writes it anew into the same message, which is followed over its stream again.
+         *
+         * Tag: Assistant
+         *
+         * Responses:
+         *   - 202 The answer is queued
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such chat, or no such message in it
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The message is not an answer, or it is still being written
+         */
         post {
             val message = call.requireOwnedChatMessageFromUrl()
             val model = call.dependency<LLModel>()

@@ -13,6 +13,7 @@ import es.jvbabi.overmail.server.http.api.ApiException
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.notFound
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.ApplicationCall
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -34,7 +35,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 /** One shared mail as both routes answer it. */
 @Serializable
 data class SharedEmailResponse(
-    /** Whether the mail itself is behind a password the visitor has not typed yet. */
+    @JsonSchema.Description("Whether the mail is behind a password that was not sent")
     @SerialName("needs_password") val needsPassword: Boolean,
     /**
      * Who handed the link out.
@@ -43,6 +44,7 @@ data class SharedEmailResponse(
      * password field wants to know is whether this is the link they were promised, and a name
      * answers that. It says nothing about the mail, which is what the password guards.
      */
+    @JsonSchema.Description("Who handed the link out, there even while the share is locked")
     @SerialName("shared_by") val sharedBy: SharedBy,
     /**
      * Who wrote it, when, and about what.
@@ -50,8 +52,9 @@ data class SharedEmailResponse(
      * Null where the share keeps even that behind its password -- the page then has nothing to
      * show but the password field, which is the point of that setting.
      */
+    @JsonSchema.Description("Subject, sender and date; null while the share keeps even these behind its password")
     @SerialName("metadata") val metadata: Metadata?,
-    /** The mail itself. Only ever here once the share is open. */
+    @JsonSchema.Description("The mail itself; only there once the share is open")
     @SerialName("content") val content: Content?,
 ) {
     @Serializable
@@ -63,12 +66,12 @@ data class SharedEmailResponse(
     @Serializable
     data class Metadata(
         @SerialName("subject") val subject: String,
-        /** Display name from this mail's header, absent for a bare address. */
+        @JsonSchema.Description("Display name from the header of the mail; null for a bare address")
         @SerialName("sender_name") val senderName: String?,
         @SerialName("sender_address") val senderAddress: String,
-        /** Whole seconds since the epoch, like the rest of the mail api. */
+        @JsonSchema.Description("When it was sent, in whole seconds since the epoch")
         @SerialName("sent") val sent: Long,
-        /** Only where the share was made with them; empty otherwise. */
+        @JsonSchema.Description("Only where the share was made with them; empty otherwise")
         @SerialName("labels") val labels: List<Label>,
     )
 
@@ -82,7 +85,7 @@ data class SharedEmailResponse(
     data class Content(
         @SerialName("text") val text: String?,
         @SerialName("html") val html: String?,
-        /** Only where the share was made with them; empty otherwise. */
+        @JsonSchema.Description("Only where the share was made with them; empty otherwise")
         @SerialName("attachments") val attachments: List<Attachment>,
     )
 
@@ -90,6 +93,7 @@ data class SharedEmailResponse(
     data class Attachment(
         @SerialName("id") val id: Uuid,
         @SerialName("name") val name: String,
+        @JsonSchema.Description("In bytes")
         @SerialName("size") val size: Long,
         @SerialName("content_type") val contentType: String,
     )

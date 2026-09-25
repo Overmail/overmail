@@ -26,6 +26,14 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.setEmailArchiveState(action: EmailArchiveAction) {
     authenticate {
+        /**
+         * Description: Idempotent, a mail that is already there answers the same.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 204 The mail is there
+         */
         post {
             val notifier = call.dependency<MailNotifier>()
             val userId = call.requireAuthenticatedUserId()

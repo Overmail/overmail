@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.User
+import io.ktor.openapi.JsonSchema
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -184,32 +185,29 @@ internal fun listingIds(userId: User.Id, filter: MailFilter, group: Op<Boolean>)
 
 @Serializable
 internal data class EmailGroupsResponse(
-    /** The levels these groups are cut by, outermost first -- what `by` asked for. */
+    @JsonSchema.Description("The levels the groups are cut by, outermost first, as `by` asked for them")
     @SerialName("groupings") val groupings: List<String>,
     @SerialName("groups") val groups: List<EmailGroup>,
 )
 
 @Serializable
 internal data class EmailGroup(
-    /**
-     * One key per level, outermost first: a day as `yyyy-mm-dd`, an id for a sender or an
-     * account, `true`/`false` for read, an archive state by name. Empty for the one stretch of an
-     * ungrouped listing.
-     */
+    @JsonSchema.Description("One key per level, outermost first. `day` is `yyyy-mm-dd`, `month` is `yyyymm`, `year` the year; `date_smart` is 1 today, 2 yesterday, 3 the rest of this week, 4 the rest of this month, and `yyyymm` for anything older. `sender` and `imap_account` are ids, `read` is `true` or `false`, `archived` a state. Empty for an ungrouped listing")
     @SerialName("keys") val keys: List<String>,
+    @JsonSchema.Description("How many mails the group holds")
     @SerialName("count") val count: Long,
 )
 
 @Serializable
 internal data class EmailListResponse(
-    /** How long the group is, not how much of it was asked for. */
+    @JsonSchema.Description("How many mails the group holds, not how many were asked for")
     @SerialName("total") val total: Long,
     @SerialName("ids") val ids: List<Uuid>,
 )
 
 @Serializable
 internal data class EmailIdsResponse(
-    /** How many mails the stretch holds. More than [ids] when the answer was cut, see [MAX_IDS]. */
+    @JsonSchema.Description("How many mails the group holds; more than `ids` when the answer was cut")
     @SerialName("total") val total: Long,
     @SerialName("ids") val ids: List<Uuid>,
 )

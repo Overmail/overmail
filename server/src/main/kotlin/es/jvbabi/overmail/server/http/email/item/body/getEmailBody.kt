@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.http.email.item.body
 
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailFromUrl
 import io.ktor.http.CacheControl
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.cacheControl
 import io.ktor.server.response.respond
@@ -19,6 +20,16 @@ import kotlinx.serialization.Serializable
  */
 fun Route.getEmailBody() {
     authenticate {
+        /**
+         * Get the text and html body of a mail.
+         *
+         * Description: Both parts as they were imported; either can be absent. Cached for an hour, as a stored mail never changes.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 200 [GetEmailBodyResponse] The body
+         */
         get {
             val email = call.requireOwnedEmailFromUrl()
 
@@ -33,6 +44,8 @@ fun Route.getEmailBody() {
 
 @Serializable
 private data class GetEmailBodyResponse(
+    @JsonSchema.Description("The plain text part; null when the mail has none")
     @SerialName("text") val text: String?,
+    @JsonSchema.Description("The html part; null when the mail has none")
     @SerialName("html") val html: String?,
 )

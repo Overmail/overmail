@@ -24,6 +24,19 @@ import kotlinx.serialization.Serializable
  * is a word remains a link whose password is a word.
  */
 fun Route.openShare() {
+    /**
+     * Open a share link with its password.
+     *
+     * Description: The answer of `GET /api/shares/{shareId}`, unlocked. A link without a password opens whatever is sent.
+     *
+     * Tag: Public
+     *
+     * Body: [OpenShareRequest] The password
+     *
+     * Responses:
+     *   - 200 [SharedEmailResponse] The shared mail
+     *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not the password of this share
+     */
     post {
         val share = call.requireLiveShareFromUrl()
         val request = call.receive<OpenShareRequest>()

@@ -37,6 +37,13 @@ private val json = Json {
     encodeDefaults = true
 }
 
+/**
+ * The chats of the assistant, as the sidebar lists them: `GET /api/webapp/ai/socket`.
+ *
+ * A page of chats on connect, the next page for every `request.chats.more`, and every chat that
+ * is created, renamed or deleted afterwards -- as long as it is one this client holds, or one that
+ * did not exist yet when it connected.
+ */
 fun Route.aiSocket() {
     authenticate {
         clientWebSocket {

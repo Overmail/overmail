@@ -25,6 +25,14 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
  */
 fun Route.deleteKnowledgeEntry() {
     authenticate {
+        /**
+         * Delete a knowledge entry.
+         *
+         * Tag: Knowledge
+         *
+         * Responses:
+         *   - 204 The entry is deleted
+         */
         delete {
             val userId = call.requireAuthenticatedUserId()
             val knowledgeId = knowledgeIdFromPath(call.parameters["knowledgeId"])

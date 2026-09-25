@@ -176,10 +176,52 @@ Caddy is a werkbank container, so its upstreams are `host.docker.internal`, not 
 ## HTTP and OpenAPI
 
 The spec is assembled from the live routing tree by the Ktor OpenAPI compiler plugin
-(`ktor { openApi { } }` in `server/build.gradle.kts`) — there is no checked-in openapi file, and
-adding a route is enough to document it. A KDoc comment above a route becomes its summary, so
-write one. Swagger UI sits at `/api/swagger`, the generated spec at
-`/api/swagger/documentation.json`.
+(`ktor { openApi { } }` in `server/build.gradle.kts`) — there is no checked-in openapi file.
+Swagger UI sits at `/api/swagger`, the generated spec at `/api/swagger/documentation.json`.
+
+Code inference is switched off, so **the spec is exactly what the KDoc says**: a route without one
+shows up with its path and nothing else, and `OpenApiSpecTest` fails on it. The KDoc goes directly
+above the handler call (`get {`, `post {`, …), not above the `Route.` function — that one stays
+the note for whoever reads the code:
+
+```kotlin
+authenticate {
+    /**
+     * Change a share link.
+     *
+     * Description: The whole share is sent. The link itself stays the same.
+     *
+     * Tag: Shares
+     *
+     * Body: [UpdateShareRequest] The share
+     *
+     * Responses:
+     *   - 200 [SharePayload] The changed share
+     *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A `valid_until` in the past
+     */
+    put { … }
+}
+```
+
+- The prose before the first `Key:` line is the summary: one sentence, imperative.
+- `Description:` is a single line; the plugin drops continuation lines. A second `:` before the
+  first backtick turns the line into an unknown key, so write `Idempotent, a mail…` rather than
+  `Idempotent: a mail…`.
+- `Tag:` is one word — the plugin cuts it at the first space — and one of the tags declared with
+  a description in `swaggerUI { }` in `Routes.kt`.
+- `[Type]` resolves against the package of the file; anything from another package is written
+  fully qualified, `ApiErrorBody` included. A primitive is `[String]`, `[Int]`, `[Boolean]`, a
+  uuid `[kotlin.uuid.Uuid]`. A response that is not json names its content type:
+  `- 200 message/rfc822 The source`.
+- No `/*` anywhere in a KDoc (`image/*`): Kotlin nests block comments.
+- A comment above a `route(…)` applies to everything below it. `Routes.kt` uses that for what a
+  subtree shares — `Path:` parameters and the 401/403/404 of a resource — and keeps prose out of
+  those comments, because prose becomes the summary of every route below. Where one handler serves
+  several routes (`/read` and `/unread`), each route names itself with a one-line KDoc there and
+  the handler's KDoc starts at `Description:`.
+- A field a type does not explain — a timestamp's unit, a nullable's meaning, the values of a
+  string — gets `@JsonSchema.Description` on the `@Serializable` class; KDoc on a field does not
+  reach the spec.
 
 ## Authentication
 

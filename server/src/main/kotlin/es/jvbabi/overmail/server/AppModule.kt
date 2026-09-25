@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
+import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
@@ -52,6 +53,7 @@ fun Application.overmail() {
     // Before the routes, so everything they throw comes out as the api's error payload.
     installApiErrorHandling()
     install(Authentication) { overmailSession() }
+    registerSessionSecurityScheme()
     install(SSE)
     install(WebSockets) {
         pingPeriod = 15.seconds

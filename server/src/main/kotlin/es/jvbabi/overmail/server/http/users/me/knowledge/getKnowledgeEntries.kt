@@ -24,6 +24,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.getKnowledgeEntries() {
     authenticate {
+        /**
+         * List what the assistant knows about the current user.
+         *
+         * Description: Every entry, the most recently changed first.
+         *
+         * Tag: Knowledge
+         *
+         * Responses:
+         *   - 200 [KnowledgeEntriesResponse] The entries
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
 

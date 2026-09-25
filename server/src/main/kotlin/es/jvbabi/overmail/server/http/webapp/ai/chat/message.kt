@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.forbidden
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -31,6 +32,20 @@ import kotlinx.serialization.Serializable
  */
 fun Route.message() {
     authenticate {
+        /**
+         * Ask the assistant.
+         *
+         * Description: Without `chat_id` this starts a new chat. The answer is written into `answer_message_id`, which is followed over its stream.
+         *
+         * Tag: Assistant
+         *
+         * Body: [ChatMessageRequest] The question
+         *
+         * Responses:
+         *   - 200 [MessageResponse] The chat, the question and the answer being written
+         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The chat belongs to somebody else
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such chat
+         */
         post {
             val db = call.database()
             val aiChatNotifier = call.dependency<AiChatNotifier>()
@@ -38,7 +53,7 @@ fun Route.message() {
             val model = call.dependency<LLModel>()
 
             val user = call.requireAuthenticatedUser()
-            val request = call.receive<Message>()
+            val request = call.receive<ChatMessageRequest>()
 
             val chat = if (request.chatId == null) {
                 db.query {
@@ -77,16 +92,16 @@ fun Route.message() {
                     this.content = AiChatMessage.MessageContent.UserMessageContent(
                         segments = request.prompt.segments.map { segment ->
                             when (segment) {
-                                is Message.Prompt.Segment.Text -> AiChatMessage.MessageContent.UserMessageContent.Segment.Text(
+                                is ChatMessageRequest.Prompt.Segment.Text -> AiChatMessage.MessageContent.UserMessageContent.Segment.Text(
                                     content = segment.content
                                 )
-                                is Message.Prompt.Segment.Email -> AiChatMessage.MessageContent.UserMessageContent.Segment.Email(
+                                is ChatMessageRequest.Prompt.Segment.Email -> AiChatMessage.MessageContent.UserMessageContent.Segment.Email(
                                     id = segment.id
                                 )
-                                is Message.Prompt.Segment.Label -> AiChatMessage.MessageContent.UserMessageContent.Segment.Label(
+                                is ChatMessageRequest.Prompt.Segment.Label -> AiChatMessage.MessageContent.UserMessageContent.Segment.Label(
                                     id = segment.id
                                 )
-                                is Message.Prompt.Segment.Sender -> AiChatMessage.MessageContent.UserMessageContent.Segment.Sender(
+                                is ChatMessageRequest.Prompt.Segment.Sender -> AiChatMessage.MessageContent.UserMessageContent.Segment.Sender(
                                     id = segment.id
                                 )
                             }
@@ -121,7 +136,8 @@ fun Route.message() {
 }
 
 @Serializable
-private data class Message(
+private data class ChatMessageRequest(
+    @JsonSchema.Description("The chat to continue; null starts a new one")
     @SerialName("chat_id") val chatId: Uuid?,
     @SerialName("prompt") val prompt: Prompt
 ) {
@@ -170,6 +186,6 @@ private data class Message(
 private data class MessageResponse(
     @SerialName("chat_id") val chatId: Uuid,
     @SerialName("message_id") val messageId: Uuid,
-    /** The still-empty agent message the answer is written into. */
+    @JsonSchema.Description("The answer, still empty; follow it over its stream")
     @SerialName("answer_message_id") val answerMessageId: Uuid,
 )

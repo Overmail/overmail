@@ -74,21 +74,74 @@ import io.ktor.server.routing.openapi.OpenApiDocSource
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
+/** What the spec says about the api as a whole, above the list of operations. */
+private const val API_DESCRIPTION = """
+Everything under `/api` except the sign-in flow's own screens.
+
+**Authentication.** Operations with a lock need a signed-in user: the session JWT from the
+`overmail_session` cookie, or the same token as `Authorization: Bearer`. Without one they answer
+401.
+
+**Errors.** Every failing request answers with an `ApiErrorBody`. `error.code` is what a client
+branches on (`unauthenticated`, `forbidden`, `not_found`, `invalid_request`, `conflict`, `gone`,
+`internal`), `error.details` names what it was about.
+
+**Timestamps.** The mail routes send whole seconds since the epoch; knowledge entries and sessions
+send ISO-8601 strings. Each field says which.
+
+**Streams.** What a screen keeps current travels over WebSockets, which this document cannot
+describe: `/api/stack`, `/api/webapp/content/socket`, `/api/webapp/home/socket`,
+`/api/webapp/listing/socket`, `/api/webapp/views/socket` and `/api/webapp/ai/socket`. The same goes
+for the server-sent events of an answer of the assistant,
+`/api/webapp/ai/chat/{chatId}/message/{messageId}/stream`.
+"""
+
+/**
+ * Every route this server owns. Caddy forwards /api* unchanged and sends everything else to
+ * SvelteKit, so all of them live under /api.
+ */
 internal fun Application.configureRouting() {
     routing {
-        // Caddy forwards /api* unchanged and sends everything else to SvelteKit, so every route
-        // this server owns has to live under /api.
         route("/api") {
             // Reads the live routing tree, so every route below shows up without a checked-in spec.
+            // Every handler documents itself in the KDoc above it; the comments on the routes here
+            // only carry what a whole subtree shares -- its path parameters and its errors. Prose
+            // becomes the summary of everything below, so there is none, except where one handler
+            // serves several routes and each of them names itself here.
             swaggerUI("/swagger") {
-                info = OpenApiInfo(title = "Overmail", version = "1.0")
+                info = OpenApiInfo(title = "Overmail", version = "1.0", description = API_DESCRIPTION.trim())
                 source = OpenApiDocSource.Routing(ContentType.Application.Json)
                 // Default is documentation.yaml, but the source above emits JSON.
                 remotePath = "documentation.json"
+
+                // In the order Swagger UI lists them. A handler names its tag itself -- one word, the
+                // plugin cuts a tag at its first space. One that is not declared here still shows
+                // up, just without a description and at the end.
+                tag("System", "Whether the server is up.")
+                tag("Authentication", "Signing in: the web sign-in flow, and pairing the app through a device code.")
+                tag("Account", "Who is signed in, and the addresses they receive mail under.")
+                tag("Sessions", "The devices the current user is signed in on.")
+                tag("Emails", "One mail or a selection of them: lookup, body, source, attachments, state and labels.")
+                tag("Listing", "What a listing holds -- its groups, a page of a group, a whole group -- and the quick search.")
+                tag("Shares", "Links that hand one mail out to somebody without an account, as the owner manages them.")
+                tag("Public", "What a share link opens. No session: holding the link is the whole authorization.")
+                tag("Labels", "The labels of the current user.")
+                tag("Senders", "The address book: correspondents by id and by search.")
+                tag("Avatars", "Pictures of correspondents.")
+                tag("Views", "Saved ways of looking at the mailbox, as the sidebar lists them.")
+                tag("Inboxes", "Connected IMAP mailboxes: reading, editing, pausing and disconnecting them.")
+                tag("Setup", "The \"new inbox\" dialog: probing a server and a login, scanning folders, creating the inbox.")
+                tag("Knowledge", "What the assistant knows about the current user.")
+                tag("Assistant", "Chatting with the assistant: asking, following an answer, reading a chat back.")
             }
 
             /**
-             * Reports whether the server is up.
+             * Report whether the server is up.
+             *
+             * Tag: System
+             *
+             * Responses:
+             *   - 200 text/plain [String] Always `ok`
              */
             get("/health") {
                 call.respondText("ok")
@@ -100,7 +153,14 @@ internal fun Application.configureRouting() {
                 }
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/avatars") {
+                /**
+                 * Path: avatarId [kotlin.uuid.Uuid] The picture, as `avatar_url` names it
+                 */
                 route("/{avatarId}") {
                     getAvatar()
                 }
@@ -110,6 +170,10 @@ internal fun Application.configureRouting() {
                 stackSocket()
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/emails") {
                 // GET /emails?ids=a,b,c -- what a client-side cache asks for the ids it lacks.
                 emailsByIds()
@@ -117,9 +181,16 @@ internal fun Application.configureRouting() {
                 // What the routes under /{emailId} do to one mail, for a whole selection: the ids
                 // come in the body, because a picked stretch of the mailbox does not fit in a url.
                 route("/bulk") {
+                    /** Mark a selection of mails as read. */
                     route("/read") { setEmailsRead(isRead = true) }
+
+                    /** Mark a selection of mails as unread. */
                     route("/unread") { setEmailsRead(isRead = false) }
+
+                    /** Archive a selection of mails. */
                     route("/archive") { setEmailsArchiveState(EmailArchiveAction.Archive) }
+
+                    /** Move a selection of mails back into the mailbox. */
                     route("/unarchive") { setEmailsArchiveState(EmailArchiveAction.Unarchive) }
                 }
 
@@ -130,7 +201,7 @@ internal fun Application.configureRouting() {
                         emailListGroups()
                     }
 
-                    // GET /emails/list/ids?from=&to= -- a whole stretch at once, which is what
+                    // GET /emails/list/ids?by=&group= -- a whole group at once, which is what
                     // picking one in the table needs.
                     route("/ids") {
                         emailListIds()
@@ -141,6 +212,13 @@ internal fun Application.configureRouting() {
                     emailSearch()
                 }
 
+                /**
+                 * Path: emailId [kotlin.uuid.Uuid] The mail
+                 *
+                 * Responses:
+                 *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The mail belongs to somebody else
+                 *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail
+                 */
                 route("/{emailId}") {
                     route("/body") {
                         getEmailBody()
@@ -151,6 +229,9 @@ internal fun Application.configureRouting() {
                         downloadEmail()
                     }
 
+                    /**
+                     * Path: attachmentId [kotlin.uuid.Uuid] The attachment
+                     */
                     route("/attachments/{attachmentId}") {
                         downloadAttachment()
                     }
@@ -163,6 +244,9 @@ internal fun Application.configureRouting() {
                         getShares()
                         newShare()
 
+                        /**
+                         * Path: shareId [kotlin.uuid.Uuid] The share
+                         */
                         route("/{shareId}") {
                             updateShare()
                             deleteShare()
@@ -171,28 +255,36 @@ internal fun Application.configureRouting() {
 
                     // One route per state rather than a body that names it: they are separate
                     // actions to a reader, and this keeps them separate in the api too.
+                    /** Mark a mail as read. */
                     route("/read") {
                         setEmailRead(isRead = true)
                     }
 
+                    /** Mark a mail as unread. */
                     route("/unread") {
                         setEmailRead(isRead = false)
                     }
 
+                    /** Archive a mail. */
                     route("/archive") {
                         setEmailArchiveState(EmailArchiveAction.Archive)
                     }
 
+                    /** Move a mail back into the mailbox. */
                     route("/unarchive") {
                         setEmailArchiveState(EmailArchiveAction.Unarchive)
                     }
 
+                    /** File a mail as spam. */
                     route("/spam") {
                         setEmailArchiveState(EmailArchiveAction.Spam)
                     }
 
                     // The pair addresses the assignment; there is no id for it, see
                     // `EmailLabels`.
+                    /**
+                     * Path: labelId [kotlin.uuid.Uuid] The label
+                     */
                     route("/labels/{labelId}") {
                         attachEmailLabel()
                         detachEmailLabel()
@@ -202,6 +294,13 @@ internal fun Application.configureRouting() {
 
             // What a share link resolves to. No session anywhere below here: holding the link
             // is the whole authorization, see `getShare`.
+            /**
+             * Path: shareId [String] The share, as a uuid with or without its hyphens
+             *
+             * Responses:
+             *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such share
+             *   - 410 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The share has run out
+             */
             route("/shares/{shareId}") {
                 getShare()
 
@@ -209,11 +308,18 @@ internal fun Application.configureRouting() {
                     openShare()
                 }
 
+                /**
+                 * Path: attachmentId [kotlin.uuid.Uuid] The attachment
+                 */
                 route("/attachments/{attachmentId}") {
                     downloadSharedAttachment()
                 }
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/labels") {
                 labelsByIds()
                 createLabel()
@@ -227,6 +333,10 @@ internal fun Application.configureRouting() {
                 }
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/users") {
                 route("/me") {
                     getCurrentUser()
@@ -237,6 +347,12 @@ internal fun Application.configureRouting() {
                         getKnowledgeEntries()
                         createKnowledgeEntry()
 
+                        /**
+                         * Path: knowledgeId [kotlin.uuid.Uuid] The entry
+                         *
+                         * Responses:
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such entry, or not one of the current user's
+                         */
                         route("/{knowledgeId}") {
                             updateKnowledgeEntry()
                             deleteKnowledgeEntry()
@@ -247,6 +363,13 @@ internal fun Application.configureRouting() {
                     route("/sessions") {
                         getSessions()
 
+                        /**
+                         * Path: sessionId [kotlin.uuid.Uuid] The session
+                         *
+                         * Responses:
+                         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The session belongs to somebody else
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such session
+                         */
                         route("/{sessionId}") {
                             revokeSession()
                         }
@@ -257,6 +380,12 @@ internal fun Application.configureRouting() {
                             createView()
                         }
 
+                        /**
+                         * Path: viewId [kotlin.uuid.Uuid] The view
+                         *
+                         * Responses:
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such view, or not one of the current user's
+                         */
                         route("/{viewId}") {
                             updateView()
                             deleteView()
@@ -266,8 +395,14 @@ internal fun Application.configureRouting() {
                     route("/inboxes") {
                         getInboxes()
 
+                        // What the edit screen opens on, saves through, and checks against.
+                        /**
+                         * Path: inboxId [kotlin.uuid.Uuid] The inbox
+                         *
+                         * Responses:
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such inbox, or not one of the current user's
+                         */
                         route("/{inboxId}") {
-                            // What the edit screen opens on, saves through, and checks against.
                             getInbox()
                             updateInbox()
                             deleteInbox()
@@ -285,10 +420,12 @@ internal fun Application.configureRouting() {
                             }
 
                             // One route per state, like the read and archive routes above.
+                            /** Pause the importer of an inbox. */
                             route("/pause") {
                                 setInboxPaused(paused = true)
                             }
 
+                            /** Resume the importer of an inbox. */
                             route("/resume") {
                                 setInboxPaused(paused = false)
                             }
@@ -322,6 +459,10 @@ internal fun Application.configureRouting() {
                 }
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/senders") {
                 sendersByIds()
 
@@ -330,6 +471,10 @@ internal fun Application.configureRouting() {
                 }
             }
 
+            /**
+             * Responses:
+             *   - 401 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not signed in
+             */
             route("/webapp") {
                 route("/content") {
                     route("/socket") {
@@ -375,11 +520,21 @@ internal fun Application.configureRouting() {
                     route("/chat") {
                         message()
 
+                        /**
+                         * Path: chatId [kotlin.uuid.Uuid] The chat
+                         *
+                         * Responses:
+                         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The chat belongs to somebody else
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such chat
+                         */
                         route("/{chatId}") {
                             route("/history") {
                                 chatHistory()
                             }
 
+                            /**
+                             * Path: messageId [kotlin.uuid.Uuid] A message of that chat
+                             */
                             route("/message/{messageId}") {
                                 route("/stream") {
                                     chatMessageStream()

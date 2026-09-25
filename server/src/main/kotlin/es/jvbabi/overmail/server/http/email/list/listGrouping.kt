@@ -29,11 +29,9 @@ import org.jetbrains.exposed.v1.datetime.Year
 /**
  * What a listing can be cut by, one level of it.
  *
- * The four date kinds all count *days* here, and the client folds those days into the stretch a
- * reader is shown -- a year, a month, or today and yesterday. Same reason as before: which day a
- * mail belongs to is a question of a time zone, and what that day is called is a question of
- * wording; neither is this endpoint's. A level that counts days can still sit above another one,
- * because the client folds what it is given rather than asking again.
+ * The date kinds are cut here, in the server's zone: a group is what a client asks for again, so
+ * the boundaries have to be the ones both sides agree on. What a group is *called* -- "today", a
+ * month name -- is the client's, the key is only the stretch. See [groupKey] for what each one is.
  */
 enum class MailGroupingKind(val wire: String) {
     DATE_SMART("date_smart"),

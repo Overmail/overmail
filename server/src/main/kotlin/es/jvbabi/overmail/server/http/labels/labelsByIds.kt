@@ -24,6 +24,19 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.labelsByIds() {
     authenticate {
+        /**
+         * Look up labels by id.
+         *
+         * Description: Unknown, malformed and foreign ids are left out of the answer rather than failing it; at most 100 ids are read.
+         *
+         * Tag: Labels
+         *
+         * Query parameters:
+         *   - ids [String] Comma-separated label ids
+         *
+         * Responses:
+         *   - 200 [LabelsResponse] The labels among them that are the current user's
+         */
         get {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(LabelsResponse(emptyList()))

@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -37,6 +38,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.deleteInbox() {
     authenticate {
+        /**
+         * Disconnect an inbox.
+         *
+         * Description: Every mail imported through it is deleted with it.
+         *
+         * Tag: Inboxes
+         *
+         * Responses:
+         *   - 200 [DeleteInboxResponse] How many mails were deleted
+         */
         delete {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
@@ -77,6 +88,6 @@ fun Route.deleteInbox() {
 
 @Serializable
 private data class DeleteInboxResponse(
-    /** How many mails went with the mailbox. */
+    @JsonSchema.Description("How many mails were deleted with the inbox")
     @SerialName("deleted_emails") val deletedEmails: Long,
 )

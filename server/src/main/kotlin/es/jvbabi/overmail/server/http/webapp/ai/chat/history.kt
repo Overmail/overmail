@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.api.requireOwnedChatFromUrl
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -36,6 +37,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.chatHistory() {
     authenticate {
+        /**
+         * Get every message of a chat.
+         *
+         * Description: Oldest first. What a question referenced comes back resolved; a reference that no longer resolves keeps only its id.
+         *
+         * Tag: Assistant
+         *
+         * Responses:
+         *   - 200 [ChatHistoryResponse] The messages
+         */
         get {
             val chat = call.requireOwnedChatFromUrl()
             val userId = call.requireAuthenticatedUserId()
@@ -182,6 +193,7 @@ private sealed class ChatHistoryMessage {
     @SerialName("user")
     data class User(
         @SerialName("id") val id: Uuid,
+        @JsonSchema.Description("When it was written, in whole seconds since the epoch")
         @SerialName("created_at") val createdAt: Long,
         @SerialName("content") val content: List<ChatHistorySegment>,
     ) : ChatHistoryMessage()
@@ -190,10 +202,12 @@ private sealed class ChatHistoryMessage {
     @SerialName("assistant")
     data class Assistant(
         @SerialName("id") val id: Uuid,
+        @JsonSchema.Description("When it was written, in whole seconds since the epoch")
         @SerialName("created_at") val createdAt: Long,
+        @JsonSchema.Description("Whether the answer is still being written")
         @SerialName("pending") val pending: Boolean,
         @SerialName("content") val content: String,
-        /** Tokens the model reported for this answer; still growing while it is pending. */
+        @JsonSchema.Description("Tokens the model reported for the answer; still growing while it is pending")
         @SerialName("tokens_output") val tokensOutput: Int,
     ) : ChatHistoryMessage()
 }
@@ -211,7 +225,7 @@ private sealed class ChatHistorySegment {
         @SerialName("id") val id: Uuid,
         @SerialName("subject") val subject: String?,
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
     ) : ChatHistorySegment()
 
@@ -230,7 +244,7 @@ private sealed class ChatHistorySegment {
         @SerialName("address") val address: String?,
         @SerialName("name") val name: String?,
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
     ) : ChatHistorySegment()
 }

@@ -5,6 +5,7 @@ import es.jvbabi.overmail.core.ImapCommandException
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -42,6 +43,19 @@ private val LOGIN_TIMEOUT = 15.seconds
  */
 fun Route.testImapLogin() {
     authenticate {
+        /**
+         * Check whether IMAP credentials work.
+         *
+         * Description: Logs in and out again; nothing is stored. A rejected login is an `outcome`, not an error status.
+         *
+         * Tag: Setup
+         *
+         * Body: [ImapLoginTestRequest] The connection
+         *
+         * Responses:
+         *   - 200 [ImapLoginTestResponse] How the login went
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, or an invalid port
+         */
         post {
             call.requireAuthenticatedUser()
             val request = call.receive<ImapLoginTestRequest>()
@@ -127,8 +141,8 @@ internal data class ImapLoginTestRequest(
 
 @Serializable
 internal data class ImapLoginTestResponse(
-    /** The one field a client that only wants to enable its "next" button reads. */
+    @JsonSchema.Description("Whether the server accepted the login")
     @SerialName("authenticated") val authenticated: Boolean,
-    /** Which outcome it was, see [ImapLoginTestOutcome]. */
+    @JsonSchema.Description("`authenticated`, `invalid_credentials`, `connection_failed` or `timeout`")
     @SerialName("outcome") val outcome: String,
 )

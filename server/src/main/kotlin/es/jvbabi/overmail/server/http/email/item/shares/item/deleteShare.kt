@@ -25,6 +25,17 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
  */
 fun Route.deleteShare() {
     authenticate {
+        /**
+         * Delete a share link.
+         *
+         * Description: The link stops working for good; the mail is untouched.
+         *
+         * Tag: Shares
+         *
+         * Responses:
+         *   - 204 The share is deleted
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail, or no such share of it
+         */
         delete {
             val emailId = call.requireOwnedEmailIdFromUrl()
             val shareId = shareIdFromPath(call.parameters["shareId"])

@@ -11,6 +11,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.api.requireThat
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -42,6 +43,20 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.inboxSubmitRoute() {
     authenticate {
+        /**
+         * Create an inbox.
+         *
+         * Description: The last step of the setup dialog. `newest_messages` is resolved to a date before it is stored; the importer starts afterwards.
+         *
+         * Tag: Setup
+         *
+         * Body: [SubmitInboxRequest] The inbox
+         *
+         * Responses:
+         *   - 201 [SubmitInboxResponse] The new inbox
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, or no folders or one listed twice
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user has an inbox with the same host, port and username
+         */
         post {
             val database = call.database()
             val importerManager = call.application.dependencies.resolve<ImporterManager>()
@@ -157,6 +172,7 @@ private fun SubmitInboxRequest.FolderSettings.AiImportSettings.stored(
 @Serializable
 private data class SubmitInboxRequest(
     @SerialName("imap") val imap: Imap,
+    @JsonSchema.Description("Every folder to sync")
     @SerialName("folder_settings") val folderSettings: List<FolderSettings>,
 ) {
     @Serializable
@@ -170,8 +186,9 @@ private data class SubmitInboxRequest(
     @Serializable
     data class FolderSettings(
         @SerialName("folder_name") val folderName: String,
-        /** Whether the folder is watched over an open connection rather than only polled. */
+        @JsonSchema.Description("Whether the folder is watched over an open connection rather than only polled")
         @SerialName("imap_push") val imapPush: Boolean,
+        @JsonSchema.Description("Which of its mails the assistant classifies")
         @SerialName("ai_import") val aiImport: AiImportSettings,
     ) {
         @Serializable
@@ -186,6 +203,7 @@ private data class SubmitInboxRequest(
 
             @Serializable
             @SerialName("after_date")
+            @JsonSchema.Description("In whole seconds since the epoch")
             data class AfterDate(@SerialName("timestamp") val timestamp: Long) : AiImportSettings()
 
             /**
@@ -195,6 +213,7 @@ private data class SubmitInboxRequest(
              */
             @Serializable
             @SerialName("newest_messages")
+            @JsonSchema.Description("How many of the newest mails of the folder")
             data class NewestMessages(@SerialName("count") val count: Int) : AiImportSettings()
         }
     }
@@ -202,6 +221,6 @@ private data class SubmitInboxRequest(
 
 @Serializable
 private data class SubmitInboxResponse(
-    /** The account that was created; what a client would ask about it under. */
+    @JsonSchema.Description("The new inbox")
     @SerialName("id") val id: Uuid,
 )

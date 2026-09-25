@@ -33,6 +33,16 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
  */
 fun Route.deleteView() {
     authenticate {
+        /**
+         * Delete a view.
+         *
+         * Description: Only the view; no mail is touched.
+         *
+         * Tag: Views
+         *
+         * Responses:
+         *   - 204 The view is deleted
+         */
         delete {
             val userId = call.requireAuthenticatedUserId()
             val viewId = viewIdFromPath(call.parameters["viewId"])

@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.lookUpNthNewestDates
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
 import io.ktor.server.plugins.di.dependencies
@@ -46,6 +47,20 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.updateInbox() {
     authenticate {
+        /**
+         * Save an inbox.
+         *
+         * Description: The connection and the complete folder settings; a folder left out stops syncing. An empty password keeps the stored one. The importer restarts afterwards.
+         *
+         * Tag: Inboxes
+         *
+         * Body: [UpdateInboxRequest] The inbox
+         *
+         * Responses:
+         *   - 200 [UpdateInboxResponse] The inbox is saved
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, or no folders or one listed twice
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Another inbox of the user has the same host, port and username
+         */
         put {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
@@ -166,6 +181,7 @@ private fun UpdateInboxRequest.FolderSettings.WireAiScope.stored(
 @Serializable
 internal data class UpdateInboxRequest(
     @SerialName("imap") val imap: Imap,
+    @JsonSchema.Description("Every folder to sync; one left out stops syncing")
     @SerialName("folder_settings") val folderSettings: List<FolderSettings>,
 ) {
     @Serializable
@@ -173,14 +189,16 @@ internal data class UpdateInboxRequest(
         @SerialName("host") val host: String,
         @SerialName("port") val port: Int,
         @SerialName("username") val username: String,
-        /** Empty keeps the stored one; the screen never receives it to send back. */
+        @JsonSchema.Description("Empty keeps the stored one")
         @SerialName("password") val password: String = "",
     )
 
     @Serializable
     data class FolderSettings(
         @SerialName("folder_name") val folderName: String,
+        @JsonSchema.Description("Whether the folder is watched over an open connection rather than only polled")
         @SerialName("imap_push") val imapPush: Boolean,
+        @JsonSchema.Description("Which of its mails the assistant classifies")
         @SerialName("ai_import") val aiImport: WireAiScope,
     ) {
         /**
@@ -191,8 +209,11 @@ internal data class UpdateInboxRequest(
          */
         @Serializable
         data class WireAiScope(
+            @JsonSchema.Description("`only_new_messages`, `all_messages`, `after_date` or `newest_messages`")
             @SerialName("type") val type: String,
+            @JsonSchema.Description("The date for `after_date`, in whole seconds since the epoch")
             @SerialName("timestamp") val timestamp: Long? = null,
+            @JsonSchema.Description("How many of the newest mails, for `newest_messages`")
             @SerialName("count") val count: Int? = null,
         )
     }

@@ -30,6 +30,16 @@ private val json = Json { encodeDefaults = true }
  */
 fun Route.chatMessageStream() {
     authenticate {
+        /**
+         * Follow an answer as it is written.
+         *
+         * Description: Server-sent events. A `snapshot` of the text so far first, then `content` chunks and `usage`, and `done` at the end. A finished answer is a snapshot and `done`.
+         *
+         * Tag: Assistant
+         *
+         * Responses:
+         *   - 200 text/event-stream [StreamEvent] The events
+         */
         sse {
             // The api's error payload has nowhere to go once an EventSource is open, and closing
             // without `done` leaves the client reconnecting every second -- so a message it may not

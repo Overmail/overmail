@@ -16,8 +16,13 @@ ktor {
 
     // Compiler plugin: feeds route metadata (types, KDoc) into the runtime, which is what lets
     // the spec be assembled from the routing tree instead of a hand-written openapi file.
+    //
+    // Only what the KDoc says, no inference from the handler body: that one adds every parameter a
+    // second time next to the documented one, types numbers read through a helper as strings and
+    // lists the Authorization header the session provider reads as a parameter of every route.
     openApi {
         enabled = true
+        codeInferenceEnabled = false
     }
 }
 

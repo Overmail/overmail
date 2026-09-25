@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.FuzzyMatchResult
 import es.jvbabi.overmail.server.util.detailedFuzzyContains
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -133,8 +134,28 @@ private fun matchable(text: String, ranges: List<IntRange>) = EmailSearchRespons
     },
 )
 
+/**
+ * The quick search: `GET /api/emails/search?query=rechnung`.
+ *
+ * Over subject and sender only, fuzzy, and answered with the hits marked so the client can
+ * highlight them. Every candidate is matched in Kotlin rather than in the database, so this reads
+ * every mail of the user once -- fine for a search box, not for a full-text search.
+ */
 fun Route.emailSearch() {
     authenticate {
+        /**
+         * Search mails by subject and sender.
+         *
+         * Description: Fuzzy, every word of the query has to hit the subject, the sender's name or their address. The ten best matches with the hits marked; without a query the ten newest mails. Spam is left out.
+         *
+         * Tag: Listing
+         *
+         * Query parameters:
+         *   - query [String] What to search for
+         *
+         * Responses:
+         *   - 200 [EmailSearchResponse] The matches, best first
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
             val query = call.queryParameter("query").orEmpty()
@@ -222,10 +243,13 @@ private data class EmailSearchResponse(
         @SerialName("id") val id: Uuid,
         @SerialName("subject") val subject: MatchableString,
         @SerialName("from") val from: From,
+        @JsonSchema.Description("Where the picture of the sender is; null when there is none")
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
+        @JsonSchema.Description("The recipients, by name where the mail gave one")
         @SerialName("to") val to: List<String>,
+        @JsonSchema.Description("When it was sent, as ISO-8601")
         @SerialName("date") val date: String
     ) {
         @Serializable
@@ -241,7 +265,9 @@ private data class EmailSearchResponse(
         ) {
             @Serializable
             data class Match(
+                @JsonSchema.Description("Where a hit starts, in characters")
                 @SerialName("start") val start: Int,
+                @JsonSchema.Description("Where it ends, exclusive")
                 @SerialName("end") val end: Int
             )
         }

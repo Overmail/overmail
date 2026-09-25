@@ -30,6 +30,18 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
  */
 fun Route.attachEmailLabel() {
     authenticate {
+        /**
+         * Put a label on a mail.
+         *
+         * Description: Idempotent, a mail that already carries the label answers the same.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 204 The mail carries the label
+         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The mail or the label is somebody else's
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail or label
+         */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
             val userId = call.requireAuthenticatedUserId()
@@ -48,6 +60,18 @@ fun Route.attachEmailLabel() {
 
 fun Route.detachEmailLabel() {
     authenticate {
+        /**
+         * Take a label off a mail.
+         *
+         * Description: Idempotent, a mail that does not carry the label answers the same.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 204 The mail does not carry the label
+         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The mail or the label is somebody else's
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail or label
+         */
         delete {
             val mailNotifier = call.dependency<MailNotifier>()
             val userId = call.requireAuthenticatedUserId()

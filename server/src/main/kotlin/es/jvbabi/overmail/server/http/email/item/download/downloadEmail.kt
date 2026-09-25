@@ -23,6 +23,16 @@ import kotlinx.datetime.toLocalDateTime
  */
 fun Route.downloadEmail() {
     authenticate {
+        /**
+         * Download the source of a mail.
+         *
+         * Description: The RFC 5322 source as it arrived, as an `.eml` attachment named after the day it was sent and its subject.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 200 message/rfc822 The source
+         */
         get {
             val email = call.requireOwnedEmailFromUrl()
 

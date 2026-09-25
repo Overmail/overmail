@@ -25,6 +25,14 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.setEmailRead(isRead: Boolean) {
     authenticate {
+        /**
+         * Description: Idempotent, a mail that is already in that state answers the same.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 204 The mail is in that state
+         */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
             val userId = call.requireAuthenticatedUserId()

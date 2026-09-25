@@ -11,6 +11,7 @@ import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -45,6 +46,19 @@ private val COLOR = Regex("^#[0-9a-fA-F]{6}$")
  */
 fun Route.createLabel() {
     authenticate {
+        /**
+         * Create a label.
+         *
+         * Description: A label of the same name, ignoring case, is answered instead of creating a second one. Without a color the name picks one. `attach_to_email_ids` puts the label on those of the user's mails.
+         *
+         * Tag: Labels
+         *
+         * Body: [CreateLabelRequest] The label
+         *
+         * Responses:
+         *   - 200 [CreateLabelResponse] The new label, or the one of that name that was there
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank name, or a color that is not `#rrggbb`
+         */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
             val user = call.requireAuthenticatedUser()
@@ -99,8 +113,9 @@ fun Route.createLabel() {
 @Serializable
 data class CreateLabelRequest(
     @SerialName("name") val name: String,
-    /** Null for "pick one": see [Label.defaultColorFor]. */
+    @JsonSchema.Description("`#rrggbb`; null picks one from the name")
     @SerialName("color") val color: String? = null,
+    @JsonSchema.Description("Mails of the user to put the label on right away")
     @SerialName("attach_to_email_ids") val attachToEmailIds: List<Uuid> = emptyList(),
 )
 

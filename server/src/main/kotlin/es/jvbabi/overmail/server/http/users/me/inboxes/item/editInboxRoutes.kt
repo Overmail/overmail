@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.scanMailbo
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.probeImapLogin
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -37,6 +38,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.getInbox() {
     authenticate {
+        /**
+         * Get an inbox with its folder settings.
+         *
+         * Description: What the edit screen opens on. Never with the password.
+         *
+         * Tag: Inboxes
+         *
+         * Responses:
+         *   - 200 [InboxDetailResponse] The inbox
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
@@ -83,6 +94,19 @@ fun Route.getInbox() {
  */
 fun Route.testInboxLogin() {
     authenticate {
+        /**
+         * Check a login for an existing inbox.
+         *
+         * Description: The login check of the setup dialog; an empty password checks the stored one. A rejected login is an `outcome`, not an error status.
+         *
+         * Tag: Inboxes
+         *
+         * Body: [EditInboxConnectionRequest] The connection as the form holds it
+         *
+         * Responses:
+         *   - 200 [es.jvbabi.overmail.server.http.users.me.inboxes.create.test.ImapLoginTestResponse] How the login went
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, or an invalid port
+         */
         post {
             val userId = call.requireAuthenticatedUserId()
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
@@ -115,6 +139,19 @@ fun Route.testInboxLogin() {
  */
 fun Route.streamInboxFoldersForInbox() {
     authenticate {
+        /**
+         * Scan the folders of an existing inbox.
+         *
+         * Description: The folder scan of the setup dialog, as server-sent events; an empty password uses the stored one.
+         *
+         * Tag: Inboxes
+         *
+         * Body: [EditInboxConnectionRequest] The connection as the form holds it
+         *
+         * Responses:
+         *   - 200 text/event-stream [es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.FolderStreamEvent] `folders` first, then `stats` per folder, then `done` -- or `error`
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, or an invalid port
+         */
         post {
             val userId = call.requireAuthenticatedUserId()
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
@@ -148,6 +185,7 @@ internal data class EditInboxConnectionRequest(
     @SerialName("host") val host: String,
     @SerialName("port") val port: Int,
     @SerialName("username") val username: String,
+    @JsonSchema.Description("Empty uses the stored one")
     @SerialName("password") val password: String = "",
 )
 
@@ -163,15 +201,18 @@ internal data class InboxDetailResponse(
     @Serializable
     data class FolderSetting(
         @SerialName("folder_name") val folderName: String,
+        @JsonSchema.Description("Whether the folder is watched over an open connection rather than only polled")
         @SerialName("imap_push") val imapPush: Boolean,
+        @JsonSchema.Description("Which of its mails the assistant classifies")
         @SerialName("ai_import") val aiImport: WireAiScope,
     )
 
     /** The stored scope in the shape the client sends it back in, so one type serves both ways. */
     @Serializable
     data class WireAiScope(
+        @JsonSchema.Description("`only_new_messages`, `all_messages` or `after_date`")
         @SerialName("type") val type: String,
-        /** Seconds since the epoch; only set for `after_date`. */
+        @JsonSchema.Description("The date for `after_date`, in whole seconds since the epoch")
         @SerialName("timestamp") val timestamp: Long? = null,
     )
 }

@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -41,6 +42,16 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.createView() {
     authenticate {
+        /**
+         * Create a view.
+         *
+         * Description: No body. The view starts out grouped by date with nothing filtered, and is named in the user's interface language.
+         *
+         * Tag: Views
+         *
+         * Responses:
+         *   - 201 [CreatedViewResponse] The new view
+         */
         post {
             val userId = call.requireAuthenticatedUserId()
 
@@ -100,9 +111,9 @@ fun Route.createView() {
 @Serializable
 private data class CreatedViewResponse(
     @SerialName("id") val id: Uuid,
-    /** Generated, see [nextViewName] -- the caller did not choose it and has to be told. */
+    @JsonSchema.Description("Generated, in the interface language of the user")
     @SerialName("name") val name: String,
     @SerialName("view") val view: ViewSettings,
-    /** Where the row goes in the list, see [viewSortKeyAfter] -- generated as well. */
+    @JsonSchema.Description("Where the view sits in the list; views are ordered by it as a string")
     @SerialName("sort_key") val sortKey: String,
 )

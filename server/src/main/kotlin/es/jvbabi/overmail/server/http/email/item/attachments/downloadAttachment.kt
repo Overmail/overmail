@@ -22,6 +22,17 @@ import kotlin.uuid.Uuid
  */
 fun Route.downloadAttachment() {
     authenticate {
+        /**
+         * Download an attachment of a mail.
+         *
+         * Description: In the type the sender declared, and always as an attachment, so a browser never renders it in place.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 200 application/octet-stream The attachment
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such mail, or no such attachment on it
+         */
         get {
             val emailId = call.requireOwnedEmailIdFromUrl()
             // Spelled out rather than through idFromUrl, see the openapi plugin note in http/api/.

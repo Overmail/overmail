@@ -28,6 +28,27 @@ import io.ktor.server.routing.get
  */
 fun Route.emailListIds() {
     authenticate {
+        /**
+         * Get every mail id of one group.
+         *
+         * Description: What selecting a whole group needs. Fewer keys than `by` has levels name a group further up. Newest first and at most 10000 ids; `total` says when the answer was cut. A filter parameter that is absent restricts nothing; one that is present but empty lets nothing through.
+         *
+         * Tag: Listing
+         *
+         * Query parameters:
+         *   - by [String] Comma-separated groupings, outermost first: `date_smart`, `year`, `month`, `day`, `sender`, `imap_account`, `read`, `archived`
+         *   - group [String] Comma-separated keys of one group, outermost first, as `/api/emails/list/groups` answered them
+         *   - archived_state [String] Comma-separated states that pass: `Archive`, `Unarchive`, `Spam`
+         *   - read_state [Boolean] `true` for read mails only, `false` for unread ones only
+         *   - imap_account_ids [String] Comma-separated ids of the inboxes the mails came in through
+         *   - sent_by [String] Comma-separated sender ids; `self` stands for the user's own addresses
+         *   - sent_to [String] Comma-separated recipient ids; `self` stands for the user's own addresses
+         *   - has_labels [String] Comma-separated label ids; a mail has to carry at least one of them
+         *
+         * Responses:
+         *   - 200 [EmailIdsResponse] The ids
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A parameter that cannot be read
+         */
         get {
             val parameters = call.request.queryParameters
             val groupings = mailGroupings(parameters)

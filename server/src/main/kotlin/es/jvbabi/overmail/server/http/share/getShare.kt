@@ -13,6 +13,16 @@ import io.ktor.server.routing.get
  * the same answer with the password typed in.
  */
 fun Route.getShare() {
+    /**
+     * Open a share link.
+     *
+     * Description: As much as is visible without a password. The whole mail for a link without one, `metadata` where the owner allowed it, otherwise only `needs_password` and who shared it.
+     *
+     * Tag: Public
+     *
+     * Responses:
+     *   - 200 [SharedEmailResponse] The shared mail
+     */
     get {
         val share = call.requireLiveShareFromUrl()
         // A link without a password is open to whoever has it; there is nothing to type.

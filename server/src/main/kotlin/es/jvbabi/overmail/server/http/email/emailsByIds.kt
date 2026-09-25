@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.http.api.requestedIds
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -32,6 +33,19 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.emailsByIds() {
     authenticate {
+        /**
+         * Look up mails by id.
+         *
+         * Description: What a client-side cache asks for the ids it lacks. Unknown, malformed and foreign ids are left out of the answer rather than failing it; at most 100 ids are read.
+         *
+         * Tag: Emails
+         *
+         * Query parameters:
+         *   - ids [String] Comma-separated mail ids
+         *
+         * Responses:
+         *   - 200 [EmailsResponse] The mails among them that exist and are the current user's
+         */
         get {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(EmailsResponse(emptyList()))
@@ -85,12 +99,14 @@ private data class EmailsResponse(
         @SerialName("id") val id: Uuid,
         @SerialName("subject") val subject: String,
         @SerialName("sender_id") val senderId: Uuid,
-        /** Display name from this mail's header, absent for a bare address. */
+        @JsonSchema.Description("Display name from the header of the mail; null for a bare address")
         @SerialName("sender_name") val senderName: String?,
         @SerialName("sender_address") val senderAddress: String,
+        @JsonSchema.Description("Where the picture of the sender is; null when there is none")
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
+        @JsonSchema.Description("When it was sent, in whole seconds since the epoch")
         @SerialName("sent") val sent: Long,
         @SerialName("is_read") val isRead: Boolean,
     )

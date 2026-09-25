@@ -23,6 +23,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.getShares() {
     authenticate {
+        /**
+         * List the share links of a mail.
+         *
+         * Description: Expired links included, newest first.
+         *
+         * Tag: Shares
+         *
+         * Responses:
+         *   - 200 [SharesResponse] The share links
+         */
         get {
             val emailId = call.requireOwnedEmailIdFromUrl()
 

@@ -10,6 +10,7 @@ import io.ktor.network.sockets.aSocket
 import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.network.tls.tls
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -54,6 +55,19 @@ private val PROBE_TIMEOUT = 5.seconds
  */
 fun Route.testImapHost() {
     authenticate {
+        /**
+         * Check whether an IMAP server answers at a host and port.
+         *
+         * Description: A TLS handshake and the server's greeting, no login. A server that does not answer is an `outcome`, not an error status.
+         *
+         * Tag: Setup
+         *
+         * Body: [ImapHostTestRequest] The host and port
+         *
+         * Responses:
+         *   - 200 [ImapHostTestResponse] What answered
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or an invalid port
+         */
         post {
             call.requireAuthenticatedUser()
             val request = call.receive<ImapHostTestRequest>()
@@ -245,10 +259,10 @@ internal data class ImapHostTestRequest(
 
 @Serializable
 internal data class ImapHostTestResponse(
-    /** The one field a client that only wants a green tick reads. */
+    @JsonSchema.Description("Whether an IMAP server answered")
     @SerialName("reachable") val reachable: Boolean,
-    /** Which outcome it was, see [ImapHostTestOutcome]. */
+    @JsonSchema.Description("`reachable`, `host_not_found`, `connection_failed`, `tls_failed`, `no_imap_server` or `timeout`")
     @SerialName("outcome") val outcome: String,
-    /** What the server answered `CAPABILITY` with; empty unless [reachable]. */
+    @JsonSchema.Description("What the server answered `CAPABILITY` with; empty unless it was reachable")
     @SerialName("capabilities") val capabilities: List<String> = emptyList(),
 )

@@ -34,6 +34,17 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.setEmailsRead(isRead: Boolean) {
     authenticate {
+        /**
+         * Description: Idempotent. Mails that are already in that state, are somebody else's or do not exist are skipped without an error.
+         *
+         * Tag: Emails
+         *
+         * Body: [BulkEmailsRequest] The mails, at most 500
+         *
+         * Responses:
+         *   - 200 [BulkEmailsResponse] How many of them changed
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] More than 500 ids
+         */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
             val userId = call.requireAuthenticatedUserId()

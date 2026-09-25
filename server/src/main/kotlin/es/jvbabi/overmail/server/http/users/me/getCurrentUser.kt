@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.CacheControl
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.cacheControl
 import io.ktor.server.response.respond
@@ -31,6 +32,16 @@ private val CURRENT_USER_CACHE_DURATION = 5.minutes
  */
 fun Route.getCurrentUser() {
     authenticate {
+        /**
+         * Get the current user.
+         *
+         * Description: With every address they receive mail under. Cached privately for five minutes.
+         *
+         * Tag: Account
+         *
+         * Responses:
+         *   - 200 [CurrentUserResponse] The user
+         */
         get {
             val user = call.requireAuthenticatedUser()
 
@@ -76,15 +87,12 @@ fun Route.getCurrentUser() {
 @Serializable
 private data class CurrentUserResponse(
     @SerialName("id") val id: Uuid,
-    /** What they sign in with, next to their address. */
+    @JsonSchema.Description("What they sign in with, next to their address")
     @SerialName("username") val username: String,
     @SerialName("firstname") val firstname: String,
     @SerialName("lastname") val lastname: String,
-    /** The address of the account, as they wrote it. */
+    @JsonSchema.Description("The address of the account, as they wrote it")
     @SerialName("email") val email: String,
-    /**
-     * Every address this user receives mail under, lowercase: what a screen compares the
-     * recipients of a mail against to find the reader among them.
-     */
+    @JsonSchema.Description("Every address they receive mail under, lowercase")
     @SerialName("addresses") val addresses: List<String>,
 )

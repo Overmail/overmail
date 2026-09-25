@@ -10,6 +10,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.encodeURLParameter
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respondBytes
@@ -32,6 +33,20 @@ import kotlin.uuid.Uuid
  * not this mail's.
  */
 fun Route.downloadSharedAttachment() {
+    /**
+     * Download an attachment of a shared mail.
+     *
+     * Description: A POST so the password travels in the body rather than in the url. Only shares made with their attachments have any.
+     *
+     * Tag: Public
+     *
+     * Body: [DownloadSharedAttachmentRequest] The password, for a share that has one
+     *
+     * Responses:
+     *   - 200 application/octet-stream The attachment
+     *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Not the password of this share
+     *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such share or attachment, or the share was made without attachments
+     */
     post {
         val share = call.requireLiveShareFromUrl()
         val request = call.receive<DownloadSharedAttachmentRequest>()
@@ -80,6 +95,6 @@ fun Route.downloadSharedAttachment() {
 
 @Serializable
 private data class DownloadSharedAttachmentRequest(
-    /** What the visitor typed to open the share. Left out for a share without a password. */
+    @JsonSchema.Description("The password of the share; left out for a share without one")
     @SerialName("password") val password: String? = null,
 )

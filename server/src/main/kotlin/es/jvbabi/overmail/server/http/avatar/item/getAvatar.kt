@@ -23,6 +23,21 @@ private val AVATAR_CACHE_DURATION = 365.days
  */
 fun Route.getAvatar() {
     authenticate {
+        /**
+         * Download the picture of a correspondent.
+         *
+         * Description: Cached privately for a year. A changed picture gets a new id, so the url of one never goes stale.
+         *
+         * Tag: Avatars
+         *
+         * Responses:
+         *   - 200 image/png The picture, as png
+         *   - 200 image/jpeg The picture, as jpeg
+         *   - 200 image/gif The picture, as gif
+         *   - 200 image/webp The picture, as webp
+         *   - 200 image/svg+xml The picture, as svg
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such picture
+         */
         get {
             val image = call.requireAvatarFromUrl().data
 

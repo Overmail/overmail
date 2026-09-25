@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.http.api.intQueryParameter
 import es.jvbabi.overmail.server.http.api.queryParameter
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.util.fuzzyContains
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -27,6 +28,20 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.labelSearch() {
     authenticate {
+        /**
+         * Search the labels of the current user.
+         *
+         * Description: Fuzzy on the name, most used first.
+         *
+         * Tag: Labels
+         *
+         * Query parameters:
+         *   - query [String] What the name has to contain
+         *   - limit [Int] How many labels to answer; defaults to 10 without a query and to every match with one
+         *
+         * Responses:
+         *   - 200 [LabelSearchResponse] The labels
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
             val query = call.queryParameter("query").orEmpty()
@@ -82,8 +97,11 @@ private data class LabelSearchResponse(
         @SerialName("name") val name: String,
         @SerialName("color") val color: String,
         @SerialName("description") val description: String?,
+        @JsonSchema.Description("When it was created, in whole seconds since the epoch")
         @SerialName("created_at") val createdAt: Long,
+        @JsonSchema.Description("Whether the assistant created it")
         @SerialName("created_by_agent") val createdByAgent: Boolean,
+        @JsonSchema.Description("How many of the user's mails carry it")
         @SerialName("email_count") val emailCount: Long,
     )
 }

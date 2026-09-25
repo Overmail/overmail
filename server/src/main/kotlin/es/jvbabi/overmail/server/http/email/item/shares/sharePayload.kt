@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.http.email.item.shares
 
 import es.jvbabi.overmail.server.database.models.Shares
+import io.ktor.openapi.JsonSchema
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -18,18 +19,21 @@ import org.jetbrains.exposed.v1.core.ResultRow
  */
 @Serializable
 data class SharePayload(
-    /** What the link is built from. */
+    @JsonSchema.Description("What the link is built from")
     @SerialName("id") val id: Uuid,
-    /** What the owner called this share, to tell their own links apart. Optional. */
+    @JsonSchema.Description("What the owner called the share; null for none")
     @SerialName("share_name") val shareName: String?,
+    @JsonSchema.Description("When the share was made, in whole seconds since the epoch")
     @SerialName("shared_at") val sharedAt: Long,
-    /** When the link stops working, or null for one that does not run out. */
+    @JsonSchema.Description("When the link stops working, in whole seconds since the epoch; null for never")
     @SerialName("valid_until") val validUntil: Long?,
+    @JsonSchema.Description("Whether a visitor sees the labels of the mail")
     @SerialName("include_labels") val includeLabels: Boolean,
-    /** Whether a visitor sees the attachments and can download them. */
+    @JsonSchema.Description("Whether a visitor sees the attachments and can download them")
     @SerialName("include_attachments") val includeAttachments: Boolean,
+    @JsonSchema.Description("Whether a visitor is asked for a password")
     @SerialName("has_password") val hasPassword: Boolean,
-    /** Whether subject, sender and date are shown before the password is entered. */
+    @JsonSchema.Description("Whether subject, sender and date are shown before the password is entered")
     @SerialName("allow_metadata_without_password") val allowMetadataWithoutPassword: Boolean,
 )
 

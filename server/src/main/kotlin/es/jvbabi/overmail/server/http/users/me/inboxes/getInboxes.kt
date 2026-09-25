@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -28,6 +29,16 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
  */
 fun Route.getInboxes() {
     authenticate {
+        /**
+         * List the connected inboxes.
+         *
+         * Description: By login, with the synced folders and how many mails were imported. Never with the password.
+         *
+         * Tag: Inboxes
+         *
+         * Responses:
+         *   - 200 [InboxesResponse] The inboxes
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
 
@@ -94,13 +105,13 @@ private data class InboxesResponse(
         @SerialName("id") val id: Uuid,
         @SerialName("host") val host: String,
         @SerialName("port") val port: Int,
-        /** The imap login, which for most providers is the address itself. */
+        @JsonSchema.Description("The IMAP login, for most providers the address itself")
         @SerialName("username") val username: String,
-        /** Whether the importer for it is switched off; nothing imported is affected by that. */
+        @JsonSchema.Description("Whether its importer is switched off; nothing imported is affected by that")
         @SerialName("is_paused") val isPaused: Boolean,
-        /** The folders being synced, by name, alphabetically. */
+        @JsonSchema.Description("The synced folders by name, alphabetically")
         @SerialName("folders") val folders: List<String>,
-        /** How many mails were imported through it -- what deleting it would take with it. */
+        @JsonSchema.Description("How many mails were imported through it, which deleting it deletes")
         @SerialName("email_count") val emailCount: Long,
     )
 }

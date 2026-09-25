@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -55,6 +56,20 @@ private const val NAME_LIMIT = 255
  */
 fun Route.updateView() {
     authenticate {
+        /**
+         * Change a view.
+         *
+         * Description: Only what the body names changes. `view` replaces the settings as a whole; `position` moves the view behind `after_view_id`, or to the top for null.
+         *
+         * Tag: Views
+         *
+         * Body: [UpdateViewRequest] What to change
+         *
+         * Responses:
+         *   - 200 [UpdatedViewResponse] The view
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A body that changes nothing, a blank or too long name, or a view placed behind itself
+         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such view, or `after_view_id` names none of the user's views
+         */
         patch {
             val userId = call.requireAuthenticatedUserId()
             val viewId = viewIdFromPath(call.parameters["viewId"])
@@ -123,14 +138,11 @@ fun Route.updateView() {
 
 @Serializable
 private data class UpdateViewRequest(
-    /** Trimmed before it is written. Absent leaves the name alone; blank is refused. */
+    @JsonSchema.Description("The new name, trimmed; absent keeps the name, blank is refused")
     @SerialName("name") val name: String? = null,
-    /**
-     * The whole settings object, not a change to it -- there is nothing in it to address. Absent
-     * leaves the settings alone; present replaces them, filter included, see above.
-     */
+    @JsonSchema.Description("The whole settings; absent keeps them, present replaces them, filter included")
     @SerialName("view") val view: ViewSettings? = null,
-    /** Absent leaves the view where it is; see [Position] for what null inside it means. */
+    @JsonSchema.Description("Where to move the view; absent leaves it where it is")
     @SerialName("position") val position: Position? = null,
 ) {
     @Serializable
@@ -142,6 +154,7 @@ private data class UpdateViewRequest(
          * this is a nested object: `"after_view_id": null` has to be able to mean "to the front"
          * rather than "no move asked for".
          */
+        @JsonSchema.Description("The view to go behind; null for the top of the list")
         @SerialName("after_view_id") val afterViewId: View.Id? = null,
     )
 }
@@ -150,7 +163,7 @@ private data class UpdateViewRequest(
 private data class UpdatedViewResponse(
     @SerialName("id") val id: View.Id,
     @SerialName("name") val name: String,
-    /** Worked out here for a move, so the caller does not have to guess where the row ended up. */
+    @JsonSchema.Description("Where the view sits in the list; views are ordered by it as a string")
     @SerialName("sort_key") val sortKey: String,
     @SerialName("view") val view: ViewSettings,
 )

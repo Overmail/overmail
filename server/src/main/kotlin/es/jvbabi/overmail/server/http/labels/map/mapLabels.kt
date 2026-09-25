@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -18,8 +19,24 @@ import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.uuid.Uuid
 
+/**
+ * How the labels hang together: `GET /api/labels/map`.
+ *
+ * Every label on at least one mail, and per other label how many of its mails carry that one too
+ * -- the edges of the graph the label map draws. Labels on no mail at all are not on the map.
+ */
 fun Route.mapLabels() {
     authenticate {
+        /**
+         * Get how the labels occur together.
+         *
+         * Description: Every label on at least one mail, with how many mails carry it and, per other label, how many of those carry that one too.
+         *
+         * Tag: Labels
+         *
+         * Responses:
+         *   - 200 [LabelMap] The labels and their relations
+         */
         get {
             val db = call.database()
             val user = call.requireAuthenticatedUser()
@@ -87,12 +104,15 @@ private data class LabelMap(
         @SerialName("id") val id: Uuid,
         @SerialName("name") val name: String,
         @SerialName("color") val color: String,
+        @JsonSchema.Description("How many mails carry it")
         @SerialName("email_count") val emailCount: Long,
+        @JsonSchema.Description("The other labels on its mails")
         @SerialName("relations") val relations: List<Relation>
     ) {
         @Serializable
         data class Relation(
             @SerialName("label_id") val labelId: Uuid,
+            @JsonSchema.Description("How many of its mails carry that label too")
             @SerialName("count") val count: Long,
         )
     }

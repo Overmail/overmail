@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.email.bulk
 
+import io.ktor.openapi.JsonSchema
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -17,12 +18,13 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class BulkEmailsRequest(
+    @JsonSchema.Description("The mails, at most 500")
     @SerialName("ids") val ids: List<Uuid> = emptyList(),
 )
 
 @Serializable
 data class BulkEmailsResponse(
-    /** How many mails this moved or flipped. The rest were already where the caller wanted them. */
+    @JsonSchema.Description("How many of them changed; the rest already were where they were asked to be")
     @SerialName("changed") val changed: Int,
 )
 

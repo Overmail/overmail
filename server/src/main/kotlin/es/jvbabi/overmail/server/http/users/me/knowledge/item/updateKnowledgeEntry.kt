@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.users.me.knowledge.readKnowledgeInput
 import es.jvbabi.overmail.server.http.users.me.knowledge.toKnowledgeEntryPayload
 import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -39,6 +40,20 @@ import org.jetbrains.exposed.v1.jdbc.update
  */
 fun Route.updateKnowledgeEntry() {
     authenticate {
+        /**
+         * Change a knowledge entry.
+         *
+         * Description: The whole entry is sent; a keyword left out is removed. Who wrote the entry stays as it was.
+         *
+         * Tag: Knowledge
+         *
+         * Body: [UpdateKnowledgeRequest] The entry
+         *
+         * Responses:
+         *   - 200 [es.jvbabi.overmail.server.http.users.me.knowledge.KnowledgeEntryPayload] The changed entry
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank or too long name, a blank description, or a `relevant_on` that is not a date
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Another entry has that name
+         */
         put {
             val userId = call.requireAuthenticatedUserId()
             val knowledgeId = knowledgeIdFromPath(call.parameters["knowledgeId"])
@@ -93,8 +108,8 @@ fun Route.updateKnowledgeEntry() {
 private data class UpdateKnowledgeRequest(
     @SerialName("name") val name: String,
     @SerialName("description") val description: String,
-    /** The complete list the screen is showing; anything left out is a keyword the user removed. */
+    @JsonSchema.Description("The complete list; a keyword left out is removed")
     @SerialName("keywords") val keywords: List<String> = emptyList(),
-    /** `YYYY-MM-DD`, or null to say this entry is not about a day. */
+    @JsonSchema.Description("`YYYY-MM-DD`, or null for an entry that is not about a day")
     @SerialName("relevant_on") val relevantOn: String? = null,
 )

@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -28,6 +29,16 @@ import kotlin.uuid.Uuid
  */
 fun Route.getSessions() {
     authenticate {
+        /**
+         * List the sessions of the current user.
+         *
+         * Description: Every session that was not revoked, newest first. `is_current_session` marks the caller's own.
+         *
+         * Tag: Sessions
+         *
+         * Responses:
+         *   - 200 [SessionsResponse] The sessions
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
             val currentToken = call.sessionToken()
@@ -61,6 +72,8 @@ private data class SessionsResponse(
 private data class SessionPayload(
     @SerialName("id") val id: Uuid,
     @SerialName("client") val client: Session.Client,
+    @JsonSchema.Description("When the session was issued, as ISO-8601")
     @SerialName("issued_at") val issuedAt: Instant,
+    @JsonSchema.Description("Whether it is the session this request came with")
     @SerialName("is_current_session") val isCurrentSession: Boolean,
 )

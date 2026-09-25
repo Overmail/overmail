@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.http.api.requestedIds
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -31,6 +32,19 @@ import org.jetbrains.exposed.v1.jdbc.select
  */
 fun Route.sendersByIds() {
     authenticate {
+        /**
+         * Look up senders by id.
+         *
+         * Description: Unknown, malformed and foreign ids are left out of the answer rather than failing it; at most 100 ids are read. The name is the newest one the sender used.
+         *
+         * Tag: Senders
+         *
+         * Query parameters:
+         *   - ids [String] Comma-separated sender ids
+         *
+         * Responses:
+         *   - 200 [SendersResponse] The senders among them that are in the user's address book
+         */
         get {
             val ids = call.requestedIds()
             if (ids.isEmpty()) return@get call.respond(SendersResponse(emptyList()))
@@ -79,11 +93,12 @@ private data class SendersResponse(
     @Serializable
     data class Sender(
         @SerialName("id") val id: Uuid,
-        /** Display name from their mails, absent when they only ever sent a bare address. */
+        @JsonSchema.Description("Display name from their newest mail; null when they only ever sent a bare address")
         @SerialName("name") val name: String?,
         @SerialName("address") val address: String,
+        @JsonSchema.Description("Where the picture of the sender is; null when there is none")
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
     )
 }

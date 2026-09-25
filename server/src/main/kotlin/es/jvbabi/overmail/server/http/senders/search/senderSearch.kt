@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import es.jvbabi.overmail.server.util.fuzzyContains
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -42,6 +43,20 @@ private data class SenderAvatar(val address: String, val url: String?, val paddi
  */
 fun Route.senderSearch() {
     authenticate {
+        /**
+         * Search the correspondents of the current user.
+         *
+         * Description: Fuzzy on the address and the name, the ones with the most mails first.
+         *
+         * Tag: Senders
+         *
+         * Query parameters:
+         *   - query [String] What the address or name has to contain
+         *   - limit [Int] How many senders to answer; defaults to 10
+         *
+         * Responses:
+         *   - 200 [SenderSearchResponse] The senders
+         */
         get {
             val userId = call.requireAuthenticatedUserId()
             val query = call.queryParameter("query").orEmpty()
@@ -119,12 +134,14 @@ private data class SenderSearchResponse(
     @Serializable
     data class Sender(
         @SerialName("id") val id: Uuid,
-        /** Display name from the sender's mails, absent when they only ever sent a bare address. */
+        @JsonSchema.Description("The display name they use most; null when they only ever sent a bare address")
         @SerialName("name") val name: String?,
         @SerialName("address") val address: String,
+        @JsonSchema.Description("Where the picture of the sender is; null when there is none")
         @SerialName("avatar_url") val avatarUrl: String?,
-        /** Whether that picture may be clipped to a circle, see `EmailAvatars.circlePadding`. */
+        @JsonSchema.Description("How much of its box the picture gives up on every side to fit a circle, as a fraction; null when it needs none")
         @SerialName("avatar_padding") val avatarPadding: Double?,
+        @JsonSchema.Description("How many mails of theirs the user has")
         @SerialName("email_count") val emailCount: Long,
     )
 }

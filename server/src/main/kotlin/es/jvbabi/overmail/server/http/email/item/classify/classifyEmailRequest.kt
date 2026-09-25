@@ -17,6 +17,16 @@ import io.ktor.server.routing.post
  */
 fun Route.classifyEmailRequest() {
     authenticate {
+        /**
+         * Classify a mail again.
+         *
+         * Description: Queued rather than run in the request; what it changes arrives over the content socket like every other change to the mail.
+         *
+         * Tag: Emails
+         *
+         * Responses:
+         *   - 202 The run is queued
+         */
         post {
             val queue = call.dependency<EmailClassificationQueue>()
 

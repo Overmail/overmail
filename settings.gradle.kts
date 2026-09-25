@@ -37,3 +37,5 @@ rootProject.name = "overmail"
 include(":server")
 include(":app:shared")
 include(":app:android")
+
+include("common")

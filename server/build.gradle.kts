@@ -34,6 +34,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":common"))
 
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)

@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.http.email.list
+package es.jvbabi.overmail.common.email.grouping
 
 import kotlin.time.Clock
 import kotlin.time.Instant

@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.domain.repository
 
 import es.jvbabi.overmail.domain.model.ArchivedState
+import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewState
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +17,7 @@ interface EmailsRepository {
 }
 
 sealed class ViewResult {
-    data class Item(val emailId: Uuid): ViewResult()
+    data class Item(val email: Email): ViewResult()
 
     /**
      * One group of a grouped listing, one subclass per `ViewGroupingKind`. What sets a group apart
@@ -52,7 +53,7 @@ sealed class ViewResult {
         /** The mails of one sender, a participant id. */
         data class Sender(val participantId: Uuid, override val items: List<ViewResult>): Group()
 
-        data class ImapAccount(val imapAccountId: Uuid, override val items: List<ViewResult>): Group()
+        data class ImapAccount(val imapAccount: es.jvbabi.overmail.domain.model.ImapAccount, override val items: List<ViewResult>): Group()
 
         data class Read(val isRead: Boolean, override val items: List<ViewResult>): Group()
 

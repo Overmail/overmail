@@ -136,7 +136,7 @@ data class ColorFamily(
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
   val colorScheme = when {

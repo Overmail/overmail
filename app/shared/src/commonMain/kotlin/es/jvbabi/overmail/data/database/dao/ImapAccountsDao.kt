@@ -19,6 +19,10 @@ interface ImapAccountsDao {
     @Upsert
     suspend fun upsert(imapAccounts: List<DbImapAccount>)
 
+    /** Which of [ids] are here already. */
+    @Query("SELECT id FROM imap_accounts WHERE id IN (:ids)")
+    suspend fun existingIds(ids: List<Uuid>): List<Uuid>
+
     @Query("DELETE FROM imap_accounts WHERE overmail_account_id = :overmailAccountId AND id NOT IN (:keep)")
     suspend fun deleteOthers(overmailAccountId: Uuid, keep: List<Uuid>)
 

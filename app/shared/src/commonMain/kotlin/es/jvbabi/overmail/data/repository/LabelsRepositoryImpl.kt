@@ -83,7 +83,7 @@ class LabelsRepositoryImpl(
 }
 
 /** `#RRGGBB`, the only form the server stores a label color in. */
-private fun parseHexColor(hex: String): Color = Color(0xFF000000 or hex.removePrefix("#").toLong(16))
+internal fun parseHexColor(hex: String): Color = Color(0xFF000000 or hex.removePrefix("#").toLong(16))
 
 /** `GET /api/labels/search`, `http/labels/search/labelSearch.kt`. */
 @Serializable

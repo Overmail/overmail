@@ -1,11 +1,16 @@
 package es.jvbabi.overmail.data.repository
 
+import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.entity.composed.EmbeddedEmail
+import es.jvbabi.overmail.data.network.safeRequest
+import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.NetworkErrorKind
+import es.jvbabi.overmail.domain.model.NetworkException
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewGrouping
@@ -16,6 +21,15 @@ import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.utils.takeFrom
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.sse.SSEClientException
+import io.ktor.client.plugins.sse.sse
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.url
+import io.ktor.http.ParametersBuilder
+import io.ktor.http.URLBuilder
+import io.ktor.http.appendPathSegments
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -23,9 +37,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
+private val logger = Logger.withTag("EmailsRepository")
+
 class EmailsRepositoryImpl(
+    private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
 ) : EmailsRepository {
     override fun getView(
@@ -52,8 +73,148 @@ class EmailsRepositoryImpl(
                         }
                     }
             }
-        }.join() // Job so we can later fetch data additionally while using the realtime local database as single source of truth
+        }
+
+        launch {
+            followViewIds(viewSettingsState, user).collect { groups ->
+                groups.filter { it.total > it.ids.size }.forEach { group ->
+                    logger.w { "Group ${group.keys} holds ${group.total} mails, the server sent ${group.ids.size} of them" }
+                }
+                // TODO: Load the ids the local database lacks through `GET /api/emails?ids=`
+            }
+        }
     }
+
+    /**
+     * The ids of every mail in the view per outermost group, and again whenever they change:
+     * the snapshots of `GET /api/emails/list/ids/stream`, `emailListIdsStream.kt` there. Per
+     * outermost group, because the server cuts each group at 10000 ids.
+     *
+     * A stream that broke or ended is opened again after [RECONNECT_DELAY]. One the server
+     * refused is not: asking again would be refused again.
+     */
+    private fun followViewIds(viewState: ViewState, user: OvermailAccount): Flow<List<RemoteGroupIds>> = channelFlow {
+        val url = URLBuilder(urlString = user.homeserver).apply {
+            appendPathSegments("api", "emails", "list", "ids", "stream")
+            viewState.groupings.firstOrNull()?.let { parameters.append("by", it.kind.wire) }
+            parameters.appendFilter(viewState.filter)
+        }.build()
+
+        while (true) {
+            val result = safeRequest {
+                try {
+                    httpClient.sse(request = {
+                        url(url)
+                        bearerAuth(user.token)
+                    }) {
+                        incoming.collect { event ->
+                            val data = event.data ?: return@collect // a keep-alive
+                            when (val message = streamJson.decodeFromString<ApiIdsStreamEvent>(data)) {
+                                is ApiIdsStreamEvent.Snapshot -> this@channelFlow.send(
+                                    message.groups.map { RemoteGroupIds(keys = it.keys, total = it.total, ids = it.ids) }
+                                )
+                                is ApiIdsStreamEvent.Failed -> throw NetworkException(
+                                    kind = NetworkErrorKind.Other,
+                                    message = message.error.message,
+                                    apiErrorCode = message.error.code,
+                                )
+                            }
+                        }
+                    }
+                } catch (e: SSEClientException) {
+                    // No event stream came back: the server refused before it started, or
+                    // something in front of it answered instead.
+                    throw e.response?.toNetworkException() ?: e
+                }
+            }
+
+            val failure = result.exceptionOrNull()
+            if (failure is NetworkException && failure.isRefusal()) {
+                logger.e(failure) { "The server refused the ids of the view, not asking again" }
+                break
+            }
+            logger.w(failure) { "The ids of the view stopped streaming, reconnecting in $RECONNECT_DELAY" }
+            delay(RECONNECT_DELAY)
+        }
+    }
+}
+
+/** How long a stream that broke waits before it is opened again. */
+private val RECONNECT_DELAY = 5.seconds
+
+private val streamJson = Json { ignoreUnknownKeys = true }
+
+/** An answer from the server that says no, as opposed to one that did not get through. */
+private fun NetworkException.isRefusal(): Boolean = when (kind) {
+    NetworkErrorKind.Unauthorized, NetworkErrorKind.Forbidden, NetworkErrorKind.NotFound -> true
+    // A 4xx with the api's error body, or a `failed` event: the request itself is wrong.
+    NetworkErrorKind.Other -> apiErrorCode != null
+    NetworkErrorKind.ConnectionError, NetworkErrorKind.ServerError -> false
+}
+
+/** The ids of one group as the server answered them; [keys] are the server's, outermost first. */
+private data class RemoteGroupIds(
+    val keys: List<String>,
+    /** How many mails the group holds, more than [ids] when the answer was cut. */
+    val total: Long,
+    val ids: List<Uuid>,
+)
+
+/** The server's `MailGroupingKind.wire`. */
+private val ViewGroupingKind.wire: String
+    get() = when (this) {
+        ViewGroupingKind.DateSmart -> "date_smart"
+        ViewGroupingKind.Year -> "year"
+        ViewGroupingKind.Month -> "month"
+        ViewGroupingKind.Day -> "day"
+        ViewGroupingKind.Sender -> "sender"
+        ViewGroupingKind.ImapAccount -> "imap_account"
+        ViewGroupingKind.Read -> "read"
+        ViewGroupingKind.Archived -> "archived"
+    }
+
+/**
+ * The filter as the list endpoints read it, see `listFilter.kt` there. What is null is left out;
+ * an empty list is sent as an empty parameter, which the server reads as letting nothing through.
+ */
+private fun ParametersBuilder.appendFilter(filter: ViewFilter) {
+    filter.readState?.let { append("read_state", it.toString()) }
+    filter.archivedState?.let { states -> append("archived_state", states.joinToString(",") { it.name }) }
+    filter.imapAccountIds?.let { ids -> append("imap_account_ids", ids.joinToString(",")) }
+    filter.sentBy?.let { correspondents -> append("sent_by", correspondents.joinToString(",") { it.wire }) }
+    filter.sentTo?.let { correspondents -> append("sent_to", correspondents.joinToString(",") { it.wire }) }
+    filter.hasLabels?.let { ids -> append("has_labels", ids.joinToString(",")) }
+}
+
+private val Correspondent.wire: String
+    get() = when (this) {
+        is Correspondent.Contact -> id.toString()
+        is Correspondent.Self -> "self"
+    }
+
+/** The events of `GET /api/emails/list/ids/stream`, `http/email/list/emailListIdsStream.kt`. */
+@Serializable
+private sealed class ApiIdsStreamEvent {
+    @Serializable
+    @SerialName("snapshot")
+    data class Snapshot(@SerialName("groups") val groups: List<Group>) : ApiIdsStreamEvent()
+
+    @Serializable
+    @SerialName("failed")
+    data class Failed(@SerialName("error") val error: Error) : ApiIdsStreamEvent()
+
+    @Serializable
+    data class Group(
+        @SerialName("keys") val keys: List<String>,
+        @SerialName("total") val total: Long,
+        @SerialName("ids") val ids: List<Uuid>,
+    )
+
+    @Serializable
+    data class Error(
+        @SerialName("code") val code: String,
+        @SerialName("message") val message: String,
+    )
 }
 
 /**

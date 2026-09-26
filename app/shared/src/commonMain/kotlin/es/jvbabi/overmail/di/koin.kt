@@ -9,11 +9,13 @@ import es.jvbabi.overmail.data.database.converter.InstantConverter
 import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
+import es.jvbabi.overmail.data.repository.EmailsRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
@@ -28,6 +30,7 @@ import es.jvbabi.overmail.page.onboarding.success.OnboardingSuccessViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.header
@@ -96,6 +99,9 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                     json(jsonInstance)
                 }
 
+                // The listing's ids are followed as server-sent events, see EmailsRepositoryImpl.
+                install(SSE)
+
                 install(WebSockets) {
                     contentConverter = KotlinxWebsocketSerializationConverter(jsonInstance)
                     pingIntervalMillis = 10.seconds.inWholeMilliseconds
@@ -133,6 +139,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
         singleOf(::ParticipantsRepositoryImpl) bind ParticipantsRepository::class
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
+        singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
 
         viewModelOf(::HomeViewModel)
         viewModelOf(::ViewViewModel)

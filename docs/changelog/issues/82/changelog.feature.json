@@ -1,0 +1,10 @@
+{
+  "title": "The app remembers your account",
+  "description": "The app remembers which of your Overmail accounts it is showing. The account you just signed in with becomes the current one, and if it is removed, the app switches to another of your accounts on its own.",
+  "localized": {
+    "de": {
+      "title": "Die App merkt sich dein Konto",
+      "description": "Die App merkt sich, welches deiner Overmail-Konten sie gerade anzeigt. Das Konto, mit dem du dich gerade angemeldet hast, wird zum aktuellen, und wird es entfernt, wechselt die App von selbst zu einem deiner anderen Konten."
+    }
+  }
+}

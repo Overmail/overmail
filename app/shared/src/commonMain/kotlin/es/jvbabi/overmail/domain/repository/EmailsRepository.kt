@@ -27,6 +27,12 @@ sealed class ViewResult {
     sealed class Group: ViewResult() {
         abstract val items: List<ViewResult>
 
+        val emailCount: Int by lazy {
+            items
+                .count { it is Item }
+                .plus(items.filterIsInstance<Group>().sumOf { it.emailCount })
+        }
+
         data class DateSmart(val stretch: Stretch, override val items: List<ViewResult>): Group() {
             /**
              * The server's `SmartDateBucket`. A near stretch only exists while it is not empty by

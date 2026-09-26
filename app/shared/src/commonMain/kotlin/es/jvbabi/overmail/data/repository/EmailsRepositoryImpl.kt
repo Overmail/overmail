@@ -66,20 +66,26 @@ private fun Collection<EmbeddedEmail>.applyFilter(
     val filtered = this.toMutableList()
     if (filter.readState != null) filtered.removeAll { email -> email.dbEmail.isRead != filter.readState }
     if (filter.sentBy != null) {
-        val allowedSenderIds = filter.sentBy.flatMap { sender ->
-            when (sender) {
-                is Correspondent.Contact -> setOf(sender.id)
-                is Correspondent.Self -> usersParticipantIds
-            }
-        }
+        val allowedSenderIds = filter.sentBy.participantIds(usersParticipantIds)
         filtered.removeAll { email -> email.sender.participant.id !in allowedSenderIds }
     }
-    if (filter.sentTo != null) TODO("EmbeddedEmails don't provide sender data yet")
+    if (filter.sentTo != null) {
+        // Addressed to any of them, in any of the header fields -- To, Cc and Bcc alike.
+        val allowedRecipientIds = filter.sentTo.participantIds(usersParticipantIds)
+        filtered.removeAll { email -> email.recipients.none { it.recipient.participantId in allowedRecipientIds } }
+    }
     if (filter.archivedState != null) filtered.removeAll { email -> email.dbEmail.archivedState !in filter.archivedState }
-    if (filter.hasLabels != null) TODO("EmbeddedEmails don't provide labels yet")
+    if (filter.hasLabels != null) filtered.removeAll { email -> email.labels.none { it.label.id in filter.hasLabels } }
     if (filter.imapAccountIds != null) filtered.removeAll { email -> email.imapAccount.imapAccount.id !in filter.imapAccountIds }
     return filtered
 }
+
+private fun List<Correspondent>.participantIds(usersParticipantIds: Set<Uuid>): Set<Uuid> = flatMap { correspondent ->
+    when (correspondent) {
+        is Correspondent.Contact -> setOf(correspondent.id)
+        is Correspondent.Self -> usersParticipantIds
+    }
+}.toSet()
 
 /**
  * Cuts the mails by the first of [groupings] and every group again by the rest, with the mails

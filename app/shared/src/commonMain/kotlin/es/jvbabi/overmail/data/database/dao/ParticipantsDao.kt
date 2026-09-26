@@ -23,6 +23,7 @@ interface ParticipantsDao {
     @Upsert
     suspend fun upsert(participants: List<DbParticipant>)
 
+    @Transaction
     @Query("SELECT * FROM participants WHERE email IN (:emails)")
     fun getAllParticipantsWithEmails(emails: List<String>): Flow<List<EmbeddedParticipant>>
 }

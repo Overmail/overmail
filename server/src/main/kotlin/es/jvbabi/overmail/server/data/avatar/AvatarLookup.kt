@@ -8,6 +8,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 /**
@@ -35,7 +37,10 @@ class AvatarLookup {
         BimiResolver(client),
     )
 
-    /** @return the first picture any resolver had for [address], or null when none had one. */
+    /**
+     * @return the first picture any resolver had for [address], as a png (see [toAvatarPng]), or
+     *   null when none had one that could be decoded.
+     */
     suspend fun findAvatarOnline(address: String, name: String? = null): Result? {
         for (resolver in resolvers) {
             val bytes = try {
@@ -51,15 +56,26 @@ class AvatarLookup {
                 null
             }
 
-            // Repaired here rather than in each resolver: every picture comes off somebody
-            // else's web server, and a namespace-less svg is unusable whichever one served it.
-            if (bytes != null) return Result(resolver.identifier, bytes.withSvgNamespace())
+            if (bytes == null) continue
+
+            // Repaired and converted here rather than in each resolver: every picture comes off
+            // somebody else's web server, and a namespace-less svg is unusable whichever one
+            // served it. Decoding is processor work, so it leaves the IO dispatcher for it.
+            val png = withContext(Dispatchers.Default) { bytes.withSvgNamespace().toAvatarPng() }
+
+            // A picture nothing can decode is no answer, so the next resolver gets its turn.
+            if (png == null) {
+                logger.debug("Resolver ${resolver.identifier} had an undecodable picture for ${address.maskEmail()}")
+                continue
+            }
+
+            return Result(resolver.identifier, png)
         }
 
         return null
     }
 
-    /** A picture as a resolver handed it over, together with which resolver that was. */
+    /** A picture, converted to png, together with the resolver that found it. */
     class Result(
         val source: String,
         val data: ByteArray,

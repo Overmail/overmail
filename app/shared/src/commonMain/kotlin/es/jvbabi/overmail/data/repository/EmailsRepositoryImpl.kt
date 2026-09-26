@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -77,7 +78,10 @@ class EmailsRepositoryImpl(
         launch { emailSync.changes(user).collect() }
 
         launch {
-            followViewIds(viewSettingsState, user).collectLatest { groups ->
+            // Conflated rather than latest: a snapshot arriving mid-load must not throw away the
+            // chunk in flight, or a view that changes faster than a chunk loads never gets it.
+            // What is stored stays stored, so the next round only asks for what is still missing.
+            followViewIds(viewSettingsState, user).conflate().collect { groups ->
                 groups.filter { it.total > it.ids.size }.forEach { group ->
                     logger.w { "Group ${group.keys} holds ${group.total} mails, the server sent ${group.ids.size} of them" }
                 }

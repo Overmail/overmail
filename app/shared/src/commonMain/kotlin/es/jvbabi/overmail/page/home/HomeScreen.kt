@@ -1,24 +1,24 @@
 package es.jvbabi.overmail.page.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.times
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.List
 import com.phosphor.icons.regular.MagnifyingGlass
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -30,15 +30,26 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.app_icon
+import overmail.app.shared.generated.resources.home_greeting_day
+import overmail.app.shared.generated.resources.home_greeting_evening
+import overmail.app.shared.generated.resources.home_greeting_morning
+import overmail.app.shared.generated.resources.home_greeting_night
 
 @Composable
 fun HomeScreen() {
+    val homeViewModel = koinViewModel<HomeViewModel>()
+    val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val viewViewModel = koinViewModel<ViewViewModel>()
     val content by viewViewModel.content.collectAsStateWithLifecycle()
     val viewState by viewViewModel.viewState.collectAsStateWithLifecycle()
 
     HomeContent(
+        homeState = homeState,
         viewState = viewState,
         content = content,
         onViewStateChange = { viewViewModel.onEvent(ViewEvent.SetViewState(it)) },
@@ -53,6 +64,7 @@ private const val EDGE_TINT_ALPHA = 0.5f
 
 @Composable
 private fun HomeContent(
+    homeState: HomeState,
     viewState: ViewState,
     content: ViewContentState,
     onViewStateChange: (ViewState) -> Unit,
@@ -85,15 +97,52 @@ private fun HomeContent(
                 }
             }
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
                     .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
                     .padding(top = innerPadding.calculateTopPadding())
                     .height(HEADER_HEIGHT)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Head")
+                IconButton(
+                    onClick = {},
+                    modifier = Modifier.padding(end = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = PhIcons.Regular.List,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Image(
+                    painter = painterResource(Res.drawable.app_icon),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(HEADER_HEIGHT - 2*16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Column {
+                    Text(
+                        text = "Overmail",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    if (homeState.currentUser != null) Text(
+                        text = stringResource(
+                            when (homeState.greeting) {
+                                Greeting.Night -> Res.string.home_greeting_night
+                                Greeting.Morning -> Res.string.home_greeting_morning
+                                Greeting.Day -> Res.string.home_greeting_day
+                                Greeting.Evening -> Res.string.home_greeting_evening
+                            },
+                            homeState.currentUser.firstName,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
             }
 
             Column(
@@ -146,6 +195,13 @@ private fun HomeContent(
 @Preview
 private fun HomeContentPreview() {
     AppTheme(dynamicColor = false) {
-        HomeContent(viewState = ViewState.Mailbox, content = PREVIEW_VIEW_CONTENT, onViewStateChange = {})
+        HomeContent(
+            homeState = HomeState(
+                currentUser = PREVIEW_ACCOUNT,
+            ),
+            viewState = ViewState.Mailbox,
+            content = PREVIEW_VIEW_CONTENT,
+            onViewStateChange = {}
+        )
     }
 }

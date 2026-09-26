@@ -1,4 +1,9 @@
 <resources>
+    <string name="home_greeting_night">Good night, %1$s</string>
+    <string name="home_greeting_morning">Good morning, %1$s</string>
+    <string name="home_greeting_day">Good afternoon, %1$s</string>
+    <string name="home_greeting_evening">Good evening, %1$s</string>
+
     <string name="home_filter_labels">Labels</string>
     <string name="home_filter_from">From</string>
     <string name="home_filter_to">To</string>

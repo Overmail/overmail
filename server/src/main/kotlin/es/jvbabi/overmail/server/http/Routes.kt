@@ -21,6 +21,7 @@ import es.jvbabi.overmail.server.http.email.bulk.setEmailsRead
 import es.jvbabi.overmail.server.http.email.list.emailList
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.list.emailListIds
+import es.jvbabi.overmail.server.http.email.list.emailListIdsStream
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
@@ -205,6 +206,11 @@ internal fun Application.configureRouting() {
                     // picking one in the table needs.
                     route("/ids") {
                         emailListIds()
+
+                        // GET /emails/list/ids/stream?by= -- the same ids per group, kept current.
+                        route("/stream") {
+                            emailListIdsStream()
+                        }
                     }
                 }
 

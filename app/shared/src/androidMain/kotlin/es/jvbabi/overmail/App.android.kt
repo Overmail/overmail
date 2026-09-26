@@ -7,6 +7,7 @@ import okio.Path.Companion.toPath
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -17,6 +18,10 @@ import es.jvbabi.overmail.ui.theme.darkScheme
 import es.jvbabi.overmail.ui.theme.lightScheme
 import org.koin.core.qualifier.named
 import org.koin.mp.KoinPlatformTools
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.time.Instant
 
 /**
  * Qualifier of the activity's context. Registered by `MainActivity`, so anything that needs to
@@ -73,3 +78,10 @@ actual fun deviceInfo(): DeviceInfo = DeviceInfo(
     manufacturer = Build.MANUFACTURER,
     os = "Android ${Build.VERSION.RELEASE}",
 )
+
+actual fun formatDateTime(instant: Instant, skeleton: String, languageTag: String): String {
+    val locale = Locale.forLanguageTag(languageTag)
+    val pattern = DateFormat.getBestDateTimePattern(locale, skeleton)
+    // SimpleDateFormat starts out in the device's time zone.
+    return SimpleDateFormat(pattern, locale).format(Date(instant.toEpochMilliseconds()))
+}

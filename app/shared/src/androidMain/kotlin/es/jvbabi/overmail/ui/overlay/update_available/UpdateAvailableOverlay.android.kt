@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.intl.Locale
@@ -38,9 +39,9 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import es.jvbabi.overmail.ThemeWrapper
 import es.jvbabi.overmail.domain.model.*
-import es.jvbabi.overmail.ui.components.ProgressiveBlurScrim
-import es.jvbabi.overmail.ui.components.ScrimEdge
+import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.blendColor
+import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import nl.jacobras.humanreadable.HumanReadable
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -243,14 +244,23 @@ fun UpdateAvailableOverlayContent(
             }
         }
 
-        ProgressiveBlurScrim(
-            hazeState = hazeState,
-            edge = ScrimEdge.Bottom,
+        // The buttons float over the changelog, which passes under them blurred rather than ending
+        // on a hard line at their top edge.
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .fillMaxWidth()
                 .onSizeChanged { size ->
                     buttonsHeight = with(density) { size.height.toDp() }
-                },
+                }
+                // Strongest at the top, where the gradient below still lets the changelog show.
+                .progressiveBackgroundBlur(hazeState, ProgressiveDirection.TopToBottom, BottomSheetDefaults.ContainerColor)
+                .background(
+                    Brush.verticalGradient(
+                        0f to BottomSheetDefaults.ContainerColor.copy(alpha = 0f),
+                        .75f to BottomSheetDefaults.ContainerColor.copy(alpha = 1f),
+                    )
+                ),
         ) {
             val isDownloading = state.download is UpdateDownload.Running
 

@@ -79,7 +79,7 @@ private fun HomeContent(
                         is ViewResult.Item -> Text("Email ${result.email.subject}")
                         is ViewResult.Group -> ViewGroupComponent(
                             group = result,
-                            sender = (result as? ViewResult.Group.Sender)?.let { content.senders[it.participantId] },
+                            senders = content.senders,
                         )
                     }
                 }

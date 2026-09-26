@@ -11,8 +11,11 @@ import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.domain.repository.ViewResult
 import kotlinx.datetime.Month
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -106,31 +109,97 @@ private val PREVIEW_SUBJECTS = listOf(
 
 /** The mailbox's stretches and how many mails each holds, newest first. */
 private fun previewGroups(): List<ViewResult.Group> {
-    val random = Random(42)
+    val mailbox = PreviewMailbox(seed = 42)
     val now = Clock.System.now()
-    var next = 0L
-
-    fun emails(count: Int, newest: Instant, spacing: kotlin.time.Duration): List<ViewResult.Item> =
-        List(count) { index -> ViewResult.Item(previewEmail(next++, newest - spacing * index, random)) }
 
     return listOf(
-        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Today, emails(6, now - 12.minutes, 47.minutes)),
-        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Yesterday, emails(5, now - 1.days, 2.hours)),
-        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Week, emails(9, now - 2.days, 7.hours)),
-        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Month, emails(12, now - 6.days, 13.hours)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Today, mailbox.emails(6, now - 12.minutes, 47.minutes)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Yesterday, mailbox.emails(5, now - 1.days, 2.hours)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Week, mailbox.emails(9, now - 2.days, 7.hours)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Month, mailbox.emails(12, now - 6.days, 13.hours)),
         ViewResult.Group.DateSmart(
             ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.AUGUST),
-            emails(14, now - 30.days, 2.days),
+            mailbox.emails(14, now - 30.days, 2.days),
         ),
         ViewResult.Group.DateSmart(
             ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.JULY),
-            emails(11, now - 60.days, 3.days),
+            mailbox.emails(11, now - 60.days, 3.days),
         ),
         ViewResult.Group.DateSmart(
             ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.JUNE),
-            emails(4, now - 95.days, 6.days),
+            mailbox.emails(4, now - 95.days, 6.days),
         ),
     )
+}
+
+/** The preview's correspondents by id, for the sender groups to name themselves with. */
+internal val PREVIEW_SENDERS_BY_ID: Map<Uuid, Participant> by lazy { PREVIEW_SENDERS.associateBy { it.id } }
+
+/**
+ * Every kind of group at least once, with the cases their header is written differently for: a
+ * month of this year and of another, a sender with a name, one with an address only and one
+ * this device does not know yet. The last ones hold groups rather than mails, the second level a
+ * view can be grouped by.
+ */
+internal val PREVIEW_GROUPS_OF_EVERY_KIND: List<ViewResult.Group> by lazy {
+    val mailbox = PreviewMailbox(seed = 7)
+    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    val named = PREVIEW_SENDERS.first { it.name != null }
+    val addressOnly = PREVIEW_SENDERS.first { it.name == null }
+    // Not in PREVIEW_SENDERS_BY_ID, so it stands for a sender this device has not loaded yet.
+    val unknown = Uuid.fromLongs(2, 999)
+
+    listOf(
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Today, mailbox.emails(3)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Yesterday, mailbox.emails(2)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Week, mailbox.emails(5)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Month, mailbox.emails(8)),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(today.year, today.month),
+            mailbox.emails(4),
+        ),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(today.year - 1, Month.DECEMBER),
+            mailbox.emails(11),
+        ),
+        ViewResult.Group.Year(today.year - 1, mailbox.emails(24)),
+        ViewResult.Group.Month(today.year, today.month, mailbox.emails(6)),
+        ViewResult.Group.Day(today, mailbox.emails(1)),
+        ViewResult.Group.Sender(named.id, mailbox.emails(4)),
+        ViewResult.Group.Sender(addressOnly.id, mailbox.emails(2)),
+        ViewResult.Group.Sender(unknown, mailbox.emails(1)),
+        ViewResult.Group.ImapAccount(PREVIEW_IMAP_ACCOUNTS.first(), mailbox.emails(9)),
+        ViewResult.Group.Read(isRead = false, items = mailbox.emails(3)),
+        ViewResult.Group.Read(isRead = true, items = mailbox.emails(17)),
+        ViewResult.Group.Archived(ArchivedState.Unarchive, mailbox.emails(5)),
+        ViewResult.Group.Archived(ArchivedState.Archive, mailbox.emails(12)),
+        ViewResult.Group.Archived(ArchivedState.Spam, mailbox.emails(2)),
+        // Two levels: by date, then by sender, the unknown sender included.
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.Today,
+            listOf(named.id, addressOnly.id, unknown).mapIndexed { index, id ->
+                ViewResult.Group.Sender(id, mailbox.emails(3 - index))
+            },
+        ),
+        // Two levels: by read state, then by account.
+        ViewResult.Group.Read(
+            isRead = false,
+            items = PREVIEW_IMAP_ACCOUNTS.map { ViewResult.Group.ImapAccount(it, mailbox.emails(4)) },
+        ),
+    )
+}
+
+/** Hands out made-up mails with ids that do not repeat, the same ones for the same [seed]. */
+private class PreviewMailbox(seed: Int) {
+    private val random = Random(seed)
+    private var next = 0L
+
+    fun emails(
+        count: Int,
+        newest: Instant = Clock.System.now(),
+        spacing: Duration = 3.hours,
+    ): List<ViewResult.Item> =
+        List(count) { index -> ViewResult.Item(previewEmail(next++, newest - spacing * index, random)) }
 }
 
 private fun previewEmail(index: Long, sentAt: Instant, random: Random): Email {

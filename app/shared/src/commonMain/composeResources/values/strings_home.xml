@@ -86,4 +86,18 @@
     <string name="home_grouping_sort_unread_first">Unread first</string>
     <string name="home_grouping_sort_active_first">Active first</string>
     <string name="home_grouping_sort_archived_first">Archived first</string>
+
+    <!-- The headers over the groups of the listing. -->
+    <string name="home_group_today">Today</string>
+    <string name="home_group_yesterday">Yesterday</string>
+    <string name="home_group_week">This week</string>
+    <string name="home_group_month">This month</string>
+    <string name="home_group_read">Read</string>
+    <string name="home_group_unread">Unread</string>
+    <!-- A month of another year: "August 2025". -->
+    <string name="home_group_month_with_year">%1$s %2$d</string>
+    <!-- A day: month name, day of month, year, as in "September 26, 2026". -->
+    <string name="home_group_day">%1$s %2$d, %3$d</string>
+    <!-- A sender whose name is not known on this device yet. -->
+    <string name="home_group_sender_unknown">…</string>
 </resources>

@@ -2,11 +2,13 @@ package es.jvbabi.overmail.data.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import es.jvbabi.overmail.domain.model.ArchivedState
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @Entity(
     tableName = "email",
+    primaryKeys = ["id"],
 )
 data class DbEmail(
     @ColumnInfo(name = "id") val id: Uuid,
@@ -16,4 +18,5 @@ data class DbEmail(
     @ColumnInfo(name = "sent_from_participant_id") val sentFromParticipantId: Uuid,
     @ColumnInfo(name = "subject") val subject: String?,
     @ColumnInfo(name = "is_read") val isRead: Boolean,
+    @ColumnInfo(name = "archive_state") val archivedState: ArchivedState,
 )

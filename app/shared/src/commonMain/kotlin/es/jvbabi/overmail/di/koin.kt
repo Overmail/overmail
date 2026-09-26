@@ -79,6 +79,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                 .addTypeConverter(UuidConverter())
                 .addTypeConverter(InstantConverter())
                 .addTypeConverter(ColorConverter())
+                // Everything in it is a cache of the server, so a schema change starts over rather than migrating.
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
 

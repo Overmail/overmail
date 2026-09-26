@@ -34,5 +34,6 @@ data class EmbeddedEmail(
         sentAt = dbEmail.sentAt,
         subject = dbEmail.subject,
         isRead = dbEmail.isRead,
+        archivedState = dbEmail.archivedState,
     )
 }

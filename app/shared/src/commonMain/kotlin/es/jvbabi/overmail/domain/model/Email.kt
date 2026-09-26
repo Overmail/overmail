@@ -11,4 +11,5 @@ data class Email(
     val sentAt: Instant,
     val subject: String?,
     val isRead: Boolean,
+    val archivedState: ArchivedState,
 )

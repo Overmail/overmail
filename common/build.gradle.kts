@@ -8,10 +8,6 @@ plugins {
 group = "es.jvbabi.overmail"
 version = "unspecified"
 
-repositories {
-    mavenCentral()
-}
-
 kotlin {
     compilerOptions {
         optIn.add("kotlin.uuid.ExperimentalUuidApi")

@@ -32,7 +32,7 @@ internal val PREVIEW_VIEW_CONTENT: ViewContentState by lazy {
     ViewContentState(results = previewGroups(), isLoading = false)
 }
 
-private val PREVIEW_ACCOUNT = OvermailAccount(
+val PREVIEW_ACCOUNT = OvermailAccount(
     id = Uuid.fromLongs(0, 0),
     username = "preview",
     firstName = "Preview",

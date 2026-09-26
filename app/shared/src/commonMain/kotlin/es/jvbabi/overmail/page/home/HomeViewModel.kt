@@ -1,30 +1,52 @@
 package es.jvbabi.overmail.page.home
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.repository.AccountRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
-class HomeViewModel: ViewModel() {
-
-    var serverState by mutableStateOf(ServerState.Checking)
-        private set
+class HomeViewModel(
+    private val accountRepository: AccountRepository,
+): ViewModel() {
+    val state: StateFlow<HomeState>
+        field = MutableStateFlow(HomeState())
 
     init {
-        checkServer()
-    }
-
-    fun checkServer() {
-        serverState = ServerState.Checking
         viewModelScope.launch {
+            accountRepository.getCurrentAccount().collectLatest { currentUser ->
+                state.update { it.copy(currentUser = currentUser) }
+            }
+        }
+
+        // Read again rather than once at setup: the screen is left open, and 18:00 must not find
+        // it still saying "Guten Tag". The time zone too, it may change while the app is open.
+        viewModelScope.launch {
+            while (isActive) {
+                state.update { it.copy(now = localNow()) }
+                delay(1.seconds)
+            }
         }
     }
 }
 
-enum class ServerState {
-    Checking,
-    Reachable,
-    Unreachable,
+private fun localNow() = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+
+data class HomeState(
+    val currentUser: OvermailAccount? = null,
+    /** The time on the device's clock, updated every second. */
+    val now: LocalDateTime = localNow(),
+) {
+    val greeting: Greeting get() = Greeting.at(now.time)
 }

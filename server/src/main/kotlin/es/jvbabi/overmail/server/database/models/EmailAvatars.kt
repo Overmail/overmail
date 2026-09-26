@@ -9,9 +9,13 @@ import org.jetbrains.exposed.v1.datetime.timestamp
 import kotlin.uuid.Uuid
 
 /**
- * A picture we found for a correspondent, as bytes. Rows only ever exist for pictures that were
- * actually found -- an address nothing could be resolved for is simply an [EmailUsers] row whose
- * `avatar_id` stays null, so retrying it costs no bookkeeping.
+ * A picture we found for a correspondent, as png bytes -- whatever format it was found in is
+ * converted before it is written, see `toAvatarPng`. Rows written before that may still hold the
+ * original format, which is why `GET /api/avatars/{avatarId}` reads the type off the bytes.
+ *
+ * Rows only ever exist for pictures that were actually found -- an address nothing could be
+ * resolved for is simply an [EmailUsers] row whose `avatar_id` stays null, so retrying it costs
+ * no bookkeeping.
  *
  * The bytes are immutable once written: a refresh does not update them, it writes a new row and
  * points the address book at it. That is what lets the id be the cache key of the url the browser

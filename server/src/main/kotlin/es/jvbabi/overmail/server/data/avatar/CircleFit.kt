@@ -2,9 +2,6 @@ package es.jvbabi.overmail.server.data.avatar
 
 import es.jvbabi.overmail.server.util.imageContentType
 import io.ktor.http.ContentType
-import org.apache.batik.transcoder.SVGAbstractTranscoder
-import org.apache.batik.transcoder.TranscoderInput
-import org.apache.batik.transcoder.TranscoderOutput
 import org.apache.batik.transcoder.image.ImageTranscoder
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -68,7 +65,7 @@ fun ByteArray.circlePadding(): Double? {
 
 /** @return the picture as pixels, at most [ANALYSIS_SIZE] on its longer side, or null. */
 private fun ByteArray.decodeForAnalysis(): BufferedImage? = try {
-    if (imageContentType() == ContentType.Image.SVG) rasteriseSvg() else ImageIO.read(ByteArrayInputStream(this))
+    if (imageContentType() == ContentType.Image.SVG) rasteriseSvgForAnalysis() else ImageIO.read(ByteArrayInputStream(this))
 } catch (cause: Exception) {
     // Anything the readers throw is the same answer as "no reader for this": a picture we cannot
     // look at.
@@ -83,41 +80,13 @@ private fun ByteArray.decodeForAnalysis(): BufferedImage? = try {
  * makes Batik keep its default height, which distorts every logo that carries a `viewBox` and no
  * size of its own -- most of them. Left to the maximum it letterboxes such a file into a square by
  * itself, which is the square this is looking for anyway.
- *
- * Locked down on the way in, because the file came off a third party's web server: no scripts, and
- * nothing it names may be fetched.
  */
-private fun ByteArray.rasteriseSvg(): BufferedImage? {
-    val transcoder = InMemoryImageTranscoder()
-
-    transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_ALLOW_EXTERNAL_RESOURCES, false)
-    transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_ALLOWED_SCRIPT_TYPES, "")
-    transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_CONSTRAIN_SCRIPT_ORIGIN, true)
-    transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_EXECUTE_ONLOAD, false)
-    transcoder.addTranscodingHint(ImageTranscoder.KEY_MAX_WIDTH, ANALYSIS_SIZE.toFloat())
-    transcoder.addTranscodingHint(ImageTranscoder.KEY_MAX_HEIGHT, ANALYSIS_SIZE.toFloat())
-
-    transcoder.transcode(TranscoderInput(ByteArrayInputStream(this)), null)
-
-    return transcoder.image
-}
-
-/**
- * Batik writes its result somewhere rather than returning it; the only place this one wants it is
- * memory. A named class rather than an anonymous object: the openapi compiler plugin cannot walk
- * a local class that extends a Java type.
- */
-private class InMemoryImageTranscoder : ImageTranscoder() {
-
-    var image: BufferedImage? = null
-
-    override fun createImage(width: Int, height: Int): BufferedImage =
-        BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
-
-    override fun writeImage(image: BufferedImage, output: TranscoderOutput?) {
-        this.image = image
-    }
-}
+private fun ByteArray.rasteriseSvgForAnalysis(): BufferedImage? = rasteriseSvg(
+    mapOf(
+        ImageTranscoder.KEY_MAX_WIDTH to ANALYSIS_SIZE.toFloat(),
+        ImageTranscoder.KEY_MAX_HEIGHT to ANALYSIS_SIZE.toFloat(),
+    )
+)
 
 /**
  * The picture on a transparent square canvas, centred, scaled down to [ANALYSIS_SIZE] if it is

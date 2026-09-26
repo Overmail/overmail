@@ -8,6 +8,8 @@ import es.jvbabi.overmail.data.network.safeRequest
 import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.Key
+import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.domain.repository.RedeemAuthCodeResponse
 import es.jvbabi.overmail.domain.repository.UserinfoResponse
 import io.ktor.client.*
@@ -15,6 +17,10 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -23,6 +29,7 @@ import kotlin.uuid.Uuid
 class AccountRepositoryImpl(
     private val database: OvermailDatabase,
     private val httpClient: HttpClient,
+    private val keyValueRepository: KeyValueRepository,
 ): AccountRepository {
 
     override fun getAccounts(): Flow<List<OvermailAccount>> {
@@ -83,6 +90,30 @@ class AccountRepositoryImpl(
 
     override fun getById(id: Uuid): Flow<OvermailAccount?> {
         return database.overmailAccountDao.findById(id).map { item -> item?.toModel() }
+    }
+
+    override fun getCurrentAccount(): Flow<OvermailAccount?> {
+        return keyValueRepository.get(Key.CurrentAccount).flatMapLatest { id ->
+            if (id == null) flowOf(null) else getById(id)
+        }
+    }
+
+    override suspend fun keepCurrentAccountValid() {
+        combine(getAccounts(), keyValueRepository.get(Key.CurrentAccount)) { accounts, current ->
+            accounts.any { it.id == current }
+        }.collect { isValid ->
+            if (isValid) return@collect
+
+            // The two flows re-emit independently, so a new account and the key pointing at it
+            // can arrive in either order. Read both again before overwriting what may be right.
+            val accounts = getAccounts().first()
+            val current = keyValueRepository.get(Key.CurrentAccount).first()
+            if (accounts.any { it.id == current }) return@collect
+
+            val first = accounts.firstOrNull()
+            if (first != null) keyValueRepository.set(Key.CurrentAccount, first.id)
+            else if (current != null) keyValueRepository.delete(Key.CurrentAccount)
+        }
     }
 }
 

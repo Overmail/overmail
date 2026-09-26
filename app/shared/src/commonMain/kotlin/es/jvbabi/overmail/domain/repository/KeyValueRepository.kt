@@ -53,6 +53,14 @@ sealed class Key<VALUE>(val key: String) {
      * mind, so the app installs the update itself and this is left as it was, ready to take over
      * again if the permission is ever withdrawn.
      */
+    /**
+     * The id of the [es.jvbabi.overmail.domain.model.OvermailAccount] the app is showing.
+     *
+     * Kept pointing at an existing account by [AccountRepository.keepCurrentAccountValid]: missing
+     * or dangling, it becomes the first account, and without any account it is removed.
+     */
+    data object CurrentAccount: UuidKey("app.account.current")
+
     data object AlwaysInstallUpdatesManually: BooleanKey("app.update.alwaysInstallManually") {
         override val defaultValue: Boolean = false
     }

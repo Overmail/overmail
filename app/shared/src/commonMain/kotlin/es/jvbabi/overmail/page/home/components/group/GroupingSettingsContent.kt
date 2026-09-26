@@ -474,8 +474,9 @@ private fun LazyItemScope.CategoryItem(
                 editor.startDrag(kind)
                 try {
                     drag(down.id) { change ->
-                        change.consume()
+                        // Read before consuming: a consumed change reports no movement.
                         editor.dragBy(change.positionChange().y)
+                        change.consume()
                     }
                 } finally {
                     // Lifted, cancelled or the row left the composition: put it down either way.

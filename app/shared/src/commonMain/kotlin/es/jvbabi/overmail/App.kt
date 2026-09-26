@@ -95,7 +95,10 @@ fun App() {
 
         UpdateAvailableOverlay()
 
-        val hasAccounts by koinInject<AccountRepository>()
+        val accountRepository = koinInject<AccountRepository>()
+        LaunchedEffect(accountRepository) { accountRepository.keepCurrentAccountValid() }
+
+        val hasAccounts by accountRepository
             .getAccounts()
             .map { it.isNotEmpty() }
             .collectAsStateWithLifecycle(null)

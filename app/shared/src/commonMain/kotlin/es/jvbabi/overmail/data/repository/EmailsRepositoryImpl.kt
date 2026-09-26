@@ -4,8 +4,7 @@ import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.entity.composed.EmbeddedEmail
-import es.jvbabi.overmail.data.network.safeRequest
-import es.jvbabi.overmail.data.network.toNetworkException
+import es.jvbabi.overmail.data.network.followServerSentEvents
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.Email
@@ -19,19 +18,16 @@ import es.jvbabi.overmail.domain.model.ViewSorting
 import es.jvbabi.overmail.domain.model.ViewSortingKind
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.EmailsRepository
+import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.utils.takeFrom
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.sse.SSEClientException
-import io.ktor.client.plugins.sse.sse
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.url
 import io.ktor.http.ParametersBuilder
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -40,7 +36,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
 private val logger = Logger.withTag("EmailsRepository")
@@ -48,7 +43,10 @@ private val logger = Logger.withTag("EmailsRepository")
 class EmailsRepositoryImpl(
     private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
+    imapAccountsRepository: ImapAccountsRepository,
 ) : EmailsRepository {
+    private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
+
     override fun getView(
         viewSettingsState: ViewState,
         instantLocalEmission: Boolean,
@@ -75,12 +73,15 @@ class EmailsRepositoryImpl(
             }
         }
 
+        // Keeps what the database holds current while the view is on screen.
+        launch { emailSync.changes(user).collect() }
+
         launch {
-            followViewIds(viewSettingsState, user).collect { groups ->
+            followViewIds(viewSettingsState, user).collectLatest { groups ->
                 groups.filter { it.total > it.ids.size }.forEach { group ->
                     logger.w { "Group ${group.keys} holds ${group.total} mails, the server sent ${group.ids.size} of them" }
                 }
-                // TODO: Load the ids the local database lacks through `GET /api/emails?ids=`
+                emailSync.loadMissing(user, groups.flatMap { it.ids })
             }
         }
     }
@@ -89,9 +90,6 @@ class EmailsRepositoryImpl(
      * The ids of every mail in the view per outermost group, and again whenever they change:
      * the snapshots of `GET /api/emails/list/ids/stream`, `emailListIdsStream.kt` there. Per
      * outermost group, because the server cuts each group at 10000 ids.
-     *
-     * A stream that broke or ended is opened again after [RECONNECT_DELAY]. One the server
-     * refused is not: asking again would be refused again.
      */
     private fun followViewIds(viewState: ViewState, user: OvermailAccount): Flow<List<RemoteGroupIds>> = channelFlow {
         val url = URLBuilder(urlString = user.homeserver).apply {
@@ -100,57 +98,22 @@ class EmailsRepositoryImpl(
             parameters.appendFilter(viewState.filter)
         }.build()
 
-        while (true) {
-            val result = safeRequest {
-                try {
-                    httpClient.sse(request = {
-                        url(url)
-                        bearerAuth(user.token)
-                    }) {
-                        incoming.collect { event ->
-                            val data = event.data ?: return@collect // a keep-alive
-                            when (val message = streamJson.decodeFromString<ApiIdsStreamEvent>(data)) {
-                                is ApiIdsStreamEvent.Snapshot -> this@channelFlow.send(
-                                    message.groups.map { RemoteGroupIds(keys = it.keys, total = it.total, ids = it.ids) }
-                                )
-                                is ApiIdsStreamEvent.Failed -> throw NetworkException(
-                                    kind = NetworkErrorKind.Other,
-                                    message = message.error.message,
-                                    apiErrorCode = message.error.code,
-                                )
-                            }
-                        }
-                    }
-                } catch (e: SSEClientException) {
-                    // No event stream came back: the server refused before it started, or
-                    // something in front of it answered instead.
-                    throw e.response?.toNetworkException() ?: e
-                }
+        httpClient.followServerSentEvents(url, user.token, what = "The ids of the view") { data ->
+            when (val message = streamJson.decodeFromString<ApiIdsStreamEvent>(data)) {
+                is ApiIdsStreamEvent.Snapshot -> send(
+                    message.groups.map { RemoteGroupIds(keys = it.keys, total = it.total, ids = it.ids) }
+                )
+                is ApiIdsStreamEvent.Failed -> throw NetworkException(
+                    kind = NetworkErrorKind.Other,
+                    message = message.error.message,
+                    apiErrorCode = message.error.code,
+                )
             }
-
-            val failure = result.exceptionOrNull()
-            if (failure is NetworkException && failure.isRefusal()) {
-                logger.e(failure) { "The server refused the ids of the view, not asking again" }
-                break
-            }
-            logger.w(failure) { "The ids of the view stopped streaming, reconnecting in $RECONNECT_DELAY" }
-            delay(RECONNECT_DELAY)
         }
     }
 }
 
-/** How long a stream that broke waits before it is opened again. */
-private val RECONNECT_DELAY = 5.seconds
-
 private val streamJson = Json { ignoreUnknownKeys = true }
-
-/** An answer from the server that says no, as opposed to one that did not get through. */
-private fun NetworkException.isRefusal(): Boolean = when (kind) {
-    NetworkErrorKind.Unauthorized, NetworkErrorKind.Forbidden, NetworkErrorKind.NotFound -> true
-    // A 4xx with the api's error body, or a `failed` event: the request itself is wrong.
-    NetworkErrorKind.Other -> apiErrorCode != null
-    NetworkErrorKind.ConnectionError, NetworkErrorKind.ServerError -> false
-}
 
 /** The ids of one group as the server answered them; [keys] are the server's, outermost first. */
 private data class RemoteGroupIds(

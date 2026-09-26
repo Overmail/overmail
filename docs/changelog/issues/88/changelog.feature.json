@@ -1,0 +1,10 @@
+{
+  "title": "A blue look",
+  "description": "The app now uses its own colours with blue as the main colour, instead of taking them from your phone's wallpaper.",
+  "localized": {
+    "de": {
+      "title": "Ein blauer Look",
+      "description": "Die App verwendet jetzt ihre eigenen Farben mit Blau als Hauptfarbe, statt sie aus dem Hintergrundbild deines Handys zu übernehmen."
+    }
+  }
+}

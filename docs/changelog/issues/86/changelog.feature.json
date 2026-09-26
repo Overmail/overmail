@@ -1,0 +1,10 @@
+{
+  "title": "Your inbox on the home screen",
+  "description": "The home screen now lists your mail, grouped the way your view settings say, with subgroups where you nested them. Every mail shows its sender, when it was sent and its subject. The header greets you by the time of day and keeps the search bar and view settings in reach while you scroll.",
+  "localized": {
+    "de": {
+      "title": "Dein Posteingang auf dem Startbildschirm",
+      "description": "Der Startbildschirm listet jetzt deine E-Mails auf, gruppiert so, wie es deine Ansichtseinstellungen festlegen, mit Untergruppen, wo du sie verschachtelt hast. Jede E-Mail zeigt Absender, Sendezeit und Betreff. Die Kopfzeile begrüßt dich je nach Tageszeit und hält Suchleiste und Ansichtseinstellungen beim Scrollen in Reichweite."
+    }
+  }
+}

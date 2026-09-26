@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,17 +48,18 @@ fun ViewGroupComponent(
     /** The correspondents sender groups stand for, on either level; a missing one is not known here. */
     senders: Map<Uuid, Participant> = emptyMap(),
 ) {
+    val localDensity = LocalDensity.current
     Column(modifier = modifier) {
         GroupHeader(
             group = group,
             senders = senders,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp, start = 32.dp),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 8.dp, start = 50.dp),
         )
         HorizontalDivider(
             modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-                .height(1.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .height(with(localDensity) { 1.toDp() })
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.outline)
         )
@@ -66,12 +68,9 @@ fun ViewGroupComponent(
                 is ViewResult.Group -> ViewGroupComponent(
                     group = item,
                     senders = senders,
-                    modifier = Modifier.padding(start = 32.dp)
+                    modifier = Modifier.padding(start = 16.dp)
                 )
-                is ViewResult.Item -> Row {
-                    ParticipantAvatar(item.email.sentBy, size = 24.dp)
-                    Text("Email ${item.email.subject}")
-                }
+                is ViewResult.Item -> ViewItem(item)
             }
         }
     }

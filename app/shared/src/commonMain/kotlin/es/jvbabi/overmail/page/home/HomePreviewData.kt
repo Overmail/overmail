@@ -189,6 +189,27 @@ internal val PREVIEW_GROUPS_OF_EVERY_KIND: List<ViewResult.Group> by lazy {
     )
 }
 
+/**
+ * Single mails for the preview of a row, with the cases a row is drawn differently for: unread
+ * and read, a sender with a name and one with an address only, no subject and one too long for
+ * the line.
+ */
+internal val PREVIEW_ITEMS: List<ViewResult.Item> by lazy {
+    val mails = PreviewMailbox(seed = 3).emails(4).map { it.email }
+    val addressOnly = PREVIEW_SENDERS.first { it.name == null }
+
+    listOf(
+        mails[0].copy(isRead = false),
+        mails[1].copy(isRead = true),
+        mails[2].copy(sentBy = addressOnly),
+        mails[3].copy(subject = null),
+        mails[3].copy(
+            id = Uuid.fromLongs(4, 999),
+            subject = "Re: Re: Fwd: The slides from yesterday's meeting, the budget for the next quarter and who is bringing the cake on Friday",
+        ),
+    ).map { ViewResult.Item(it) }
+}
+
 /** Hands out made-up mails with ids that do not repeat, the same ones for the same [seed]. */
 private class PreviewMailbox(seed: Int) {
     private val random = Random(seed)

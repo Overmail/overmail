@@ -35,6 +35,8 @@ import kotlin.uuid.Uuid
 @Serializable
 data class EmailMeta(
     @SerialName("id") val id: Uuid,
+    /** The mailbox it was imported through. */
+    @SerialName("imap_account_id") val imapAccountId: Uuid,
     @SerialName("subject") val subject: String,
     /** Unix seconds. */
     @SerialName("sent") val sent: Long,
@@ -173,6 +175,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
         .leftJoin(EmailAvatars)
         .select(
             Emails.id,
+            Emails.imapAccount,
             Emails.subject,
             Emails.senderName,
             Emails.sent,
@@ -202,6 +205,7 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
 
             EmailMeta(
                 id = id,
+                imapAccountId = row[Emails.imapAccount].value,
                 subject = row[Emails.subject],
                 sent = row[Emails.sent].epochSeconds,
                 isRead = row[Emails.isRead],

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.ui.components.ScrollOffset
 
 private val CARD_SHAPE = RoundedCornerShape(16.dp)
 
@@ -55,7 +57,8 @@ internal data class CardHand(
 /**
  * One sheet of the pile, drawn where [pose] says. [depth] is its place in the pile as a whole
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
- * about the hand on it, see [EmailStackState.dragOf].
+ * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
+ * scrolled; only a lifted card is, the others lie at its top.
  */
 @Composable
 internal fun StackCard(
@@ -65,6 +68,7 @@ internal fun StackCard(
     pose: () -> CardPose,
     drag: CardDrag?,
     modifier: Modifier = Modifier,
+    scroll: ScrollOffset = remember(body) { ScrollOffset() },
 ) {
     Box(
         modifier = modifier
@@ -74,7 +78,7 @@ internal fun StackCard(
     ) {
         Column(Modifier.fillMaxSize()) {
             CardHeader(email = email)
-            CardBody(body = body, modifier = Modifier.weight(1f))
+            CardBody(body = body, scroll = scroll, modifier = Modifier.weight(1f))
         }
 
         if (drag?.towards != null) SwipeOverlay(towards = drag.towards, progress = drag.progress, isEnough = drag.action != null)

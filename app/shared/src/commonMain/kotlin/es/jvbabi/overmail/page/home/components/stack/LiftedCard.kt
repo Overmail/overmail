@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -21,7 +24,9 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.uuid.Uuid
 
 /** How far a lifted card stays from the edges of the screen, on top of the system bars. */
@@ -33,6 +38,12 @@ private val LIFTED_BLUR = 24.dp
 /** How dark everything behind a lifted card gets, once it is all the way up. */
 private const val LIFTED_SCRIM = 0.2f
 
+/** How far the finger can move from where it lifted the card before the mail starts to scroll. */
+private val SCROLL_DEADZONE = 16.dp
+
+/** How fast the mail scrolls per px the finger is past [SCROLL_DEADZONE], in px per second. */
+private const val SCROLL_SPEED = 8f
+
 /**
  * The card of [state] that is lifted off the pile, laid over everything else and grown from its
  * place in the pile to as much of the screen as [LIFTED_PADDING] and the system bars leave. Goes
@@ -41,7 +52,8 @@ private const val LIFTED_SCRIM = 0.2f
  *
  * It takes no touch of its own: the finger that lifted it is still the pile's, see
  * [emailStackSwipe]. It does not move the card any more -- a lifted card is read, not swiped --
- * and lays it back down when it lets go.
+ * and lays it back down when it lets go. Moved up or down, it scrolls the mail like a joystick:
+ * the further from where it lifted the card, past a small dead zone, the faster -- down reads on.
  */
 @Composable
 fun LiftedCard(
@@ -50,6 +62,7 @@ fun LiftedCard(
     modifier: Modifier = Modifier,
 ) {
     val insets = WindowInsets.systemBars
+    val density = LocalDensity.current
     // Where this box is in the root, to find the pile in it: the card's place there is in the root.
     val origin = remember { OffsetHolder() }
 
@@ -61,6 +74,19 @@ fun LiftedCard(
     ) {
         val email = state.lifted ?: return@Box
 
+        LaunchedEffect(email) {
+            val deadzone = with(density) { SCROLL_DEADZONE.toPx() }
+            var last = withFrameNanos { it }
+            while (true) {
+                val now = withFrameNanos { it }
+                val seconds = (now - last) / 1_000_000_000f
+                last = now
+                val finger = state.liftedFingerY
+                val past = abs(finger) - deadzone
+                if (past > 0f) state.liftedScroll.scrollBy(sign(finger) * past * SCROLL_SPEED * seconds)
+            }
+        }
+
         StackCard(
             email = email,
             body = bodies[email.id] ?: StackCardBody.Loading,
@@ -70,6 +96,7 @@ fun LiftedCard(
                 CardPose(hand = motion?.let { CardHand(offset = it.offset, rotation = state.rotationOf(it), press = it.press.value) })
             },
             drag = state.dragOf(email.id),
+            scroll = state.liftedScroll,
             modifier = Modifier.layout { measurable, constraints ->
                 val inPile = Rect(state.cardPosition - origin.value, state.cardSize.toSize())
                 val padding = LIFTED_PADDING.roundToPx()

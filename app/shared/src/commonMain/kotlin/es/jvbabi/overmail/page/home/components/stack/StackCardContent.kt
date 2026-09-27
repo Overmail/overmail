@@ -19,19 +19,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.EmailHtml
 import es.jvbabi.overmail.ui.components.LabelBadge
+import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.utils.sentAtLabel
 import org.jetbrains.compose.resources.stringResource
@@ -122,14 +122,12 @@ private fun CardLabels(email: Email, modifier: Modifier = Modifier) {
 private val OVERFLOW_FADE = 48.dp
 
 /**
- * What the mail says, in whatever room the card has left, down to the card's edge. It does not
- * scroll: a card is read at a glance, and a mail longer than the card fades out where the card
- * ends.
+ * What the mail says, in whatever room the card has left, down to the card's edge. It is not
+ * scrolled by touch -- a card is read at a glance -- but [scroll] moves it, see LiftedCard; a mail
+ * that goes on below what shows fades out where the card ends.
  */
 @Composable
-internal fun CardBody(body: StackCardBody, modifier: Modifier = Modifier) {
-    // Per body: a mail that did not fit says nothing about the next one.
-    var overflows by remember(body) { mutableStateOf(false) }
+internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, modifier: Modifier = Modifier) {
     // The paper of the card, see cardSurface.
     val paper = MaterialTheme.colorScheme.surfaceContainerLowest
 
@@ -140,7 +138,7 @@ internal fun CardBody(body: StackCardBody, modifier: Modifier = Modifier) {
             .clipToBounds()
             .drawWithContent {
                 drawContent()
-                if (!overflows) return@drawWithContent
+                if (!scroll.hasMoreBelow) return@drawWithContent
                 val fade = OVERFLOW_FADE.toPx().coerceAtMost(size.height)
                 drawRect(
                     brush = Brush.verticalGradient(listOf(paper.copy(alpha = 0f), paper), startY = size.height - fade, endY = size.height),
@@ -153,14 +151,20 @@ internal fun CardBody(body: StackCardBody, modifier: Modifier = Modifier) {
             is StackCardBody.Html -> EmailHtml(
                 html = body.html,
                 modifier = Modifier.fillMaxSize(),
-                onOverflowChange = { overflows = it },
+                scroll = scroll,
             )
             is StackCardBody.Text -> Text(
                 text = body.text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                overflow = TextOverflow.Clip,
-                onTextLayout = { overflows = it.didOverflowHeight },
+                modifier = Modifier.layout { measurable, constraints ->
+                    // As tall as the text is, moved up by the scroll; the box cuts it off.
+                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                    scroll.max = (placeable.height - constraints.maxHeight).toFloat()
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        placeable.place(0, -scroll.value.roundToInt())
+                    }
+                },
             )
             StackCardBody.Failed -> Text(
                 text = stringResource(Res.string.home_stack_body_failed),

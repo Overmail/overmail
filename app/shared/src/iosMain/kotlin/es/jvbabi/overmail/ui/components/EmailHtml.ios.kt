@@ -2,7 +2,6 @@ package es.jvbabi.overmail.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
@@ -34,32 +35,40 @@ import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationDelegateProtocol
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
+import platform.darwin.DISPATCH_TIME_NOW
 import platform.darwin.NSObject
+import platform.darwin.dispatch_after
+import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_time
 import platform.posix.memcpy
 import kotlin.coroutines.resume
+import kotlin.math.roundToInt
 
 private val logger = Logger.withTag("EmailHtml")
+
+/** How much of a long mail is pictured at most, in points: the rest of it is never scrolled to. */
+private const val MAX_SNAPSHOT_HEIGHT = 4000.0
+
+/** How long WebKit is given to lay the mail out at its full height before it is pictured. */
+private const val RELAYOUT_DELAY = 100_000_000L
 
 /**
  * A picture of a web view rather than the view itself: UIKit views sit outside the Compose layer
  * and would stay upright while the card around them turns. The mail is rendered once, off screen,
- * at the size it is shown at, and what is drawn is that snapshot -- which turns, scales and clips
- * like everything else on the card.
+ * at the width it is shown at and as tall as it is, and what is drawn is that snapshot -- which
+ * turns, scales and clips like everything else on the card, and is moved by [scroll].
  */
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier, onOverflowChange: (Boolean) -> Unit) {
+actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset) {
     BoxWithConstraints(modifier = modifier) {
         // Points on iOS are what a dp is.
         val width = maxWidth.value.toDouble()
-        val height = maxHeight.value.toDouble()
+        // What a mail sized to the screen is sized to; not a key, a taller box shows more of the same.
+        val viewportHeight = maxHeight.value.toDouble()
         var snapshot by remember(html) { mutableStateOf<ImageBitmap?>(null) }
 
-        LaunchedEffect(html, width, height) {
-            if (width > 0 && height > 0) {
-                val rendered = renderSnapshot(emailHtmlDocument(html), width, height)
-                snapshot = rendered?.image
-                if (rendered != null) onOverflowChange(rendered.overflows)
-            }
+        LaunchedEffect(html, width) {
+            if (width > 0 && viewportHeight > 0) renderSnapshot(emailHtmlDocument(html), width, viewportHeight)?.let { snapshot = it }
         }
 
         val image = snapshot
@@ -67,28 +76,37 @@ actual fun EmailHtml(html: String, modifier: Modifier, onOverflowChange: (Boolea
         else Image(
             bitmap = image,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds,
+            modifier = Modifier.layout { measurable, constraints ->
+                // As wide as the box, as tall as that makes the mail, moved up by the scroll.
+                val imageWidth = constraints.maxWidth
+                val imageHeight = (imageWidth * image.height.toFloat() / image.width).roundToInt()
+                val placeable = measurable.measure(Constraints.fixed(imageWidth, imageHeight))
+                scroll.max = (imageHeight - constraints.maxHeight).toFloat()
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.place(0, -scroll.value.roundToInt())
+                }
+            },
         )
     }
 }
 
-/** A picture of a rendered mail, and whether the mail went on past it. */
-private class Snapshot(val image: ImageBitmap, val overflows: Boolean)
-
 /**
- * Renders [document] in a web view of [width] x [height] points and takes a picture of it once it
- * has loaded; null when it would not load. The view has to be in a window for WebKit to draw it, so
- * it is put into the key window, underneath everything, for as long as it takes.
+ * Renders [document] in a web view [width] points wide and takes a picture of all of it, up to
+ * [MAX_SNAPSHOT_HEIGHT], once it has loaded; null when it would not load. It is laid out at
+ * [viewportHeight] first, which is what a mail sized to the screen measures itself against.
+ *
+ * The view has to be in a window for WebKit to draw it, so it is put into the key window,
+ * underneath everything, for as long as it takes.
  */
 @OptIn(ExperimentalForeignApi::class)
-private suspend fun renderSnapshot(document: String, width: Double, height: Double): Snapshot? =
+private suspend fun renderSnapshot(document: String, width: Double, viewportHeight: Double): ImageBitmap? =
     suspendCancellableCoroutine { continuation ->
         val configuration = WKWebViewConfiguration().apply {
             // A mail runs no script, the content security policy aside.
             defaultWebpagePreferences.allowsContentJavaScript = false
         }
-        val webView = WKWebView(frame = CGRectMake(0.0, 0.0, width, height), configuration = configuration).apply {
+        val webView = WKWebView(frame = CGRectMake(0.0, 0.0, width, viewportHeight), configuration = configuration).apply {
             scrollView.scrollEnabled = false
             opaque = false
             backgroundColor = UIColor.clearColor
@@ -96,7 +114,7 @@ private suspend fun renderSnapshot(document: String, width: Double, height: Doub
             userInteractionEnabled = false
         }
 
-        fun finish(image: Snapshot?) {
+        fun finish(image: ImageBitmap?) {
             webView.navigationDelegate = null
             webView.removeFromSuperview()
             if (continuation.isActive) continuation.resume(image)
@@ -105,10 +123,15 @@ private suspend fun renderSnapshot(document: String, width: Double, height: Doub
         val delegate = object : NSObject(), WKNavigationDelegateProtocol {
             @ObjCSignatureOverride
             override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
-                val overflows = webView.scrollView.contentSize.useContents { this.height } > height
-                webView.takeSnapshotWithConfiguration(null) { image, error ->
-                    if (error != null) logger.w { "Could not take a picture of a mail: ${error.localizedDescription}" }
-                    finish(image?.toImageBitmap()?.let { Snapshot(it, overflows) })
+                // Grown to the whole mail, so the picture holds what scrolling will bring up.
+                val contentHeight = webView.scrollView.contentSize.useContents { this.height }
+                val fullHeight = contentHeight.coerceIn(viewportHeight, MAX_SNAPSHOT_HEIGHT)
+                webView.setFrame(CGRectMake(0.0, 0.0, width, fullHeight))
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, RELAYOUT_DELAY), dispatch_get_main_queue()) {
+                    webView.takeSnapshotWithConfiguration(null) { image, error ->
+                        if (error != null) logger.w { "Could not take a picture of a mail: ${error.localizedDescription}" }
+                        finish(image?.toImageBitmap())
+                    }
                 }
             }
 

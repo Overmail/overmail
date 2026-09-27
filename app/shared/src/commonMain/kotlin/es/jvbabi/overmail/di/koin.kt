@@ -18,6 +18,9 @@ import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
+import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
+import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
@@ -130,6 +133,10 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
         singleOf(::ParticipantsRepositoryImpl) bind ParticipantsRepository::class
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
+
+        singleOf(::GetCurrentAccountUseCase)
+        singleOf(::SetCurrentAccountUseCase)
+        singleOf(::KeepCurrentAccountValidUseCase)
 
         viewModelOf(::HomeViewModel)
         viewModelOf(::ViewSettingsViewModel)

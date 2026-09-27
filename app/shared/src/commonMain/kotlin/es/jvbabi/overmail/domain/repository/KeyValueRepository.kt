@@ -48,7 +48,8 @@ sealed class Key<VALUE>(val key: String) {
     /**
      * The id of the [es.jvbabi.overmail.domain.model.OvermailAccount] the app is showing.
      *
-     * Kept pointing at an existing account by [AccountRepository.keepCurrentAccountValid]: missing
+     * Kept pointing at an existing account by
+     * [es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase]: missing
      * or dangling, it becomes the first account, and without any account it is removed.
      */
     data object CurrentAccount: UuidKey("app.account.current")

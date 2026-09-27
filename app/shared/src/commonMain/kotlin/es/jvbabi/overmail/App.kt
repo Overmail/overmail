@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.page.Screen
 import es.jvbabi.overmail.page.home.HomeScreen
 import es.jvbabi.overmail.page.onboarding.OnboardingRoot
@@ -95,10 +96,10 @@ fun App() {
 
         UpdateAvailableOverlay()
 
-        val accountRepository = koinInject<AccountRepository>()
-        LaunchedEffect(accountRepository) { accountRepository.keepCurrentAccountValid() }
+        val keepCurrentAccountValid = koinInject<KeepCurrentAccountValidUseCase>()
+        LaunchedEffect(keepCurrentAccountValid) { keepCurrentAccountValid() }
 
-        val hasAccounts by accountRepository
+        val hasAccounts by koinInject<AccountRepository>()
             .getAccounts()
             .map { it.isNotEmpty() }
             .collectAsStateWithLifecycle(null)

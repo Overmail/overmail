@@ -12,16 +12,6 @@ interface AccountRepository {
     suspend fun saveAccount(account: OvermailAccount)
 
     fun getById(id: Uuid): Flow<OvermailAccount?>
-
-    /** The account [Key.CurrentAccount] points at, or null while there is none. */
-    fun getCurrentAccount(): Flow<OvermailAccount?>
-
-    /**
-     * Repairs [Key.CurrentAccount] whenever it is missing or points at an account that does not
-     * exist: it becomes the first account, or is deleted when there is none. Suspends for as long
-     * as it runs.
-     */
-    suspend fun keepCurrentAccountValid()
 }
 
 sealed class RedeemAuthCodeResponse {

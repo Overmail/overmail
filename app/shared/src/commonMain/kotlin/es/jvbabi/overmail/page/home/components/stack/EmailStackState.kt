@@ -27,10 +27,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 /** Share of the card's width a card has to be pulled aside to leave the pile when let go. */
 private const val SWIPE_THRESHOLD = 0.3f
+
+/**
+ * How long a card has to be held past the threshold for letting go to be felt: a card only
+ * flicked past it was not a decision the hand made there.
+ */
+private val CONFIRM_AFTER = 50.milliseconds
 
 /** How big the top card is while a finger is on it. */
 private const val PRESSED_SCALE = 0.96f
@@ -128,6 +137,9 @@ class EmailStackState internal constructor(
     /** The card being held, from the touch that picked it up until it is let go. */
     private var held: Pair<Email, CardMotion>? by mutableStateOf(null)
 
+    /** Since when the held card has been past the threshold, without going back; null while it is not. */
+    private var beyondSince: TimeMark? = null
+
     /**
      * The card a touch goes to: the top one of those still on the pile. A card thrown off is
      * already out of the way, so the next swipe does not have to wait for it to be gone.
@@ -201,6 +213,7 @@ class EmailStackState internal constructor(
         motion.job?.cancel()
         motion.grab = grabAt(position)
         held = email to motion
+        beyondSince = null
         scope.launch { motion.press.animateTo(PRESSED_SCALE, spring(stiffness = Spring.StiffnessMedium)) }
         return true
     }
@@ -211,8 +224,13 @@ class EmailStackState internal constructor(
         motion.offset += delta
         // Felt where letting go starts to mean something, and again where it stops to.
         val isBeyond = abs(motion.offset.x) > threshold
-        if (isBeyond && !wasBeyond) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-        else if (wasBeyond && !isBeyond) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        if (isBeyond && !wasBeyond) {
+            beyondSince = TimeSource.Monotonic.markNow()
+            haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+        } else if (wasBeyond && !isBeyond) {
+            beyondSince = null
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        }
     }
 
     internal fun release(velocity: Velocity, swipeVelocity: Float) {
@@ -239,7 +257,9 @@ class EmailStackState internal constructor(
             return
         }
 
-        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        val heldPast = beyondSince?.let { it.elapsedNow() >= CONFIRM_AFTER } == true
+        beyondSince = null
+        if (heldPast) haptics.performHapticFeedback(HapticFeedbackType.Confirm)
         // Right away rather than once it is out: the next touch already goes to the card below.
         motion.leaving = true
         motion.thrownFor = swipe

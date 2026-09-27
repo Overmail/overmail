@@ -29,6 +29,8 @@ import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.ViewSettings
 import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
 import es.jvbabi.overmail.page.home.components.stack.EmailStack
+import es.jvbabi.overmail.page.home.components.stack.LiftedCard
+import es.jvbabi.overmail.page.home.components.stack.blurredBehindLiftedCard
 import es.jvbabi.overmail.page.home.components.stack.StackSwipe
 import es.jvbabi.overmail.page.home.components.stack.emailStackSwipe
 import es.jvbabi.overmail.page.home.components.stack.rememberEmailStackState
@@ -99,145 +101,151 @@ private fun HomeContent(
         // How far the listing scrolls until it covers the pile, which is what the pile is tall.
         val stackHeight = (containerHeight - bottomHeight - LIST_PEEK_BELOW_STACK - HEADER_HEIGHT - innerPadding.calculateTopPadding() - innerPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
         val stackHeightPx = with(localDensity) { stackHeight.toPx() }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { (_, h) ->
-                    containerHeight = with(localDensity) { h.toDp() }
-                }
-        ) {
-            val verticalPercentageOfStackVisible by remember(stackHeightPx) {
-                derivedStateOf {
-                    if (emailsListState.firstVisibleItemIndex > 0 || stackHeightPx <= 0f) return@derivedStateOf 0f
-                    (1 - emailsListState.firstVisibleItemScrollOffset / stackHeightPx).coerceIn(0f, 1f)
-                }
-            }
+        Box(Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .hazeSource(hazeState)
-                    // The listing lies on top of the pile and takes every touch, so the swipe is
-                    // picked up here. Only where the pile is not covered: below the header and
-                    // above the listing, which scrolls up over it.
-                    .emailStackSwipe(emailStackState, remember(topOfStack, stackHeight, localDensity) {
-                        { position ->
-                            val stackTop = with(localDensity) { topOfStack.toPx() }
-                            val topOfList = stackTop + with(localDensity) { stackHeight.toPx() } - emailsListState.firstVisibleItemScrollOffset
-                            emailsListState.firstVisibleItemIndex == 0 && position.y > stackTop && position.y < topOfList
-                        }
-                    })
+                    .onSizeChanged { (_, h) ->
+                        containerHeight = with(localDensity) { h.toDp() }
+                    }
+                    .blurredBehindLiftedCard(emailStackState)
             ) {
-                EmailStack(
-                    emails = stackContent.emails,
-                    bodies = stackContent.bodies,
-                    isLoading = stackContent.isLoading,
-                    state = emailStackState,
-                    onSwiped = { email, swipe ->
-                        onStackEvent(
-                            when (swipe) {
-                                StackSwipe.Archive -> EmailStackEvent.Archive(email)
-                                StackSwipe.Keep -> EmailStackEvent.Keep(email)
-                            }
-                        )
-                    },
-                    // In the layer, not in composition: read there, the scroll position would
-                    // recompose the whole screen on every frame of a scroll.
+                val verticalPercentageOfStackVisible by remember(stackHeightPx) {
+                    derivedStateOf {
+                        if (emailsListState.firstVisibleItemIndex > 0 || stackHeightPx <= 0f) return@derivedStateOf 0f
+                        (1 - emailsListState.firstVisibleItemScrollOffset / stackHeightPx).coerceIn(0f, 1f)
+                    }
+                }
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = verticalPercentageOfStackVisible
-                            scaleX = verticalPercentageOfStackVisible * 0.15f + 0.85f
-                            scaleY = scaleX
-                        },
-                    contentPaddingValues = PaddingValues(
-                        top = topOfStack,
-                        bottom = innerPadding.calculateBottomPadding() + bottomHeight + LIST_PEEK_BELOW_STACK
-                    )
-                )
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = topOfStack + stackHeight,
-                        bottom = bottomHeight,
-                    ),
-                    state = emailsListState,
-                    flingBehavior = rememberStackSnapFlingBehavior(emailsListState, stackHeightPx),
+                        .hazeSource(hazeState)
+                        // The listing lies on top of the pile and takes every touch, so the swipe is
+                        // picked up here. Only where the pile is not covered: below the header and
+                        // above the listing, which scrolls up over it.
+                        .emailStackSwipe(emailStackState, remember(topOfStack, stackHeight, localDensity) {
+                            { position ->
+                                val stackTop = with(localDensity) { topOfStack.toPx() }
+                                val topOfList = stackTop + with(localDensity) { stackHeight.toPx() } - emailsListState.firstVisibleItemScrollOffset
+                                emailsListState.firstVisibleItemIndex == 0 && position.y > stackTop && position.y < topOfList
+                            }
+                        })
                 ) {
-                    items(content.results) { result ->
-                        when (result) {
-                            is ViewResult.Item -> Text("Email ${result.email.subject}")
-                            is ViewResult.Group -> ViewGroupComponent(
-                                group = result,
-                                senders = content.senders,
+                    EmailStack(
+                        emails = stackContent.emails,
+                        bodies = stackContent.bodies,
+                        isLoading = stackContent.isLoading,
+                        state = emailStackState,
+                        onSwiped = { email, swipe ->
+                            onStackEvent(
+                                when (swipe) {
+                                    StackSwipe.Archive -> EmailStackEvent.Archive(email)
+                                    StackSwipe.Keep -> EmailStackEvent.Keep(email)
+                                }
                             )
+                        },
+                        // In the layer, not in composition: read there, the scroll position would
+                        // recompose the whole screen on every frame of a scroll.
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = verticalPercentageOfStackVisible
+                                scaleX = verticalPercentageOfStackVisible * 0.15f + 0.85f
+                                scaleY = scaleX
+                            },
+                        contentPaddingValues = PaddingValues(
+                            top = topOfStack,
+                            bottom = innerPadding.calculateBottomPadding() + bottomHeight + LIST_PEEK_BELOW_STACK
+                        )
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = topOfStack + stackHeight,
+                            bottom = bottomHeight,
+                        ),
+                        state = emailsListState,
+                        flingBehavior = rememberStackSnapFlingBehavior(emailsListState, stackHeightPx),
+                    ) {
+                        items(content.results) { result ->
+                            when (result) {
+                                is ViewResult.Item -> Text("Email ${result.email.subject}")
+                                is ViewResult.Group -> ViewGroupComponent(
+                                    group = result,
+                                    senders = content.senders,
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
-                    .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
-                    .padding(top = innerPadding.calculateTopPadding())
-                    .height(HEADER_HEIGHT)
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                HomeHeader(
-                    currentUser = homeState.currentUser,
-                    greeting = homeState.greeting,
-                )
-            }
-
-            if (verticalPercentageOfStackVisible < 1f) Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset { IntOffset(x = 0, y = (with(localDensity) { 92.dp.toPx() } * verticalPercentageOfStackVisible).roundToInt()) }
-                    .fillMaxWidth()
-                    .alpha(1-verticalPercentageOfStackVisible)
-                    .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.BottomToTop, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
-                    .progressiveBackground(edgeTint, ProgressiveDirection.BottomToTop)
-                    .onSizeChanged { (_, h) ->
-                        bottomHeight = with(localDensity) { h.toDp() }
-                    }
-                    .consumeWindowInsets(innerPadding)
-                    .padding(bottom = innerPadding.calculateBottomPadding())
-                    .imePadding(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TextField(
-                    value = "",
-                    onValueChange = {},
-                    leadingIcon = {
-                        Icon(
-                            imageVector = PhIcons.Regular.MagnifyingGlass,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    placeholder = { Text("Q2 Budget report") },
+                Box(
                     modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        errorIndicatorColor = Color.Transparent,
-                    ),
-                    shape = RoundedCornerShape(percent = 50),
-                )
+                        .fillMaxWidth()
+                        .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
+                        .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
+                        .padding(top = innerPadding.calculateTopPadding())
+                        .height(HEADER_HEIGHT)
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    HomeHeader(
+                        currentUser = homeState.currentUser,
+                        greeting = homeState.greeting,
+                    )
+                }
 
-                ViewSettings(
-                    viewState = viewState,
-                    state = viewSettingsState,
-                    onViewStateChange = onViewStateChange,
-                    onEvent = onViewSettingsEvent,
-                )
+                if (verticalPercentageOfStackVisible < 1f) Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset { IntOffset(x = 0, y = (with(localDensity) { 92.dp.toPx() } * verticalPercentageOfStackVisible).roundToInt()) }
+                        .fillMaxWidth()
+                        .alpha(1-verticalPercentageOfStackVisible)
+                        .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.BottomToTop, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
+                        .progressiveBackground(edgeTint, ProgressiveDirection.BottomToTop)
+                        .onSizeChanged { (_, h) ->
+                            bottomHeight = with(localDensity) { h.toDp() }
+                        }
+                        .consumeWindowInsets(innerPadding)
+                        .padding(bottom = innerPadding.calculateBottomPadding())
+                        .imePadding(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextField(
+                        value = "",
+                        onValueChange = {},
+                        leadingIcon = {
+                            Icon(
+                                imageVector = PhIcons.Regular.MagnifyingGlass,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        placeholder = { Text("Q2 Budget report") },
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent,
+                        ),
+                        shape = RoundedCornerShape(percent = 50),
+                    )
+
+                    ViewSettings(
+                        viewState = viewState,
+                        state = viewSettingsState,
+                        onViewStateChange = onViewStateChange,
+                        onEvent = onViewSettingsEvent,
+                    )
+                }
             }
+
+            // Over everything above, the header and the search included.
+            LiftedCard(state = emailStackState, bodies = stackContent.bodies)
         }
     }
 }

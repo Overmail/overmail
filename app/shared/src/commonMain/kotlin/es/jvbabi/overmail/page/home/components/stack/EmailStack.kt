@@ -164,7 +164,8 @@ private fun PiledCard(
                 place = (if (depth == 0 || motion?.leaving == true) 0f else depth - state.progress) + (1f - appeared.value),
                 hand = motion?.let { CardHand(offset = it.offset, rotation = state.rotationOf(it), press = it.press.value) },
                 dealt = dealt.value,
-                alpha = appeared.value,
+                // Lifted, the card is drawn over everything else instead, see LiftedCard.
+                alpha = if (state.lifted?.id == email.id) 0f else appeared.value,
             )
         },
         drag = state.dragOf(email.id),

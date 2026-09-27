@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Velocity
 import es.jvbabi.overmail.domain.model.Email
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
@@ -40,6 +41,9 @@ private const val SWIPE_THRESHOLD = 0.3f
  * flicked past it was not a decision the hand made there.
  */
 private val CONFIRM_AFTER = 50.milliseconds
+
+/** How long a finger has to rest on a card, unmoved, for the card to be lifted off the pile. */
+private val LIFT_AFTER = 200.milliseconds
 
 /** How big the top card is while a finger is on it. */
 private const val PRESSED_SCALE = 0.96f
@@ -141,6 +145,18 @@ class EmailStackState internal constructor(
     private var beyondSince: TimeMark? = null
 
     /**
+     * The card lifted off the pile to be read: held still long enough, it is laid over everything
+     * else, as big as the screen allows. Still there while it is laid back down.
+     */
+    internal var lifted: Email? by mutableStateOf(null)
+        private set
+
+    /** How far [lifted] is on its way up: 0 in the pile, 1 over everything. */
+    internal val lift = Animatable(0f)
+
+    private var liftJob: Job? = null
+
+    /**
      * The card a touch goes to: the top one of those still on the pile. A card thrown off is
      * already out of the way, so the next swipe does not have to wait for it to be gone.
      */
@@ -214,12 +230,23 @@ class EmailStackState internal constructor(
         motion.grab = grabAt(position)
         held = email to motion
         beyondSince = null
+        liftJob?.cancel()
+        liftJob = scope.launch {
+            delay(LIFT_AFTER)
+            lifted = email
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            lift.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+        }
         scope.launch { motion.press.animateTo(PRESSED_SCALE, spring(stiffness = Spring.StiffnessMedium)) }
         return true
     }
 
     internal fun dragBy(delta: Offset) {
-        val (_, motion) = held ?: return
+        val (email, motion) = held ?: return
+        // A lifted card is there to be read, not swiped: it stays where it is until it is let go.
+        if (lifted == email) return
+        // Moved before it was lifted: a swipe, not a card to read.
+        liftJob?.cancel()
         val wasBeyond = abs(motion.offset.x) > threshold
         motion.offset += delta
         // Felt where letting go starts to mean something, and again where it stops to.
@@ -236,6 +263,12 @@ class EmailStackState internal constructor(
     internal fun release(velocity: Velocity, swipeVelocity: Float) {
         val (email, motion) = held ?: return
         held = null
+        liftJob?.cancel()
+        if (lifted == email) scope.launch {
+            lift.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
+            // Not if another card was lifted meanwhile, which takes the animation over.
+            if (lifted == email) lifted = null
+        }
         val unpress = scope.launch { motion.press.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
         val offset = motion.offset
         // A flick only counts in the direction the card is already pulled, so a card dragged

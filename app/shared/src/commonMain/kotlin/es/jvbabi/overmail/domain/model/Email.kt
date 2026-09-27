@@ -10,6 +10,11 @@ data class Email(
     val sentBy: Participant,
     val sentAt: Instant,
     val subject: String?,
+    /**
+     * How the body begins, as one line. Null while the server has not looked at the body yet,
+     * empty for a mail with nothing readable in it.
+     */
+    val preview: String?,
     val isRead: Boolean,
     val archivedState: ArchivedState,
     val labels: List<Label>,

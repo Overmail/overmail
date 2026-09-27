@@ -90,8 +90,8 @@ fun ViewItem(
                     color = color,
                 )
             })
-            Text(
-                text = "Lorem ipsum dolor sit amet",
+            if (!item.email.preview.isNullOrEmpty()) Text(
+                text = item.email.preview,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,

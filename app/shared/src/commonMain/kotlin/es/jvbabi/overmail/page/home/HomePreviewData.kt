@@ -107,6 +107,16 @@ private val PREVIEW_SUBJECTS = listOf(
     "Your package is on its way",
 )
 
+private val PREVIEW_TEXTS = listOf(
+    "Hi all, attached is the report for the second quarter. The numbers look better than expected",
+    "Thank you for your booking. Your tickets are attached to this mail as a PDF",
+    "We noticed a new sign-in to your account from a device we have not seen before",
+    "Looks good to me, just one question about the migration before we merge this",
+    "Please find your invoice for September attached. The amount will be debited on",
+    "Sounds great! Should I bring something? I could make the dessert again",
+    "",
+)
+
 /** The mailbox's stretches and how many mails each holds, newest first. */
 private fun previewGroups(): List<ViewResult.Group> {
     val mailbox = PreviewMailbox(seed = 42)
@@ -234,6 +244,7 @@ private fun previewEmail(index: Long, sentAt: Instant, random: Random): Email {
         sentBy = sender,
         sentAt = sentAt,
         subject = PREVIEW_SUBJECTS[random.nextInt(PREVIEW_SUBJECTS.size)].takeIf { random.nextInt(20) != 0 },
+        preview = PREVIEW_TEXTS[random.nextInt(PREVIEW_TEXTS.size)].takeIf { random.nextInt(10) != 0 },
         // The newest ones are the ones still unread.
         isRead = index > 4 && random.nextInt(4) != 0,
         archivedState = ArchivedState.Unarchive,

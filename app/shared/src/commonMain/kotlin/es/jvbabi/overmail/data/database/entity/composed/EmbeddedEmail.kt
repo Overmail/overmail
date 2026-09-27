@@ -52,6 +52,7 @@ data class EmbeddedEmail(
         sentBy = sender.toModel(),
         sentAt = dbEmail.sentAt,
         subject = dbEmail.subject,
+        preview = dbEmail.preview,
         isRead = dbEmail.isRead,
         archivedState = dbEmail.archivedState,
         labels = labels.map { it.toModel() },

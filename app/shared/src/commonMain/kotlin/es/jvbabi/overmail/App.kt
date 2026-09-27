@@ -54,6 +54,12 @@ expect fun deviceInfo(): DeviceInfo
 expect fun imageCacheDirectory(context: PlatformContext): Path
 
 /**
+ * Where the bodies of mails are kept on disk, see `EmailBodyCache`: inside the platform's cache,
+ * like the pictures, so the system may clear it when space runs out.
+ */
+expect fun emailBodyCacheDirectory(): Path
+
+/**
  * The color scheme the system suggests -- Material You on Android 12 and up, the app's own scheme
  * everywhere else. Only consulted when [AppTheme] is asked for a dynamic theme.
  */

@@ -2,6 +2,7 @@ package es.jvbabi.overmail.domain.repository
 
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.EmailBody
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewState
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +15,12 @@ interface EmailsRepository {
         instantLocalEmission: Boolean = false,
         user: OvermailAccount
     ): Flow<List<ViewResult>>
+
+    /**
+     * What the mail of [emailId] says, its text and its html part. Kept in a file cache and only
+     * fetched while there is no copy: a stored mail never changes.
+     */
+    suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody>
 }
 
 sealed class ViewResult {

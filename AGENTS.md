@@ -66,8 +66,8 @@ modules are entry points and nothing else.
 ## Workflow
 
 Every change starts as an issue and lands as a pull request against `main`. The issue number is
-what ties the two together, and it is not cosmetic: `check_changelog.main.kts` and
-`sync-labels.yaml` both read it back out of the branch name.
+what ties the two together, and it is not cosmetic: `check_changelog.main.kts`,
+`generate_changelog.main.kts` and `sync-labels.yaml` all read it back out of the pull request.
 
 1. **The issue carries a type** -- Feature, Bug or Task. The type decides the shape of the
    changelog entry and the section it is rendered under, so an issue without one is a warning on
@@ -80,8 +80,8 @@ what ties the two together, and it is not cosmetic: `check_changelog.main.kts` a
    leaves the reference out: `feat(web/button): add cursor pointer to button base styles`.
 4. **Add the changelog entry** for the issue, see [Changelog](#changelog).
 5. **Open the pull request against `main` and link the issue** with `Closes #<issue>` in the
-   description. The link is what the tooling reads first; the branch name is only its fallback,
-   for pull requests nobody linked.
+   description. The closing keywords are what the tooling reads first, from GitHub's link and from
+   the description itself; the branch name is only its fallback, for pull requests nobody linked.
 
 ### Labels
 
@@ -100,10 +100,26 @@ Exactly one thing must not happen: merging without any of them. An unlabelled me
 apart from a forgotten label, so it falls back to building everything. `project:other` is how a
 change says it deliberately delivers nothing.
 
+### Stacked pull requests
+
+Work that splits into reviewable steps can go up as a stack (`gh stack`), each pull request based
+on the branch of the one below:
+
+- **One concern per layer**, each on its own branch named after its issue: `feat/12-auth`,
+  `feat/12-api`. A stack may span several issues.
+- **Every layer names its issues** with `Closes #<issue>` in its description, even when the layer
+  below closes the same one. GitHub does not link the keywords of a pull request that targets
+  another branch, so the tooling reads them from the description.
+- **Every layer carries the labels** for what it touches.
+- **A Feature's changelog entry** lives in the topmost layer that closes the issue, or below it;
+  only the topmost one fails without it.
+- **Merge with `gh stack merge`.** The stack lands in one push and is built and released as one.
+
 ## Release pipeline
 
 A merge to `main` runs [deploy.yaml](.github/workflows/deploy.yaml), which builds only what the
-merged pull request's `project:*` labels say it touches:
+`project:*` labels of every pull request merged since the last successful deploy say they touch
+(a stack lands as several at once). Deploys run one at a time:
 
 | Label                               | Effect on a merge to `main`                  |
 |-------------------------------------|----------------------------------------------|
@@ -132,7 +148,25 @@ optional.
 
 `.github/check_changelog.main.kts` checks this on every pull request;
 `.github/generate_changelog.main.kts` renders the release body from the entries of every issue
-referenced by the commits since the last release.
+closed by the pull requests merged since the last release, plus those named in direct pushes.
+
+## Scaffold
+
+This project is based on [Scaffold](https://github.com/Julius-Babies/Scaffold);
+[.scaffold/README.md](.scaffold/README.md) names the version and lists every
+deviation from it. Files derived from Scaffold: `.github/`.
+
+When changing one of these files:
+
+1. **Check whether the change belongs in Scaffold.** If it would help every
+   project based on Scaffold (a fix, a better check, a new convention), tell the
+   user and propose making it in Scaffold instead. Only make it here if the user
+   agrees or it is genuinely specific to this project.
+2. **Document it.** Every difference from the Scaffold version goes into the
+   deviations table of `.scaffold/README.md`, with its reason, in the same change.
+   Mark it as an upstream candidate if it should move to Scaffold later.
+3. **Never change the Scaffold version by hand.** Upgrading follows the procedure
+   in Scaffold's AGENTS.md.
 
 ## Configuration
 

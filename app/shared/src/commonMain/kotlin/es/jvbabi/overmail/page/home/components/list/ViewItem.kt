@@ -56,7 +56,7 @@ fun ViewItem(
                         text = item.email.sentBy.name ?: item.email.sentBy.email,
                         maxLines = 1,
                         overflow = TextOverflow.MiddleEllipsis,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = fontWeight,
                     )
                     if (item.email.isRead) Spacer(
@@ -85,14 +85,14 @@ fun ViewItem(
                     text = item.email.subject ?: "Kein Betreff",
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = fontWeight,
                     color = color,
                 )
             })
-            Text(
-                text = "Lorem ipsum dolor sit amet",
-                maxLines = 1,
+            if (!item.email.preview.isNullOrEmpty()) Text(
+                text = item.email.preview,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
             )

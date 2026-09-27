@@ -1,0 +1,10 @@
+{
+  "title": "A glimpse into every mail",
+  "description": "Every mail on the home screen now shows how it begins, right below its subject, so you know what it is about before opening it.",
+  "localized": {
+    "de": {
+      "title": "Ein Blick in jede E-Mail",
+      "description": "Jede E-Mail auf dem Startbildschirm zeigt jetzt direkt unter dem Betreff, wie sie beginnt, damit du schon vor dem Öffnen weißt, worum es geht."
+    }
+  }
+}

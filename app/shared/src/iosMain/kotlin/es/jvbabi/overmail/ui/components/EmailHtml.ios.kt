@@ -19,6 +19,7 @@ import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.jetbrains.skia.Image as SkiaImage
@@ -46,7 +47,7 @@ private val logger = Logger.withTag("EmailHtml")
  * like everything else on the card.
  */
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier) {
+actual fun EmailHtml(html: String, modifier: Modifier, onOverflowChange: (Boolean) -> Unit) {
     BoxWithConstraints(modifier = modifier) {
         // Points on iOS are what a dp is.
         val width = maxWidth.value.toDouble()
@@ -54,7 +55,11 @@ actual fun EmailHtml(html: String, modifier: Modifier) {
         var snapshot by remember(html) { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(html, width, height) {
-            if (width > 0 && height > 0) snapshot = renderSnapshot(emailHtmlDocument(html), width, height)
+            if (width > 0 && height > 0) {
+                val rendered = renderSnapshot(emailHtmlDocument(html), width, height)
+                snapshot = rendered?.image
+                if (rendered != null) onOverflowChange(rendered.overflows)
+            }
         }
 
         val image = snapshot
@@ -68,13 +73,16 @@ actual fun EmailHtml(html: String, modifier: Modifier) {
     }
 }
 
+/** A picture of a rendered mail, and whether the mail went on past it. */
+private class Snapshot(val image: ImageBitmap, val overflows: Boolean)
+
 /**
  * Renders [document] in a web view of [width] x [height] points and takes a picture of it once it
  * has loaded; null when it would not load. The view has to be in a window for WebKit to draw it, so
  * it is put into the key window, underneath everything, for as long as it takes.
  */
 @OptIn(ExperimentalForeignApi::class)
-private suspend fun renderSnapshot(document: String, width: Double, height: Double): ImageBitmap? =
+private suspend fun renderSnapshot(document: String, width: Double, height: Double): Snapshot? =
     suspendCancellableCoroutine { continuation ->
         val configuration = WKWebViewConfiguration().apply {
             // A mail runs no script, the content security policy aside.
@@ -88,7 +96,7 @@ private suspend fun renderSnapshot(document: String, width: Double, height: Doub
             userInteractionEnabled = false
         }
 
-        fun finish(image: ImageBitmap?) {
+        fun finish(image: Snapshot?) {
             webView.navigationDelegate = null
             webView.removeFromSuperview()
             if (continuation.isActive) continuation.resume(image)
@@ -97,9 +105,10 @@ private suspend fun renderSnapshot(document: String, width: Double, height: Doub
         val delegate = object : NSObject(), WKNavigationDelegateProtocol {
             @ObjCSignatureOverride
             override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
+                val overflows = webView.scrollView.contentSize.useContents { this.height } > height
                 webView.takeSnapshotWithConfiguration(null) { image, error ->
                     if (error != null) logger.w { "Could not take a picture of a mail: ${error.localizedDescription}" }
-                    finish(image?.toImageBitmap())
+                    finish(image?.toImageBitmap()?.let { Snapshot(it, overflows) })
                 }
             }
 

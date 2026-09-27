@@ -19,7 +19,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
@@ -111,26 +118,49 @@ private fun CardLabels(email: Email, modifier: Modifier = Modifier) {
     }
 }
 
+/** How tall the fade is that a mail longer than its card runs out in. */
+private val OVERFLOW_FADE = 48.dp
+
 /**
- * What the mail says, in whatever room the card has left. It does not scroll: a card is read at a
- * glance, and a mail longer than the card is cut where the card ends.
+ * What the mail says, in whatever room the card has left, down to the card's edge. It does not
+ * scroll: a card is read at a glance, and a mail longer than the card fades out where the card
+ * ends.
  */
 @Composable
 internal fun CardBody(body: StackCardBody, modifier: Modifier = Modifier) {
+    // Per body: a mail that did not fit says nothing about the next one.
+    var overflows by remember(body) { mutableStateOf(false) }
+    // The paper of the card, see cardSurface.
+    val paper = MaterialTheme.colorScheme.surfaceContainerLowest
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .clipToBounds(),
+            .padding(start = 24.dp, top = 24.dp, end = 24.dp)
+            .clipToBounds()
+            .drawWithContent {
+                drawContent()
+                if (!overflows) return@drawWithContent
+                val fade = OVERFLOW_FADE.toPx().coerceAtMost(size.height)
+                drawRect(
+                    brush = Brush.verticalGradient(listOf(paper.copy(alpha = 0f), paper), startY = size.height - fade, endY = size.height),
+                    topLeft = Offset(0f, size.height - fade),
+                )
+            },
     ) {
         when (body) {
             StackCardBody.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            is StackCardBody.Html -> EmailHtml(html = body.html, modifier = Modifier.fillMaxSize())
+            is StackCardBody.Html -> EmailHtml(
+                html = body.html,
+                modifier = Modifier.fillMaxSize(),
+                onOverflowChange = { overflows = it },
+            )
             is StackCardBody.Text -> Text(
                 text = body.text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 overflow = TextOverflow.Clip,
+                onTextLayout = { overflows = it.didOverflowHeight },
             )
             StackCardBody.Failed -> Text(
                 text = stringResource(Res.string.home_stack_body_failed),

@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.graphics.Color
 import android.view.View
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -14,7 +17,9 @@ import androidx.compose.ui.viewinterop.AndroidView
  */
 @SuppressLint("ClickableViewAccessibility")
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier) {
+actual fun EmailHtml(html: String, modifier: Modifier, onOverflowChange: (Boolean) -> Unit) {
+    val currentOnOverflowChange by rememberUpdatedState(onOverflowChange)
+
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -32,6 +37,14 @@ actual fun EmailHtml(html: String, modifier: Modifier) {
                 isFocusable = false
                 // Read, not browsed: a touch on it is the pile's.
                 setOnTouchListener { _, _ -> true }
+
+                // Asked again whenever the page or the view changes size: images load after the
+                // page has, and a card grows when it is lifted.
+                fun reportOverflow() = currentOnOverflowChange(contentHeight * scale > height)
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String?) = reportOverflow()
+                }
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reportOverflow() }
             }
         },
         update = { webView ->

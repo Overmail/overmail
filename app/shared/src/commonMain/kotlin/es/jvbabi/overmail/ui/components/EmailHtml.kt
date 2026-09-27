@@ -21,10 +21,11 @@ private val VIEWPORT = Regex("""<meta[^>]+name\s*=\s*["']?viewport""", RegexOpti
  * touch goes to whatever lies around it.
  *
  * On Android a web view, on iOS a picture of one -- a UIKit view would not turn and scale along
- * with the Compose layer around it.
+ * with the Compose layer around it. [onOverflowChange] says whether the mail is longer than the
+ * room it has, once that is known.
  */
 @Composable
-expect fun EmailHtml(html: String, modifier: Modifier = Modifier)
+expect fun EmailHtml(html: String, modifier: Modifier = Modifier, onOverflowChange: (Boolean) -> Unit = {})
 
 /**
  * [html] as a document to hand a web view: with the content security policy in its head, and a

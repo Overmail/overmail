@@ -46,14 +46,6 @@ sealed class Key<VALUE>(val key: String) {
     }
 
     /**
-     * Whether the user has settled on installing updates by hand rather than letting the app do it.
-     *
-     * Android only — no other platform installs its own updates. Being allowed to install takes
-     * priority over this: someone who has since granted that permission has plainly changed their
-     * mind, so the app installs the update itself and this is left as it was, ready to take over
-     * again if the permission is ever withdrawn.
-     */
-    /**
      * The id of the [es.jvbabi.overmail.domain.model.OvermailAccount] the app is showing.
      *
      * Kept pointing at an existing account by [AccountRepository.keepCurrentAccountValid]: missing
@@ -61,6 +53,14 @@ sealed class Key<VALUE>(val key: String) {
      */
     data object CurrentAccount: UuidKey("app.account.current")
 
+    /**
+     * Whether the user has settled on installing updates by hand rather than letting the app do it.
+     *
+     * Android only — no other platform installs its own updates. Being allowed to install takes
+     * priority over this: someone who has since granted that permission has plainly changed their
+     * mind, so the app installs the update itself and this is left as it was, ready to take over
+     * again if the permission is ever withdrawn.
+     */
     data object AlwaysInstallUpdatesManually: BooleanKey("app.update.alwaysInstallManually") {
         override val defaultValue: Boolean = false
     }

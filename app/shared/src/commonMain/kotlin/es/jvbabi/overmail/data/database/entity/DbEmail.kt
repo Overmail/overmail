@@ -18,6 +18,8 @@ data class DbEmail(
     @ColumnInfo(name = "sent_from_participant_id") val sentFromParticipantId: Uuid,
     @ColumnInfo(name = "subject") val subject: String?,
     @ColumnInfo(name = "preview") val preview: String?,
+    @ColumnInfo(name = "has_text") val hasText: Boolean,
+    @ColumnInfo(name = "has_html") val hasHtml: Boolean,
     @ColumnInfo(name = "is_read") val isRead: Boolean,
     @ColumnInfo(name = "archive_state") val archivedState: ArchivedState,
 )

@@ -199,6 +199,8 @@ private fun ApiEmailMeta.toDb(account: OvermailAccount) = DbEmail(
     sentFromParticipantId = sender.id,
     subject = subject,
     preview = preview,
+    hasText = hasText,
+    hasHtml = hasHtml,
     isRead = isRead,
     archivedState = when (archiveState) {
         "archive" -> ArchivedState.Archive
@@ -246,6 +248,8 @@ private data class ApiEmailMeta(
     @SerialName("sent") val sent: Long,
     @SerialName("is_read") val isRead: Boolean,
     @SerialName("preview") val preview: String?,
+    @SerialName("has_text") val hasText: Boolean,
+    @SerialName("has_html") val hasHtml: Boolean,
     @SerialName("archive_state") val archiveState: String,
     @SerialName("sender") val sender: Participant,
     @SerialName("to") val to: List<Participant>,

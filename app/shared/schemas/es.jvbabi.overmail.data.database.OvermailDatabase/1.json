@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "a78d4f13d873d7b9fcf4d41be81c93db",
+    "identityHash": "403285240e6f698d26587c15c9d93426",
     "entities": [
       {
         "tableName": "key_value",
@@ -342,7 +342,7 @@
       },
       {
         "tableName": "email",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `overmail_account_id` TEXT NOT NULL, `imap_account_id` TEXT NOT NULL, `sent_at` INTEGER NOT NULL, `sent_from_participant_id` TEXT NOT NULL, `subject` TEXT, `preview` TEXT, `is_read` INTEGER NOT NULL, `archive_state` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `overmail_account_id` TEXT NOT NULL, `imap_account_id` TEXT NOT NULL, `sent_at` INTEGER NOT NULL, `sent_from_participant_id` TEXT NOT NULL, `subject` TEXT, `preview` TEXT, `has_text` INTEGER NOT NULL, `has_html` INTEGER NOT NULL, `is_read` INTEGER NOT NULL, `archive_state` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -383,6 +383,18 @@
             "fieldPath": "preview",
             "columnName": "preview",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "hasText",
+            "columnName": "has_text",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hasHtml",
+            "columnName": "has_html",
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "isRead",
@@ -534,7 +546,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a78d4f13d873d7b9fcf4d41be81c93db')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '403285240e6f698d26587c15c9d93426')"
     ]
   }
 }

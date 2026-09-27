@@ -15,6 +15,10 @@ data class Email(
      * empty for a mail with nothing readable in it.
      */
     val preview: String?,
+    /** Whether the body has a plain text part, see `EmailsRepository.getBody`. */
+    val hasText: Boolean,
+    /** Whether the body has an html part. */
+    val hasHtml: Boolean,
     val isRead: Boolean,
     val archivedState: ArchivedState,
     val labels: List<Label>,

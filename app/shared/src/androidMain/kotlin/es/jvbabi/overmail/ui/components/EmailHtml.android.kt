@@ -5,14 +5,7 @@ import android.graphics.Color
 import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +46,7 @@ actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, top
         },
         factory = { context ->
             WebView(context).apply {
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null);
                 settings.javaScriptEnabled = false
                 // Laid out at the width the mail asks for, then zoomed out until it fits.
                 settings.useWideViewPort = true

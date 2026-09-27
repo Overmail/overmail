@@ -11,41 +11,39 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.TreeStructure
 import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.page.home.ViewSettingsEvent
+import es.jvbabi.overmail.page.home.ViewSettingsState
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.home.components.filter.*
 import es.jvbabi.overmail.page.home.components.group.GroupModal
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.*
 import kotlin.uuid.Uuid
 
 /**
  * The chips that set up [viewState] -- grouping and filters -- and the modals they open. Edits
- * leave through [onViewStateChange]; what the modals need loaded is [ViewSettingsViewModel]'s,
- * which this holds itself.
+ * leave through [onViewStateChange]; what the modals need loaded is [state], a
+ * [ViewSettingsViewModel]'s, which is asked for more through [onEvent].
  */
 @Composable
 fun ViewSettings(
     viewState: ViewState,
+    state: ViewSettingsState,
     onViewStateChange: (ViewState) -> Unit,
+    onEvent: (ViewSettingsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel = koinViewModel<ViewSettingsViewModel>()
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
     // What is loaded follows the view: the names of its labels and contacts.
-    LaunchedEffect(viewState) { viewModel.onEvent(ViewSettingsEvent.SetView(viewState)) }
+    LaunchedEffect(viewState) { onEvent(ViewSettingsEvent.SetView(viewState)) }
 
     val onFilterChange = { filter: ViewFilter -> onViewStateChange(viewState.copy(filter = filter)) }
     val onReadSelectionChange = { selection: List<ReadState> ->
-        viewModel.onEvent(ViewSettingsEvent.SetReadSelection(selection))
+        onEvent(ViewSettingsEvent.SetReadSelection(selection))
         onFilterChange(viewState.filter.copy(readState = readStateOf(selection)))
     }
 
@@ -110,7 +108,7 @@ fun ViewSettings(
             toNames = namesOf(viewState.filter.sentTo),
             onFromClick = {
                 // Opening starts over, as with the labels.
-                viewModel.onEvent(ViewSettingsEvent.SetParticipantQuery(""))
+                onEvent(ViewSettingsEvent.SetParticipantQuery(""))
                 showFromPicker = true
             },
             accountNames = viewState.filter.imapAccountIds.orEmpty().map { id ->
@@ -118,16 +116,16 @@ fun ViewSettings(
             },
             onAccountsClick = {
                 // Read afresh as it opens: a mailbox connected elsewhere should be in it.
-                viewModel.onEvent(ViewSettingsEvent.RefreshImapAccounts)
+                onEvent(ViewSettingsEvent.RefreshImapAccounts)
                 showAccounts = true
             },
             onToClick = {
-                viewModel.onEvent(ViewSettingsEvent.SetParticipantQuery(""))
+                onEvent(ViewSettingsEvent.SetParticipantQuery(""))
                 showToPicker = true
             },
             onLabelsClick = {
                 // Opening starts over: the query from last time says nothing about this one.
-                viewModel.onEvent(ViewSettingsEvent.SetLabelQuery(""))
+                onEvent(ViewSettingsEvent.SetLabelQuery(""))
                 showLabelPicker = true
             },
         )
@@ -148,11 +146,11 @@ fun ViewSettings(
         query = state.labelQuery,
         results = state.labelResults,
         isFetching = state.isFetchingLabels,
-        onQueryChange = { viewModel.onEvent(ViewSettingsEvent.SetLabelQuery(it)) },
+        onQueryChange = { onEvent(ViewSettingsEvent.SetLabelQuery(it)) },
         onToggle = {
             onFilterChange(viewState.filter.toggleLabel(it))
             // What was typed has done its job once its label is picked, as in the web app.
-            viewModel.onEvent(ViewSettingsEvent.SetLabelQuery(""))
+            onEvent(ViewSettingsEvent.SetLabelQuery(""))
         },
         // Unlike picking, taking a label off leaves what is typed.
         onRemove = { onFilterChange(viewState.filter.removeLabel(it)) },
@@ -199,10 +197,10 @@ fun ViewSettings(
             query = state.participantQuery,
             results = state.participantResults,
             isFetching = state.isFetchingParticipants,
-            onQueryChange = { viewModel.onEvent(ViewSettingsEvent.SetParticipantQuery(it)) },
+            onQueryChange = { onEvent(ViewSettingsEvent.SetParticipantQuery(it)) },
             onToggle = {
                 onFilterChange(viewState.filter.toggleCorrespondent(target, it))
-                viewModel.onEvent(ViewSettingsEvent.SetParticipantQuery(""))
+                onEvent(ViewSettingsEvent.SetParticipantQuery(""))
             },
             // What is typed stays, as with the labels.
             onRemove = { onFilterChange(viewState.filter.removeCorrespondent(target, it)) },

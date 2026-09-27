@@ -245,6 +245,8 @@ private fun previewEmail(index: Long, sentAt: Instant, random: Random): Email {
         sentAt = sentAt,
         subject = PREVIEW_SUBJECTS[random.nextInt(PREVIEW_SUBJECTS.size)].takeIf { random.nextInt(20) != 0 },
         preview = PREVIEW_TEXTS[random.nextInt(PREVIEW_TEXTS.size)].takeIf { random.nextInt(10) != 0 },
+        hasText = true,
+        hasHtml = random.nextBoolean(),
         // The newest ones are the ones still unread.
         isRead = index > 4 && random.nextInt(4) != 0,
         archivedState = ArchivedState.Unarchive,

@@ -149,7 +149,11 @@ fun AppTheme(
         colorScheme = colorScheme,
         typography = appTypography(),
         content = {
-            CompositionLocalProvider(LocalContentColor provides colorScheme.onSurface) {
+            CompositionLocalProvider(
+                LocalContentColor provides colorScheme.onSurface,
+                // Not from the dynamic scheme: the base colours are what they are, only light or dark.
+                LocalBaseColors provides if (darkTheme) darkBaseColors else lightBaseColors,
+            ) {
                 Box {
                     content()
                 }

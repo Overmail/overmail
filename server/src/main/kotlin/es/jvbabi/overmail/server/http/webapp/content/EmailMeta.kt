@@ -22,6 +22,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.uuid.Uuid
 
@@ -46,6 +47,10 @@ data class EmailMeta(
      * empty for one with nothing readable in it.
      */
     @SerialName("preview") val preview: String?,
+    /** Whether the body has a plain text part, so a client knows what `/body` will answer before asking. */
+    @SerialName("has_text") val hasText: Boolean,
+    /** Whether the body has an html part. */
+    @SerialName("has_html") val hasHtml: Boolean,
     /**
      * `unarchive`, `archive` or `spam` -- the latest event of the archive log. It travels with
      * the mail so a listing can drop a row that left the mailbox without asking what its window
@@ -167,6 +172,10 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
         .orderBy(EmailArchives.createdAt, SortOrder.ASC)
         .associate { row -> row[EmailArchives.email].value to row[EmailArchives.action] }
 
+    // Whether the parts are there, not the parts: the bodies are what makes a mail row heavy.
+    val hasText = Emails.textContent.isNotNull()
+    val hasHtml = Emails.htmlContent.isNotNull()
+
     // Columns, not the entity: loading an Email reads its raw source with it.
     return Emails
         .join(ImapAccounts, JoinType.INNER, Emails.imapAccount, ImapAccounts.id)
@@ -181,6 +190,8 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
             Emails.sent,
             Emails.isRead,
             EmailPreviews.preview,
+            hasText,
+            hasHtml,
             EmailUsers.id,
             EmailUsers.address,
             EmailUsers.avatar,
@@ -210,6 +221,8 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
                 sent = row[Emails.sent].epochSeconds,
                 isRead = row[Emails.isRead],
                 preview = row[EmailPreviews.preview],
+                hasText = row[hasText],
+                hasHtml = row[hasHtml],
                 archiveState = (archiveByEmail[id] ?: EmailArchiveAction.Unarchive).wire(),
                 sender = EmailMeta.Participant(
                     id = row[EmailUsers.id].value,

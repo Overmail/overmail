@@ -2,12 +2,18 @@ package es.jvbabi.overmail.data.repository
 
 import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
+import es.jvbabi.overmail.data.cache.EmailBodyCache
+import es.jvbabi.overmail.emailBodyCacheDirectory
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.entity.composed.EmbeddedEmail
 import es.jvbabi.overmail.data.network.followServerSentEvents
+import es.jvbabi.overmail.data.network.isResponseFromBackend
+import es.jvbabi.overmail.data.network.safeRequest
+import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Correspondent
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.EmailBody
 import es.jvbabi.overmail.domain.model.NetworkErrorKind
 import es.jvbabi.overmail.domain.model.NetworkException
 import es.jvbabi.overmail.domain.model.OvermailAccount
@@ -22,9 +28,13 @@ import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.utils.takeFrom
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
 import io.ktor.http.ParametersBuilder
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
@@ -47,6 +57,7 @@ class EmailsRepositoryImpl(
     imapAccountsRepository: ImapAccountsRepository,
 ) : EmailsRepository {
     private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
+    private val emailBodyCache = EmailBodyCache(emailBodyCacheDirectory())
 
     override fun getView(
         viewSettingsState: ViewState,
@@ -88,6 +99,24 @@ class EmailsRepositoryImpl(
                 emailSync.loadMissing(user, groups.flatMap { it.ids })
             }
         }
+    }
+
+    override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
+        emailBodyCache.get(emailId)?.let { return Result.success(it) }
+        return fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }
+    }
+
+    private suspend fun fetchBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> = safeRequest {
+        val response = httpClient.get(URLBuilder(urlString = user.homeserver).apply {
+            appendPathSegments("api", "emails", emailId.toString(), "body")
+        }.build()) {
+            bearerAuth(user.token)
+        }
+
+        if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+
+        val body = response.body<ApiEmailBody>()
+        EmailBody(text = body.text, html = body.html)
     }
 
     /**
@@ -359,3 +388,10 @@ private fun ViewSorting.comparator(): Comparator<Email> {
     }
     return if (reversed) natural.reversed() else natural
 }
+
+/** `GET /api/emails/{emailId}/body`, `http/email/item/body/getEmailBody.kt`. */
+@Serializable
+private data class ApiEmailBody(
+    @SerialName("text") val text: String?,
+    @SerialName("html") val html: String?,
+)

@@ -1,0 +1,10 @@
+{
+  "title": "Your inbox as a stack of cards",
+  "description": "The home screen now starts with your inbox as a stack of cards, one mail at a time. Swipe a card to the left to archive it or to the right to keep it; scroll up on the listing below to get to all your mails.",
+  "localized": {
+    "de": {
+      "title": "Dein Posteingang als Kartenstapel",
+      "description": "Der Startbildschirm beginnt jetzt mit deinem Posteingang als Kartenstapel, eine E-Mail nach der anderen. Wische eine Karte nach links, um sie zu archivieren, oder nach rechts, um sie zu behalten; scrolle in der Liste darunter nach oben, um zu all deinen E-Mails zu kommen."
+    }
+  }
+}

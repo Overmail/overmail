@@ -35,6 +35,9 @@ private fun activityContext(): Context =
 actual fun imageCacheDirectory(context: PlatformContext): Path =
     context.cacheDir.resolve("avatars").absolutePath.toPath()
 
+actual fun emailBodyCacheDirectory(): Path =
+    KoinPlatformTools.defaultContext().get().get<Context>().cacheDir.resolve("email-bodies").absolutePath.toPath()
+
 actual fun openUrl(url: String) {
     val customTabsIntent = CustomTabsIntent.Builder()
         .setShowTitle(true)

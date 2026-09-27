@@ -1,0 +1,10 @@
+{
+  "title": "What your mails say",
+  "description": "The cards of your inbox now show what a mail says, not just its subject. A mail is loaded once and kept on your device, so opening it again is instant.",
+  "localized": {
+    "de": {
+      "title": "Was in deinen E-Mails steht",
+      "description": "Die Karten deines Posteingangs zeigen jetzt, was in einer E-Mail steht, nicht nur ihren Betreff. Eine E-Mail wird einmal geladen und auf deinem Gerät behalten, sodass sie beim nächsten Mal sofort da ist."
+    }
+  }
+}

@@ -25,6 +25,7 @@ import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
+import es.jvbabi.overmail.page.home.EmailStackViewModel
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.home.ViewViewModel
@@ -153,6 +154,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
         viewModelOf(::AppViewModel)
         viewModelOf(::HomeViewModel)
+        viewModelOf(::EmailStackViewModel)
         viewModelOf(::ViewViewModel)
         viewModelOf(::ViewSettingsViewModel)
         viewModelOf(::OnboardingAuthViewModel)

@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
@@ -56,10 +60,11 @@ private const val RELAYOUT_DELAY = 100_000_000L
  * A picture of a web view rather than the view itself: UIKit views sit outside the Compose layer
  * and would stay upright while the card around them turns. The mail is rendered once, off screen,
  * at the width it is shown at and as tall as it is, and what is drawn is that snapshot -- which
- * turns, scales and clips like everything else on the card, and is moved by [scroll].
+ * turns, scales and clips like everything else on the card, and is moved by [scroll], from
+ * [topInset] down its box up behind whatever lies there and on through the mail.
  */
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset) {
+actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp) {
     BoxWithConstraints(modifier = modifier) {
         // Points on iOS are what a dp is.
         val width = maxWidth.value.toDouble()
@@ -72,19 +77,23 @@ actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset) {
         }
 
         val image = snapshot
-        if (image == null) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        if (image == null) Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
         else Image(
             bitmap = image,
             contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier.layout { measurable, constraints ->
-                // As wide as the box, as tall as that makes the mail, moved up by the scroll.
+                // As wide as the box, as tall as that makes the mail, starting below the inset and
+                // moved up by the scroll.
+                val inset = topInset.roundToPx()
                 val imageWidth = constraints.maxWidth
                 val imageHeight = (imageWidth * image.height.toFloat() / image.width).roundToInt()
                 val placeable = measurable.measure(Constraints.fixed(imageWidth, imageHeight))
-                scroll.max = (imageHeight - constraints.maxHeight).toFloat()
+                scroll.max = (inset + imageHeight - constraints.maxHeight).toFloat()
                 layout(constraints.maxWidth, constraints.maxHeight) {
-                    placeable.place(0, -scroll.value.roundToInt())
+                    placeable.place(0, inset - scroll.value.roundToInt())
                 }
             },
         )

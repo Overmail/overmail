@@ -2,6 +2,8 @@ package es.jvbabi.overmail.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /** The width html mails are typically designed for; they are laid out at it and scaled to fit. */
 internal const val EMAIL_DESIGN_WIDTH = 640
@@ -21,11 +23,12 @@ private val VIEWPORT = Regex("""<meta[^>]+name\s*=\s*["']?viewport""", RegexOpti
  * touch goes to whatever lies around it.
  *
  * On Android a web view, on iOS a picture of one -- a UIKit view would not turn and scale along
- * with the Compose layer around it. A mail longer than its box is moved through by [scroll], which
- * learns from it how far that goes.
+ * with the Compose layer around it. It starts [topInset] down its box, below whatever lies over its
+ * top; [scroll] moves it up behind that first and through the mail after, and learns from it how
+ * far that goes.
  */
 @Composable
-expect fun EmailHtml(html: String, modifier: Modifier = Modifier, scroll: ScrollOffset)
+expect fun EmailHtml(html: String, modifier: Modifier = Modifier, scroll: ScrollOffset, topInset: Dp = 0.dp)
 
 /**
  * [html] as a document to hand a web view: with the content security policy in its head, and a

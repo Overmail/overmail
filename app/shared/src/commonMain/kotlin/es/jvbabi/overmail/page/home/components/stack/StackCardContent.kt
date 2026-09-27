@@ -27,7 +27,14 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.Easing
+import dev.chrisbanes.haze.HazeState
+import es.jvbabi.overmail.utils.ProgressiveDirection
+import es.jvbabi.overmail.utils.progressiveBackground
+import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.EmailHtml
 import es.jvbabi.overmail.ui.components.LabelBadge
@@ -53,10 +60,36 @@ sealed interface StackCardBody {
     data object Failed : StackCardBody
 }
 
-/** What a card says of its mail before the mail itself: the subject, who sent it, its labels. */
+/** How far below its content the header's blur runs out, which is where the mail starts. */
+private val HEADER_FADE = 24.dp
+
+/** How much the mail behind the header is blurred where the header begins. */
+private val HEADER_BLUR = 32.dp
+
+/**
+ * Solid for the upper half of the header, then running out: the subject and the sender stay
+ * readable over whatever of the mail has been scrolled behind them.
+ */
+private val HEADER_EASING = Easing { fraction -> EaseInOut.transform(((fraction - 0.5f) / 0.5f).coerceIn(0f, 1f)) }
+
+/**
+ * What a card says of its mail before the mail itself: the subject, who sent it, its labels. It
+ * lies over the mail, which [hazeState] captures, and blurs and covers it where the mail is
+ * scrolled behind it.
+ */
 @Composable
-internal fun CardHeader(email: Email, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(top = 24.dp).padding(horizontal = 24.dp)) {
+internal fun CardHeader(email: Email, hazeState: HazeState, modifier: Modifier = Modifier) {
+    // The paper of the card, see cardSurface.
+    val paper = MaterialTheme.colorScheme.surfaceContainerLowest
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = paper, startRadius = HEADER_BLUR, easing = HEADER_EASING)
+            .progressiveBackground(paper, ProgressiveDirection.TopToBottom, easing = HEADER_EASING)
+            .padding(top = 24.dp, bottom = HEADER_FADE)
+            .padding(horizontal = 24.dp),
+    ) {
         Text(
             text = email.subject ?: stringResource(Res.string.home_stack_no_subject),
             style = MaterialTheme.typography.titleMediumEmphasized,
@@ -122,19 +155,20 @@ private fun CardLabels(email: Email, modifier: Modifier = Modifier) {
 private val OVERFLOW_FADE = 48.dp
 
 /**
- * What the mail says, in whatever room the card has left, down to the card's edge. It is not
- * scrolled by touch -- a card is read at a glance -- but [scroll] moves it, see LiftedCard; a mail
- * that goes on below what shows fades out where the card ends.
+ * What the mail says, over the whole card and starting [topInset] down, below the header. It is
+ * not scrolled by touch -- a card is read at a glance -- but [scroll] moves it, see LiftedCard,
+ * and it goes on behind the header then. A mail that goes on below what shows fades out where the
+ * card ends.
  */
 @Composable
-internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, modifier: Modifier = Modifier) {
+internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, topInset: Dp, modifier: Modifier = Modifier) {
     // The paper of the card, see cardSurface.
     val paper = MaterialTheme.colorScheme.surfaceContainerLowest
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 24.dp, top = 24.dp, end = 24.dp)
+            .padding(horizontal = 24.dp)
             .clipToBounds()
             .drawWithContent {
                 drawContent()
@@ -147,31 +181,37 @@ internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, modifier: Modif
             },
     ) {
         when (body) {
-            StackCardBody.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            StackCardBody.Loading -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
             is StackCardBody.Html -> EmailHtml(
                 html = body.html,
                 modifier = Modifier.fillMaxSize(),
                 scroll = scroll,
+                topInset = topInset,
             )
             is StackCardBody.Text -> Text(
                 text = body.text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.layout { measurable, constraints ->
-                    // As tall as the text is, moved up by the scroll; the box cuts it off.
+                    // As tall as the text is, below the header and moved up by the scroll; the
+                    // box cuts it off.
+                    val inset = topInset.roundToPx()
                     val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                    scroll.max = (placeable.height - constraints.maxHeight).toFloat()
+                    scroll.max = (inset + placeable.height - constraints.maxHeight).toFloat()
                     layout(constraints.maxWidth, constraints.maxHeight) {
-                        placeable.place(0, -scroll.value.roundToInt())
+                        placeable.place(0, inset - scroll.value.roundToInt())
                     }
                 },
             )
-            StackCardBody.Failed -> Text(
-                text = stringResource(Res.string.home_stack_body_failed),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            StackCardBody.Failed -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
+                Text(
+                    text = stringResource(Res.string.home_stack_body_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
         }
     }
 }

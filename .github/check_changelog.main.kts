@@ -9,7 +9,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -20,6 +23,10 @@ import kotlin.system.exitProcess
  *  - Feature: title and description, and the entry itself is required
  *  - Bug:     description only, entry optional
  *  - Task:    description optional, entry optional
+ *
+ * In a stack of pull requests, several layers may close the same issue. A
+ * Feature's entry then only has to exist in the topmost of them: layers further
+ * down are told it is expected higher up instead of failing.
  *
  * The pull request number comes from the environment so the workflow never
  * interpolates pull request data into the script itself. Falls back to the
@@ -132,20 +139,42 @@ fun finish(headline: String): Nothing {
 }
 
 // --- which issues does this pull request close? ---------------------------
-// The link is authoritative; the branch name is only a fallback for local runs
-// and for pull requests that never got linked.
-val linkedIssues = pullRequest
-    ?.let { capture("gh", "pr", "view", it, "--json", "closingIssuesReferences", "--jq", ".closingIssuesReferences[].number") }
-    ?.lines()
-    ?.mapNotNull { it.trim().toIntOrNull() }
-    .orEmpty()
+// Resolved the same way in generate_changelog.main.kts and sync-labels.yaml, the three have to agree.
+//
+// GitHub only links closing keywords of pull requests that target the default branch, so every
+// layer of a stack above the bottom one has no closing references. The keywords are therefore also
+// read from the description directly. The branch name is only a fallback for local runs and for
+// pull requests that reference no issue at all.
 
-// e.g. feat/15-add-minimal-movement -> 15, 5-editremove-shares -> 5
-val issues = linkedIssues.ifEmpty {
-    listOfNotNull(
-        branch?.let { Regex("^([a-zA-Z]+/)?(\\d+)-").find(it)?.groupValues?.get(2)?.toIntOrNull() }
+/** "Closes #12", "fixes: #12", "Resolved #12", … */
+val closingKeyword = Regex("(?i)\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\\s+#(\\d+)\\b")
+
+/** e.g. feat/15-add-minimal-movement -> 15, 5-editremove-shares -> 5 */
+fun issueOfBranch(branch: String?): Int? =
+    branch?.let { Regex("^([a-zA-Z]+/)?(\\d+)-").find(it)?.groupValues?.get(2)?.toIntOrNull() }
+
+val pullRequestFields = "number,headRefName,body,closingIssuesReferences"
+
+data class PullRequest(val number: Int, val branch: String, val issues: List<Int>)
+
+/** Reads a pull request as returned by `gh pr view/list --json [pullRequestFields]`. */
+fun JsonObject.toPullRequest(): PullRequest {
+    val branch = this["headRefName"]?.jsonPrimitive?.content.orEmpty()
+    val linked = this["closingIssuesReferences"]?.jsonArray.orEmpty()
+        .mapNotNull { it.jsonObject["number"]?.jsonPrimitive?.intOrNull }
+    val body = (this["body"] as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
+    val mentioned = closingKeyword.findAll(body).map { it.groupValues[1].toInt() }.toList()
+    return PullRequest(
+        number = this["number"]!!.jsonPrimitive.intOrNull!!,
+        branch = branch,
+        issues = (linked + mentioned).ifEmpty { listOfNotNull(issueOfBranch(branch)) }.distinct().sorted(),
     )
-}.distinct().sorted()
+}
+
+val issues = pullRequest
+    ?.let { capture("gh", "pr", "view", it, "--json", pullRequestFields) }
+    ?.let { Json.parseToJsonElement(it).jsonObject.toPullRequest().issues }
+    ?: listOfNotNull(issueOfBranch(branch))
 
 if (issues.isEmpty()) {
     warn("No linked issue found for this pull request (branch '$branch'), skipping the changelog check.")
@@ -265,6 +294,26 @@ fun projectLabelsOf(kind: String, number: String): List<String> =
 // itself would arrive at.
 val pullRequestLabels = pullRequest?.let { projectLabelsOf("pr", it) }.orEmpty()
 
+/**
+ * The open pull requests stacked on top of [branch], transitively: those based on it, those based
+ * on them, and so on. Found through the base branches alone, so this works for any stack, however
+ * it was built.
+ */
+fun pullRequestsAbove(branch: String, seen: MutableSet<String> = mutableSetOf()): List<PullRequest> {
+    if (!seen.add(branch)) return emptyList()
+    val above = capture("gh", "pr", "list", "--state", "open", "--base", branch, "--json", pullRequestFields)
+        ?.let { Json.parseToJsonElement(it).jsonArray.map { element -> element.jsonObject.toPullRequest() } }
+        .orEmpty()
+    return above + above.flatMap { pullRequestsAbove(it.branch, seen) }
+}
+
+// Only for an actual pull request: a local run on the default branch would take every open pull
+// request for one stacked on top of it.
+val stackedAbove = if (pullRequest != null && branch != null) pullRequestsAbove(branch) else emptyList()
+
+/** The pull request highest up the stack that closes [issue] as well, if any. */
+fun topmostAbove(issue: Int): PullRequest? = stackedAbove.lastOrNull { issue in it.issues }
+
 issues.forEach { issue ->
     val labels = (projectLabelsOf("issue", "$issue") + pullRequestLabels).distinct().sorted()
 
@@ -317,6 +366,12 @@ issues.forEach { issue ->
         legacy -> {
             fail("Issue #$issue still uses changelog.json. Please rename it to ${shape.fileName}.")
             findings.appendLine("- ❌ **#$issue** (${type ?: "no type"}): `changelog.json` is no longer read, rename it to `${shape.fileName}`.")
+        }
+
+        !file.exists() && required && topmostAbove(issue) != null -> {
+            val above = topmostAbove(issue)!!.number
+            warn("Issue #$issue is a Feature without a changelog here, it is expected further up the stack in #$above.")
+            findings.appendLine("- ⚠️ **#$issue** (Feature) has no changelog in this layer. It is expected further up the stack, in #$above.")
         }
 
         !file.exists() && required -> {

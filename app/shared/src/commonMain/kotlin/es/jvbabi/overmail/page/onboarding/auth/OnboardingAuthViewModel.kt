@@ -10,6 +10,7 @@ import dev.icerock.moko.permissions.camera.CAMERA
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.RedeemAuthCodeResponse
+import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import io.ktor.http.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ import kotlin.uuid.Uuid
 class OnboardingAuthViewModel(
     private val permissionsController: PermissionsController,
     private val accountRepository: AccountRepository,
+    private val setCurrentAccount: SetCurrentAccountUseCase,
 ): ViewModel() {
     val state: StateFlow<OnboardingAuthState>
         field = MutableStateFlow(OnboardingAuthState())
@@ -96,6 +98,8 @@ class OnboardingAuthViewModel(
                         token = resultData.jwt,
                     )
                     accountRepository.saveAccount(user)
+                    // After saving, so the key never points at an account that is not there yet.
+                    setCurrentAccount(user.id)
                     onUserCreated(user)
                 } catch (_: RequestCanceledException) {
                     if (state.value.codeState is OnboardingAuthState.CodeState.Processing) state.update { it.copy(codeState = OnboardingAuthState.CodeState.Idle) }

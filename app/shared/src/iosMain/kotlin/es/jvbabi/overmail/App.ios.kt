@@ -14,7 +14,11 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.CoreGraphics.CGRectMake
+import platform.Foundation.NSDate
+import platform.Foundation.NSDateFormatter
+import platform.Foundation.NSLocale
 import platform.Foundation.NSURL
+import platform.Foundation.dateWithTimeIntervalSince1970
 import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
@@ -31,6 +35,7 @@ import platform.UIKit.UIScreen
 import platform.UIKit.popoverPresentationController
 import platform.posix.uname
 import platform.posix.utsname
+import kotlin.time.Instant
 
 actual fun imageCacheDirectory(context: PlatformContext): Path {
     val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
@@ -97,3 +102,12 @@ actual fun deviceInfo(): DeviceInfo = DeviceInfo(
 /** iOS has no system-wide accent to derive a scheme from, so this is the app's own. */
 @Composable
 actual fun dynamicTheme(dark: Boolean): ColorScheme = if (dark) darkScheme else lightScheme
+
+actual fun formatDateTime(instant: Instant, skeleton: String, languageTag: String): String {
+    // A new formatter starts out in the device's time zone.
+    val formatter = NSDateFormatter().apply {
+        locale = NSLocale(localeIdentifier = languageTag)
+        setLocalizedDateFormatFromTemplate(skeleton)
+    }
+    return formatter.stringFromDate(NSDate.dateWithTimeIntervalSince1970(instant.toEpochMilliseconds() / 1000.0))
+}

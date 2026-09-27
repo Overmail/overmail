@@ -1,4 +1,9 @@
 <resources>
+    <string name="home_greeting_night">Gute Nacht, %1$s</string>
+    <string name="home_greeting_morning">Guten Morgen, %1$s</string>
+    <string name="home_greeting_day">Guten Tag, %1$s</string>
+    <string name="home_greeting_evening">Guten Abend, %1$s</string>
+
     <string name="home_filter_labels">Labels</string>
     <string name="home_filter_from">Von</string>
     <string name="home_filter_to">An</string>
@@ -74,4 +79,14 @@
     <string name="home_grouping_sort_unread_first">Ungelesene zuerst</string>
     <string name="home_grouping_sort_active_first">Aktive zuerst</string>
     <string name="home_grouping_sort_archived_first">Archivierte zuerst</string>
+
+    <string name="home_group_today">Heute</string>
+    <string name="home_group_yesterday">Gestern</string>
+    <string name="home_group_week">Diese Woche</string>
+    <string name="home_group_month">Dieser Monat</string>
+    <string name="home_group_read">Gelesen</string>
+    <string name="home_group_unread">Ungelesen</string>
+    <string name="home_group_month_with_year">%1$s %2$d</string>
+    <string name="home_group_day">%2$d. %1$s %3$d</string>
+    <string name="home_group_sender_unknown">…</string>
 </resources>

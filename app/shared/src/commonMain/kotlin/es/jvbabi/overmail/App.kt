@@ -24,6 +24,7 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.SyncHumanReadableLocale
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
@@ -32,6 +33,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import es.jvbabi.overmail.data.network.ServerImageCacheStrategy
 import io.ktor.client.HttpClient
 import okio.Path
+import kotlin.time.Instant
 
 /** Avatars are small; this holds thousands of them. */
 private const val IMAGE_DISK_CACHE_BYTES = 64L * 1024 * 1024
@@ -57,6 +59,13 @@ expect fun imageCacheDirectory(context: PlatformContext): Path
  */
 @Composable
 expect fun dynamicTheme(dark: Boolean): ColorScheme
+
+/**
+ * [instant] in the device's time zone, with the fields [skeleton] names -- Unicode date field
+ * symbols such as `dMMM` -- in the order and punctuation [languageTag] writes them in. What
+ * `Intl.DateTimeFormat` is to the web app.
+ */
+expect fun formatDateTime(instant: Instant, skeleton: String, languageTag: String): String
 
 @Composable
 @Preview
@@ -94,6 +103,8 @@ fun App() {
         val backstack = remember { mutableStateListOf<Screen>(Screen.Home) }
 
         UpdateAvailableOverlay()
+
+        koinViewModel<AppViewModel>()
 
         val hasAccounts by koinInject<AccountRepository>()
             .getAccounts()

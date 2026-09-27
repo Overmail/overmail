@@ -46,6 +46,15 @@ sealed class Key<VALUE>(val key: String) {
     }
 
     /**
+     * The id of the [es.jvbabi.overmail.domain.model.OvermailAccount] the app is showing.
+     *
+     * Kept pointing at an existing account by
+     * [es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase]: missing
+     * or dangling, it becomes the first account, and without any account it is removed.
+     */
+    data object CurrentAccount: UuidKey("app.account.current")
+
+    /**
      * Whether the user has settled on installing updates by hand rather than letting the app do it.
      *
      * Android only — no other platform installs its own updates. Being allowed to install takes

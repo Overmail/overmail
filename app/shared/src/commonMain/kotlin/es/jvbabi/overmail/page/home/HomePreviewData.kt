@@ -1,0 +1,254 @@
+package es.jvbabi.overmail.page.home
+
+import androidx.compose.ui.graphics.Color
+import es.jvbabi.overmail.domain.model.ArchivedState
+import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.EmailRecipient
+import es.jvbabi.overmail.domain.model.EmailRecipientType
+import es.jvbabi.overmail.domain.model.ImapAccount
+import es.jvbabi.overmail.domain.model.Label
+import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.Participant
+import es.jvbabi.overmail.domain.repository.ViewResult
+import kotlinx.datetime.Month
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
+import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+/**
+ * A mailbox full of made-up mail for the previews of the home screen, grouped like the mailbox
+ * itself: today, yesterday, this week, this month, then by month.
+ *
+ * Seeded, so every render of a preview shows the same mails.
+ */
+internal val PREVIEW_VIEW_CONTENT: ViewContentState by lazy {
+    ViewContentState(results = previewGroups(), isLoading = false)
+}
+
+val PREVIEW_ACCOUNT = OvermailAccount(
+    id = Uuid.fromLongs(0, 0),
+    username = "preview",
+    firstName = "Preview",
+    lastName = "User",
+    email = "preview@example.com",
+    homeserver = "https://example.com",
+    token = "",
+)
+
+private val PREVIEW_IMAP_ACCOUNTS = listOf("preview@example.com", "preview.work@example.org")
+    .mapIndexed { index, username ->
+        ImapAccount(
+            id = Uuid.fromLongs(1, index.toLong()),
+            host = "imap.example.com",
+            port = 993,
+            username = username,
+            isPaused = false,
+            emailCount = 0,
+            overmailAccount = PREVIEW_ACCOUNT,
+        )
+    }
+
+private val PREVIEW_SELF = participant(0, "Preview User", "preview@example.com")
+
+private val PREVIEW_SENDERS = listOf(
+    participant(1, "University of Waterloo", "uninews@uwaterloo.com"),
+    participant(2, "Google Account", "account@google.com"),
+    participant(3, null, "nsmith@hotmail.com"),
+    participant(4, "GitHub", "noreply@github.com"),
+    participant(5, "Deutsche Bahn", "buchungsbestaetigung@bahn.de"),
+    participant(6, "Anna Schmidt", "anna.schmidt@example.de"),
+    participant(7, "Lukas Weber", "l.weber@example.org"),
+    participant(8, "Stripe", "receipts@stripe.com"),
+    participant(9, "Figma", "team@figma.com"),
+    participant(10, null, "billing@hetzner.com"),
+    participant(11, "Maria García", "maria.garcia@example.es"),
+    participant(12, "Linear", "notifications@linear.app"),
+)
+
+private val PREVIEW_LABELS = listOf(
+    "Finance" to Color(0xFF2E7D32),
+    "Travel" to Color(0xFF1565C0),
+    "University" to Color(0xFF6A1B9A),
+    "Work" to Color(0xFFEF6C00),
+    "Newsletter" to Color(0xFF546E7A),
+).mapIndexed { index, (name, color) ->
+    Label(
+        id = Uuid.fromLongs(3, index.toLong()),
+        name = name,
+        color = color,
+        emailCount = 0,
+        overmailAccount = PREVIEW_ACCOUNT,
+    )
+}
+
+private val PREVIEW_SUBJECTS = listOf(
+    "Q2 Budget report",
+    "Your booking confirmation for Berlin Hbf → München Hbf",
+    "Security alert: new sign-in on Android",
+    "[overmail] Pull request #42: Add view settings",
+    "Invoice #2026-0913",
+    "Re: Dinner on Saturday?",
+    "Your receipt from Stripe",
+    "Weekly digest: 12 new comments",
+    "Exam schedule for the winter term",
+    "Fwd: Slides from yesterday's meeting",
+    "Your server invoice for September",
+    "Reminder: dentist appointment tomorrow",
+    "New login to your account",
+    "Re: Re: Project timeline",
+    "Welcome to the team!",
+    "Your package is on its way",
+)
+
+/** The mailbox's stretches and how many mails each holds, newest first. */
+private fun previewGroups(): List<ViewResult.Group> {
+    val mailbox = PreviewMailbox(seed = 42)
+    val now = Clock.System.now()
+
+    return listOf(
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Today, mailbox.emails(6, now - 12.minutes, 47.minutes)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Yesterday, mailbox.emails(5, now - 1.days, 2.hours)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Week, mailbox.emails(9, now - 2.days, 7.hours)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Month, mailbox.emails(12, now - 6.days, 13.hours)),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.AUGUST),
+            mailbox.emails(14, now - 30.days, 2.days),
+        ),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.JULY),
+            mailbox.emails(11, now - 60.days, 3.days),
+        ),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(2026, Month.JUNE),
+            mailbox.emails(4, now - 95.days, 6.days),
+        ),
+    )
+}
+
+/** The preview's correspondents by id, for the sender groups to name themselves with. */
+internal val PREVIEW_SENDERS_BY_ID: Map<Uuid, Participant> by lazy { PREVIEW_SENDERS.associateBy { it.id } }
+
+/**
+ * Every kind of group at least once, with the cases their header is written differently for: a
+ * month of this year and of another, a sender with a name, one with an address only and one
+ * this device does not know yet. The last ones hold groups rather than mails, the second level a
+ * view can be grouped by.
+ */
+internal val PREVIEW_GROUPS_OF_EVERY_KIND: List<ViewResult.Group> by lazy {
+    val mailbox = PreviewMailbox(seed = 7)
+    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    val named = PREVIEW_SENDERS.first { it.name != null }
+    val addressOnly = PREVIEW_SENDERS.first { it.name == null }
+    // Not in PREVIEW_SENDERS_BY_ID, so it stands for a sender this device has not loaded yet.
+    val unknown = Uuid.fromLongs(2, 999)
+
+    listOf(
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Today, mailbox.emails(3)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Yesterday, mailbox.emails(2)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Week, mailbox.emails(5)),
+        ViewResult.Group.DateSmart(ViewResult.Group.DateSmart.Stretch.Month, mailbox.emails(8)),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(today.year, today.month),
+            mailbox.emails(4),
+        ),
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.CalendarMonth(today.year - 1, Month.DECEMBER),
+            mailbox.emails(11),
+        ),
+        ViewResult.Group.Year(today.year - 1, mailbox.emails(24)),
+        ViewResult.Group.Month(today.year, today.month, mailbox.emails(6)),
+        ViewResult.Group.Day(today, mailbox.emails(1)),
+        ViewResult.Group.Sender(named.id, mailbox.emails(4)),
+        ViewResult.Group.Sender(addressOnly.id, mailbox.emails(2)),
+        ViewResult.Group.Sender(unknown, mailbox.emails(1)),
+        ViewResult.Group.ImapAccount(PREVIEW_IMAP_ACCOUNTS.first(), mailbox.emails(9)),
+        ViewResult.Group.Read(isRead = false, items = mailbox.emails(3)),
+        ViewResult.Group.Read(isRead = true, items = mailbox.emails(17)),
+        ViewResult.Group.Archived(ArchivedState.Unarchive, mailbox.emails(5)),
+        ViewResult.Group.Archived(ArchivedState.Archive, mailbox.emails(12)),
+        ViewResult.Group.Archived(ArchivedState.Spam, mailbox.emails(2)),
+        // Two levels: by date, then by sender, the unknown sender included.
+        ViewResult.Group.DateSmart(
+            ViewResult.Group.DateSmart.Stretch.Today,
+            listOf(named.id, addressOnly.id, unknown).mapIndexed { index, id ->
+                ViewResult.Group.Sender(id, mailbox.emails(3 - index))
+            },
+        ),
+        // Two levels: by read state, then by account.
+        ViewResult.Group.Read(
+            isRead = false,
+            items = PREVIEW_IMAP_ACCOUNTS.map { ViewResult.Group.ImapAccount(it, mailbox.emails(4)) },
+        ),
+    )
+}
+
+/**
+ * Single mails for the preview of a row, with the cases a row is drawn differently for: unread
+ * and read, a sender with a name and one with an address only, no subject and one too long for
+ * the line.
+ */
+internal val PREVIEW_ITEMS: List<ViewResult.Item> by lazy {
+    val mails = PreviewMailbox(seed = 3).emails(4).map { it.email }
+    val addressOnly = PREVIEW_SENDERS.first { it.name == null }
+
+    listOf(
+        mails[0].copy(isRead = false),
+        mails[1].copy(isRead = true),
+        mails[2].copy(sentBy = addressOnly),
+        mails[3].copy(subject = null),
+        mails[3].copy(
+            id = Uuid.fromLongs(4, 999),
+            subject = "Re: Re: Fwd: The slides from yesterday's meeting, the budget for the next quarter and who is bringing the cake on Friday",
+        ),
+    ).map { ViewResult.Item(it) }
+}
+
+/** Hands out made-up mails with ids that do not repeat, the same ones for the same [seed]. */
+private class PreviewMailbox(seed: Int) {
+    private val random = Random(seed)
+    private var next = 0L
+
+    fun emails(
+        count: Int,
+        newest: Instant = Clock.System.now(),
+        spacing: Duration = 3.hours,
+    ): List<ViewResult.Item> =
+        List(count) { index -> ViewResult.Item(previewEmail(next++, newest - spacing * index, random)) }
+}
+
+private fun previewEmail(index: Long, sentAt: Instant, random: Random): Email {
+    val sender = PREVIEW_SENDERS[random.nextInt(PREVIEW_SENDERS.size)]
+    val cc = PREVIEW_SENDERS.filter { it != sender }.shuffled(random).take(random.nextInt(0, 3))
+
+    return Email(
+        id = Uuid.fromLongs(4, index),
+        overmailAccount = PREVIEW_ACCOUNT,
+        imapAccount = PREVIEW_IMAP_ACCOUNTS[random.nextInt(PREVIEW_IMAP_ACCOUNTS.size)],
+        sentBy = sender,
+        sentAt = sentAt,
+        subject = PREVIEW_SUBJECTS[random.nextInt(PREVIEW_SUBJECTS.size)].takeIf { random.nextInt(20) != 0 },
+        // The newest ones are the ones still unread.
+        isRead = index > 4 && random.nextInt(4) != 0,
+        archivedState = ArchivedState.Unarchive,
+        labels = PREVIEW_LABELS.shuffled(random).take(random.nextInt(0, 3)),
+        recipients = listOf(EmailRecipient(PREVIEW_SELF, EmailRecipientType.Recipient)) +
+            cc.map { EmailRecipient(it, EmailRecipientType.Cc) },
+    )
+}
+
+private fun participant(index: Long, name: String?, email: String) = Participant(
+    id = Uuid.fromLongs(2, index),
+    name = name,
+    email = email,
+    avatarUrl = null,
+    avatarPadding = null,
+    emailCount = 0,
+    overmailAccount = PREVIEW_ACCOUNT,
+)

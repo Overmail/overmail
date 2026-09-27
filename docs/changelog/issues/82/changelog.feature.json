@@ -1,0 +1,10 @@
+{
+  "title": "The app remembers your account",
+  "description": "The app remembers which of your accounts it is showing.",
+  "localized": {
+    "de": {
+      "title": "Die App merkt sich dein Konto",
+      "description": "Die App merkt sich, welches deiner Konten sie anzeigt."
+    }
+  }
+}

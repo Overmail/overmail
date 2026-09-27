@@ -1,0 +1,10 @@
+{
+  "title": "Your mail on your phone",
+  "description": "The app keeps your mail on your phone and in sync with the server: new mail, read and archived mail and label changes arrive while the app is open, and filters and grouping are answered right on the device.",
+  "localized": {
+    "de": {
+      "title": "Deine E-Mails auf deinem Handy",
+      "description": "Die App speichert deine E-Mails auf deinem Handy und hält sie mit dem Server synchron: Neue E-Mails, gelesene und archivierte E-Mails und geänderte Labels kommen an, während die App geöffnet ist, und Filter und Gruppierung werden direkt auf dem Gerät beantwortet."
+    }
+  }
+}

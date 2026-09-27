@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Kotlin/JVM mail server with a SvelteKit web app and a Compose Multiplatform app.
-Gradle multi-project: `server`, `app:shared`, `app:android`; the web app is bun/vite
+Gradle multi-project: `server`, `common`, `app:shared`, `app:android`; the web app is bun/vite
 in `web/` and outside Gradle. Exposed 1.4 DAO on JDBC/Postgres; every query runs in
 a suspending transaction on `Dispatchers.IO`.
 
@@ -16,6 +16,8 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   http/                Ktor engine, config and routes
   http/api/            what every route needs: the current user, url resources, errors
   jobs/                background work (IMAP import)
+
+common/                Kotlin Multiplatform code both the server and the app use (smart dates)
 
 app/
   shared/              Compose Multiplatform: everything the app is, Android + iOS

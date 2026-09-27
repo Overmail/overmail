@@ -4,11 +4,15 @@ import androidx.room.*
 import es.jvbabi.overmail.data.database.converter.ColorConverter
 import es.jvbabi.overmail.data.database.converter.InstantConverter
 import es.jvbabi.overmail.data.database.converter.UuidConverter
+import es.jvbabi.overmail.data.database.dao.EmailsDao
 import es.jvbabi.overmail.data.database.dao.KeyValueDao
 import es.jvbabi.overmail.data.database.dao.ImapAccountsDao
 import es.jvbabi.overmail.data.database.dao.LabelsDao
 import es.jvbabi.overmail.data.database.dao.ParticipantsDao
 import es.jvbabi.overmail.data.database.dao.OvermailAccountDao
+import es.jvbabi.overmail.data.database.entity.DbEmail
+import es.jvbabi.overmail.data.database.entity.DbEmailLabels
+import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbKeyValue
 import es.jvbabi.overmail.data.database.entity.DbLabels
 import es.jvbabi.overmail.data.database.entity.DbOvermailAccount
@@ -22,6 +26,9 @@ import es.jvbabi.overmail.data.database.entity.DbParticipant
         DbLabels::class,
         DbParticipant::class,
         DbImapAccount::class,
+        DbEmail::class,
+        DbEmailLabels::class,
+        DbEmailRecipients::class,
     ],
     version = 1,
     exportSchema = true,
@@ -40,6 +47,7 @@ abstract class OvermailDatabase : RoomDatabase() {
     abstract val labelsDao: LabelsDao
     abstract val participantsDao: ParticipantsDao
     abstract val imapAccountsDao: ImapAccountsDao
+    abstract val emailsDao: EmailsDao
 }
 
 @Suppress("KotlinNoActualForExpect", "EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")

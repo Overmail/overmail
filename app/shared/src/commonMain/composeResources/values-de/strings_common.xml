@@ -1,3 +1,16 @@
 <resources>
     <string name="common_ok">OK</string>
+
+    <string name="common_month_january">Januar</string>
+    <string name="common_month_february">Februar</string>
+    <string name="common_month_march">März</string>
+    <string name="common_month_april">April</string>
+    <string name="common_month_may">Mai</string>
+    <string name="common_month_june">Juni</string>
+    <string name="common_month_july">Juli</string>
+    <string name="common_month_august">August</string>
+    <string name="common_month_september">September</string>
+    <string name="common_month_october">Oktober</string>
+    <string name="common_month_november">November</string>
+    <string name="common_month_december">Dezember</string>
 </resources>

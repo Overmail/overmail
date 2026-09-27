@@ -2,6 +2,7 @@ package es.jvbabi.overmail.di
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import es.jvbabi.overmail.AppViewModel
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.converter.ColorConverter
@@ -9,17 +10,24 @@ import es.jvbabi.overmail.data.database.converter.InstantConverter
 import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
+import es.jvbabi.overmail.data.repository.EmailsRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
+import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
+import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
+import es.jvbabi.overmail.page.home.ViewViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
@@ -27,6 +35,7 @@ import es.jvbabi.overmail.page.onboarding.success.OnboardingSuccessViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.header
@@ -78,6 +87,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                 .addTypeConverter(UuidConverter())
                 .addTypeConverter(InstantConverter())
                 .addTypeConverter(ColorConverter())
+                // Everything in it is a cache of the server, so a schema change starts over rather than migrating.
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
 
@@ -92,6 +103,9 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
                     ignoreType<DefaultClientWebSocketSession>()
                     json(jsonInstance)
                 }
+
+                // The listing's ids are followed as server-sent events, see EmailsRepositoryImpl.
+                install(SSE)
 
                 install(WebSockets) {
                     contentConverter = KotlinxWebsocketSerializationConverter(jsonInstance)
@@ -130,8 +144,16 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
         singleOf(::ParticipantsRepositoryImpl) bind ParticipantsRepository::class
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
+        singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
 
+        singleOf(::GetCurrentAccountUseCase)
+        singleOf(::SetCurrentAccountUseCase)
+        singleOf(::KeepCurrentAccountValidUseCase)
+        singleOf(::SetupApplicationUseCase)
+
+        viewModelOf(::AppViewModel)
         viewModelOf(::HomeViewModel)
+        viewModelOf(::ViewViewModel)
         viewModelOf(::ViewSettingsViewModel)
         viewModelOf(::OnboardingAuthViewModel)
         viewModelOf(::OnboardingPermissionsViewModel)

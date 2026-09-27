@@ -1,7 +1,9 @@
 package es.jvbabi.overmail.server.http.email.list
 
+import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
@@ -68,5 +70,5 @@ class SmartDateTest {
     }
 
     private fun boundariesOn(date: LocalDate) =
-        smartDateBoundaries(zone, LocalDateTime(date, kotlinx.datetime.LocalTime(12, 0)).toInstant(zone))
+        smartDateBoundaries(zone, LocalDateTime(date, LocalTime(12, 0)).toInstant(zone))
 }

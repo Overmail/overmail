@@ -18,9 +18,12 @@ import es.jvbabi.overmail.server.http.email.item.shares.item.updateShare
 import es.jvbabi.overmail.server.http.email.item.shares.newShare
 import es.jvbabi.overmail.server.http.email.bulk.setEmailsArchiveState
 import es.jvbabi.overmail.server.http.email.bulk.setEmailsRead
+import es.jvbabi.overmail.server.http.email.changes.emailChanges
 import es.jvbabi.overmail.server.http.email.list.emailList
+import es.jvbabi.overmail.server.http.email.meta.emailsMeta
 import es.jvbabi.overmail.server.http.email.list.emailListGroups
 import es.jvbabi.overmail.server.http.email.list.emailListIds
+import es.jvbabi.overmail.server.http.email.list.emailListIdsStream
 import es.jvbabi.overmail.server.http.email.search.emailSearch
 import es.jvbabi.overmail.server.http.labels.createLabel
 import es.jvbabi.overmail.server.http.labels.labelsByIds
@@ -178,6 +181,16 @@ internal fun Application.configureRouting() {
                 // GET /emails?ids=a,b,c -- what a client-side cache asks for the ids it lacks.
                 emailsByIds()
 
+                // QUERY /emails/meta -- the whole metadata of a stretch, for a client database.
+                route("/meta") {
+                    emailsMeta()
+                }
+
+                // GET /emails/changes -- what a client database applies on top of that.
+                route("/changes") {
+                    emailChanges()
+                }
+
                 // What the routes under /{emailId} do to one mail, for a whole selection: the ids
                 // come in the body, because a picked stretch of the mailbox does not fit in a url.
                 route("/bulk") {
@@ -205,6 +218,11 @@ internal fun Application.configureRouting() {
                     // picking one in the table needs.
                     route("/ids") {
                         emailListIds()
+
+                        // GET /emails/list/ids/stream?by= -- the same ids per group, kept current.
+                        route("/stream") {
+                            emailListIdsStream()
+                        }
                     }
                 }
 

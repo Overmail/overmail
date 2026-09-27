@@ -5,12 +5,14 @@ package es.jvbabi.overmail.page.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewSorting
 import es.jvbabi.overmail.domain.model.ViewSortingKind
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,12 +50,33 @@ class EmailStackViewModel(
         viewModelScope.launch {
             account
                 .flatMapLatest { account ->
-                    if (account == null) flowOf(emptyList())
+                    if (account == null) flowOf(null to emptyList())
                     else emailsRepository.getView(INBOX, instantLocalEmission = true, user = account)
-                        .map { results -> results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        .map { results -> account to results.filterIsInstance<ViewResult.Item>().map { it.email } }
                 }
-                .combine(handled) { emails, handled -> emails.filter { it.id !in handled } }
-                .collect { emails -> state.value = EmailStackContentState(emails = emails, isLoading = false) }
+                .combine(handled) { (account, emails), handled -> account to emails.filter { it.id !in handled } }
+                .collect { (account, emails) ->
+                    state.update { it.copy(emails = emails, isLoading = false) }
+                    if (account != null) emails.take(BODIES_AHEAD).forEach { loadBody(it, account) }
+                }
+        }
+    }
+
+    /**
+     * Fetches what [email] says unless it is here or on its way. One that failed is asked for
+     * again, the next time the pile changes with it still near the top.
+     */
+    private fun loadBody(email: Email, account: OvermailAccount) {
+        val known = state.value.bodies[email.id]
+        if (known != null && known !is StackCardBody.Failed) return
+        state.update { it.copy(bodies = it.bodies + (email.id to StackCardBody.Loading)) }
+
+        viewModelScope.launch {
+            val body = emailsRepository.getBody(email.id, account).fold(
+                onSuccess = { body -> body.html?.let(StackCardBody::Html) ?: StackCardBody.Text(body.text.orEmpty()) },
+                onFailure = { StackCardBody.Failed },
+            )
+            state.update { it.copy(bodies = it.bodies + (email.id to body)) }
         }
     }
 
@@ -65,6 +88,9 @@ class EmailStackViewModel(
     }
 }
 
+/** How many mails from the top of the pile have their body fetched ahead: the cards that show, and the next. */
+private const val BODIES_AHEAD = 5
+
 /** The mailbox without its groups: the pile is one run of mails, not a listing. */
 private val INBOX = ViewState(
     filter = ViewState.Mailbox.filter,
@@ -74,6 +100,8 @@ private val INBOX = ViewState(
 data class EmailStackContentState(
     /** Newest first: the first one is the card on top. */
     val emails: List<Email> = emptyList(),
+    /** What the mails near the top of the pile say, as far as it is asked for. */
+    val bodies: Map<Uuid, StackCardBody> = emptyMap(),
     val isLoading: Boolean = true,
 )
 

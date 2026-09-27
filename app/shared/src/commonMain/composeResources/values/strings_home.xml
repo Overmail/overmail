@@ -105,14 +105,13 @@
     <string name="home_group_day">%1$s %2$d, %3$d</string>
     <!-- A sender whose name is not known on this device yet. -->
     <string name="home_group_sender_unknown">…</string>
-    <!-- The card on top of the pile, while the app shows no more of a mail than its subject. -->
+    <!-- The heading of a card on the pile for a mail without a subject. -->
     <string name="home_stack_no_subject">No subject</string>
     <string name="home_stack_empty">All done</string>
-    <string name="home_stack_action_archive">Archive</string>
-    <string name="home_stack_action_keep">Keep</string>
-    <!-- Spelled out on a card while it is moved: "Held · towards Archive 73 % · letting go: back onto the pile". -->
-    <string name="home_stack_drag">%1$s · towards %2$s %3$d % · letting go: %4$s</string>
-    <string name="home_stack_drag_held">Held</string>
-    <string name="home_stack_drag_released">Let go</string>
-    <string name="home_stack_drag_back">back onto the pile</string>
+    <!-- On a card pulled aside: "Pull" until letting go would do it, then "Let go"; followed by what it does. -->
+    <string name="home_stack_overlay_pull">Pull</string>
+    <string name="home_stack_overlay_let_go">Let go</string>
+    <string name="home_stack_overlay_archive">to archive</string>
+    <string name="home_stack_overlay_skip">to skip</string>
+    <string name="home_stack_body_failed">The mail could not be loaded.</string>
 </resources>

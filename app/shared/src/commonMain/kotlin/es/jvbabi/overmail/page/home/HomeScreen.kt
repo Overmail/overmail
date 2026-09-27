@@ -129,6 +129,7 @@ private fun HomeContent(
             ) {
                 EmailStack(
                     emails = stackContent.emails,
+                    bodies = stackContent.bodies,
                     isLoading = stackContent.isLoading,
                     state = emailStackState,
                     onSwiped = { email, swipe ->

@@ -49,12 +49,13 @@ private const val DEAL_STAGGER = 70L
 private val DEAL_EASING = CubicBezierEasing(0.2f, 1.04f, 0.32f, 1f)
 
 /**
- * The pile of [emails], the first one on top. Only draws; the swipe comes in through [state], see
- * [emailStackSwipe].
+ * The pile of [emails], the first one on top, each saying what [bodies] has of it. Only draws; the
+ * swipe comes in through [state], see [emailStackSwipe].
  */
 @Composable
 fun EmailStack(
     emails: List<Email>,
+    bodies: Map<Uuid, StackCardBody>,
     isLoading: Boolean,
     state: EmailStackState,
     onSwiped: (Email, StackSwipe) -> Unit,
@@ -108,6 +109,7 @@ fun EmailStack(
             key(email.id) {
                 PiledCard(
                     email = email,
+                    body = bodies[email.id] ?: StackCardBody.Loading,
                     depth = depth,
                     state = state,
                     dealDelay = if (firstDeal.ids?.contains(email.id) == true) (cards.lastIndex - depth) * DEAL_STAGGER else null,
@@ -129,6 +131,7 @@ private class FirstDeal {
 @Composable
 private fun PiledCard(
     email: Email,
+    body: StackCardBody,
     depth: Int,
     state: EmailStackState,
     dealDelay: Long?,
@@ -152,6 +155,7 @@ private fun PiledCard(
 
     StackCard(
         email = email,
+        body = body,
         depth = depth,
         pose = {
             val motion = state.motionOf(email.id)
@@ -174,6 +178,7 @@ private fun EmailStackPreview() {
         val state = rememberEmailStackState()
         EmailStack(
             emails = PREVIEW_ITEMS.map { it.email },
+            bodies = emptyMap(),
             isLoading = false,
             state = state,
             onSwiped = { _, _ -> },

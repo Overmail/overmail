@@ -39,10 +39,10 @@ private val LIFTED_BLUR = 24.dp
 private const val LIFTED_SCRIM = 0.2f
 
 /** How far the finger can move from where it lifted the card before the mail starts to scroll. */
-private val SCROLL_DEADZONE = 16.dp
+private val SCROLL_DEADZONE = 8.dp
 
-/** How fast the mail scrolls per px the finger is past [SCROLL_DEADZONE], in px per second. */
-private const val SCROLL_SPEED = 8f
+/** How fast the mail scrolls per px the finger is past [SCROLL_DEADZONE], in px^2 per second. */
+private const val SCROLL_SPEED = 6f
 
 /**
  * The card of [state] that is lifted off the pile, laid over everything else and grown from its
@@ -83,7 +83,7 @@ fun LiftedCard(
                 last = now
                 val finger = state.liftedFingerY
                 val past = abs(finger) - deadzone
-                if (past > 0f) state.liftedScroll.scrollBy(sign(finger) * past * SCROLL_SPEED * seconds)
+                if (past > 0f) state.liftedScroll.scrollBy(sign(finger) * past * SCROLL_SPEED * SCROLL_SPEED * seconds)
             }
         }
 

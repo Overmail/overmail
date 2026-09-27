@@ -1,9 +1,8 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package es.jvbabi.overmail.page.home.components.stack
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
@@ -11,12 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,25 +24,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.bold.ArchiveBold
 import com.phosphor.icons.bold.CheckBold
 import com.phosphor.icons.bold.SkipForwardBold
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
+import es.jvbabi.overmail.ui.components.LabelBadge
+import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.ui.theme.LocalBaseColors
+import es.jvbabi.overmail.utils.sentAtLabel
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_stack_no_subject
@@ -148,13 +140,69 @@ internal fun StackCard(
                 if (place > 0f) drawRect(tint, alpha = (0.05f + place * 0.15f).coerceAtMost(0.65f))
             },
     ) {
-        Text(
-            text = email.subject ?: stringResource(Res.string.home_stack_no_subject),
-            style = MaterialTheme.typography.headlineSmall,
-            color = if (email.subject == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
-            maxLines = 4,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column {
+            Text(
+                text = email.subject ?: stringResource(Res.string.home_stack_no_subject),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = if (email.subject == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .padding(horizontal = 24.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .padding(horizontal = 24.dp)
+            ) {
+                ParticipantAvatar(email.sentBy, size = 32.dp)
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    val primary = email.sentBy.name ?: email.sentBy.email
+                    val secondary = if (email.sentBy.name != null) email.sentBy.email else null
+
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(
+                            text = primary,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier
+                                .weight(1f, false)
+                                .alignByBaseline(),
+                            maxLines = 1,
+                            overflow = TextOverflow.MiddleEllipsis,
+                        )
+
+                        Spacer(Modifier.width(4.dp))
+
+                        Text(
+                            text = sentAtLabel(email.sentAt),
+                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                            modifier = Modifier.alignByBaseline()
+                        )
+                    }
+
+                    if (secondary != null) Text(
+                        text = secondary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            FlowRow(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                email.labels.forEach { label ->
+                    LabelBadge(
+                        name = label.name,
+                        color = label.color,
+                    )
+                }
+            }
+        }
 
         if (drag?.towards != null) {
             val colorSet = when (drag.towards) {

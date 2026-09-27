@@ -49,7 +49,6 @@ val HEADER_HEIGHT = 64.dp
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
 private val EDGE_BLUR_RADIUS = 48.dp
-private const val EDGE_TINT_ALPHA = 0.5f
 
 @Composable
 private fun HomeContent(
@@ -62,7 +61,7 @@ private fun HomeContent(
     val hazeState = rememberHazeState()
     var bottomHeight by remember { mutableStateOf(0.dp) }
     // Only a tint: an opaque edge would hide the blur exactly where it is strongest.
-    val edgeTint = MaterialTheme.colorScheme.background.copy(alpha = EDGE_TINT_ALPHA)
+    val edgeTint = MaterialTheme.colorScheme.background
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(

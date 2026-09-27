@@ -15,7 +15,6 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
-import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.page.Screen
 import es.jvbabi.overmail.page.home.HomeScreen
 import es.jvbabi.overmail.page.onboarding.OnboardingRoot
@@ -25,6 +24,7 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.SyncHumanReadableLocale
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
@@ -96,8 +96,7 @@ fun App() {
 
         UpdateAvailableOverlay()
 
-        val keepCurrentAccountValid = koinInject<KeepCurrentAccountValidUseCase>()
-        LaunchedEffect(keepCurrentAccountValid) { keepCurrentAccountValid() }
+        koinViewModel<AppViewModel>()
 
         val hasAccounts by koinInject<AccountRepository>()
             .getAccounts()

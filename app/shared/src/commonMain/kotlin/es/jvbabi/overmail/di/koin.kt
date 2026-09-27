@@ -2,6 +2,7 @@ package es.jvbabi.overmail.di
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import es.jvbabi.overmail.AppViewModel
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.converter.ColorConverter
@@ -21,6 +22,7 @@ import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
@@ -137,7 +139,9 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::GetCurrentAccountUseCase)
         singleOf(::SetCurrentAccountUseCase)
         singleOf(::KeepCurrentAccountValidUseCase)
+        singleOf(::SetupApplicationUseCase)
 
+        viewModelOf(::AppViewModel)
         viewModelOf(::HomeViewModel)
         viewModelOf(::ViewSettingsViewModel)
         viewModelOf(::OnboardingAuthViewModel)

@@ -1,20 +1,13 @@
 package es.jvbabi.overmail.page.home.components.list
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -25,7 +18,6 @@ import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.PREVIEW_GROUPS_OF_EVERY_KIND
 import es.jvbabi.overmail.page.home.PREVIEW_SENDERS_BY_ID
-import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -68,7 +60,7 @@ fun ViewGroupComponent(
                 is ViewResult.Group -> ViewGroupComponent(
                     group = item,
                     senders = senders,
-                    modifier = Modifier.padding(start = 16.dp)
+                    modifier = Modifier.padding(start = 24.dp)
                 )
                 is ViewResult.Item -> ViewItem(item)
             }
@@ -85,7 +77,7 @@ private fun GroupHeader(
 ) {
     Row(
         modifier = modifier
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

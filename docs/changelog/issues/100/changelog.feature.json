@@ -1,0 +1,10 @@
+{
+  "title": "Labels on your mails",
+  "description": "Every mail on the home screen now shows its labels in their colour, the same way the web app does. When a row runs out of room, the labels that no longer fit are counted instead of cut off.",
+  "localized": {
+    "de": {
+      "title": "Labels an deinen E-Mails",
+      "description": "Jede E-Mail auf dem Startbildschirm zeigt jetzt ihre Labels in ihrer Farbe, genauso wie die Web-App. Wird eine Zeile zu knapp, werden die Labels, die nicht mehr passen, gezählt statt abgeschnitten."
+    }
+  }
+}

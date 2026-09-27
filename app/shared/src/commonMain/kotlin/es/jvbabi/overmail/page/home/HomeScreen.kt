@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.page.home
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,36 +8,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.times
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phosphor.icons.PhIcons
-import com.phosphor.icons.regular.List
 import com.phosphor.icons.regular.MagnifyingGlass
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.ViewSettings
 import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import overmail.app.shared.generated.resources.Res
-import overmail.app.shared.generated.resources.app_icon
-import overmail.app.shared.generated.resources.home_greeting_day
-import overmail.app.shared.generated.resources.home_greeting_evening
-import overmail.app.shared.generated.resources.home_greeting_morning
-import overmail.app.shared.generated.resources.home_greeting_night
 
 @Composable
 fun HomeScreen() {
@@ -60,7 +49,6 @@ val HEADER_HEIGHT = 64.dp
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
 private val EDGE_BLUR_RADIUS = 48.dp
-private const val EDGE_TINT_ALPHA = 0.5f
 
 @Composable
 private fun HomeContent(
@@ -73,7 +61,7 @@ private fun HomeContent(
     val hazeState = rememberHazeState()
     var bottomHeight by remember { mutableStateOf(0.dp) }
     // Only a tint: an opaque edge would hide the blur exactly where it is strongest.
-    val edgeTint = MaterialTheme.colorScheme.background.copy(alpha = EDGE_TINT_ALPHA)
+    val edgeTint = MaterialTheme.colorScheme.background
     Scaffold { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -97,7 +85,7 @@ private fun HomeContent(
                 }
             }
 
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
@@ -105,44 +93,12 @@ private fun HomeContent(
                     .padding(top = innerPadding.calculateTopPadding())
                     .height(HEADER_HEIGHT)
                     .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                contentAlignment = Alignment.CenterStart,
             ) {
-                IconButton(
-                    onClick = {},
-                    modifier = Modifier.padding(end = 8.dp),
-                ) {
-                    Icon(
-                        imageVector = PhIcons.Regular.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Image(
-                    painter = painterResource(Res.drawable.app_icon),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .size(HEADER_HEIGHT - 2*16.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                HomeHeader(
+                    currentUser = homeState.currentUser,
+                    greeting = homeState.greeting,
                 )
-                Column {
-                    Text(
-                        text = "Overmail",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    if (homeState.currentUser != null) Text(
-                        text = stringResource(
-                            when (homeState.greeting) {
-                                Greeting.Night -> Res.string.home_greeting_night
-                                Greeting.Morning -> Res.string.home_greeting_morning
-                                Greeting.Day -> Res.string.home_greeting_day
-                                Greeting.Evening -> Res.string.home_greeting_evening
-                            },
-                            homeState.currentUser.firstName,
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
             }
 
             Column(

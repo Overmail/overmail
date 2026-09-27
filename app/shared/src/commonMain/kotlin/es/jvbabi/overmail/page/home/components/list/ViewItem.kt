@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
+import es.jvbabi.overmail.ui.components.LabelBadges
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.sentAtLabel
@@ -33,7 +34,7 @@ fun ViewItem(
             .clip(RoundedCornerShape(16.dp))
             .clickable {}
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         ParticipantAvatar(
             participant = item.email.sentBy,
@@ -94,6 +95,10 @@ fun ViewItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
+            )
+            if (item.email.labels.isNotEmpty()) LabelBadges(
+                labels = item.email.labels,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

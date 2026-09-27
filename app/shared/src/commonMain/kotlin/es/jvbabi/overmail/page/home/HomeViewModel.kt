@@ -3,7 +3,7 @@ package es.jvbabi.overmail.page.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.jvbabi.overmail.domain.model.OvermailAccount
-import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +18,14 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 class HomeViewModel(
-    private val accountRepository: AccountRepository,
+    private val getCurrentAccount: GetCurrentAccountUseCase,
 ): ViewModel() {
     val state: StateFlow<HomeState>
         field = MutableStateFlow(HomeState())
 
     init {
         viewModelScope.launch {
-            accountRepository.getCurrentAccount().collectLatest { currentUser ->
+            getCurrentAccount().collectLatest { currentUser ->
                 state.update { it.copy(currentUser = currentUser) }
             }
         }

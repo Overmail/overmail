@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.androidMultiplatformLibrary)
 }
 
@@ -27,28 +26,18 @@ kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
         }
-
-        androidResources {
-            enable = true
-        }
     }
 
     jvm()
 
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            // What the Xcode project imports, see app/ios/iosApp/ContentView.swift.
-            baseName = "OvermailCommon"
-            isStatic = true
-        }
-    }
+    // No framework of its own: :app:shared bundles this into ComposeApp.
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.kotlinx.datetime)
+            // smartDateBoundaries takes a TimeZone, so callers need the types too.
+            api(libs.kotlinx.datetime)
         }
     }
 }

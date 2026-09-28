@@ -2,6 +2,8 @@ package es.jvbabi.overmail.data.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import es.jvbabi.overmail.domain.model.ArchivedState
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -9,6 +11,34 @@ import kotlin.uuid.Uuid
 @Entity(
     tableName = "email",
     primaryKeys = ["id"],
+    foreignKeys = [
+        ForeignKey(
+            entity = DbOvermailAccount::class,
+            parentColumns = ["id"],
+            childColumns = ["overmail_account_id"],
+            onUpdate = ForeignKey.CASCADE,
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = DbImapAccount::class,
+            parentColumns = ["id"],
+            childColumns = ["imap_account_id"],
+            onUpdate = ForeignKey.CASCADE,
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = DbParticipant::class,
+            parentColumns = ["id"],
+            childColumns = ["sent_from_participant_id"],
+            onUpdate = ForeignKey.CASCADE,
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["overmail_account_id"]),
+        Index(value = ["imap_account_id"]),
+        Index(value = ["sent_from_participant_id"]),
+    ],
 )
 data class DbEmail(
     @ColumnInfo(name = "id") val id: Uuid,

@@ -66,6 +66,10 @@ class EmailsRepositoryImpl(
     private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
     private val emailBodyCache = EmailBodyCache(emailBodyCacheDirectory())
 
+    /** What [peekBody] answers from, the bodies last read, newest last; replaced as a whole. */
+    @Volatile
+    private var recentBodies: Map<Uuid, EmailBody> = emptyMap()
+
     /** What [peekEmail] answers from: every mail as it was last read, replaced as a whole. */
     @Volatile
     private var lastRead: Map<Uuid, Email> = emptyMap()
@@ -131,9 +135,16 @@ class EmailsRepositoryImpl(
     override fun peekEmail(emailId: Uuid): Email? = lastRead[emailId]
 
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
-        emailBodyCache.get(emailId)?.let { return Result.success(it) }
-        return fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }
+        recentBodies[emailId]?.let { return Result.success(it) }
+        val body = emailBodyCache.get(emailId)?.let { Result.success(it) }
+            ?: fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }
+        body.onSuccess { recentBodies = ((recentBodies - emailId) + (emailId to it)).entries.toList().takeLast(RECENT_BODIES).associate { e -> e.key to e.value } }
+        return body
     }
+
+    override fun peekBody(emailId: Uuid): EmailBody? = recentBodies[emailId]
+
+    override fun peekPicture(emailId: Uuid): ImageBitmap? = emailPictures.peek(emailId)
 
     override suspend fun getPicture(emailId: Uuid, html: String, order: () -> Int): ImageBitmap? =
         emailPictures.get(emailId, html, order)
@@ -205,6 +216,9 @@ class EmailsRepositoryImpl(
 }
 
 private val streamJson = Json { ignoreUnknownKeys = true }
+
+/** How many bodies [EmailsRepositoryImpl.peekBody] remembers; the pile reads a few ahead. */
+private const val RECENT_BODIES = 16
 
 /** The ids of one group as the server answered them; [keys] are the server's, outermost first. */
 private data class RemoteGroupIds(

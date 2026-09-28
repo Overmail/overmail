@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,8 +101,9 @@ fun ListMailPreviewCard(
 private val ROW_SHAPE = RoundedCornerShape(16.dp)
 
 /**
- * A mail of the listing. Tapped, [onOpen] opens its page, which grows out of the row, see
- * [sharedMail]. Pressed and held, with a [preview], it lifts a card of the mail over everything,
+ * A mail of the listing. Tapped, [onOpen] opens its page, which grows out of the row while it
+ * [isShared], see [sharedMail]; only the row last opened is, a group composes all of its rows at
+ * once. Pressed and held, with a [preview], it lifts a card of the mail over everything,
  * grown out of the row as well.
  */
 @Composable
@@ -109,13 +111,15 @@ fun ViewItem(
     item: ViewResult.Item,
     preview: ListMailPreview? = null,
     onOpen: (() -> Unit)? = null,
+    isShared: Boolean = false,
 ) {
-    if (preview == null) return ViewItemRow(item, onOpen = onOpen)
+    if (preview == null) return ViewItemRow(item, onOpen = onOpen, isShared = isShared)
 
     var bounds by remember { mutableStateOf(Rect.Zero) }
     ViewItemRow(
         item = item,
         onOpen = onOpen,
+        isShared = isShared,
         modifier = Modifier.onGloballyPositioned { bounds = it.boundsInRoot() },
         // Inside the click, so the release of a long press is not a click as well.
         gesture = Modifier.liftOnLongPress(preview.lift, preview, onPress = { preview.prepare(item.email, bounds) }),
@@ -128,10 +132,15 @@ private fun ViewItemRow(
     modifier: Modifier = Modifier,
     gesture: Modifier = Modifier,
     onOpen: (() -> Unit)? = null,
+    isShared: Boolean = false,
 ) {
+    @Composable
+    fun Modifier.shared(part: SharedMailPart, shape: Shape? = null) =
+        if (isShared) sharedMail(item.email.id, part, shape = shape) else this
+
     Row(
         modifier = modifier
-            .sharedMail(item.email.id, SharedMailPart.Container, shape = ROW_SHAPE)
+            .shared(SharedMailPart.Container, shape = ROW_SHAPE)
             .fillMaxWidth()
             .clip(ROW_SHAPE)
             .clickable(enabled = onOpen != null) { onOpen?.invoke() }
@@ -143,7 +152,7 @@ private fun ViewItemRow(
             participant = item.email.sentBy,
             size = 36.dp,
             modifier = Modifier
-                .sharedMail(item.email.id, SharedMailPart.Avatar, shape = RoundedCornerShape(8.dp))
+                .shared(SharedMailPart.Avatar, shape = RoundedCornerShape(8.dp))
                 .clip(RoundedCornerShape(8.dp))
         )
         Column {
@@ -165,7 +174,7 @@ private fun ViewItemRow(
                         fontWeight = fontWeight,
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .sharedMail(item.email.id, SharedMailPart.Sender),
+                            .shared(SharedMailPart.Sender),
                     )
                     if (!item.email.isRead) Spacer(
                         modifier = Modifier
@@ -185,7 +194,7 @@ private fun ViewItemRow(
                     fontWeight = fontWeight,
                     modifier = Modifier
                         .alignByBaseline()
-                        .sharedMail(item.email.id, SharedMailPart.SentAt),
+                        .shared(SharedMailPart.SentAt),
                 )
             }
             run(subject@{
@@ -198,7 +207,7 @@ private fun ViewItemRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = fontWeight,
                     color = color,
-                    modifier = Modifier.sharedMail(item.email.id, SharedMailPart.Subject),
+                    modifier = Modifier.shared(SharedMailPart.Subject),
                 )
             })
             if (!item.email.preview.isNullOrEmpty()) Text(
@@ -211,7 +220,7 @@ private fun ViewItemRow(
                 labels = item.email.labels,
                 modifier = Modifier
                     .padding(top = 4.dp)
-                    .sharedMail(item.email.id, SharedMailPart.Labels),
+                    .shared(SharedMailPart.Labels),
             )
         }
     }

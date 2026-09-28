@@ -37,6 +37,12 @@ interface EmailsRepository {
      */
     suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody>
 
+    /** What [getBody] last answered for the mail of [emailId], if it was lately; without waiting, like [peekEmail]. */
+    fun peekBody(emailId: Uuid): EmailBody?
+
+    /** The picture [getPicture] last answered for the mail of [emailId], if it was lately; without waiting. */
+    fun peekPicture(emailId: Uuid): ImageBitmap?
+
     /**
      * A picture of the html part of the mail of [emailId], [html], the way it is shown on a card;
      * null when it would not render. Kept in a file cache like the body. Rendered one at a time for

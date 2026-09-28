@@ -43,6 +43,8 @@ fun ViewGroupComponent(
     preview: ListMailPreview? = null,
     /** Opens the page of a mail in it; tapping does nothing without. */
     onOpenEmail: ((Uuid) -> Unit)? = null,
+    /** The mail whose row grows into its page and back, see [ViewItem]. */
+    sharedEmailId: Uuid? = null,
 ) {
     val localDensity = LocalDensity.current
     Column(modifier = modifier) {
@@ -66,9 +68,15 @@ fun ViewGroupComponent(
                     senders = senders,
                     preview = preview,
                     onOpenEmail = onOpenEmail,
+                    sharedEmailId = sharedEmailId,
                     modifier = Modifier.padding(start = 24.dp)
                 )
-                is ViewResult.Item -> ViewItem(item, preview, onOpen = onOpenEmail?.let { { it(item.email.id) } })
+                is ViewResult.Item -> ViewItem(
+                    item = item,
+                    preview = preview,
+                    onOpen = onOpenEmail?.let { { it(item.email.id) } },
+                    isShared = item.email.id == sharedEmailId,
+                )
             }
         }
     }

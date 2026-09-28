@@ -27,6 +27,11 @@ class EmailBodies(
 
     private val pictureJobs = mutableMapOf<Uuid, Job>()
 
+    /** Takes [body] as what the mail of [emailId] says, unless something is known of it already. */
+    fun seed(emailId: Uuid, body: StackCardBody) {
+        bodies.update { if (emailId in it) it else it + (emailId to body) }
+    }
+
     /**
      * Fetches what the mail of [emailId] says unless it is here or on its way, and pictures an html
      * one; one that failed is asked for again, and so is a picture that was let go. [order] is the

@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
-import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewSorting
 import es.jvbabi.overmail.domain.model.ViewSortingKind
 import es.jvbabi.overmail.domain.model.ViewState
@@ -52,6 +51,8 @@ class EmailStackViewModel(
      */
     private val handled = MutableStateFlow(emptySet<Uuid>())
 
+    private val bodies = EmailBodies(viewModelScope, emailsRepository::getBody)
+
     private val account = accountRepository.getAccounts()
         .map { it.firstOrNull() }
         .distinctUntilChanged()
@@ -67,26 +68,13 @@ class EmailStackViewModel(
                 .combine(handled) { (account, emails), handled -> account to emails.filter { it.id !in handled } }
                 .collect { (account, emails) ->
                     state.update { it.copy(emails = emails, isLoading = false) }
-                    if (account != null) emails.take(BODIES_AHEAD).forEach { loadBody(it, account) }
+                    // One that failed is asked for again, the next time the pile changes with it
+                    // still near the top.
+                    if (account != null) emails.take(BODIES_AHEAD).forEach { bodies.load(it.id, account) }
                 }
         }
-    }
-
-    /**
-     * Fetches what [email] says unless it is here or on its way. One that failed is asked for
-     * again, the next time the pile changes with it still near the top.
-     */
-    private fun loadBody(email: Email, account: OvermailAccount) {
-        val known = state.value.bodies[email.id]
-        if (known != null && known !is StackCardBody.Failed) return
-        state.update { it.copy(bodies = it.bodies + (email.id to StackCardBody.Loading)) }
-
         viewModelScope.launch {
-            val body = emailsRepository.getBody(email.id, account).fold(
-                onSuccess = { body -> body.html?.let(StackCardBody::Html) ?: StackCardBody.Text(body.text.orEmpty()) },
-                onFailure = { StackCardBody.Failed },
-            )
-            state.update { it.copy(bodies = it.bodies + (email.id to body)) }
+            bodies.bodies.collect { known -> state.update { it.copy(bodies = known) } }
         }
     }
 

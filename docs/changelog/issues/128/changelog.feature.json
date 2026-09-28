@@ -1,0 +1,10 @@
+{
+  "title": "The stack shrinks once you are done",
+  "description": "When the last mail has left the stack, it shrinks to a small \"All done\" and the list moves up with it.",
+  "localized": {
+    "de": {
+      "title": "Der Stapel schrumpft, wenn du fertig bist",
+      "description": "Sobald die letzte E-Mail den Stapel verlassen hat, schrumpft er auf ein kleines „Alles erledigt“ und die Liste rückt mit ihm nach oben."
+    }
+  }
+}

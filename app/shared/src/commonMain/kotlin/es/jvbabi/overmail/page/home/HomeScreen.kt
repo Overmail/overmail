@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.page.home
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -99,6 +100,8 @@ private val STACK_READ_AFTER = 2.seconds
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
 private val EDGE_BLUR_RADIUS = 48.dp
 
+val STACK_HEIGHT_WHEN_FINISHED = 92.dp
+
 @Composable
 private fun HomeContent(
     homeState: HomeState,
@@ -130,7 +133,8 @@ private fun HomeContent(
     Scaffold{ innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
         // How far the listing scrolls until it covers the pile, which is what the pile is tall.
-        val stackHeight = (containerHeight - bottomHeight - LIST_PEEK_BELOW_STACK - HEADER_HEIGHT - innerPadding.calculateTopPadding() - innerPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
+        val stackHeightBase = (containerHeight - bottomHeight - LIST_PEEK_BELOW_STACK - HEADER_HEIGHT - innerPadding.calculateTopPadding() - innerPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
+        val stackHeight by animateDpAsState(if (emailStackState.cards.isEmpty()) STACK_HEIGHT_WHEN_FINISHED else stackHeightBase)
         val stackHeightPx = with(localDensity) { stackHeight.toPx() }
         // Over everything in it, the header and the search included.
         Box(Modifier.fillMaxSize().liftHost(liftState)) {
@@ -201,7 +205,7 @@ private fun HomeContent(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             top = topOfStack + stackHeight,
-                            bottom = bottomHeight,
+                            bottom = bottomHeight + stackHeight,
                         ),
                         state = emailsListState,
                         flingBehavior = rememberStackSnapFlingBehavior(emailsListState, stackHeightPx),

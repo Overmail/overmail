@@ -113,7 +113,9 @@ private suspend fun renderSnapshot(window: ViewGroup, document: String, width: I
                 @Suppress("DEPRECATION")
                 val pageHeight = (view.contentHeight * view.scale).roundToInt()
                 val maxHeight = minOf(viewportHeight * MAX_SNAPSHOT_VIEWPORTS, MAX_SNAPSHOT_PX).coerceAtLeast(viewportHeight)
-                view.layoutParams = ViewGroup.LayoutParams(width, pageHeight.coerceIn(viewportHeight, maxHeight))
+                // Only the height changed on the params it has: the window made them of its own kind,
+                // which it measures its children by, and plain ones would crash that.
+                view.layoutParams = view.layoutParams.apply { height = pageHeight.coerceIn(viewportHeight, maxHeight) }
                 view.postDelayed({
                     if (done) return@postDelayed
                     // Once what is drawn next shows the page as it is now, laid out at its height.

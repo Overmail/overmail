@@ -26,6 +26,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
+import es.jvbabi.overmail.ui.components.ScrollOffset
+import es.jvbabi.overmail.ui.lift.liftable
 import es.jvbabi.overmail.ui.theme.AppTheme
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
@@ -153,6 +155,8 @@ private fun PiledCard(
         haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
     }
 
+    val scroll = remember(body) { ScrollOffset() }
+
     StackCard(
         email = email,
         body = body,
@@ -164,11 +168,13 @@ private fun PiledCard(
                 place = (if (depth == 0 || motion?.leaving == true) 0f else depth - state.progress) + (1f - appeared.value),
                 hand = motion?.let { CardHand(offset = it.offset, rotation = state.rotationOf(it), press = it.press.value) },
                 dealt = dealt.value,
-                // Lifted, the card is drawn over everything else instead, see LiftedCard.
-                alpha = if (state.lifted?.id == email.id) 0f else appeared.value,
+                alpha = appeared.value,
             )
         },
         drag = state.dragOf(email.id),
+        scroll = scroll,
+        // Held still, the card is lifted off the pile as it is, see EmailStackState.press.
+        modifier = Modifier.liftable(state.lift, email.id, scroll),
     )
 }
 

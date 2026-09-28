@@ -156,9 +156,9 @@ private val OVERFLOW_FADE = 48.dp
 
 /**
  * What the mail says, over the whole card and starting [topInset] down, below the header. It is
- * not scrolled by touch -- a card is read at a glance -- but [scroll] moves it, see LiftedCard,
- * and it goes on behind the header then. A mail that goes on below what shows fades out where the
- * card ends.
+ * not scrolled by touch -- a card is read at a glance -- but [scroll] moves it while the card is
+ * lifted, see [es.jvbabi.overmail.ui.lift.LiftState], and it goes on behind the header then. A
+ * mail that goes on below what shows fades out where the card ends.
  */
 @Composable
 internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, topInset: Dp, modifier: Modifier = Modifier) {

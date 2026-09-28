@@ -64,7 +64,8 @@ internal data class CardHand(
  * One sheet of the pile, drawn where [pose] says. [depth] is its place in the pile as a whole
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
  * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
- * scrolled; only a lifted card is, the others lie at its top.
+ * scrolled; only a lifted card is, see [es.jvbabi.overmail.ui.lift.LiftState], the others lie at
+ * its top.
  */
 @Composable
 internal fun StackCard(

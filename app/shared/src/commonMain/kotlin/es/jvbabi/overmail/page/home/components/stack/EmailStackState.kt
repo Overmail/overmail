@@ -9,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
@@ -23,7 +22,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import es.jvbabi.overmail.domain.model.Email
-import es.jvbabi.overmail.ui.components.ScrollOffset
+import es.jvbabi.overmail.ui.lift.LiftState
+import es.jvbabi.overmail.ui.lift.rememberLiftState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -118,6 +118,8 @@ internal class CardMotion {
 class EmailStackState internal constructor(
     private val scope: CoroutineScope,
     private val haptics: HapticFeedback,
+    /** What a card held still is lifted off the pile by, to be read over everything else. */
+    val lift: LiftState,
 ) {
     /** Only the cards that are moved or on their way somewhere; the rest lie in their place. */
     private val motions = mutableStateMapOf<Uuid, CardMotion>()
@@ -146,27 +148,8 @@ class EmailStackState internal constructor(
     /** Since when the held card has been past the threshold, without going back; null while it is not. */
     private var beyondSince: TimeMark? = null
 
-    /**
-     * The card lifted off the pile to be read: held still long enough, it is laid over everything
-     * else, as big as the screen allows. Still there while it is laid back down.
-     */
-    internal var lifted: Email? by mutableStateOf(null)
-        private set
-
-    /** How far [lifted] is on its way up: 0 in the pile, 1 over everything. */
-    internal val lift = Animatable(0f)
-
+    /** Lifts the held card once it has been held still for [LIFT_AFTER]. */
     private var liftJob: Job? = null
-
-    /**
-     * How far the finger has moved up or down since [lifted] was lifted, in px: the lifted card is
-     * not moved by it any more, it scrolls its mail at a speed this sets, see LiftedCard.
-     */
-    internal var liftedFingerY by mutableFloatStateOf(0f)
-        private set
-
-    /** How far the mail on [lifted] is scrolled. */
-    internal val liftedScroll = ScrollOffset()
 
     /**
      * The card a touch goes to: the top one of those still on the pile. A card thrown off is
@@ -245,11 +228,7 @@ class EmailStackState internal constructor(
         liftJob?.cancel()
         liftJob = scope.launch {
             delay(LIFT_AFTER)
-            liftedFingerY = 0f
-            liftedScroll.scrollTo(0f)
-            lifted = email
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            lift.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+            lift.lift(email.id)
         }
         scope.launch { motion.press.animateTo(PRESSED_SCALE, spring(stiffness = Spring.StiffnessMedium)) }
         return true
@@ -259,8 +238,8 @@ class EmailStackState internal constructor(
         val (email, motion) = held ?: return
         // A lifted card is there to be read, not swiped: it stays where it is until it is let go,
         // and the finger scrolls through it instead.
-        if (lifted == email) {
-            liftedFingerY += delta.y
+        if (lift.isLifted(email.id)) {
+            lift.moveFinger(delta.y)
             return
         }
         // Moved before it was lifted: a swipe, not a card to read.
@@ -282,16 +261,7 @@ class EmailStackState internal constructor(
         val (email, motion) = held ?: return
         held = null
         liftJob?.cancel()
-        liftedFingerY = 0f
-        if (lifted == email) scope.launch {
-            // Back to its top on the way down: the card in the pile it turns back into is there.
-            launch {
-                animate(liftedScroll.value, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { value, _ -> liftedScroll.scrollTo(value) }
-            }
-            lift.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
-            // Not if another card was lifted meanwhile, which takes the animation over.
-            if (lifted == email) lifted = null
-        }
+        if (lift.isLifted(email.id)) lift.release()
         val unpress = scope.launch { motion.press.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
         val offset = motion.offset
         // A flick only counts in the direction the card is already pulled, so a card dragged
@@ -333,9 +303,10 @@ class EmailStackState internal constructor(
     }
 }
 
+/** [lift] is what the card is lifted with; share it with whatever else on the screen lifts. */
 @Composable
-fun rememberEmailStackState(): EmailStackState {
+fun rememberEmailStackState(lift: LiftState = rememberLiftState()): EmailStackState {
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
-    return remember(scope, haptics) { EmailStackState(scope, haptics) }
+    return remember(scope, haptics, lift) { EmailStackState(scope, haptics, lift) }
 }

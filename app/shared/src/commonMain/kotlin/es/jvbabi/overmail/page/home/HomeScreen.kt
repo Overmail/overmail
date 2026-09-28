@@ -10,8 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,22 +28,18 @@ import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.ViewSettings
 import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
-import es.jvbabi.overmail.page.home.components.stack.EmailStack
-import es.jvbabi.overmail.page.home.components.stack.LiftedCard
-import es.jvbabi.overmail.page.home.components.stack.blurredBehindLiftedCard
-import es.jvbabi.overmail.page.home.components.stack.StackSwipe
-import es.jvbabi.overmail.page.home.components.stack.emailStackSwipe
-import es.jvbabi.overmail.page.home.components.stack.rememberEmailStackState
-import es.jvbabi.overmail.page.home.components.stack.rememberStackSnapFlingBehavior
+import es.jvbabi.overmail.page.home.components.stack.*
+import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.rememberLiftState
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_stack_archive_failed
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
@@ -113,21 +109,23 @@ private fun HomeContent(
     var containerHeight by remember { mutableStateOf(0.dp) }
 
     val emailsListState = rememberLazyListState()
-    val emailStackState = rememberEmailStackState()
+    // One for the screen: whatever is lifted lies over all of it, see liftHost.
+    val liftState = rememberLiftState()
+    val emailStackState = rememberEmailStackState(liftState)
 
     Scaffold{ innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
         // How far the listing scrolls until it covers the pile, which is what the pile is tall.
         val stackHeight = (containerHeight - bottomHeight - LIST_PEEK_BELOW_STACK - HEADER_HEIGHT - innerPadding.calculateTopPadding() - innerPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
         val stackHeightPx = with(localDensity) { stackHeight.toPx() }
-        Box(Modifier.fillMaxSize()) {
+        // Over everything in it, the header and the search included.
+        Box(Modifier.fillMaxSize().liftHost(liftState)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .onSizeChanged { (_, h) ->
                         containerHeight = with(localDensity) { h.toDp() }
                     }
-                    .blurredBehindLiftedCard(emailStackState)
             ) {
                 val verticalPercentageOfStackVisible by remember(stackHeightPx) {
                     derivedStateOf {

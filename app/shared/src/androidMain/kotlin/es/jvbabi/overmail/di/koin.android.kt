@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
+import es.jvbabi.overmail.data.picture.AndroidEmailPictureRenderer
+import es.jvbabi.overmail.data.picture.EmailPictureRenderer
 import es.jvbabi.overmail.data.repository.OvermailAppRepositoryImpl
 import es.jvbabi.overmail.data.repository.UpdateRepositoryImpl
 import es.jvbabi.overmail.data.repository.fake.FakeOvermailAppRepository
@@ -31,7 +33,8 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
 }
 
 /**
- * Android is the only platform that updates itself, so the whole updater is declared here.
+ * The renderer of mail pictures, and the updater: Android is the only platform that updates
+ * itself, so the whole updater is declared here.
  *
  * What the updater talks to the outside world through — releases on GitHub, the file system, the
  * system installer — comes from one of two interchangeable scenarios, so the flow can be walked
@@ -39,6 +42,9 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
  */
 actual fun platformModule(): Module = module {
     includes(if (BuildKonfig.FAKE_UPDATE) fakeUpdateScenario else realUpdateScenario)
+
+    // At start, so it sees the activity come up: that window is where a mail is rendered.
+    single<EmailPictureRenderer>(createdAtStart = true) { AndroidEmailPictureRenderer(context = get()) }
 
     singleOf(::CheckAppIsLatestVersionUseCase)
     singleOf(::GetReleaseChangelogsUseCase)

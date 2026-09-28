@@ -47,6 +47,11 @@ actual fun emailBodyCacheDirectory(): Path {
     return "$caches/email-bodies".toPath()
 }
 
+actual fun emailPictureCacheDirectory(): Path {
+    val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
+    return "$caches/email-pictures".toPath()
+}
+
 actual fun openUrl(url: String) {
     val nsUrl = NSURL(string = url)
     val safariViewController = SFSafariViewController(nsUrl)

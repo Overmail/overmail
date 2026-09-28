@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -37,7 +38,7 @@ import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import es.jvbabi.overmail.domain.model.Email
-import es.jvbabi.overmail.ui.components.EmailHtml
+import es.jvbabi.overmail.ui.components.EmailPicture
 import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
@@ -52,8 +53,11 @@ sealed interface StackCardBody {
     /** On its way from the server, or from the cache. */
     data object Loading : StackCardBody
 
-    /** A mail with an html part, which is what is shown of it then. */
-    data class Html(val html: String) : StackCardBody
+    /**
+     * A mail with an html part, which is what is shown of it then: as its [picture], null until
+     * that is made, or while it is not kept -- see `EmailBodies`.
+     */
+    data class Html(val html: String, val picture: ImageBitmap? = null) : StackCardBody
 
     /** A mail with only a text part. */
     data class Text(val text: String) : StackCardBody
@@ -197,11 +201,11 @@ internal fun CardBody(
             StackCardBody.Loading -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is StackCardBody.Html -> EmailHtml(
-                html = body.html,
-                modifier = Modifier.fillMaxSize(),
+            is StackCardBody.Html -> EmailPicture(
+                picture = body.picture,
                 scroll = scroll,
                 topInset = topInset,
+                modifier = Modifier.fillMaxSize(),
             )
             is StackCardBody.Text -> Text(
                 text = body.text,

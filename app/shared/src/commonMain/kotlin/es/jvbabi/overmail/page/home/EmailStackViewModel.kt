@@ -13,6 +13,7 @@ import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -51,7 +53,7 @@ class EmailStackViewModel(
      */
     private val handled = MutableStateFlow(emptySet<Uuid>())
 
-    private val bodies = EmailBodies(viewModelScope, emailsRepository::getBody)
+    private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
 
     private val account = accountRepository.getAccounts()
         .map { it.firstOrNull() }
@@ -63,20 +65,32 @@ class EmailStackViewModel(
                 .flatMapLatest { account ->
                     if (account == null) flowOf(null to emptyList())
                     else emailsRepository.getView(INBOX, instantLocalEmission = true, user = account)
-                        .map { results -> account to results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        .map { results -> results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        // A write that leaves the inbox as it was -- most of a first sync, which
+                        // loads the archive too -- does not deal the pile anew.
+                        .distinctUntilChanged()
+                        .flowOn(Dispatchers.Default)
+                        .map { emails -> account to emails }
                 }
                 .combine(handled) { (account, emails), handled -> account to emails.filter { it.id !in handled } }
                 .collect { (account, emails) ->
                     state.update { it.copy(emails = emails, isLoading = false) }
                     // One that failed is asked for again, the next time the pile changes with it
                     // still near the top.
-                    if (account != null) emails.take(BODIES_AHEAD).forEach { bodies.load(it.id, account) }
+                    val ahead = emails.take(BODIES_AHEAD)
+                    // A card that has left the pile no longer needs its picture held.
+                    bodies.keepPictures(ahead.mapTo(HashSet()) { it.id })
+                    if (account != null) ahead.forEach { email -> bodies.load(email.id, account, order = { placeOnPile(email.id) }) }
                 }
         }
         viewModelScope.launch {
             bodies.bodies.collect { known -> state.update { it.copy(bodies = known) } }
         }
     }
+
+    /** Where the mail of [emailId] lies on the pile now, 0 on top; far down once it is off it. */
+    private fun placeOnPile(emailId: Uuid): Int =
+        state.value.emails.indexOfFirst { it.id == emailId }.takeIf { it >= 0 } ?: Int.MAX_VALUE
 
     fun onEvent(event: EmailStackEvent) {
         when (event) {

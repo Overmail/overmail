@@ -1,5 +1,7 @@
 package es.jvbabi.overmail.data.repository
 
+import androidx.compose.ui.graphics.ImageBitmap
+import es.jvbabi.overmail.data.picture.EmailPictures
 import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
 import es.jvbabi.overmail.data.cache.EmailBodyCache
@@ -36,6 +38,8 @@ import io.ktor.http.ParametersBuilder
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
@@ -56,6 +60,7 @@ class EmailsRepositoryImpl(
     private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
     imapAccountsRepository: ImapAccountsRepository,
+    private val emailPictures: EmailPictures,
 ) : EmailsRepository {
     private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
     private val emailBodyCache = EmailBodyCache(emailBodyCacheDirectory())
@@ -101,11 +106,18 @@ class EmailsRepositoryImpl(
             }
         }
     }
+        // Filtering and arranging goes through every mail of the account, on every change of the
+        // database -- a first sync makes several. Not on the collector's thread, which for a
+        // screen is the main one.
+        .flowOn(Dispatchers.Default)
 
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
         emailBodyCache.get(emailId)?.let { return Result.success(it) }
         return fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }
     }
+
+    override suspend fun getPicture(emailId: Uuid, html: String, order: () -> Int): ImageBitmap? =
+        emailPictures.get(emailId, html, order)
 
     override suspend fun setArchivedState(email: Email, archivedState: ArchivedState, user: OvermailAccount): Result<Unit> {
         overmailDatabase.emailsDao.setArchivedState(email.id, archivedState)

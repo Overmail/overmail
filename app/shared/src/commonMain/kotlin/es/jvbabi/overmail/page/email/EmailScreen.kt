@@ -53,9 +53,10 @@ import es.jvbabi.overmail.ui.components.EmailHtmlBody
 import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.ui.theme.displayFontFamily
-import es.jvbabi.overmail.ui.transition.SharedMailPart
+import es.jvbabi.overmail.ui.transition.MailPart
 import es.jvbabi.overmail.ui.transition.isScreenSettled
-import es.jvbabi.overmail.ui.transition.sharedMail
+import es.jvbabi.overmail.ui.transition.mailPage
+import es.jvbabi.overmail.ui.transition.mailPart
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -75,13 +76,10 @@ import overmail.app.shared.generated.resources.email_unarchive
 import org.jetbrains.compose.resources.StringResource
 import kotlin.uuid.Uuid
 
-/** What the page is cut to on its way out of the row it was opened from, and back into it. */
-private val SHARED_SHAPE = RoundedCornerShape(16.dp)
-
 /**
  * The mail of [emailId] on a page of its own, what the web app's mail page is: its subject and
  * what can be done with it, who it is between, its labels and what it says. It grows out of
- * whatever showed the mail and was tapped, see [sharedMail], and can be opened from anywhere
+ * whatever showed the mail and was tapped, see [mailPage], and can be opened from anywhere
  * else as well -- a mail this device does not hold yet is loaded.
  */
 @Composable
@@ -115,12 +113,15 @@ private fun EmailContent(
     onBack: () -> Unit,
     onEvent: (EmailEvent) -> Unit,
 ) {
-    // A background of its own: it grows over the screen it came out of.
+    // A background of its own, drawn by mailPage: it grows out of the row over the screen below.
     Box(
         Modifier
-            .sharedMail(emailId, SharedMailPart.Container, shape = SHARED_SHAPE)
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .mailPage(
+                emailId = emailId,
+                background = MaterialTheme.colorScheme.background,
+                cardColor = MaterialTheme.colorScheme.surfaceContainer,
+            )
     ) {
         Column(Modifier.fillMaxSize()) {
             EmailTopBar(email = state.email, onBack = onBack, onEvent = onEvent)
@@ -142,7 +143,7 @@ private fun EmailContent(
                     color = if (email.subject == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .sharedMail(email.id, SharedMailPart.Subject),
+                        .mailPart(email.id, MailPart.Subject, isRow = false),
                 )
 
                 EmailParticipants(email = email, modifier = Modifier.padding(horizontal = 24.dp))
@@ -150,7 +151,7 @@ private fun EmailContent(
                 if (email.labels.isNotEmpty()) FlowRow(
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .sharedMail(email.id, SharedMailPart.Labels),
+                        .mailPart(email.id, MailPart.Labels, isRow = false),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {

@@ -21,7 +21,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,8 +39,9 @@ import es.jvbabi.overmail.ui.lift.liftOnLongPress
 import es.jvbabi.overmail.ui.lift.liftStandIn
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
-import es.jvbabi.overmail.ui.transition.SharedMailPart
-import es.jvbabi.overmail.ui.transition.sharedMail
+import es.jvbabi.overmail.ui.transition.MailPart
+import es.jvbabi.overmail.ui.transition.mailPart
+import es.jvbabi.overmail.ui.transition.mailRow
 import es.jvbabi.overmail.utils.sentAtLabel
 import kotlinx.serialization.builtins.serializer
 import kotlin.uuid.Uuid
@@ -102,7 +102,7 @@ private val ROW_SHAPE = RoundedCornerShape(16.dp)
 
 /**
  * A mail of the listing. Tapped, [onOpen] opens its page, which grows out of the row while it
- * [isShared], see [sharedMail]; only the row last opened is, a group composes all of its rows at
+ * [isShared], see [mailRow]; only the row last opened is, a group composes all of its rows at
  * once. Pressed and held, with a [preview], it lifts a card of the mail over everything,
  * grown out of the row as well.
  */
@@ -135,12 +135,11 @@ private fun ViewItemRow(
     isShared: Boolean = false,
 ) {
     @Composable
-    fun Modifier.shared(part: SharedMailPart, shape: Shape? = null) =
-        if (isShared) sharedMail(item.email.id, part, shape = shape) else this
+    fun Modifier.shared(part: MailPart) = if (isShared) mailPart(item.email.id, part, isRow = true) else this
 
     Row(
         modifier = modifier
-            .shared(SharedMailPart.Container, shape = ROW_SHAPE)
+            .then(if (isShared) Modifier.mailRow(item.email.id) else Modifier)
             .fillMaxWidth()
             .clip(ROW_SHAPE)
             .clickable(enabled = onOpen != null) { onOpen?.invoke() }
@@ -152,7 +151,7 @@ private fun ViewItemRow(
             participant = item.email.sentBy,
             size = 36.dp,
             modifier = Modifier
-                .shared(SharedMailPart.Avatar, shape = RoundedCornerShape(8.dp))
+                .shared(MailPart.Avatar)
                 .clip(RoundedCornerShape(8.dp))
         )
         Column {
@@ -174,7 +173,7 @@ private fun ViewItemRow(
                         fontWeight = fontWeight,
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .shared(SharedMailPart.Sender),
+                            .shared(MailPart.Sender),
                     )
                     if (!item.email.isRead) Spacer(
                         modifier = Modifier
@@ -194,7 +193,7 @@ private fun ViewItemRow(
                     fontWeight = fontWeight,
                     modifier = Modifier
                         .alignByBaseline()
-                        .shared(SharedMailPart.SentAt),
+                        .shared(MailPart.SentAt),
                 )
             }
             run(subject@{
@@ -207,7 +206,7 @@ private fun ViewItemRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = fontWeight,
                     color = color,
-                    modifier = Modifier.shared(SharedMailPart.Subject),
+                    modifier = Modifier.shared(MailPart.Subject),
                 )
             })
             if (!item.email.preview.isNullOrEmpty()) Text(
@@ -220,7 +219,7 @@ private fun ViewItemRow(
                 labels = item.email.labels,
                 modifier = Modifier
                     .padding(top = 4.dp)
-                    .shared(SharedMailPart.Labels),
+                    .shared(MailPart.Labels),
             )
         }
     }

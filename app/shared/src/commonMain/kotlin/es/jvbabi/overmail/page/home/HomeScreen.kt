@@ -268,9 +268,6 @@ private fun HomeContent(
                 }
             }
 
-            // Over everything above, the header and the search included.
-            LiftedCard(state = emailStackState, bodies = stackContent.bodies)
-
             // Not the Scaffold's own: it would sit on the search, which is not a bottom bar.
             SnackbarHost(
                 hostState = snackbarHostState,

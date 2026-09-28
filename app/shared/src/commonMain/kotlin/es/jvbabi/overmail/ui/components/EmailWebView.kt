@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,8 +39,9 @@ expect fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifie
 /**
  * An html mail as a page shows it: as wide as it is given and as tall as the mail is, in a live
  * web view. Only while [isLive] -- a web view is drawn outside the Compose layer, so on the way
- * to the page and back the mail is its [picture] instead, which is what it looks like at that
- * width too. The picture also covers the web view until that has laid the mail out.
+ * back out of the page the mail is its [picture] instead, which is what it looks like at that
+ * width too. On the way in there is nothing yet: the picture is large, and the first time it is
+ * drawn costs frames the page is growing in. It is handed to the GPU while the page is open.
  */
 @Composable
 fun EmailHtmlBody(
@@ -50,6 +52,9 @@ fun EmailHtmlBody(
 ) {
     val document = remember(html) { emailHtmlDocument(html) }
     var contentHeight by remember(html) { mutableStateOf<Dp?>(null) }
+    var hasBeenLive by remember { mutableStateOf(false) }
+    if (isLive) hasBeenLive = true
+    LaunchedEffect(picture) { picture?.prepareToDraw() }
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val pictureHeight = picture?.let { maxWidth * (it.height.toFloat() / it.width) }
@@ -69,7 +74,7 @@ fun EmailHtmlBody(
                 .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.TopCenter,
         ) {
-            if (picture != null) Image(
+            if (picture != null && hasBeenLive) Image(
                 bitmap = picture,
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,

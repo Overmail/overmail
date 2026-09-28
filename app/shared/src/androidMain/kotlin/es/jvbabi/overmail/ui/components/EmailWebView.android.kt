@@ -42,9 +42,15 @@ actual fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifie
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
-                        @Suppress("DEPRECATION")
-                        val height = view.contentHeight * view.scale
-                        currentOnContentHeight(with(density) { height.toDp() })
+                        // Told once what is drawn next shows the mail: until then what covers
+                        // the view stays, rather than an empty view showing through.
+                        view.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                            override fun onComplete(requestId: Long) {
+                                @Suppress("DEPRECATION")
+                                val height = view.contentHeight * view.scale
+                                currentOnContentHeight(with(density) { height.toDp() })
+                            }
+                        })
                     }
 
                     // The mail stays; a link leads out of the app.

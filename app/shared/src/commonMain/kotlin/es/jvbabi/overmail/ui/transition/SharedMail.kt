@@ -2,10 +2,14 @@ package es.jvbabi.overmail.ui.transition
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.SharedTransitionScope.SharedContentState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +54,8 @@ enum class SharedMailPart(internal val resizeMode: SharedTransitionScope.ResizeM
     /** When it was sent, short in a row and in full on the page. */
     SentAt(SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillHeight, Alignment.CenterEnd)),
 
-    Labels(SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart)),
+    /** Laid out anew as it grows: a row shows as many as fit in a line, the page all of them. */
+    Labels(SharedTransitionScope.ResizeMode.RemeasureToBounds),
 }
 
 /**
@@ -102,6 +107,28 @@ fun Modifier.sharedMail(
             },
             zIndexInOverlay = zIndex,
         )
+    }
+}
+
+/**
+ * How the screen of [navScope] comes and goes, on a transition of its own that follows where the
+ * NavDisplay's is headed. Shared elements hang off this one rather than the NavDisplay's: that
+ * one is seekable, for predictive back, and a bounds animation a shared element adds to it once
+ * it is under way never moves -- it sits at where it started and jumps at the end.
+ *
+ * It runs in time, so a predictive back plays it rather than following the finger. The screens'
+ * own transitions last [SHARED_MAIL_MILLIS] as well, so neither is gone before the other is done.
+ */
+@Composable
+fun rememberScreenAnimationScope(navScope: AnimatedVisibilityScope): AnimatedVisibilityScope {
+    val nav = navScope.transition
+    val state = remember { MutableTransitionState(nav.currentState) }
+    state.targetState = nav.targetState
+    val transition = rememberTransition(state, label = "screen")
+    return remember(transition) {
+        object : AnimatedVisibilityScope {
+            override val transition: Transition<EnterExitState> = transition
+        }
     }
 }
 

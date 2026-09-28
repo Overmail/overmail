@@ -33,8 +33,9 @@ class EmailViewModel(
     accountRepository: AccountRepository,
     private val emailsRepository: EmailsRepository,
 ) : ViewModel() {
+    // What is known of the mail already, so the page shows it from its first frame on.
     val state: StateFlow<EmailState>
-        field = MutableStateFlow(EmailState())
+        field = MutableStateFlow(EmailState(email = emailsRepository.peekEmail(emailId)))
 
     private val messageChannel = Channel<EmailMessage>(Channel.BUFFERED)
 
@@ -52,6 +53,8 @@ class EmailViewModel(
     private var hasMarkedRead = false
 
     init {
+        // The body is on its way while the page is.
+        state.value.email?.let(::onEmailLoaded)
         viewModelScope.launch {
             account
                 .flatMapLatest { account ->

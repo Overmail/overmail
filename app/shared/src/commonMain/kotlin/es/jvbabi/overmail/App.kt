@@ -15,6 +15,7 @@ import es.jvbabi.overmail.page.email.EmailScreen
 import es.jvbabi.overmail.ui.transition.LocalScreenAnimationScope
 import es.jvbabi.overmail.ui.transition.LocalSharedTransitionScope
 import es.jvbabi.overmail.ui.transition.SHARED_MAIL_MILLIS
+import es.jvbabi.overmail.ui.transition.rememberScreenAnimationScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -119,7 +120,7 @@ private fun ScreenEntry(
     val owner = viewModelStoreOwner ?: checkNotNull(LocalViewModelStoreOwner.current)
     CompositionLocalProvider(
         LocalSharedTransitionScope provides sharedTransitionScope,
-        LocalScreenAnimationScope provides LocalNavAnimatedContentScope.current,
+        LocalScreenAnimationScope provides rememberScreenAnimationScope(LocalNavAnimatedContentScope.current),
         LocalViewModelStoreOwner provides owner,
         content = content,
     )

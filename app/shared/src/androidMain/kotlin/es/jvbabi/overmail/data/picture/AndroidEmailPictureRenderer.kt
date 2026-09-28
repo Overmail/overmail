@@ -79,6 +79,17 @@ class AndroidEmailPictureRenderer(context: Context) : EmailPictureRenderer {
 private var wholeDocumentDraw = false
 
 /**
+ * Lets a web view draw all of what it shows rather than what is on screen, which a picture of a
+ * whole mail needs. Only possible before the first web view of the process, so whatever makes one
+ * -- a picture, or a mail's page -- calls this first. On the main thread.
+ */
+internal fun enableWholeDocumentDraw() {
+    if (wholeDocumentDraw) return
+    runCatching { WebView.enableSlowWholeDocumentDraw() }.onFailure { logger.w(it) { "A mail is pictured only as far as the screen goes" } }
+    wholeDocumentDraw = true
+}
+
+/**
  * Renders [document] in a web view [EMAIL_PICTURE_WIDTH] px wide and takes a picture of all of it,
  * up to [EMAIL_PICTURE_MAX_HEIGHT], once it has loaded; null when it would not load. It is laid out
  * at [EMAIL_PICTURE_VIEWPORT_HEIGHT] first, which is what a mail sized to the screen measures
@@ -88,12 +99,8 @@ private var wholeDocumentDraw = false
  */
 private suspend fun renderSnapshot(window: ViewGroup, document: String): Bitmap? =
     suspendCancellableCoroutine { continuation ->
-        // Without it a web view draws what is on screen and nothing below; only possible before
-        // the first web view of the process, which this is.
-        if (!wholeDocumentDraw) {
-            runCatching { WebView.enableSlowWholeDocumentDraw() }.onFailure { logger.w(it) { "A mail is pictured only as far as the screen goes" } }
-            wholeDocumentDraw = true
-        }
+        // Without it a web view draws what is on screen and nothing below.
+        enableWholeDocumentDraw()
 
         val webView = WebView(window.context).apply {
             // A mail runs no script, the content security policy aside.

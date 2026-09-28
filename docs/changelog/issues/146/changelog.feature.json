@@ -1,0 +1,10 @@
+{
+  "title": "Read a mail on its own page",
+  "description": "Tap a mail in the list to open it on a page of its own, which grows right out of the row: with everything you can do with it, who it is between, its labels and the mail itself, links included.",
+  "localized": {
+    "de": {
+      "title": "E-Mails auf einer eigenen Seite lesen",
+      "description": "Tippe in der Liste auf eine E-Mail, um sie auf einer eigenen Seite zu öffnen, die direkt aus der Zeile herauswächst: mit allem, was du mit ihr tun kannst, wer beteiligt ist, ihren Labels und der E-Mail selbst, samt Links."
+    }
+  }
+}

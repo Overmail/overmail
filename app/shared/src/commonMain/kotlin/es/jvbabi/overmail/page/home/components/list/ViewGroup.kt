@@ -41,6 +41,8 @@ fun ViewGroupComponent(
     senders: Map<Uuid, Participant> = emptyMap(),
     /** What a mail in it is previewed with when it is pressed and held; none without. */
     preview: ListMailPreview? = null,
+    /** Opens the page of a mail in it; tapping does nothing without. */
+    onOpenEmail: ((Uuid) -> Unit)? = null,
 ) {
     val localDensity = LocalDensity.current
     Column(modifier = modifier) {
@@ -63,9 +65,10 @@ fun ViewGroupComponent(
                     group = item,
                     senders = senders,
                     preview = preview,
+                    onOpenEmail = onOpenEmail,
                     modifier = Modifier.padding(start = 24.dp)
                 )
-                is ViewResult.Item -> ViewItem(item, preview)
+                is ViewResult.Item -> ViewItem(item, preview, onOpen = onOpenEmail?.let { { it(item.email.id) } })
             }
         }
     }

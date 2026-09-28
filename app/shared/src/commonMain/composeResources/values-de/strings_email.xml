@@ -1,0 +1,20 @@
+<resources>
+    <!-- Eine E-Mail auf einer eigenen Seite. Die Buttons haben diese nur als Beschreibung. -->
+    <string name="email_back">Zurück</string>
+    <string name="email_mark_read">Als gelesen markieren</string>
+    <string name="email_mark_unread">Als ungelesen markieren</string>
+    <string name="email_archive">Mail archivieren</string>
+    <string name="email_unarchive">Zurück ins Postfach</string>
+    <string name="email_mark_spam">Als Spam markieren</string>
+    <string name="email_share_link">Link zur E-Mail teilen (nur du kannst ihn öffnen)</string>
+    <string name="email_no_subject">(kein Betreff)</string>
+    <!-- Vor den Empfängern jedes Kopffelds. -->
+    <string name="email_participants_to">An</string>
+    <string name="email_participants_cc">Cc</string>
+    <string name="email_participants_bcc">Bcc</string>
+    <!-- Wer liest, unter den Empfängern der eigenen E-Mail. -->
+    <string name="email_participants_you">dich</string>
+    <string name="email_body_empty">Diese Mail hat keinen lesbaren Inhalt.</string>
+    <string name="email_body_failed">Der Inhalt konnte nicht geladen werden.</string>
+    <string name="email_action_failed">Das hat den Server nicht erreicht und wurde zurückgenommen.</string>
+</resources>

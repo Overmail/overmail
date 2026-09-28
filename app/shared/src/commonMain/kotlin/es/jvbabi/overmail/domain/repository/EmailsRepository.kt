@@ -18,6 +18,20 @@ interface EmailsRepository {
     ): Flow<List<ViewResult>>
 
     /**
+     * The mail of [emailId], and again whenever it changes, for as long as it is collected. One
+     * the local database does not hold yet is loaded from [user]'s homeserver; null until then,
+     * and for good when the server does not know it either.
+     */
+    fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?>
+
+    /**
+     * The mail of [emailId] as a view or [getEmail] last read it, right away; null when neither has
+     * since the app started. What a page opened on the mail starts with, so it has what it shows
+     * in its first frame -- which is what it grows out of the mail that was tapped with.
+     */
+    fun peekEmail(emailId: Uuid): Email?
+
+    /**
      * What the mail of [emailId] says, its text and its html part. Kept in a file cache and only
      * fetched while there is no copy: a stored mail never changes.
      */

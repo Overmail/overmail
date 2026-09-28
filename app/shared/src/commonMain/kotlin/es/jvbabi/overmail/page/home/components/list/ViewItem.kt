@@ -39,6 +39,8 @@ import es.jvbabi.overmail.ui.lift.liftOnLongPress
 import es.jvbabi.overmail.ui.lift.liftStandIn
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
+import es.jvbabi.overmail.ui.transition.SharedMailPart
+import es.jvbabi.overmail.ui.transition.sharedMail
 import es.jvbabi.overmail.utils.sentAtLabel
 import kotlinx.serialization.builtins.serializer
 import kotlin.uuid.Uuid
@@ -94,20 +96,26 @@ fun ListMailPreviewCard(
     )
 }
 
+/** How a row is cut, and what the mail's page shrinks back into. */
+private val ROW_SHAPE = RoundedCornerShape(16.dp)
+
 /**
- * A mail of the listing. Pressed and held, with a [preview], it lifts a card of the mail over
- * everything, grown out of the row.
+ * A mail of the listing. Tapped, [onOpen] opens its page, which grows out of the row, see
+ * [sharedMail]. Pressed and held, with a [preview], it lifts a card of the mail over everything,
+ * grown out of the row as well.
  */
 @Composable
 fun ViewItem(
     item: ViewResult.Item,
     preview: ListMailPreview? = null,
+    onOpen: (() -> Unit)? = null,
 ) {
-    if (preview == null) return ViewItemRow(item)
+    if (preview == null) return ViewItemRow(item, onOpen = onOpen)
 
     var bounds by remember { mutableStateOf(Rect.Zero) }
     ViewItemRow(
         item = item,
+        onOpen = onOpen,
         modifier = Modifier.onGloballyPositioned { bounds = it.boundsInRoot() },
         // Inside the click, so the release of a long press is not a click as well.
         gesture = Modifier.liftOnLongPress(preview.lift, preview, onPress = { preview.prepare(item.email, bounds) }),
@@ -119,12 +127,14 @@ private fun ViewItemRow(
     item: ViewResult.Item,
     modifier: Modifier = Modifier,
     gesture: Modifier = Modifier,
+    onOpen: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
+            .sharedMail(item.email.id, SharedMailPart.Container, shape = ROW_SHAPE)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable {}
+            .clip(ROW_SHAPE)
+            .clickable(enabled = onOpen != null) { onOpen?.invoke() }
             .then(gesture)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -132,7 +142,9 @@ private fun ViewItemRow(
         ParticipantAvatar(
             participant = item.email.sentBy,
             size = 36.dp,
-            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+            modifier = Modifier
+                .sharedMail(item.email.id, SharedMailPart.Avatar, shape = RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
         )
         Column {
             Row(
@@ -151,6 +163,9 @@ private fun ViewItemRow(
                         overflow = TextOverflow.MiddleEllipsis,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = fontWeight,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .sharedMail(item.email.id, SharedMailPart.Sender),
                     )
                     if (!item.email.isRead) Spacer(
                         modifier = Modifier
@@ -168,7 +183,9 @@ private fun ViewItemRow(
                     text = sentAtLabel(item.email.sentAt),
                     style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                     fontWeight = fontWeight,
-                    modifier = Modifier.alignByBaseline()
+                    modifier = Modifier
+                        .alignByBaseline()
+                        .sharedMail(item.email.id, SharedMailPart.SentAt),
                 )
             }
             run(subject@{
@@ -181,6 +198,7 @@ private fun ViewItemRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = fontWeight,
                     color = color,
+                    modifier = Modifier.sharedMail(item.email.id, SharedMailPart.Subject),
                 )
             })
             if (!item.email.preview.isNullOrEmpty()) Text(
@@ -191,7 +209,9 @@ private fun ViewItemRow(
             )
             if (item.email.labels.isNotEmpty()) LabelBadges(
                 labels = item.email.labels,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .sharedMail(item.email.id, SharedMailPart.Labels),
             )
         }
     }

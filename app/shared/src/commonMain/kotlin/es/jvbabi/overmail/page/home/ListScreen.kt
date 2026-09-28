@@ -51,12 +51,13 @@ private val EDGE_BLUR_RADIUS = 48.dp
 
 /**
  * [focusSearch] puts the cursor into the search, once: [onSearchFocused] says it is done, and the
- * request is taken back.
+ * request is taken back. [onOpenEmail] opens the page of a mail that was tapped.
  */
 @Composable
 fun ListScreen(
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
+    onOpenEmail: (Uuid) -> Unit = {},
 ) {
     val homeViewModel = koinViewModel<HomeViewModel>()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
@@ -79,6 +80,7 @@ fun ListScreen(
         onViewSettingsEvent = viewSettingsViewModel::onEvent,
         focusSearch = focusSearch,
         onSearchFocused = onSearchFocused,
+        onOpenEmail = onOpenEmail,
     )
 }
 
@@ -96,6 +98,7 @@ private fun ListContent(
     onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
+    onOpenEmail: (Uuid) -> Unit = {},
 ) {
     val localDensity = LocalDensity.current
     val hazeState = rememberHazeState()
@@ -149,11 +152,12 @@ private fun ListContent(
                 else itemsIndexed(content.results) { index, result ->
                     val modifier = Modifier.revealIn(reveal, index)
                     when (result) {
-                        is ViewResult.Item -> Box(modifier) { ViewItem(result, listPreview) }
+                        is ViewResult.Item -> Box(modifier) { ViewItem(result, listPreview, onOpen = { onOpenEmail(result.email.id) }) }
                         is ViewResult.Group -> ViewGroupComponent(
                             group = result,
                             senders = content.senders,
                             preview = listPreview,
+                            onOpenEmail = onOpenEmail,
                             modifier = modifier,
                         )
                     }

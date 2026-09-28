@@ -39,6 +39,7 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -65,6 +66,10 @@ class EmailsRepositoryImpl(
     private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
     private val emailBodyCache = EmailBodyCache(emailBodyCacheDirectory())
 
+    /** What [peekEmail] answers from: every mail as it was last read, replaced as a whole. */
+    @Volatile
+    private var lastRead: Map<Uuid, Email> = emptyMap()
+
     override fun getView(
         viewSettingsState: ViewState,
         instantLocalEmission: Boolean,
@@ -82,9 +87,9 @@ class EmailsRepositoryImpl(
                                 usersParticipantIds = participantIdsWhichAreCurrentUser
                             )
 
-                            val arranged = filtered
-                                .map { it.toModel() }
-                                .arrange(viewSettingsState.groupings, viewSettingsState.sorting)
+                            val emails = filtered.map { it.toModel() }
+                            lastRead = lastRead + emails.associateBy { it.id }
+                            val arranged = emails.arrange(viewSettingsState.groupings, viewSettingsState.sorting)
                             send(arranged)
                         }
                     }
@@ -110,6 +115,20 @@ class EmailsRepositoryImpl(
         // database -- a first sync makes several. Not on the collector's thread, which for a
         // screen is the main one.
         .flowOn(Dispatchers.Default)
+
+    override fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?> = channelFlow {
+        // Only loads it when it is missing, see loadMissing.
+        launch { emailSync.loadMissing(user, listOf(emailId)) }
+        // Keeps it current while it is on screen, like a view.
+        launch { emailSync.changes(user).collect() }
+        overmailDatabase.emailsDao.getById(emailId).collect { stored ->
+            val email = stored?.toModel()
+            if (email != null) lastRead = lastRead + (email.id to email)
+            send(email)
+        }
+    }
+
+    override fun peekEmail(emailId: Uuid): Email? = lastRead[emailId]
 
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
         emailBodyCache.get(emailId)?.let { return Result.success(it) }

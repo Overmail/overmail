@@ -1,5 +1,21 @@
 package es.jvbabi.overmail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import es.jvbabi.overmail.page.email.EmailScreen
+import es.jvbabi.overmail.ui.transition.LocalScreenAnimationScope
+import es.jvbabi.overmail.ui.transition.LocalSharedTransitionScope
+import es.jvbabi.overmail.ui.transition.SHARED_MAIL_MILLIS
+import es.jvbabi.overmail.ui.transition.rememberScreenAnimationScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,6 +90,41 @@ private val TAB_TRANSITION: Map<String, Any> =
 private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(tween(TAB_FADE_MILLIS))
 
 private const val TAB_FADE_MILLIS = 200
+
+/**
+ * A mail's page grows out of what was tapped and shrinks back into it, see `sharedMail`. The
+ * screen below stays as it is meanwhile, under the page; a page opened from something that does
+ * not show the mail only fades.
+ *
+ * Neither side is without an animation of its own, though: the bounds of the mail only move while
+ * the transition of the screen they head for runs, so the screen coming back from under the page
+ * is held at full alpha for as long.
+ */
+private val MAIL_TRANSITION: Map<String, Any> =
+    NavDisplay.transitionSpec { fadeIn(tween(SHARED_MAIL_MILLIS)) togetherWith ExitTransition.KeepUntilTransitionsFinished } +
+        NavDisplay.popTransitionSpec { mailPop() } +
+        NavDisplay.predictivePopTransitionSpec { mailPop() }
+
+private fun mailPop() = fadeIn(tween(SHARED_MAIL_MILLIS), initialAlpha = 1f) togetherWith fadeOut(tween(SHARED_MAIL_MILLIS))
+
+/**
+ * The content of a NavEntry: told how its screen comes and goes, and in which scope it shares
+ * elements, see `sharedMail`. [viewModelStoreOwner] replaces the entry's own store.
+ */
+@Composable
+private fun ScreenEntry(
+    sharedTransitionScope: SharedTransitionScope,
+    viewModelStoreOwner: ViewModelStoreOwner? = null,
+    content: @Composable () -> Unit,
+) {
+    val owner = viewModelStoreOwner ?: checkNotNull(LocalViewModelStoreOwner.current)
+    CompositionLocalProvider(
+        LocalSharedTransitionScope provides sharedTransitionScope,
+        LocalScreenAnimationScope provides rememberScreenAnimationScope(LocalNavAnimatedContentScope.current),
+        LocalViewModelStoreOwner provides owner,
+        content = content,
+    )
+}
 
 /** Between the bottom nav bar and the system bar below it. */
 private val BOTTOM_NAV_BAR_MARGIN = 16.dp
@@ -179,48 +230,82 @@ fun App() {
                     LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding,
                     LocalLiftState provides liftState,
                 ) {
-                    NavDisplay(
-                        backStack = backstack,
-                        onBack = { backstack.removeLastOrNull() },
-                        entryProvider = { key ->
-                            when (key) {
-                                is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                    StackScreen()
-                                }
+                    // The tabs and onboarding keep the view models of the whole app, as they
+                    // always have: the list keeps its view when the stack is picked in between.
+                    // A mail's page has its own, gone once it is left.
+                    val appViewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current)
+                    // Not handed to the NavDisplay itself: it would wrap every entry in a shared
+                    // element of its own, for entries moving between scenes, which there are none
+                    // of -- and the mail's parts would be nested in it.
+                    SharedTransitionLayout {
+                        NavDisplay(
+                            backStack = backstack,
+                            onBack = { backstack.removeLastOrNull() },
+                            entryDecorators = listOf(
+                                rememberSaveableStateHolderNavEntryDecorator(),
+                                rememberViewModelStoreNavEntryDecorator(),
+                            ),
+                            entryProvider = { key ->
+                                when (key) {
+                                    is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                        ScreenEntry(this, appViewModelStoreOwner) { StackScreen() }
+                                    }
 
-                                is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                    ListScreen(
-                                        focusSearch = focusListSearch,
-                                        onSearchFocused = { focusListSearch = false },
-                                    )
-                                }
+                                    is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                        ScreenEntry(this, appViewModelStoreOwner) {
+                                            ListScreen(
+                                                focusSearch = focusListSearch,
+                                                onSearchFocused = { focusListSearch = false },
+                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
+                                            )
+                                        }
+                                    }
 
-                                is Screen.Onboarding -> NavEntry(key = key) {
-                                    OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+                                    is Screen.Onboarding -> NavEntry(key = key) {
+                                        ScreenEntry(this, appViewModelStoreOwner) {
+                                            OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+                                        }
+                                    }
+
+                                    is Screen.Email -> NavEntry(key = key, metadata = MAIL_TRANSITION) {
+                                        ScreenEntry(this) {
+                                            EmailScreen(emailId = key.emailId, onBack = { backstack.remove(key) })
+                                        }
+                                    }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
 
-                val currentTab = backstack.lastOrNull() as? Screen.Tab
-                if (currentTab != null) BottomNavBar(
-                    selected = currentTab,
-                    onSelect = { tab ->
-                        if (tab == currentTab) {
-                            if (tab == Screen.List) focusListSearch = true
-                            return@BottomNavBar
-                        }
-                        // The stack is the root and every other tab lies on top of it, so back from
-                        // any of them leads there.
-                        backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
-                        if (tab != Screen.Stack) backstack.add(tab)
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = bottomNavBarPadding)
-                        .onSizeChanged { (_, h) -> bottomNavBarHeight = with(localDensity) { h.toDp() } },
-                )
+                // Kept while the bar leaves, so it goes as it was rather than with nothing selected.
+                val topTab = backstack.lastOrNull() as? Screen.Tab
+                var shownTab by remember { mutableStateOf<Screen.Tab>(Screen.Stack) }
+                if (topTab != null) shownTab = topTab
+                AnimatedVisibility(
+                    visible = topTab != null,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    val currentTab = shownTab
+                    BottomNavBar(
+                        selected = currentTab,
+                        onSelect = { tab ->
+                            if (tab == currentTab) {
+                                if (tab == Screen.List) focusListSearch = true
+                                return@BottomNavBar
+                            }
+                            // The stack is the root and every other tab lies on top of it, so back from
+                            // any of them leads there.
+                            backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                            if (tab != Screen.Stack) backstack.add(tab)
+                        },
+                        modifier = Modifier
+                            .padding(bottom = bottomNavBarPadding)
+                            .onSizeChanged { (_, h) -> bottomNavBarHeight = with(localDensity) { h.toDp() } },
+                    )
+                }
             }
         }
 

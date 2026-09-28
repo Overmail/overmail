@@ -2,6 +2,7 @@ package es.jvbabi.overmail.ui.lift
 
 import androidx.compose.runtime.MonotonicFrameClock
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import es.jvbabi.overmail.ui.components.ScrollOffset
@@ -180,6 +181,15 @@ class LiftStateTest {
         assertEquals(resting, liftedBounds(resting, target, 0f))
         assertEquals(target, liftedBounds(resting, target, 1f))
         assertEquals(Rect(18f, 170f, 382f, 625f), liftedBounds(resting, target, 0.5f))
+    }
+
+    @Test
+    fun onTheWayTheContentIsScaledToTheWidthAndCutOffAtTheHeight() {
+        val target = Rect(16f, 40f, 384f, 740f)
+
+        assertEquals(1f to Size(368f, 700f), liftedCut(target, target))
+        // Half as wide and a tenth as tall: shown at half its size, a fifth of it from the top.
+        assertEquals(0.5f to Size(368f, 140f), liftedCut(target, Rect(0f, 0f, 184f, 70f)))
     }
 }
 

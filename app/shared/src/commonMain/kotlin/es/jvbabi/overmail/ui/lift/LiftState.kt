@@ -16,7 +16,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -43,8 +46,9 @@ internal const val SCROLL_SPEED = 6f
  * What can be lifted off the screen and what is lifted: one content at a time, picked by the key
  * it was made [liftable] with, grown from its place to as much of the [liftHost] as there is and
  * drawn over everything in it. The content is not composed again for that -- the node that is
- * already on screen is laid out bigger and drawn by the host instead of in its place -- so nothing
- * in it is created anew by lifting or putting it down.
+ * already on screen is laid out at its lifted size and drawn by the host instead of in its place,
+ * grown by scaling and cutting it off rather than by laying it out on every frame -- so nothing
+ * in it is created anew or rendered again by lifting or putting it down.
  *
  * Whoever holds the finger drives it: [lift], then [moveFinger] for every move, [release] when it
  * lets go. Moved up or down, the finger scrolls the content like a joystick: the further from where
@@ -157,8 +161,11 @@ internal class LiftTarget(val layer: GraphicsLayer?) {
     /** Where it lies when it is not lifted, in the root. */
     var resting: Rect = Rect.Zero
 
-    /** Where it is drawn while lifted, in the root. */
-    var bounds by mutableStateOf(Rect.Zero)
+    /** Where it grows out of instead of [resting], for a stand-in; see [liftStandIn]. */
+    var origin: (() -> Rect)? = null
+
+    /** What it is cut off in while it grows. */
+    var shape: Shape = RectangleShape
 }
 
 @Composable
@@ -188,3 +195,12 @@ internal fun liftTarget(host: Rect, left: Float, top: Float, right: Float, botto
 
 /** Where content [progress] of the way from [resting] to [target] is: 0 in its place, 1 lifted. */
 internal fun liftedBounds(resting: Rect, target: Rect, progress: Float): Rect = lerp(resting, target, progress)
+
+/**
+ * How content laid out at [target] is drawn to fill [bounds] on its way there: the scale that
+ * brings it to that width, and how much of it, in its own px, that leaves showing from its top.
+ */
+internal fun liftedCut(target: Rect, bounds: Rect): Pair<Float, Size> {
+    val scale = bounds.width / target.width
+    return scale to Size(target.width, bounds.height / scale)
+}

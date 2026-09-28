@@ -15,6 +15,13 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -63,8 +70,20 @@ fun Modifier.liftHost(state: LiftState, padding: Dp = LIFTED_PADDING): Modifier 
             val progress = state.progress
             if (progress > 0f) drawRect(Color.Black, alpha = LIFTED_SCRIM * progress)
             val target = state.lifted?.let { state.targets[it] } ?: return@drawWithContent
+            val layer = target.layer ?: return@drawWithContent
+            val to = state.targetBounds(this, layoutDirection)
+            val bounds = liftedBounds(target.origin?.invoke() ?: target.resting, to, progress)
+            if (to.width <= 0f || bounds.width <= 0f) return@drawWithContent
+            // The content is laid out at its lifted size throughout; on the way it is only
+            // scaled to the width it has come to and cut off at the height.
+            val (scale, shown) = liftedCut(to, bounds)
+            val clip = Path().apply { addOutline(target.shape.createOutline(shown, layoutDirection, this@drawWithContent)) }
             val host = state.hostBounds
-            translate(target.bounds.left - host.left, target.bounds.top - host.top) { target.layer?.let { drawLayer(it) } }
+            translate(bounds.left - host.left, bounds.top - host.top) {
+                scale(scale, pivot = Offset.Zero) {
+                    clipPath(clip) { drawLayer(layer) }
+                }
+            }
         }
         // Only what is below the lifted content: that is drawn above, outside this layer.
         .graphicsLayer {
@@ -75,18 +94,40 @@ fun Modifier.liftHost(state: LiftState, padding: Dp = LIFTED_PADDING): Modifier 
 
 /**
  * Makes this content liftable as [key] of [state], see [LiftState.lift]. It keeps its place in the
- * layout -- what is around it does not move -- but while it is lifted, it is laid out as big as
- * the lift has grown it and drawn by the [liftHost] rather than here. It stays the same node all
- * the while, so nothing in it is composed or created again. [scroll] is what the finger scrolls
- * while it is lifted.
+ * layout -- what is around it does not move -- but while it is lifted, it is laid out at the size
+ * it is lifted to and drawn by the [liftHost] rather than here: grown out of its place by scaling
+ * it and cutting it off in [shape], never by laying it out again. It stays the same node all the
+ * while, so nothing in it is composed or created again, and it is measured twice per lift, up and
+ * down, not on every frame of it. [scroll] is what the finger scrolls while it is lifted.
  *
  * Reading [LiftState.isLifted] inside is how content can look different while lifted.
  */
 @Composable
-fun Modifier.liftable(state: LiftState, key: Any, scroll: ScrollOffset? = null): Modifier {
+fun Modifier.liftable(state: LiftState, key: Any, scroll: ScrollOffset? = null, shape: Shape = RectangleShape): Modifier =
+    liftTarget(state, key, scroll, shape, origin = null)
+
+/**
+ * Makes this content what is lifted as [key] of [state], out of [origin] rather than a place of its
+ * own: it takes no room and is not drawn until it is lifted. For content that stands in for
+ * something else while lifted -- a row of a list lifting a preview of what it stands for -- and
+ * stays composed in between, so what is expensive in it is created once, not per lift.
+ *
+ * It is always laid out at the size it is lifted to. [origin] is read while it is lifted, in the
+ * root; otherwise like [liftable].
+ */
+@Composable
+fun Modifier.liftStandIn(state: LiftState, key: Any, origin: () -> Rect, scroll: ScrollOffset? = null, shape: Shape = RectangleShape): Modifier =
+    liftTarget(state, key, scroll, shape, origin)
+
+@Composable
+private fun Modifier.liftTarget(state: LiftState, key: Any, scroll: ScrollOffset?, shape: Shape, origin: (() -> Rect)?): Modifier {
     val layer = rememberGraphicsLayer()
     val target = remember(state, key, layer) { LiftTarget(layer) }
-    SideEffect { target.scroll = scroll }
+    SideEffect {
+        target.scroll = scroll
+        target.shape = shape
+        target.origin = origin
+    }
     DisposableEffect(state, key, target) {
         state.targets[key] = target
         onDispose { if (state.targets[key] === target) state.targets.remove(key) }
@@ -94,29 +135,23 @@ fun Modifier.liftable(state: LiftState, key: Any, scroll: ScrollOffset? = null):
     return this
         .onGloballyPositioned { target.resting = Rect(it.positionInRoot(), it.size.toSize()) }
         .layout { measurable, constraints ->
-            if (!state.isLifted(key)) {
+            if (origin == null && !state.isLifted(key)) {
                 val placeable = measurable.measure(constraints)
                 return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
             }
-            val resting = target.resting
-            // Read here, in layout, so the content is moved and grown frame by frame without
-            // anything around it being composed again.
-            val bounds = liftedBounds(resting, state.targetBounds(this, layoutDirection), state.progress)
-            target.bounds = bounds
+            val to = state.targetBounds(this, layoutDirection)
             val placeable = measurable.measure(
-                Constraints.fixed(bounds.width.roundToInt().coerceAtLeast(0), bounds.height.roundToInt().coerceAtLeast(0))
+                Constraints.fixed(to.width.roundToInt().coerceAtLeast(0), to.height.roundToInt().coerceAtLeast(0))
             )
-            // Its place stays as big as it was; only what is in it grows.
-            val width = constraints.constrainWidth(resting.width.roundToInt())
-            val height = constraints.constrainHeight(resting.height.roundToInt())
-            layout(width, height) {
-                placeable.place((bounds.left - resting.left).roundToInt(), (bounds.top - resting.top).roundToInt())
-            }
+            // A stand-in takes no room; lifted content keeps the room it had.
+            val width = if (origin == null) constraints.constrainWidth(target.resting.width.roundToInt()) else 0
+            val height = if (origin == null) constraints.constrainHeight(target.resting.height.roundToInt()) else 0
+            layout(width, height) { placeable.place(0, 0) }
         }
         .drawWithContent {
             // Always into the layer, so the host has it the moment the content is lifted.
             layer.record { this@drawWithContent.drawContent() }
-            if (!state.isLifted(key)) drawLayer(layer)
+            if (origin == null && !state.isLifted(key)) drawLayer(layer)
         }
 }
 

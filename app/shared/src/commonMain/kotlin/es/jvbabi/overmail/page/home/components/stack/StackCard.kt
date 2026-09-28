@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.ScrollOffset
 
-private val CARD_SHAPE = RoundedCornerShape(16.dp)
+internal val CARD_SHAPE = RoundedCornerShape(16.dp)
 
 /** How far each card below the top one sits further down. */
 private val DEPTH_OFFSET = 10.dp

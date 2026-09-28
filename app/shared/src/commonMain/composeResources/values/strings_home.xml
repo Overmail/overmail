@@ -115,4 +115,7 @@
     <string name="home_stack_overlay_skip">to skip</string>
     <string name="home_stack_body_failed">The mail could not be loaded.</string>
     <string name="home_stack_archive_failed">The mail could not be archived and is back in your inbox.</string>
+
+    <string name="home_nav_stack">Stack</string>
+    <string name="home_nav_list">List</string>
 </resources>

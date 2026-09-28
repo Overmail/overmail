@@ -22,7 +22,6 @@ import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.List
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.page.home.Greeting
-import es.jvbabi.overmail.page.home.HEADER_HEIGHT
 import es.jvbabi.overmail.page.home.PREVIEW_ACCOUNT
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
@@ -33,6 +32,8 @@ import overmail.app.shared.generated.resources.home_greeting_day
 import overmail.app.shared.generated.resources.home_greeting_evening
 import overmail.app.shared.generated.resources.home_greeting_morning
 import overmail.app.shared.generated.resources.home_greeting_night
+
+val HEADER_HEIGHT = 64.dp
 
 @Composable
 fun HomeHeader(

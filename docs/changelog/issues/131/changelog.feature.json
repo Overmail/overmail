@@ -1,0 +1,10 @@
+{
+  "title": "The stack and the list get a tab each",
+  "description": "The stack and the list are now two pages of their own, switched with the bar at the bottom. While the list loads it shows placeholders, and the mails slide in once they are there.",
+  "localized": {
+    "de": {
+      "title": "Stapel und Liste bekommen je einen Tab",
+      "description": "Stapel und Liste sind jetzt zwei eigene Seiten, zwischen denen du mit der Leiste unten wechselst. Während die Liste lädt, zeigt sie Platzhalter, und die E-Mails gleiten herein, sobald sie da sind."
+    }
+  }
+}

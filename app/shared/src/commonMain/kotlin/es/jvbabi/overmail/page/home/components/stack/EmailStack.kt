@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +28,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
-import es.jvbabi.overmail.page.home.STACK_HEIGHT_WHEN_FINISHED
 import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.lift.liftable
 import es.jvbabi.overmail.ui.theme.AppTheme
@@ -101,9 +98,7 @@ fun EmailStack(
     ) {
         if (cards.isEmpty() && leaving.isEmpty()) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(STACK_HEIGHT_WHEN_FINISHED),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {

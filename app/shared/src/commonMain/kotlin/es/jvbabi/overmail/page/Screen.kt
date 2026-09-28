@@ -9,8 +9,17 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class Screen {
 
+    /** A destination of the [BottomNavBar]; the bar shows while one of them is on top. */
     @Serializable
-    data object Home : Screen()
+    sealed class Tab : Screen()
+
+    /** The pile of mails that still need doing, swiped away one at a time. */
+    @Serializable
+    data object Stack : Tab()
+
+    /** Every mail, filtered and grouped. */
+    @Serializable
+    data object List : Tab()
 
     @Serializable
     data object Onboarding : Screen()

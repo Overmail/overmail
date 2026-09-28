@@ -187,9 +187,9 @@ class LiftStateTest {
     fun onTheWayTheContentIsScaledToTheWidthAndCutOffAtTheHeight() {
         val target = Rect(16f, 40f, 384f, 740f)
 
-        assertEquals(1f to Size(368f, 700f), liftedCut(target, target))
+        assertEquals(LiftedCut(target, 1f, Size(368f, 700f)), liftedCut(target, target))
         // Half as wide and a tenth as tall: shown at half its size, a fifth of it from the top.
-        assertEquals(0.5f to Size(368f, 140f), liftedCut(target, Rect(0f, 0f, 184f, 70f)))
+        assertEquals(LiftedCut(Rect(0f, 0f, 184f, 70f), 0.5f, Size(368f, 140f)), liftedCut(target, Rect(0f, 0f, 184f, 70f)))
     }
 }
 

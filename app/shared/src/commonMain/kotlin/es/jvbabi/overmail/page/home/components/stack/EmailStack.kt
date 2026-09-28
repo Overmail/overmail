@@ -173,6 +173,7 @@ private fun PiledCard(
         },
         drag = state.dragOf(email.id),
         scroll = scroll,
+        shownHeight = { state.lift.shownHeight(email.id) },
         // Held still, the card is lifted off the pile as it is, see EmailStackState.press.
         modifier = Modifier.liftable(state.lift, email.id, scroll, CARD_SHAPE),
     )

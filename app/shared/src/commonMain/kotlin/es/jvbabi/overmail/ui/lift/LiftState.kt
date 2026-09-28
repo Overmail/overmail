@@ -86,6 +86,8 @@ class LiftState internal constructor(
     internal var hostBounds by mutableStateOf(Rect.Zero)
     internal var hostInsets: WindowInsets? = null
     internal var hostPadding: Dp = 0.dp
+    internal var hostDensity: Density? = null
+    internal var hostLayoutDirection: LayoutDirection = LayoutDirection.Ltr
 
     fun isLifted(key: Any): Boolean = lifted == key
 
@@ -134,6 +136,27 @@ class LiftState internal constructor(
             // Not if something else was lifted meanwhile, which takes the animation over.
             if (lifted == key) lifted = null
         }
+    }
+
+    /**
+     * How much of [key] shows from its top while it is lifted, in its own px: it is laid out at
+     * its lifted size throughout and cut off there on the way. Null while it is not lifted, or not
+     * yet under a [liftHost]. Read while drawing, it follows every frame without anything being
+     * composed or laid out again -- for what belongs at the edge that cuts it off.
+     */
+    fun shownHeight(key: Any): Float? {
+        if (!isLifted(key)) return null
+        val density = hostDensity ?: return null
+        return drawnCut(key, density, hostLayoutDirection)?.shown?.height
+    }
+
+    /** Where [key] is drawn while lifted, and how, see [liftedCut]; null if there is nothing to draw. */
+    internal fun drawnCut(key: Any, density: Density, layoutDirection: LayoutDirection): LiftedCut? {
+        val target = targets[key] ?: return null
+        val to = targetBounds(density, layoutDirection)
+        val bounds = liftedBounds(target.origin?.invoke() ?: target.resting, to, progress)
+        if (to.width <= 0f || bounds.width <= 0f) return null
+        return liftedCut(to, bounds)
     }
 
     /** Where lifted content ends up, in the root: the host, less the system bars and the padding. */
@@ -196,11 +219,14 @@ internal fun liftTarget(host: Rect, left: Float, top: Float, right: Float, botto
 /** Where content [progress] of the way from [resting] to [target] is: 0 in its place, 1 lifted. */
 internal fun liftedBounds(resting: Rect, target: Rect, progress: Float): Rect = lerp(resting, target, progress)
 
+/** How lifted content is drawn on its way: at [bounds], scaled by [scale], [shown] of it from its top in its own px. */
+internal data class LiftedCut(val bounds: Rect, val scale: Float, val shown: Size)
+
 /**
  * How content laid out at [target] is drawn to fill [bounds] on its way there: the scale that
  * brings it to that width, and how much of it, in its own px, that leaves showing from its top.
  */
-internal fun liftedCut(target: Rect, bounds: Rect): Pair<Float, Size> {
+internal fun liftedCut(target: Rect, bounds: Rect): LiftedCut {
     val scale = bounds.width / target.width
-    return scale to Size(target.width, bounds.height / scale)
+    return LiftedCut(bounds, scale, Size(target.width, bounds.height / scale))
 }

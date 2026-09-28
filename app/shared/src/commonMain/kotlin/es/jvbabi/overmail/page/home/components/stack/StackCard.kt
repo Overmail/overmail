@@ -65,7 +65,7 @@ internal data class CardHand(
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
  * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
  * scrolled; only a lifted card is, see [es.jvbabi.overmail.ui.lift.LiftState], the others lie at
- * its top.
+ * its top. [shownHeight] is how much of it shows while it is lifted, see [CardBody].
  */
 @Composable
 internal fun StackCard(
@@ -76,6 +76,7 @@ internal fun StackCard(
     drag: CardDrag?,
     modifier: Modifier = Modifier,
     scroll: ScrollOffset = remember(body) { ScrollOffset() },
+    shownHeight: () -> Float? = { null },
 ) {
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
@@ -92,6 +93,7 @@ internal fun StackCard(
             body = body,
             scroll = scroll,
             topInset = headerHeight,
+            shownHeight = shownHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .hazeSource(hazeState),

@@ -32,6 +32,8 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
@@ -59,9 +61,13 @@ private const val LIFTED_SCRIM = 0.2f
 @Composable
 fun Modifier.liftHost(state: LiftState, padding: Dp = LIFTED_PADDING): Modifier {
     val insets = WindowInsets.systemBars
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     SideEffect {
         state.hostInsets = insets
         state.hostPadding = padding
+        state.hostDensity = density
+        state.hostLayoutDirection = layoutDirection
     }
     return this
         .onGloballyPositioned { state.hostBounds = Rect(it.positionInRoot(), it.size.toSize()) }
@@ -69,14 +75,12 @@ fun Modifier.liftHost(state: LiftState, padding: Dp = LIFTED_PADDING): Modifier 
             drawContent()
             val progress = state.progress
             if (progress > 0f) drawRect(Color.Black, alpha = LIFTED_SCRIM * progress)
-            val target = state.lifted?.let { state.targets[it] } ?: return@drawWithContent
+            val key = state.lifted ?: return@drawWithContent
+            val target = state.targets[key] ?: return@drawWithContent
             val layer = target.layer ?: return@drawWithContent
-            val to = state.targetBounds(this, layoutDirection)
-            val bounds = liftedBounds(target.origin?.invoke() ?: target.resting, to, progress)
-            if (to.width <= 0f || bounds.width <= 0f) return@drawWithContent
             // The content is laid out at its lifted size throughout; on the way it is only
             // scaled to the width it has come to and cut off at the height.
-            val (scale, shown) = liftedCut(to, bounds)
+            val (bounds, scale, shown) = state.drawnCut(key, this, layoutDirection) ?: return@drawWithContent
             val clip = Path().apply { addOutline(target.shape.createOutline(shown, layoutDirection, this@drawWithContent)) }
             val host = state.hostBounds
             translate(bounds.left - host.left, bounds.top - host.top) {

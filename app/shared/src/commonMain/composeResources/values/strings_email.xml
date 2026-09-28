@@ -1,0 +1,20 @@
+<resources>
+    <!-- A mail on a page of its own. The buttons only have these as descriptions. -->
+    <string name="email_back">Back</string>
+    <string name="email_mark_read">Mark as read</string>
+    <string name="email_mark_unread">Mark as unread</string>
+    <string name="email_archive">Archive the mail</string>
+    <string name="email_unarchive">Move back to the mailbox</string>
+    <string name="email_mark_spam">Mark as spam</string>
+    <string name="email_share_link">Share the mail’s link (only you can open it)</string>
+    <string name="email_no_subject">(no subject)</string>
+    <!-- Before the recipients of each header field. -->
+    <string name="email_participants_to">To</string>
+    <string name="email_participants_cc">Cc</string>
+    <string name="email_participants_bcc">Bcc</string>
+    <!-- The reader, among the recipients of their own mail. -->
+    <string name="email_participants_you">you</string>
+    <string name="email_body_empty">This mail has no readable content.</string>
+    <string name="email_body_failed">Could not load what this mail says.</string>
+    <string name="email_action_failed">That did not reach the server and was taken back.</string>
+</resources>

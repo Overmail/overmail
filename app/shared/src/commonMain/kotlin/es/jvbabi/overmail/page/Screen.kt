@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.page
 
 import kotlinx.serialization.Serializable
+import kotlin.uuid.Uuid
 
 /**
  * Every destination the app can navigate to. Serializable so a back stack survives the process
@@ -23,4 +24,8 @@ sealed class Screen {
 
     @Serializable
     data object Onboarding : Screen()
+
+    /** One mail on a page of its own; reachable from anywhere that knows the mail's id. */
+    @Serializable
+    data class Email(val emailId: Uuid) : Screen()
 }

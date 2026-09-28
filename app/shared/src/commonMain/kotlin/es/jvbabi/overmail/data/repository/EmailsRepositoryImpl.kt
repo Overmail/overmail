@@ -111,6 +111,14 @@ class EmailsRepositoryImpl(
         // screen is the main one.
         .flowOn(Dispatchers.Default)
 
+    override fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?> = channelFlow {
+        // Only loads it when it is missing, see loadMissing.
+        launch { emailSync.loadMissing(user, listOf(emailId)) }
+        // Keeps it current while it is on screen, like a view.
+        launch { emailSync.changes(user).collect() }
+        overmailDatabase.emailsDao.getById(emailId).collect { send(it?.toModel()) }
+    }
+
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
         emailBodyCache.get(emailId)?.let { return Result.success(it) }
         return fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }

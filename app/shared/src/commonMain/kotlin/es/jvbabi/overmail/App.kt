@@ -1,5 +1,9 @@
 package es.jvbabi.overmail
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -52,6 +56,19 @@ import kotlin.time.Instant
 
 /** Avatars are small; this holds thousands of them. */
 private const val IMAGE_DISK_CACHE_BYTES = 64L * 1024 * 1024
+
+/**
+ * Between two tabs the pages fade into each other: they sit side by side in the bottom bar, not
+ * on top of one another, so sliding one in over the other would say the wrong thing.
+ */
+private val TAB_TRANSITION: Map<String, Any> =
+    NavDisplay.transitionSpec { tabFade() } +
+        NavDisplay.popTransitionSpec { tabFade() } +
+        NavDisplay.predictivePopTransitionSpec { tabFade() }
+
+private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(tween(TAB_FADE_MILLIS))
+
+private const val TAB_FADE_MILLIS = 200
 
 /** Between the bottom nav bar and the system bar below it. */
 private val BOTTOM_NAV_BAR_MARGIN = 16.dp
@@ -151,11 +168,11 @@ fun App() {
                     onBack = { backstack.removeLastOrNull() },
                     entryProvider = { key ->
                         when (key) {
-                            is Screen.Stack -> NavEntry(key = key) {
+                            is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
                                 StackScreen()
                             }
 
-                            is Screen.List -> NavEntry(key = key) {
+                            is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
                                 ListScreen()
                             }
 

@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.ui.components
+package es.jvbabi.overmail.data.picture
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -8,12 +8,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Takes the pictures of html mails one at a time, see [EmailHtml]. Each one builds a web view and
- * draws the whole mail on the main thread; the first deal of the pile asks for four at once, and
- * rendered side by side they hold up every frame of it. Of those waiting, the one with the lowest
- * order goes next -- asked again every time, since a card waiting for its turn moves up the pile.
+ * Runs renders one at a time. Each builds a web view and draws a whole mail on the main thread;
+ * side by side they hold up every frame while they run. Of those waiting, the one with the lowest
+ * order goes next -- asked again every time, since a mail waiting for its turn moves up the pile.
  */
-internal object EmailSnapshotQueue {
+internal class RenderQueue {
     private class Waiter(val order: () -> Int) {
         val turn = CompletableDeferred<Unit>()
     }

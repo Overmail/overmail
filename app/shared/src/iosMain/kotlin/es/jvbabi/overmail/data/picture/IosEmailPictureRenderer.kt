@@ -1,24 +1,17 @@
-package es.jvbabi.overmail.ui.components
+package es.jvbabi.overmail.data.picture
 
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.unit.Dp
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image as SkiaImage
 import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSData
@@ -27,6 +20,8 @@ import platform.UIKit.UIApplication
 import platform.UIKit.UIColor
 import platform.UIKit.UIImage
 import platform.UIKit.UIImagePNGRepresentation
+import platform.UIKit.UIScreen
+import platform.UIKit.UIWindow
 import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationDelegateProtocol
 import platform.WebKit.WKWebView
@@ -39,48 +34,54 @@ import platform.darwin.dispatch_time
 import platform.posix.memcpy
 import kotlin.coroutines.resume
 
-private val logger = Logger.withTag("EmailHtml")
+private val logger = Logger.withTag("EmailPictureRenderer")
 
-/** How much of a long mail is pictured at most, in points: the rest of it is never scrolled to. */
-private const val MAX_SNAPSHOT_HEIGHT = 4000.0
-
-/** How long WebKit is given to lay the mail out at its full height before it is pictured. */
+/** How long WebKit is given to lay the mail out at its full height before it is pictured, in ns. */
 private const val RELAYOUT_DELAY = 100_000_000L
 
+/** How often a render looks again for a window to render in, before the app has one, in ms. */
+private const val WINDOW_POLL_MILLIS = 100L
+
 /**
- * A picture of a web view rather than the view itself: UIKit views sit outside the Compose layer
- * and would stay upright while the card around them turns. The mail is rendered once, off screen,
- * at the width it is shown at and as tall as it is; see [EmailSnapshot] for how it is shown.
+ * Renders a mail in the key window, underneath everything: WebKit only draws a web view that is
+ * in a window. Sized in points, at the screen's scale, so the picture comes out
+ * [EMAIL_PICTURE_WIDTH] px wide.
  */
-@Composable
-actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp, renderOrder: Int) {
-    val currentRenderOrder by rememberUpdatedState(renderOrder)
-    BoxWithConstraints(modifier = modifier) {
-        // Points on iOS are what a dp is.
-        val width = maxWidth.value.toDouble()
-        // What a mail sized to the screen is sized to; not a key, a taller box shows more of the same.
-        val viewportHeight = maxHeight.value.toDouble()
-        var snapshot by remember(html) { mutableStateOf<ImageBitmap?>(null) }
+class IosEmailPictureRenderer : EmailPictureRenderer {
+    override suspend fun render(document: String): RenderedEmailPicture? = withContext(Dispatchers.Main) {
+        val window = keyWindow()
+        val encoded = renderSnapshot(window, document) ?: return@withContext null
+        val picture = decode(encoded) ?: return@withContext null
+        RenderedEmailPicture(picture, encoded)
+    }
 
-        LaunchedEffect(html, width) {
-            if (width > 0 && viewportHeight > 0) EmailSnapshotQueue.run({ currentRenderOrder }) { renderSnapshot(emailHtmlDocument(html), width, viewportHeight) }?.let { snapshot = it }
+    override suspend fun decode(encoded: ByteArray): ImageBitmap? = withContext(Dispatchers.Default) {
+        runCatching { SkiaImage.makeFromEncoded(encoded).toComposeImageBitmap() }.getOrNull()
+    }
+
+    private suspend fun keyWindow(): UIWindow {
+        while (true) {
+            @Suppress("DEPRECATION")
+            UIApplication.sharedApplication.keyWindow?.let { return it }
+            delay(WINDOW_POLL_MILLIS)
         }
-
-        EmailSnapshot(snapshot, scroll, topInset)
     }
 }
 
 /**
- * Renders [document] in a web view [width] points wide and takes a picture of all of it, up to
- * [MAX_SNAPSHOT_HEIGHT], once it has loaded; null when it would not load. It is laid out at
- * [viewportHeight] first, which is what a mail sized to the screen measures itself against.
- *
- * The view has to be in a window for WebKit to draw it, so it is put into the key window,
- * underneath everything, for as long as it takes.
+ * Renders [document] in a web view in [window] and takes a picture of all of it, up to
+ * [EMAIL_PICTURE_MAX_HEIGHT], once it has loaded, as a png; null when it would not load. It is laid
+ * out at [EMAIL_PICTURE_VIEWPORT_HEIGHT] first, which is what a mail sized to the screen measures
+ * itself against.
  */
 @OptIn(ExperimentalForeignApi::class)
-private suspend fun renderSnapshot(document: String, width: Double, viewportHeight: Double): ImageBitmap? =
+private suspend fun renderSnapshot(window: UIWindow, document: String): ByteArray? =
     suspendCancellableCoroutine { continuation ->
+        val scale = UIScreen.mainScreen.scale
+        val width = EMAIL_PICTURE_WIDTH / scale
+        val viewportHeight = EMAIL_PICTURE_VIEWPORT_HEIGHT / scale
+        val maxHeight = EMAIL_PICTURE_MAX_HEIGHT / scale
+
         val configuration = WKWebViewConfiguration().apply {
             // A mail runs no script, the content security policy aside.
             defaultWebpagePreferences.allowsContentJavaScript = false
@@ -93,10 +94,10 @@ private suspend fun renderSnapshot(document: String, width: Double, viewportHeig
             userInteractionEnabled = false
         }
 
-        fun finish(image: ImageBitmap?) {
+        fun finish(picture: ByteArray?) {
             webView.navigationDelegate = null
             webView.removeFromSuperview()
-            if (continuation.isActive) continuation.resume(image)
+            if (continuation.isActive) continuation.resume(picture)
         }
 
         val delegate = object : NSObject(), WKNavigationDelegateProtocol {
@@ -104,12 +105,11 @@ private suspend fun renderSnapshot(document: String, width: Double, viewportHeig
             override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
                 // Grown to the whole mail, so the picture holds what scrolling will bring up.
                 val contentHeight = webView.scrollView.contentSize.useContents { this.height }
-                val fullHeight = contentHeight.coerceIn(viewportHeight, MAX_SNAPSHOT_HEIGHT)
-                webView.setFrame(CGRectMake(0.0, 0.0, width, fullHeight))
+                webView.setFrame(CGRectMake(0.0, 0.0, width, contentHeight.coerceIn(viewportHeight, maxHeight)))
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, RELAYOUT_DELAY), dispatch_get_main_queue()) {
                     webView.takeSnapshotWithConfiguration(null) { image, error ->
                         if (error != null) logger.w { "Could not take a picture of a mail: ${error.localizedDescription}" }
-                        finish(image?.toImageBitmap())
+                        finish(image?.png())
                     }
                 }
             }
@@ -121,9 +121,7 @@ private suspend fun renderSnapshot(document: String, width: Double, viewportHeig
         }
         webView.navigationDelegate = delegate
 
-        @Suppress("DEPRECATION")
-        val window = UIApplication.sharedApplication.keyWindow
-        window?.insertSubview(webView, atIndex = 0)
+        window.insertSubview(webView, atIndex = 0)
         webView.loadHTMLString(document, baseURL = null)
 
         continuation.invokeOnCancellation {
@@ -136,9 +134,9 @@ private suspend fun renderSnapshot(document: String, width: Double, viewportHeig
     }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun UIImage.toImageBitmap(): ImageBitmap? {
+private fun UIImage.png(): ByteArray? {
     val data: NSData = UIImagePNGRepresentation(this) ?: return null
     val bytes = ByteArray(data.length.toInt())
     bytes.usePinned { pinned -> memcpy(pinned.addressOf(0), data.bytes, data.length) }
-    return SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+    return bytes
 }

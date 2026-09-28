@@ -53,7 +53,7 @@ class EmailStackViewModel(
      */
     private val handled = MutableStateFlow(emptySet<Uuid>())
 
-    private val bodies = EmailBodies(viewModelScope, emailsRepository::getBody)
+    private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
 
     private val account = accountRepository.getAccounts()
         .map { it.firstOrNull() }
@@ -77,13 +77,20 @@ class EmailStackViewModel(
                     state.update { it.copy(emails = emails, isLoading = false) }
                     // One that failed is asked for again, the next time the pile changes with it
                     // still near the top.
-                    if (account != null) emails.take(BODIES_AHEAD).forEach { bodies.load(it.id, account) }
+                    val ahead = emails.take(BODIES_AHEAD)
+                    // A card that has left the pile no longer needs its picture held.
+                    bodies.keepPictures(ahead.mapTo(HashSet()) { it.id })
+                    if (account != null) ahead.forEach { email -> bodies.load(email.id, account, order = { placeOnPile(email.id) }) }
                 }
         }
         viewModelScope.launch {
             bodies.bodies.collect { known -> state.update { it.copy(bodies = known) } }
         }
     }
+
+    /** Where the mail of [emailId] lies on the pile now, 0 on top; far down once it is off it. */
+    private fun placeOnPile(emailId: Uuid): Int =
+        state.value.emails.indexOfFirst { it.id == emailId }.takeIf { it >= 0 } ?: Int.MAX_VALUE
 
     fun onEvent(event: EmailStackEvent) {
         when (event) {

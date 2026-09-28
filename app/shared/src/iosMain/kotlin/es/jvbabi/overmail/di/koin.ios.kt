@@ -5,6 +5,8 @@ package es.jvbabi.overmail.di
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import es.jvbabi.overmail.data.database.OvermailDatabase
+import es.jvbabi.overmail.data.picture.EmailPictureRenderer
+import es.jvbabi.overmail.data.picture.IosEmailPictureRenderer
 import kotlinx.cinterop.ExperimentalForeignApi
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -13,10 +15,12 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
 /**
- * Empty: everything iOS contributes is registered from `MainViewController`, and the one thing that
- * lives in a platform module — the in-app updater — is Android-only.
+ * The renderer of mail pictures. Everything else iOS contributes is registered from
+ * `MainViewController`, and the in-app updater is Android-only.
  */
-actual fun platformModule(): Module = module { }
+actual fun platformModule(): Module = module {
+    single<EmailPictureRenderer> { IosEmailPictureRenderer() }
+}
 
 actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
     val dbFilePath = documentDirectory() + "/overmail.db"

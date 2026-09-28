@@ -54,6 +54,7 @@ private val NAV_ITEM_SPACING = 4.dp
 /** Lifts the bar off whatever scrolls beneath it. */
 private val NAV_BAR_ELEVATION = 6.dp
 
+/** [onSelect] is told about the tab that is already [selected] as well: a second tap may mean something. */
 @Composable
 fun BottomNavBar(
     selected: Screen.Tab,

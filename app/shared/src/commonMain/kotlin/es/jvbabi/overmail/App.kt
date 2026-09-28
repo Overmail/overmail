@@ -160,6 +160,8 @@ fun App() {
 
             val localDensity = LocalDensity.current
             var bottomNavBarHeight by remember { mutableStateOf(0.dp) }
+            // The list tab tapped again while it is open: the search is what is wanted next.
+            var focusListSearch by remember { mutableStateOf(false) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             CompositionLocalProvider(LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding) {
@@ -173,7 +175,10 @@ fun App() {
                             }
 
                             is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                ListScreen()
+                                ListScreen(
+                                    focusSearch = focusListSearch,
+                                    onSearchFocused = { focusListSearch = false },
+                                )
                             }
 
                             is Screen.Onboarding -> NavEntry(key = key) {
@@ -188,6 +193,10 @@ fun App() {
             if (currentTab != null) BottomNavBar(
                 selected = currentTab,
                 onSelect = { tab ->
+                    if (tab == currentTab) {
+                        if (tab == Screen.List) focusListSearch = true
+                        return@BottomNavBar
+                    }
                     // The stack is the root and every other tab lies on top of it, so back from
                     // any of them leads there.
                     backstack.removeAll { it is Screen.Tab && it != Screen.Stack }

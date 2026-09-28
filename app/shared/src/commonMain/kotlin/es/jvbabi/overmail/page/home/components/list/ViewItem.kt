@@ -127,11 +127,11 @@ private fun ViewItemRow(
             .clickable {}
             .then(gesture)
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ParticipantAvatar(
             participant = item.email.sentBy,
-            size = 32.dp,
+            size = 36.dp,
             modifier = Modifier.clip(RoundedCornerShape(8.dp))
         )
         Column {

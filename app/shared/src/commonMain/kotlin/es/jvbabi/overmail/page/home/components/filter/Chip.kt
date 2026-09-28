@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -20,6 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.CaretDown
+
+/** Low enough that the filters take one slim line under the search. */
+internal val CHIP_HEIGHT = 30.dp
+
+/** The icons in a chip, its own and those put in as [Chip]'s leading. */
+internal val CHIP_ICON_SIZE = 16.dp
 
 @Composable
 fun Chip(
@@ -46,12 +53,12 @@ fun Chip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        val defaultRoundedCornerRadius = 18.dp
+        val defaultRoundedCornerRadius = CHIP_HEIGHT / 2
         val defaultPressedCornerRadius = 4.dp
         val defaultInnerCornerRadius = 0.dp
         FilledTonalButton(
             onClick = onClick,
-            modifier = Modifier.height(36.dp),
+            modifier = Modifier.height(CHIP_HEIGHT),
             colors = buttonColors,
             shapes = ButtonDefaults.shapes(
                 shape = RoundedCornerShape(
@@ -62,11 +69,11 @@ fun Chip(
                 ),
                 pressedShape = RoundedCornerShape(defaultPressedCornerRadius),
             ),
-            contentPadding = ButtonDefaults.contentPaddingFor(36.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 leading.invoke()
                 // A filter's chip says what it is set to, so its text changes under a tap; it
@@ -75,12 +82,12 @@ fun Chip(
                     targetState = text,
                     transitionSpec = { fadeIn() togetherWith fadeOut() using SizeTransform(clip = false) },
                 ) { current ->
-                    Text(current)
+                    Text(current, style = MaterialTheme.typography.labelMedium)
                 }
                 if (arrowDown && !segmented) Icon(
                     imageVector = PhIcons.Regular.CaretDown,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(CHIP_ICON_SIZE)
                 )
             }
         }
@@ -100,12 +107,12 @@ fun Chip(
                 ),
                 pressedShape = RoundedCornerShape(defaultPressedCornerRadius),
             ),
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(CHIP_HEIGHT),
         ) {
             if (arrowDown) Icon(
                 imageVector = PhIcons.Regular.CaretDown,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(CHIP_ICON_SIZE)
             )
         }
     }

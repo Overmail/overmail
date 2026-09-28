@@ -82,7 +82,7 @@ fun ViewSettings(
                 Icon(
                     imageVector = PhIcons.Regular.TreeStructure,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(CHIP_ICON_SIZE)
                 )
             },
             onClick = { showGroupSettings = true }
@@ -90,8 +90,8 @@ fun ViewSettings(
 
         Spacer(
             modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .height(32.dp)
+                .padding(horizontal = 6.dp)
+                .height(CHIP_HEIGHT - 6.dp)
                 .width(1.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )

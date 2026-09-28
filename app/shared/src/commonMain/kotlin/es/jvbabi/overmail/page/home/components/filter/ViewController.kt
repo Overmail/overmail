@@ -59,7 +59,7 @@ fun ViewController(
         modifier = modifier
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         LabelsChip(
             picked = pickedLabels,
@@ -171,7 +171,7 @@ internal fun ChipIcon(icon: ImageVector) {
     Icon(
         imageVector = icon,
         contentDescription = null,
-        modifier = Modifier.size(20.dp),
+        modifier = Modifier.size(CHIP_ICON_SIZE),
     )
 }
 

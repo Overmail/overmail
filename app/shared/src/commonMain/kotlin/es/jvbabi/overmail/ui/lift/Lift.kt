@@ -3,7 +3,6 @@ package es.jvbabi.overmail.ui.lift
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
@@ -123,7 +123,9 @@ fun Modifier.liftable(state: LiftState, key: Any, scroll: ScrollOffset? = null):
 /**
  * Lifts this content as [key] of [state] once a finger has rested on it for a long press, scrolls
  * it while the finger moves and puts it down when the finger lets go. A finger that moves before
- * that is left to whatever else wants it, a list that scrolls for instance.
+ * that is left to whatever else wants it, a list that scrolls for instance. Once lifted, every
+ * change of the finger is consumed, its release too, so put this inside a `clickable` to keep the
+ * long press from also being a click.
  *
  * For content that decides by itself when it is lifted, like a pile of cards that is also swiped,
  * call [LiftState.lift], [LiftState.moveFinger] and [LiftState.release] instead.
@@ -134,9 +136,13 @@ fun Modifier.liftOnLongPress(state: LiftState, key: Any): Modifier = pointerInpu
         val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
         state.lift(key)
         try {
-            drag(longPress.id) { change ->
-                state.moveFinger(change.positionChange().y)
+            while (true) {
+                val change = awaitPointerEvent().changes.firstOrNull { it.id == longPress.id } ?: break
+                val up = change.changedToUpIgnoreConsumed()
+                if (!up) state.moveFinger(change.positionChange().y)
+                // Up included: the finger that lifted the content does not also tap what is below it.
                 change.consume()
+                if (up) break
             }
         } finally {
             state.release()

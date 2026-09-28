@@ -1,109 +1,151 @@
 package es.jvbabi.overmail.ui.components
 
-import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
-import android.view.View
+import android.os.Handler
+import android.os.Looper
+import android.view.ViewGroup
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.viewinterop.AndroidView
+import co.touchlab.kermit.Logger
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 
+private val logger = Logger.withTag("EmailHtml")
+
+/** How tall a picture of a mail gets at most, in heights of its box: the rest of it is never scrolled to. */
+private const val MAX_SNAPSHOT_VIEWPORTS = 3
+
+/** How tall a picture of a mail gets at most, in px: a taller bitmap is too big for a texture on some GPUs and is not drawn at all. */
+private const val MAX_SNAPSHOT_PX = 8192
+
+/** How long the page is given to lay itself out at its full height before it is pictured, in ms. */
+private const val RELAYOUT_DELAY = 100L
+
 /**
- * A web view straight in the layout: an Android view is drawn into the Compose layer, so it turns,
- * scales and clips with the card around it. [scroll] moves it; it does not scroll by touch.
- *
- * The view is as tall as the window, whatever its box, and the box cuts it off: a web view that
- * changes size renders the mail again, and the box of a card changes size when it is lifted. Of
- * the scroll, the first [topInset] moves the view itself up from where it starts, below the inset;
- * the rest scrolls the page inside it, and what the page cannot scroll any further, since the view
- * is taller than the box, moves the view up again.
+ * A picture of a web view rather than the view itself. A live web view is rendered again whenever
+ * the card around it moves -- in the software layer it needs to draw inside the Compose layer at
+ * all, on the CPU and on every frame of a swipe or a lift. The mail is rendered once, behind
+ * everything in the window, at the width it is shown at and as tall as it is; see
+ * [EmailSnapshot] for how it is shown.
  */
-@SuppressLint("ClickableViewAccessibility")
 @Composable
 actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp) {
-    val inset = with(LocalDensity.current) { topInset.roundToPx() }
-    val windowHeight = LocalWindowInfo.current.containerSize.height
-    val currentScroll by rememberUpdatedState(scroll)
-    val currentInset by rememberUpdatedState(inset)
-    val box = remember { WebViewBox() }
-    var view by remember { mutableStateOf<WebView?>(null) }
+    val window = LocalView.current.rootView as? ViewGroup
+    BoxWithConstraints(modifier = modifier) {
+        val width = constraints.maxWidth
+        // What a mail sized to the screen is sized to; not a key, a taller box shows more of the same.
+        val viewportHeight = constraints.maxHeight
+        var snapshot by remember(html) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(view, scroll) {
-        val webView = view ?: return@LaunchedEffect
-        snapshotFlow { webView.pageScroll(scroll.value - currentInset) }.collect { webView.scrollTo(0, it) }
+        LaunchedEffect(html, width) {
+            if (window != null && width > 0 && viewportHeight > 0) {
+                renderSnapshot(window, emailHtmlDocument(html), width, viewportHeight)?.let { snapshot = it }
+            }
+        }
+
+        EmailSnapshot(snapshot, scroll, topInset)
     }
-    // A header that changes height changes how far there is to go.
-    LaunchedEffect(view, scroll, inset) {
-        view?.reportScrollRange(scroll, inset, box.height)
-    }
-
-    AndroidView(
-        modifier = modifier.layout { measurable, constraints ->
-            val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, maxOf(windowHeight, constraints.maxHeight)))
-            box.height = constraints.maxHeight
-            view?.reportScrollRange(scroll, currentInset, box.height)
-            layout(constraints.maxWidth, constraints.maxHeight) {
-                val pastInset = scroll.value - currentInset
-                val pastPage = view?.let { pastInset - it.pageScroll(pastInset) } ?: 0f
-                placeable.place(0, (-pastInset).roundToInt().coerceAtLeast(0) - pastPage.roundToInt().coerceAtLeast(0))
-            }
-        },
-        factory = { context ->
-            WebView(context).apply {
-                setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-                settings.javaScriptEnabled = false
-                // Laid out at the width the mail asks for, then zoomed out until it fits.
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
-                settings.setSupportZoom(false)
-                settings.builtInZoomControls = false
-                isVerticalScrollBarEnabled = false
-                isHorizontalScrollBarEnabled = false
-                overScrollMode = View.OVER_SCROLL_NEVER
-                setBackgroundColor(Color.TRANSPARENT)
-                isFocusable = false
-                // Read, not browsed: a touch on it is the pile's.
-                setOnTouchListener { _, _ -> true }
-
-                // Asked again whenever the page changes size: images load after the page has.
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView, url: String?) = view.reportScrollRange(currentScroll, currentInset, box.height)
-                }
-                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reportScrollRange(currentScroll, currentInset, box.height) }
-            }
-        },
-        update = { webView ->
-            view = webView
-            // Loaded once per mail: update runs on every recomposition, and a reload would flash.
-            if (webView.tag != html) {
-                webView.tag = html
-                webView.loadDataWithBaseURL(null, emailHtmlDocument(html), "text/html", "utf-8", null)
-            }
-        },
-    )
 }
 
-/** How tall the box around the view is, in px, for whatever asks outside of layout. */
-private class WebViewBox {
-    var height = 0
-}
+private var wholeDocumentDraw = false
 
-/** The page's own height, in physical pixels: contentHeight is in css pixels. */
-@Suppress("DEPRECATION")
-private val WebView.pageHeight: Float get() = contentHeight * scale
+/**
+ * Renders [document] in a web view [width] px wide and takes a picture of all of it, up to
+ * [MAX_SNAPSHOT_VIEWPORTS] times [viewportHeight] and [MAX_SNAPSHOT_PX], once it has loaded; null
+ * when it would not load. It is laid out at [viewportHeight] first, which is what a mail sized to
+ * the screen measures itself against.
+ *
+ * The view has to be in a window for Chromium to render it, so it is put into [window], underneath
+ * everything, for as long as it takes.
+ */
+private suspend fun renderSnapshot(window: ViewGroup, document: String, width: Int, viewportHeight: Int): ImageBitmap? =
+    suspendCancellableCoroutine { continuation ->
+        // Without it a web view draws what is on screen and nothing below; only possible before
+        // the first web view of the process, which this is.
+        if (!wholeDocumentDraw) {
+            runCatching { WebView.enableSlowWholeDocumentDraw() }.onFailure { logger.w(it) { "A mail is pictured only as far as the screen goes" } }
+            wholeDocumentDraw = true
+        }
 
-/** How far the page inside scrolls for [offset] px into it: as far as it goes, the rest is up to the view. */
-private fun WebView.pageScroll(offset: Float): Int =
-    offset.coerceIn(0f, (pageHeight - height).coerceAtLeast(0f)).roundToInt()
+        val webView = WebView(window.context).apply {
+            // A mail runs no script, the content security policy aside.
+            settings.javaScriptEnabled = false
+            // Laid out at the width the mail asks for, then zoomed out until it fits.
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            settings.setSupportZoom(false)
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            setBackgroundColor(Color.TRANSPARENT)
+            isFocusable = false
+        }
+        var done = false
 
-/** How far [scroll] can go: the inset, and whatever of the page is below the box after it. */
-private fun WebView.reportScrollRange(scroll: ScrollOffset, inset: Int, boxHeight: Int) {
-    if (boxHeight > 0) scroll.max = inset + pageHeight - boxHeight
+        fun finish(image: ImageBitmap?) {
+            if (done) return
+            done = true
+            window.removeView(webView)
+            webView.destroy()
+            if (continuation.isActive) continuation.resume(image)
+        }
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (done) return
+                // Grown to the whole mail, so the picture holds what scrolling will bring up.
+                @Suppress("DEPRECATION")
+                val pageHeight = (view.contentHeight * view.scale).roundToInt()
+                val maxHeight = minOf(viewportHeight * MAX_SNAPSHOT_VIEWPORTS, MAX_SNAPSHOT_PX).coerceAtLeast(viewportHeight)
+                view.layoutParams = ViewGroup.LayoutParams(width, pageHeight.coerceIn(viewportHeight, maxHeight))
+                view.postDelayed({
+                    if (done) return@postDelayed
+                    // Once what is drawn next shows the page as it is now, laid out at its height.
+                    view.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            if (done) return
+                            finish(view.picture())
+                        }
+                    })
+                }, RELAYOUT_DELAY)
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (!request.isForMainFrame) return
+                logger.w { "A mail would not render: ${error.description}" }
+                finish(null)
+            }
+        }
+
+        window.addView(webView, 0, ViewGroup.LayoutParams(width, viewportHeight))
+        webView.loadDataWithBaseURL(null, document, "text/html", "utf-8", null)
+
+        continuation.invokeOnCancellation {
+            // From whichever thread cancelled it; the view is only touched on the main one.
+            Handler(Looper.getMainLooper()).post { finish(null) }
+        }
+    }
+
+/** Everything the view shows, drawn into a bitmap of its size; null for a view with no size yet. */
+private fun WebView.picture(): ImageBitmap? {
+    if (width <= 0 || height <= 0) return null
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    draw(Canvas(bitmap))
+    return bitmap.asImageBitmap()
 }

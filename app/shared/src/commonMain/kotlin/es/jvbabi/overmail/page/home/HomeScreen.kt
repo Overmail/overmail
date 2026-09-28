@@ -27,8 +27,14 @@ import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.ViewSettings
+import es.jvbabi.overmail.page.home.components.list.ListMailPreview
 import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
-import es.jvbabi.overmail.page.home.components.stack.*
+import es.jvbabi.overmail.page.home.components.stack.EmailStack
+import es.jvbabi.overmail.page.home.components.stack.StackCardBody
+import es.jvbabi.overmail.page.home.components.stack.StackSwipe
+import es.jvbabi.overmail.page.home.components.stack.emailStackSwipe
+import es.jvbabi.overmail.page.home.components.stack.rememberEmailStackState
+import es.jvbabi.overmail.page.home.components.stack.rememberStackSnapFlingBehavior
 import es.jvbabi.overmail.ui.lift.liftHost
 import es.jvbabi.overmail.ui.lift.rememberLiftState
 import es.jvbabi.overmail.ui.theme.AppTheme
@@ -42,6 +48,7 @@ import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_stack_archive_failed
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 
 @Composable
 fun HomeScreen() {
@@ -50,6 +57,7 @@ fun HomeScreen() {
     val viewViewModel = koinViewModel<ViewViewModel>()
     val content by viewViewModel.content.collectAsStateWithLifecycle()
     val viewState by viewViewModel.viewState.collectAsStateWithLifecycle()
+    val listBodies by viewViewModel.bodies.collectAsStateWithLifecycle()
     val viewSettingsViewModel = koinViewModel<ViewSettingsViewModel>()
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
@@ -71,7 +79,9 @@ fun HomeScreen() {
         viewSettingsState = viewSettingsState,
         stackContent = stackContent,
         snackbarHostState = snackbarHostState,
+        listBodies = listBodies,
         onViewStateChange = { viewViewModel.onEvent(ViewEvent.SetViewState(it)) },
+        onLoadListBody = { viewViewModel.onEvent(ViewEvent.LoadBody(it)) },
         onViewSettingsEvent = viewSettingsViewModel::onEvent,
         onStackEvent = emailStackViewModel::onEvent,
     )
@@ -96,7 +106,9 @@ private fun HomeContent(
     viewSettingsState: ViewSettingsState,
     stackContent: EmailStackContentState,
     snackbarHostState: SnackbarHostState,
+    listBodies: Map<Uuid, StackCardBody>,
     onViewStateChange: (ViewState) -> Unit,
+    onLoadListBody: (Uuid) -> Unit,
     onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
     onStackEvent: (EmailStackEvent) -> Unit,
 ) {
@@ -112,6 +124,10 @@ private fun HomeContent(
     // One for the screen: whatever is lifted lies over all of it, see liftHost.
     val liftState = rememberLiftState()
     val emailStackState = rememberEmailStackState(liftState)
+    val currentOnLoadListBody by rememberUpdatedState(onLoadListBody)
+    val listPreview = remember(liftState, listBodies) {
+        ListMailPreview(lift = liftState, bodies = listBodies, onLoadBody = { currentOnLoadListBody(it) })
+    }
 
     Scaffold{ innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
@@ -198,6 +214,7 @@ private fun HomeContent(
                                 is ViewResult.Group -> ViewGroupComponent(
                                     group = result,
                                     senders = content.senders,
+                                    preview = listPreview,
                                 )
                             }
                         }
@@ -292,7 +309,9 @@ private fun HomeContentPreview() {
             viewSettingsState = ViewSettingsState(isFetchingImapAccounts = false),
             stackContent = EmailStackContentState(emails = PREVIEW_ITEMS.map { it.email }, isLoading = false),
             snackbarHostState = remember { SnackbarHostState() },
+            listBodies = emptyMap(),
             onViewStateChange = {},
+            onLoadListBody = {},
             onViewSettingsEvent = {},
             onStackEvent = {},
         )

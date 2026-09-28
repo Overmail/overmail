@@ -10,11 +10,13 @@ import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -44,6 +46,11 @@ class ViewViewModel(
         .map { it.firstOrNull() }
         .distinctUntilChanged()
 
+    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getBody)
+
+    /** What the mails of the listing say, as far as a preview has asked for it, see [ViewEvent.LoadBody]. */
+    val bodies: StateFlow<Map<Uuid, StackCardBody>> = emailBodies.bodies
+
     init {
         viewModelScope.launch {
             combine(account, viewState, ::Pair)
@@ -68,6 +75,10 @@ class ViewViewModel(
     fun onEvent(event: ViewEvent) {
         when (event) {
             is ViewEvent.SetViewState -> viewState.value = event.viewState
+            is ViewEvent.LoadBody -> viewModelScope.launch {
+                val account = account.first() ?: return@launch
+                emailBodies.load(event.emailId, account)
+            }
         }
     }
 }
@@ -99,4 +110,7 @@ private fun List<ViewResult>.senderIds(): Set<Uuid> = buildSet {
 
 sealed class ViewEvent {
     data class SetViewState(val viewState: ViewState) : ViewEvent()
+
+    /** A mail of the listing is previewed and needs what it says. */
+    data class LoadBody(val emailId: Uuid) : ViewEvent()
 }

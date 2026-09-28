@@ -1,9 +1,20 @@
 package es.jvbabi.overmail.ui.components
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /** The width html mails are typically designed for; they are laid out at it and scaled to fit. */
 internal const val EMAIL_DESIGN_WIDTH = 640
@@ -22,10 +33,11 @@ private val VIEWPORT = Regex("""<meta[^>]+name\s*=\s*["']?viewport""", RegexOpti
  * width it is given. It does not scroll and takes no touch: what does not fit is cut off, and a
  * touch goes to whatever lies around it.
  *
- * On Android a web view, on iOS a picture of one -- a UIKit view would not turn and scale along
- * with the Compose layer around it. It starts [topInset] down its box, below whatever lies over its
- * top; [scroll] moves it up behind that first and through the mail after, and learns from it how
- * far that goes.
+ * A picture of a web view on both platforms, taken once, at the width it is shown at and as tall
+ * as the mail, up to a cap: a live web view neither turns and scales with the Compose layer around
+ * it (iOS) nor moves without being rendered again on every frame (Android). It starts [topInset]
+ * down its box, below whatever lies over its top; [scroll] moves it up behind that first and
+ * through the mail after, and learns from it how far that goes.
  */
 @Composable
 expect fun EmailHtml(html: String, modifier: Modifier = Modifier, scroll: ScrollOffset, topInset: Dp = 0.dp)
@@ -43,4 +55,31 @@ internal fun emailHtmlDocument(html: String): String {
     // Without a head of its own, whatever comes before the body ends up in the one the parser makes.
     return if (open == null) head + html
     else html.substring(0, open.range.last + 1) + head + html.substring(open.range.last + 1)
+}
+
+/**
+ * [snapshot] of a mail, as wide as its box and as tall as that makes it, [topInset] down the box
+ * and moved up by [scroll]; a spinner while there is none yet. What both platforms show of
+ * [EmailHtml].
+ */
+@Composable
+internal fun EmailSnapshot(snapshot: ImageBitmap?, scroll: ScrollOffset, topInset: Dp) {
+    if (snapshot == null) Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+    else Image(
+        bitmap = snapshot,
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = Modifier.layout { measurable, constraints ->
+            val inset = topInset.roundToPx()
+            val imageWidth = constraints.maxWidth
+            val imageHeight = (imageWidth * snapshot.height.toFloat() / snapshot.width).roundToInt()
+            val placeable = measurable.measure(Constraints.fixed(imageWidth, imageHeight))
+            scroll.max = (inset + imageHeight - constraints.maxHeight).toFloat()
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                placeable.place(0, inset - scroll.value.roundToInt())
+            }
+        },
+    )
 }

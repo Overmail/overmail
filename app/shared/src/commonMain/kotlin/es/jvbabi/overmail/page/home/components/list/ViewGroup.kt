@@ -39,6 +39,8 @@ fun ViewGroupComponent(
     group: ViewResult.Group,
     /** The correspondents sender groups stand for, on either level; a missing one is not known here. */
     senders: Map<Uuid, Participant> = emptyMap(),
+    /** What a mail in it is previewed with when it is pressed and held; none without. */
+    preview: ListMailPreview? = null,
 ) {
     val localDensity = LocalDensity.current
     Column(modifier = modifier) {
@@ -60,9 +62,10 @@ fun ViewGroupComponent(
                 is ViewResult.Group -> ViewGroupComponent(
                     group = item,
                     senders = senders,
+                    preview = preview,
                     modifier = Modifier.padding(start = 24.dp)
                 )
-                is ViewResult.Item -> ViewItem(item)
+                is ViewResult.Item -> ViewItem(item, preview)
             }
         }
     }

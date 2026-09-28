@@ -17,11 +17,14 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -156,12 +159,19 @@ private val OVERFLOW_FADE = 48.dp
 
 /**
  * What the mail says, over the whole card and starting [topInset] down, below the header. It is
- * not scrolled by touch -- a card is read at a glance -- but [scroll] moves it, see LiftedCard,
- * and it goes on behind the header then. A mail that goes on below what shows fades out where the
- * card ends.
+ * not scrolled by touch -- a card is read at a glance -- but [scroll] moves it while the card is
+ * lifted, see [es.jvbabi.overmail.ui.lift.LiftState], and it goes on behind the header then. A
+ * mail that goes on below what shows fades out where the card ends -- or, while the card grows on
+ * its way up, where [shownHeight] says it is cut off, so the fade moves with the edge.
  */
 @Composable
-internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, topInset: Dp, modifier: Modifier = Modifier) {
+internal fun CardBody(
+    body: StackCardBody,
+    scroll: ScrollOffset,
+    topInset: Dp,
+    modifier: Modifier = Modifier,
+    shownHeight: () -> Float? = { null },
+) {
     // The paper of the card, see cardSurface.
     val paper = MaterialTheme.colorScheme.surfaceContainerLowest
 
@@ -172,24 +182,37 @@ internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, topInset: Dp, m
             .clipToBounds()
             .drawWithContent {
                 drawContent()
-                if (!scroll.hasMoreBelow) return@drawWithContent
-                val fade = OVERFLOW_FADE.toPx().coerceAtMost(size.height)
+                // Where the card ends: its box, or on the way up while lifted, where it is cut off.
+                val bottom = shownHeight()?.coerceAtMost(size.height) ?: size.height
+                // Content that goes on below that, in the box: what is scrolled out below, and
+                // what the cut hides.
+                if (size.height + scroll.max - scroll.value <= bottom + 0.5f) return@drawWithContent
+                val fade = OVERFLOW_FADE.toPx().coerceAtMost(bottom)
                 drawRect(
-                    brush = Brush.verticalGradient(listOf(paper.copy(alpha = 0f), paper), startY = size.height - fade, endY = size.height),
-                    topLeft = Offset(0f, size.height - fade),
+                    brush = Brush.verticalGradient(listOf(paper.copy(alpha = 0f), paper), startY = bottom - fade, endY = bottom),
+                    topLeft = Offset(0f, bottom - fade),
+                    size = Size(size.width, fade),
                 )
             },
     ) {
+        // Kept once it is there, with the last html it had, and only hidden while the body is
+        // something else: a web view is expensive to make, and a card that shows one mail after
+        // another -- the list's preview -- keeps the one it has.
+        val lastHtml = remember { LastHtml() }
+        if (body is StackCardBody.Html) lastHtml.html = body.html
+        lastHtml.html?.let { html ->
+            EmailHtml(
+                html = html,
+                modifier = Modifier.fillMaxSize().alpha(if (body is StackCardBody.Html) 1f else 0f),
+                scroll = scroll,
+                topInset = topInset,
+            )
+        }
         when (body) {
             StackCardBody.Loading -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is StackCardBody.Html -> EmailHtml(
-                html = body.html,
-                modifier = Modifier.fillMaxSize(),
-                scroll = scroll,
-                topInset = topInset,
-            )
+            is StackCardBody.Html -> Unit
             is StackCardBody.Text -> Text(
                 text = body.text,
                 style = MaterialTheme.typography.bodyMedium,
@@ -214,4 +237,8 @@ internal fun CardBody(body: StackCardBody, scroll: ScrollOffset, topInset: Dp, m
             }
         }
     }
+}
+
+private class LastHtml {
+    var html: String? = null
 }

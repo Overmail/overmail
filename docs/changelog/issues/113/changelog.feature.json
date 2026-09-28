@@ -1,0 +1,10 @@
+{
+  "title": "Preview a mail from the list",
+  "description": "Press and hold a mail in the list to see it over everything, just like a card of the stack. Hold your finger above or below where you pressed to scroll through it, and let go to put it away.",
+  "localized": {
+    "de": {
+      "title": "E-Mails aus der Liste in der Vorschau ansehen",
+      "description": "Halte eine E-Mail in der Liste gedrückt, um sie über allem anderen zu sehen, genau wie eine Karte des Stapels. Halte den Finger über oder unter der Stelle, an der du gedrückt hast, um durch sie zu scrollen, und lass los, um sie wieder wegzulegen."
+    }
+  }
+}

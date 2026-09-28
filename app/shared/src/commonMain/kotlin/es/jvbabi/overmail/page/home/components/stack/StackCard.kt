@@ -2,6 +2,7 @@ package es.jvbabi.overmail.page.home.components.stack
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.ScrollOffset
 
-private val CARD_SHAPE = RoundedCornerShape(16.dp)
+internal val CARD_SHAPE = RoundedCornerShape(16.dp)
 
 /** How far each card below the top one sits further down. */
 private val DEPTH_OFFSET = 10.dp
@@ -64,7 +65,8 @@ internal data class CardHand(
  * One sheet of the pile, drawn where [pose] says. [depth] is its place in the pile as a whole
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
  * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
- * scrolled; only a lifted card is, the others lie at its top.
+ * scrolled; only a lifted card is, see [es.jvbabi.overmail.ui.lift.LiftState], the others lie at
+ * its top. [shownHeight] is how much of it shows while it is lifted, see [CardBody].
  */
 @Composable
 internal fun StackCard(
@@ -75,22 +77,49 @@ internal fun StackCard(
     drag: CardDrag?,
     modifier: Modifier = Modifier,
     scroll: ScrollOffset = remember(body) { ScrollOffset() },
+    shownHeight: () -> Float? = { null },
+) {
+    MailCard(
+        email = email,
+        body = body,
+        scroll = scroll,
+        shownHeight = shownHeight,
+        place = { pose().place },
+        modifier = modifier
+            .fillMaxSize()
+            .cardPose(pose, depth, email.id.toString()),
+    ) {
+        if (drag?.towards != null) SwipeOverlay(towards = drag.towards, progress = drag.progress, isEnough = drag.action != null)
+    }
+}
+
+/**
+ * A mail on a sheet of paper: its header over what it says, which [scroll] moves. What a card of
+ * the pile is, and what a mail previewed from anywhere else looks like. [place] is how far down a
+ * pile the sheet lies, which tints it; [shownHeight] how much of it shows while it is lifted, see
+ * [CardBody]; [overlay] lies over all of it.
+ */
+@Composable
+internal fun MailCard(
+    email: Email,
+    body: StackCardBody,
+    scroll: ScrollOffset,
+    modifier: Modifier = Modifier,
+    place: () -> Float = { 0f },
+    shownHeight: () -> Float? = { null },
+    overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .cardPose(pose, depth, email.id.toString())
-            .cardSurface(place = { pose().place }),
-    ) {
+    Box(modifier = modifier.cardSurface(place)) {
         // The whole card, starting below the header: scrolled, it goes on behind it.
         CardBody(
             body = body,
             scroll = scroll,
             topInset = headerHeight,
+            shownHeight = shownHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .hazeSource(hazeState),
@@ -101,7 +130,7 @@ internal fun StackCard(
             modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
         )
 
-        if (drag?.towards != null) SwipeOverlay(towards = drag.towards, progress = drag.progress, isEnough = drag.action != null)
+        overlay()
     }
 }
 

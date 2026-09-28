@@ -116,8 +116,9 @@ fun Modifier.liftable(state: LiftState, key: Any, scroll: ScrollOffset? = null, 
  * something else while lifted -- a row of a list lifting a preview of what it stands for -- and
  * stays composed in between, so what is expensive in it is created once, not per lift.
  *
- * It is always laid out at the size it is lifted to. [origin] is read while it is lifted, in the
- * root; otherwise like [liftable].
+ * It is always laid out at the size it is lifted to, but only placed while it is lifted, so it
+ * takes no touch in between. [origin] is read while it is lifted, in the root; otherwise like
+ * [liftable].
  */
 @Composable
 fun Modifier.liftStandIn(state: LiftState, key: Any, origin: () -> Rect, scroll: ScrollOffset? = null, shape: Shape = RectangleShape): Modifier =
@@ -150,7 +151,11 @@ private fun Modifier.liftTarget(state: LiftState, key: Any, scroll: ScrollOffset
             // A stand-in takes no room; lifted content keeps the room it had.
             val width = if (origin == null) constraints.constrainWidth(target.resting.width.roundToInt()) else 0
             val height = if (origin == null) constraints.constrainHeight(target.resting.height.roundToInt()) else 0
-            layout(width, height) { placeable.place(0, 0) }
+            layout(width, height) {
+                // A stand-in that is not lifted is not placed at all: placed, it would lie over the
+                // host unseen and take every touch -- a web view in it does, for one.
+                if (origin == null || state.isLifted(key)) placeable.place(0, 0)
+            }
         }
         .drawWithContent {
             // Always into the layer, so the host has it the moment the content is lifted.

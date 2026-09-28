@@ -36,6 +36,8 @@ import io.ktor.http.ParametersBuilder
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
@@ -101,6 +103,10 @@ class EmailsRepositoryImpl(
             }
         }
     }
+        // Filtering and arranging goes through every mail of the account, on every change of the
+        // database -- a first sync makes several. Not on the collector's thread, which for a
+        // screen is the main one.
+        .flowOn(Dispatchers.Default)
 
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {
         emailBodyCache.get(emailId)?.let { return Result.success(it) }

@@ -13,6 +13,7 @@ import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -63,7 +65,12 @@ class EmailStackViewModel(
                 .flatMapLatest { account ->
                     if (account == null) flowOf(null to emptyList())
                     else emailsRepository.getView(INBOX, instantLocalEmission = true, user = account)
-                        .map { results -> account to results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        .map { results -> results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        // A write that leaves the inbox as it was -- most of a first sync, which
+                        // loads the archive too -- does not deal the pile anew.
+                        .distinctUntilChanged()
+                        .flowOn(Dispatchers.Default)
+                        .map { emails -> account to emails }
                 }
                 .combine(handled) { (account, emails), handled -> account to emails.filter { it.id !in handled } }
                 .collect { (account, emails) ->

@@ -29,8 +29,8 @@ import es.jvbabi.overmail.domain.model.EmailRecipientType
 import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.formatDateTime
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
-import es.jvbabi.overmail.ui.transition.SharedMailPart
-import es.jvbabi.overmail.ui.transition.sharedMail
+import es.jvbabi.overmail.ui.transition.MailPart
+import es.jvbabi.overmail.ui.transition.mailPart
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
@@ -58,7 +58,7 @@ fun EmailParticipants(email: Email, modifier: Modifier = Modifier) {
                 participant = email.sentBy,
                 size = 40.dp,
                 modifier = Modifier
-                    .sharedMail(email.id, SharedMailPart.Avatar, shape = RoundedCornerShape(8.dp))
+                    .mailPart(email.id, MailPart.Avatar, isRow = false)
                     .clip(RoundedCornerShape(8.dp)),
             )
             Spacer(Modifier.width(12.dp))
@@ -69,7 +69,7 @@ fun EmailParticipants(email: Email, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.sharedMail(email.id, SharedMailPart.Sender),
+                    modifier = Modifier.mailPart(email.id, MailPart.Sender, isRow = false),
                 )
                 Text(
                     text = email.sentBy.email,
@@ -77,7 +77,7 @@ fun EmailParticipants(email: Email, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
-                    modifier = if (email.sentBy.name == null) Modifier.sharedMail(email.id, SharedMailPart.Sender) else Modifier,
+                    modifier = if (email.sentBy.name == null) Modifier.mailPart(email.id, MailPart.Sender, isRow = false) else Modifier,
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -85,7 +85,7 @@ fun EmailParticipants(email: Email, modifier: Modifier = Modifier) {
                 text = sentAtFull(email),
                 style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.sharedMail(email.id, SharedMailPart.SentAt),
+                modifier = Modifier.mailPart(email.id, MailPart.SentAt, isRow = false),
             )
         }
 

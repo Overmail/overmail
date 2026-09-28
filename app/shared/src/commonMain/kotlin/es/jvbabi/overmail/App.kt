@@ -2,21 +2,20 @@ package es.jvbabi.overmail
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import es.jvbabi.overmail.page.email.EmailScreen
-import es.jvbabi.overmail.ui.transition.LocalScreenAnimationScope
-import es.jvbabi.overmail.ui.transition.LocalSharedTransitionScope
-import es.jvbabi.overmail.ui.transition.SHARED_MAIL_MILLIS
-import es.jvbabi.overmail.ui.transition.rememberScreenAnimationScope
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import es.jvbabi.overmail.ui.transition.LocalMailTransition
+import es.jvbabi.overmail.ui.transition.LocalScreenProgress
+import es.jvbabi.overmail.ui.transition.MAIL_TRANSITION_MILLIS
+import es.jvbabi.overmail.ui.transition.MailTransition
+import es.jvbabi.overmail.ui.transition.rememberScreenProgress
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -92,35 +91,32 @@ private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(twee
 private const val TAB_FADE_MILLIS = 200
 
 /**
- * A mail's page grows out of what was tapped and shrinks back into it, see `sharedMail`. The
- * screen below stays as it is meanwhile, under the page; a page opened from something that does
- * not show the mail only fades.
- *
- * Neither side is without an animation of its own, though: the bounds of the mail only move while
- * the transition of the screen they head for runs, so the screen coming back from under the page
- * is held at full alpha for as long.
+ * A mail's page grows out of the row that was tapped and shrinks back into it, see
+ * `MailTransition`, which draws all of it from how far these have played. So they change nothing
+ * that shows -- an alpha from 1 to 1 -- and only last as long: the screen below stays as it is,
+ * under the page, and a predictive back seeks them, and the page with them.
  */
 private val MAIL_TRANSITION: Map<String, Any> =
-    NavDisplay.transitionSpec { fadeIn(tween(SHARED_MAIL_MILLIS)) togetherWith ExitTransition.KeepUntilTransitionsFinished } +
-        NavDisplay.popTransitionSpec { mailPop() } +
-        NavDisplay.predictivePopTransitionSpec { mailPop() }
+    NavDisplay.transitionSpec { mailHold() togetherWith ExitTransition.KeepUntilTransitionsFinished } +
+        NavDisplay.popTransitionSpec { mailHold() togetherWith mailHoldOut() } +
+        NavDisplay.predictivePopTransitionSpec { mailHold() togetherWith mailHoldOut() }
 
-private fun mailPop() = fadeIn(tween(SHARED_MAIL_MILLIS), initialAlpha = 1f) togetherWith fadeOut(tween(SHARED_MAIL_MILLIS))
+private fun mailHold() = fadeIn(tween(MAIL_TRANSITION_MILLIS, easing = LinearEasing), initialAlpha = 1f)
+
+private fun mailHoldOut() = fadeOut(tween(MAIL_TRANSITION_MILLIS, easing = LinearEasing), targetAlpha = 1f)
 
 /**
- * The content of a NavEntry: told how its screen comes and goes, and in which scope it shares
- * elements, see `sharedMail`. [viewModelStoreOwner] replaces the entry's own store.
+ * The content of a NavEntry: told how far its screen has come, see [LocalScreenProgress].
+ * [viewModelStoreOwner] replaces the entry's own store.
  */
 @Composable
 private fun ScreenEntry(
-    sharedTransitionScope: SharedTransitionScope,
     viewModelStoreOwner: ViewModelStoreOwner? = null,
     content: @Composable () -> Unit,
 ) {
     val owner = viewModelStoreOwner ?: checkNotNull(LocalViewModelStoreOwner.current)
     CompositionLocalProvider(
-        LocalSharedTransitionScope provides sharedTransitionScope,
-        LocalScreenAnimationScope provides rememberScreenAnimationScope(LocalNavAnimatedContentScope.current),
+        LocalScreenProgress provides rememberScreenProgress(),
         LocalViewModelStoreOwner provides owner,
         content = content,
     )
@@ -234,10 +230,8 @@ fun App() {
                     // always have: the list keeps its view when the stack is picked in between.
                     // A mail's page has its own, gone once it is left.
                     val appViewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current)
-                    // Not handed to the NavDisplay itself: it would wrap every entry in a shared
-                    // element of its own, for entries moving between scenes, which there are none
-                    // of -- and the mail's parts would be nested in it.
-                    SharedTransitionLayout {
+                    val mailTransition = remember { MailTransition() }
+                    CompositionLocalProvider(LocalMailTransition provides mailTransition) {
                         NavDisplay(
                             backStack = backstack,
                             onBack = { backstack.removeLastOrNull() },
@@ -248,11 +242,11 @@ fun App() {
                             entryProvider = { key ->
                                 when (key) {
                                     is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                        ScreenEntry(this, appViewModelStoreOwner) { StackScreen() }
+                                        ScreenEntry(appViewModelStoreOwner) { StackScreen() }
                                     }
 
                                     is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                        ScreenEntry(this, appViewModelStoreOwner) {
+                                        ScreenEntry(appViewModelStoreOwner) {
                                             ListScreen(
                                                 focusSearch = focusListSearch,
                                                 onSearchFocused = { focusListSearch = false },
@@ -262,13 +256,13 @@ fun App() {
                                     }
 
                                     is Screen.Onboarding -> NavEntry(key = key) {
-                                        ScreenEntry(this, appViewModelStoreOwner) {
+                                        ScreenEntry(appViewModelStoreOwner) {
                                             OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
                                         }
                                     }
 
                                     is Screen.Email -> NavEntry(key = key, metadata = MAIL_TRANSITION) {
-                                        ScreenEntry(this) {
+                                        ScreenEntry() {
                                             EmailScreen(emailId = key.emailId, onBack = { backstack.remove(key) })
                                         }
                                     }

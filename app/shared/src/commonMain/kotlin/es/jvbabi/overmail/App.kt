@@ -1,22 +1,39 @@
 package es.jvbabi.overmail
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapperProvider
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.page.Screen
-import es.jvbabi.overmail.page.home.HomeScreen
+import es.jvbabi.overmail.page.home.ListScreen
+import es.jvbabi.overmail.page.home.StackScreen
 import es.jvbabi.overmail.page.onboarding.OnboardingRoot
 import es.jvbabi.overmail.page.settings.SettingsScreen
 import es.jvbabi.overmail.ui.overlay.update_available.UpdateAvailableOverlay
@@ -31,12 +48,30 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.disk.DiskCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import es.jvbabi.overmail.data.network.ServerImageCacheStrategy
+import es.jvbabi.overmail.page.BottomNavBar
+import es.jvbabi.overmail.page.LocalBottomNavBarHeight
 import io.ktor.client.HttpClient
 import okio.Path
 import kotlin.time.Instant
 
 /** Avatars are small; this holds thousands of them. */
 private const val IMAGE_DISK_CACHE_BYTES = 64L * 1024 * 1024
+
+/**
+ * Between two tabs the pages fade into each other: they sit side by side in the bottom bar, not
+ * on top of one another, so sliding one in over the other would say the wrong thing.
+ */
+private val TAB_TRANSITION: Map<String, Any> =
+    NavDisplay.transitionSpec { tabFade() } +
+        NavDisplay.popTransitionSpec { tabFade() } +
+        NavDisplay.predictivePopTransitionSpec { tabFade() }
+
+private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(tween(TAB_FADE_MILLIS))
+
+private const val TAB_FADE_MILLIS = 200
+
+/** Between the bottom nav bar and the system bar below it. */
+private val BOTTOM_NAV_BAR_MARGIN = 16.dp
 
 /** Opens a link in the platform's in-app browser rather than handing it to a browser app. */
 expect fun openUrl(url: String)
@@ -106,7 +141,7 @@ fun App() {
     ) {
         // The back stack is the navigation state: pushing a screen onto it navigates, popping it
         // goes back, and Navigation3 renders whatever is on top.
-        val backstack = remember { mutableStateListOf<Screen>(Screen.Home) }
+        val backstack = remember { mutableStateListOf<Screen>(Screen.Stack) }
 
         UpdateAvailableOverlay()
 
@@ -122,20 +157,55 @@ fun App() {
             LaunchedEffect(hasAccounts) {
                 if (hasAccounts == false) backstack.add(Screen.Onboarding)
             }
-            NavDisplay(
-                backStack = backstack,
-                onBack = { backstack.removeLastOrNull() },
-                entryProvider = { key ->
-                    when (key) {
-                        is Screen.Home -> NavEntry(key = key) {
-                            HomeScreen()
-                        }
 
-                        is Screen.Onboarding -> NavEntry(key = key) {
-                            OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+            val localDensity = LocalDensity.current
+            var bottomNavBarHeight by remember { mutableStateOf(0.dp) }
+            // The list tab tapped again while it is open: the search is what is wanted next.
+            var focusListSearch by remember { mutableStateOf(false) }
+            val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+
+            CompositionLocalProvider(LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding) {
+                NavDisplay(
+                    backStack = backstack,
+                    onBack = { backstack.removeLastOrNull() },
+                    entryProvider = { key ->
+                        when (key) {
+                            is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                StackScreen()
+                            }
+
+                            is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                ListScreen(
+                                    focusSearch = focusListSearch,
+                                    onSearchFocused = { focusListSearch = false },
+                                )
+                            }
+
+                            is Screen.Onboarding -> NavEntry(key = key) {
+                                OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+                            }
                         }
+                    },
+                )
+            }
+
+            val currentTab = backstack.lastOrNull() as? Screen.Tab
+            if (currentTab != null) BottomNavBar(
+                selected = currentTab,
+                onSelect = { tab ->
+                    if (tab == currentTab) {
+                        if (tab == Screen.List) focusListSearch = true
+                        return@BottomNavBar
                     }
+                    // The stack is the root and every other tab lies on top of it, so back from
+                    // any of them leads there.
+                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                    if (tab != Screen.Stack) backstack.add(tab)
                 },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = bottomNavBarPadding)
+                    .onSizeChanged { (_, h) -> bottomNavBarHeight = with(localDensity) { h.toDp() } },
             )
         }
 

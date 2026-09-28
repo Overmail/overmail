@@ -1,0 +1,10 @@
+{
+  "title": "The stack and the list get a tab each",
+  "description": "The stack and the list are now two pages of their own, switched with the bar at the bottom.",
+  "localized": {
+    "de": {
+      "title": "Stapel und Liste bekommen je einen Tab",
+      "description": "Stapel und Liste sind jetzt zwei eigene Seiten, zwischen denen du mit der Leiste unten wechselst."
+    }
+  }
+}

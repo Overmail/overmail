@@ -3,8 +3,10 @@ package es.jvbabi.overmail.page.home.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,7 +24,6 @@ import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.List
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.page.home.Greeting
-import es.jvbabi.overmail.page.home.HEADER_HEIGHT
 import es.jvbabi.overmail.page.home.PREVIEW_ACCOUNT
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
@@ -34,6 +35,8 @@ import overmail.app.shared.generated.resources.home_greeting_evening
 import overmail.app.shared.generated.resources.home_greeting_morning
 import overmail.app.shared.generated.resources.home_greeting_night
 
+val HEADER_HEIGHT = 64.dp
+
 @Composable
 fun HomeHeader(
     currentUser: OvermailAccount?,
@@ -41,27 +44,18 @@ fun HomeHeader(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(
-            onClick = {},
-            modifier = Modifier.padding(end = 8.dp),
-        ) {
-            Icon(
-                imageVector = PhIcons.Regular.List,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-        }
         Image(
             painter = painterResource(Res.drawable.app_icon),
             contentDescription = null,
             modifier = Modifier
-                .padding(end = 8.dp)
                 .size(HEADER_HEIGHT - 2*16.dp)
                 .clip(RoundedCornerShape(8.dp))
         )
+        Spacer(Modifier.width(8.dp))
         Column {
             Text(
                 text = "Overmail",

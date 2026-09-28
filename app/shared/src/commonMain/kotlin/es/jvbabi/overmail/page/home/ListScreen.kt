@@ -1,0 +1,210 @@
+package es.jvbabi.overmail.page.home
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import es.jvbabi.overmail.domain.model.ViewState
+import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.page.LocalBottomNavBarHeight
+import es.jvbabi.overmail.page.home.components.HEADER_HEIGHT
+import es.jvbabi.overmail.page.home.components.HomeHeader
+import es.jvbabi.overmail.page.home.components.SearchField
+import es.jvbabi.overmail.page.home.components.ViewSettings
+import es.jvbabi.overmail.page.home.components.list.LIST_SKELETON
+import es.jvbabi.overmail.page.home.components.list.ListMailPreview
+import es.jvbabi.overmail.page.home.components.list.ListMailPreviewCard
+import es.jvbabi.overmail.page.home.components.list.ListReveal
+import es.jvbabi.overmail.page.home.components.list.ListSkeletonRow
+import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
+import es.jvbabi.overmail.page.home.components.list.ViewItem
+import es.jvbabi.overmail.page.home.components.list.rememberSkeletonPulse
+import es.jvbabi.overmail.page.home.components.list.revealIn
+import es.jvbabi.overmail.page.home.components.stack.StackCardBody
+import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.rememberLiftState
+import es.jvbabi.overmail.ui.theme.AppTheme
+import es.jvbabi.overmail.utils.ProgressiveDirection
+import es.jvbabi.overmail.utils.progressiveBackground
+import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
+
+/** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
+private val EDGE_BLUR_RADIUS = 48.dp
+
+/**
+ * [focusSearch] puts the cursor into the search, once: [onSearchFocused] says it is done, and the
+ * request is taken back.
+ */
+@Composable
+fun ListScreen(
+    focusSearch: Boolean = false,
+    onSearchFocused: () -> Unit = {},
+) {
+    val homeViewModel = koinViewModel<HomeViewModel>()
+    val homeState by homeViewModel.state.collectAsStateWithLifecycle()
+    val viewViewModel = koinViewModel<ViewViewModel>()
+    val content by viewViewModel.content.collectAsStateWithLifecycle()
+    val viewState by viewViewModel.viewState.collectAsStateWithLifecycle()
+    val listBodies by viewViewModel.bodies.collectAsStateWithLifecycle()
+    val viewSettingsViewModel = koinViewModel<ViewSettingsViewModel>()
+    val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
+
+    ListContent(
+        homeState = homeState,
+        viewState = viewState,
+        content = content,
+        viewSettingsState = viewSettingsState,
+        listBodies = listBodies,
+        onViewStateChange = { viewViewModel.onEvent(ViewEvent.SetViewState(it)) },
+        onLoadListBody = { viewViewModel.onEvent(ViewEvent.LoadBody(it)) },
+        onViewSettingsEvent = viewSettingsViewModel::onEvent,
+        focusSearch = focusSearch,
+        onSearchFocused = onSearchFocused,
+    )
+}
+
+@Composable
+private fun ListContent(
+    homeState: HomeState,
+    viewState: ViewState,
+    content: ViewContentState,
+    viewSettingsState: ViewSettingsState,
+    listBodies: Map<Uuid, StackCardBody>,
+    onViewStateChange: (ViewState) -> Unit,
+    onLoadListBody: (Uuid) -> Unit,
+    onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
+    focusSearch: Boolean = false,
+    onSearchFocused: () -> Unit = {},
+) {
+    val localDensity = LocalDensity.current
+    val hazeState = rememberHazeState()
+    val bottomNavBarHeight = LocalBottomNavBarHeight.current
+    var topHeight by remember { mutableStateOf(0.dp) }
+    // Only a tint: an opaque edge would hide the blur exactly where it is strongest.
+    val edgeTint = MaterialTheme.colorScheme.background
+
+    // One for the screen: whatever is lifted lies over all of it, see liftHost.
+    val liftState = rememberLiftState()
+    val listPreview = remember(liftState) { ListMailPreview(liftState) }
+
+    // Only before anything is there: a view that changed keeps showing the old mails meanwhile.
+    val showsSkeleton = content.isLoading && content.results.isEmpty()
+    val skeletonPulse = rememberSkeletonPulse()
+    val reveal = remember { ListReveal() }
+    reveal.update(showsSkeleton)
+
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(focusSearch) {
+        if (!focusSearch) return@LaunchedEffect
+        searchFocus.requestFocus()
+        onSearchFocused()
+    }
+
+    Scaffold { innerPadding ->
+        // Over everything in it, the header and the search included.
+        Box(Modifier.fillMaxSize().liftHost(liftState)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(hazeState),
+                contentPadding = PaddingValues(
+                    top = topHeight,
+                    bottom = maxOf(bottomNavBarHeight, innerPadding.calculateBottomPadding()),
+                ),
+            ) {
+                if (showsSkeleton) itemsIndexed(LIST_SKELETON, contentType = { _, row -> row }) { _, row ->
+                    ListSkeletonRow(row = row, pulse = skeletonPulse)
+                }
+                else itemsIndexed(content.results) { index, result ->
+                    val modifier = Modifier.revealIn(reveal, index)
+                    when (result) {
+                        is ViewResult.Item -> Box(modifier) { ViewItem(result, listPreview) }
+                        is ViewResult.Group -> ViewGroupComponent(
+                            group = result,
+                            senders = content.senders,
+                            preview = listPreview,
+                            modifier = modifier,
+                        )
+                    }
+                }
+            }
+
+            // The header, the search and the filters in one: all of it at the top, the bottom is
+            // the nav bar's.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
+                    .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
+                    .onSizeChanged { (_, h) ->
+                        topHeight = with(localDensity) { h.toDp() }
+                    }
+                    .padding(top = innerPadding.calculateTopPadding(), bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(HEADER_HEIGHT)
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    HomeHeader(
+                        currentUser = homeState.currentUser,
+                        greeting = homeState.greeting,
+                    )
+                }
+
+                SearchField(
+                    value = "",
+                    onValueChange = {},
+                    placeholder = "Q2 Budget report",
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .focusRequester(searchFocus),
+                )
+
+                ViewSettings(
+                    viewState = viewState,
+                    state = viewSettingsState,
+                    onViewStateChange = onViewStateChange,
+                    onEvent = onViewSettingsEvent,
+                )
+            }
+
+            ListMailPreviewCard(preview = listPreview, bodies = listBodies, onLoadBody = onLoadListBody)
+        }
+    }
+}
+
+@Composable
+@Preview
+private fun ListContentPreview() {
+    AppTheme(dynamicColor = false) {
+        ListContent(
+            homeState = HomeState(currentUser = PREVIEW_ACCOUNT),
+            viewState = ViewState.MailboxWithArchive,
+            content = PREVIEW_VIEW_CONTENT,
+            viewSettingsState = ViewSettingsState(isFetchingImapAccounts = false),
+            listBodies = emptyMap(),
+            onViewStateChange = {},
+            onLoadListBody = {},
+            onViewSettingsEvent = {},
+        )
+    }
+}

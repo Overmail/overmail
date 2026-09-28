@@ -19,11 +19,9 @@ import androidx.compose.ui.unit.dp
 private val SWIPE_VELOCITY = 800.dp
 
 /**
- * Picks up the swipe on the top card of [state]. Goes on a parent of both the stack and whatever
- * lies on top of it: a touch that starts where [accepts] says the pile is, in this node's
- * coordinates, is the card's alone -- it is taken before the children see it, so the listing on
- * top does not scroll from there -- and moves the card whichever way it goes. Everywhere else the
- * children get the touch as usual.
+ * Picks up the swipe on the top card of [state]. A touch that starts where [accepts] says the pile
+ * is, in this node's coordinates, is the card's alone -- it is taken before the children see it --
+ * and moves the card whichever way it goes. Everywhere else the children get the touch as usual.
  *
  * Remember [accepts]: a new one restarts the detection, and with it a drag in progress.
  */
@@ -57,7 +55,7 @@ fun Modifier.emailStackSwipe(
 
                 velocityTracker.addPointerInputChange(change)
                 val delta = change.positionChange()
-                // Even while no card can be moved: a touch on the pile never scrolls the listing.
+                // Even while no card can be moved: a touch on the pile is nothing else's.
                 change.consume()
                 if (!pressed) continue
 

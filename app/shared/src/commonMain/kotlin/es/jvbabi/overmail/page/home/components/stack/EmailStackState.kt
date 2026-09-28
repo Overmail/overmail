@@ -111,8 +111,8 @@ internal class CardMotion {
 
 /**
  * Where the cards of the pile are while they are being swiped. Hoisted out of [EmailStack]
- * because the gesture is not the stack's own: the listing lies on top of it and takes every
- * touch, so the swipe is picked up around both, see [emailStackSwipe].
+ * because the gesture is not the stack's own: it is picked up by [emailStackSwipe], which the
+ * screen puts where it wants the pile to take touches.
  */
 @Stable
 class EmailStackState internal constructor(

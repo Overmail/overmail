@@ -1,0 +1,10 @@
+{
+  "title": "A tidier list",
+  "description": "The search and the filters sit at the top of the list and take less room, a second tap on the list tab jumps into the search, placeholders show while the list loads, and archived mails are listed too.",
+  "localized": {
+    "de": {
+      "title": "Eine aufgeräumtere Liste",
+      "description": "Suche und Filter sitzen oben in der Liste und brauchen weniger Platz, ein zweiter Tipp auf den Listen-Tab springt in die Suche, beim Laden erscheinen Platzhalter, und archivierte E-Mails werden mit angezeigt."
+    }
+  }
+}

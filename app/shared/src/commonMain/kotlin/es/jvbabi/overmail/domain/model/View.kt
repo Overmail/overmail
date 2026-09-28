@@ -23,6 +23,14 @@ data class ViewState(
             groupings = listOf(ViewGrouping(ViewGroupingKind.DateSmart)),
             sorting = ViewSorting(ViewSortingKind.Date),
         )
+
+        /**
+         * What the list starts at: the [Mailbox] with its archive, spam still left out. What is
+         * left to do is the stack's; the list is where a mail is looked up, done or not.
+         */
+        val MailboxWithArchive = Mailbox.copy(
+            filter = ViewFilter(archivedState = listOf(ArchivedState.Unarchive, ArchivedState.Archive)),
+        )
     }
 }
 

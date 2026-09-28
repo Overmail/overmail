@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 /**
- * The pile above the listing: the inbox, newest first, one mail at a time. It does not follow the
+ * The pile: the inbox, newest first, one mail at a time. It does not follow the
  * view the listing is set to -- the pile is what is left to do, whatever the listing shows.
  */
 class EmailStackViewModel(

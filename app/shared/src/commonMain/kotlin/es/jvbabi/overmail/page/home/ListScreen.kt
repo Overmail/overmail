@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -109,6 +110,15 @@ private fun ListContent(
 
     val listPreview = remember(liftState) { ListMailPreview(liftState) }
 
+    // The mail last opened: its row alone grows into the page and back, see ViewItem. Saved, as
+    // the list is composed anew on the way back.
+    var sharedEmailId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openEmail = { id: Uuid ->
+        sharedEmailId = id.toString()
+        onOpenEmail(id)
+    }
+    val sharedEmail = sharedEmailId?.let(Uuid::parse)
+
     // Only before anything is there: a view that changed keeps showing the old mails meanwhile.
     val showsSkeleton = content.isLoading && content.results.isEmpty()
     val skeletonPulse = rememberSkeletonPulse()
@@ -152,12 +162,20 @@ private fun ListContent(
                 else itemsIndexed(content.results) { index, result ->
                     val modifier = Modifier.revealIn(reveal, index)
                     when (result) {
-                        is ViewResult.Item -> Box(modifier) { ViewItem(result, listPreview, onOpen = { onOpenEmail(result.email.id) }) }
+                        is ViewResult.Item -> Box(modifier) {
+                            ViewItem(
+                                item = result,
+                                preview = listPreview,
+                                onOpen = { openEmail(result.email.id) },
+                                isShared = result.email.id == sharedEmail,
+                            )
+                        }
                         is ViewResult.Group -> ViewGroupComponent(
                             group = result,
                             senders = content.senders,
                             preview = listPreview,
-                            onOpenEmail = onOpenEmail,
+                            onOpenEmail = openEmail,
+                            sharedEmailId = sharedEmail,
                             modifier = modifier,
                         )
                     }

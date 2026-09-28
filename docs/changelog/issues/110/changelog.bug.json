@@ -1,0 +1,8 @@
+{
+  "description": "Unread mails on the home screen are now the ones shown in bold with the unread marker, not the read ones.",
+  "localized": {
+    "de": {
+      "description": "Auf dem Startbildschirm sind jetzt die ungelesenen E-Mails fett und mit der Ungelesen-Markierung hervorgehoben, nicht mehr die gelesenen."
+    }
+  }
+}

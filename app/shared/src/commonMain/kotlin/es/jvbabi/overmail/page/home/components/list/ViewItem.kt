@@ -46,7 +46,7 @@ fun ViewItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val fontWeight = if (item.email.isRead) FontWeight.Bold else FontWeight.Normal
+                val fontWeight = if (!item.email.isRead) FontWeight.Bold else FontWeight.Normal
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -59,7 +59,7 @@ fun ViewItem(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = fontWeight,
                     )
-                    if (item.email.isRead) Spacer(
+                    if (!item.email.isRead) Spacer(
                         modifier = Modifier
                             .align(Alignment.CenterVertically)
                             .padding(start = 6.dp)
@@ -79,7 +79,7 @@ fun ViewItem(
                 )
             }
             run(subject@{
-                val fontWeight = if (item.email.isRead) FontWeight.Bold else FontWeight.Normal
+                val fontWeight = if (!item.email.isRead) FontWeight.Bold else FontWeight.Normal
                 val color = if (item.email.subject == null) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.onSurface
                 Text(
                     text = item.email.subject ?: "Kein Betreff",

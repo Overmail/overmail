@@ -1,0 +1,10 @@
+{
+  "title": "More room while searching",
+  "description": "While you type into the search of the list, the header makes way, so more results fit on the screen. It comes back once the keyboard is put away.",
+  "localized": {
+    "de": {
+      "title": "Mehr Platz beim Suchen",
+      "description": "Während du in der Liste suchst, macht der Kopfbereich Platz, damit mehr Ergebnisse auf den Bildschirm passen. Sobald die Tastatur weg ist, kommt er zurück."
+    }
+  }
+}

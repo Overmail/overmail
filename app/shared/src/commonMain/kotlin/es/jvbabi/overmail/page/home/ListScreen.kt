@@ -1,14 +1,22 @@
 package es.jvbabi.overmail.page.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
@@ -23,23 +31,19 @@ import es.jvbabi.overmail.page.home.components.HEADER_HEIGHT
 import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.SearchField
 import es.jvbabi.overmail.page.home.components.ViewSettings
-import es.jvbabi.overmail.page.home.components.list.LIST_SKELETON
-import es.jvbabi.overmail.page.home.components.list.ListMailPreview
-import es.jvbabi.overmail.page.home.components.list.ListMailPreviewCard
-import es.jvbabi.overmail.page.home.components.list.ListReveal
-import es.jvbabi.overmail.page.home.components.list.ListSkeletonRow
-import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
-import es.jvbabi.overmail.page.home.components.list.ViewItem
-import es.jvbabi.overmail.page.home.components.list.rememberSkeletonPulse
-import es.jvbabi.overmail.page.home.components.list.revealIn
+import es.jvbabi.overmail.page.home.components.list.*
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
-import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.LiftState
+import es.jvbabi.overmail.ui.lift.LocalLiftState
 import es.jvbabi.overmail.ui.lift.rememberLiftState
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlin.uuid.Uuid
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
@@ -64,6 +68,7 @@ fun ListScreen(
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
 
     ListContent(
+        liftState = LocalLiftState.current,
         homeState = homeState,
         viewState = viewState,
         content = content,
@@ -79,6 +84,8 @@ fun ListScreen(
 
 @Composable
 private fun ListContent(
+    /** What a card is lifted by; its host lies over the whole app, see [LocalLiftState]. */
+    liftState: LiftState,
     homeState: HomeState,
     viewState: ViewState,
     content: ViewContentState,
@@ -97,8 +104,6 @@ private fun ListContent(
     // Only a tint: an opaque edge would hide the blur exactly where it is strongest.
     val edgeTint = MaterialTheme.colorScheme.background
 
-    // One for the screen: whatever is lifted lies over all of it, see liftHost.
-    val liftState = rememberLiftState()
     val listPreview = remember(liftState) { ListMailPreview(liftState) }
 
     // Only before anything is there: a view that changed keeps showing the old mails meanwhile.
@@ -114,9 +119,21 @@ private fun ListContent(
         onSearchFocused()
     }
 
+    // While searching, the header makes room for the results.
+    var isSearchFocused by remember { mutableStateOf(false) }
+    // Putting the keyboard away is done with searching, though it leaves the focus where it was.
+    val focusManager = LocalFocusManager.current
+    val ime = WindowInsets.ime
+    LaunchedEffect(focusManager, ime, localDensity) {
+        snapshotFlow { ime.getBottom(localDensity) > 0 }
+            .distinctUntilChanged()
+            .drop(1)
+            .filter { !it }
+            .collect { focusManager.clearFocus() }
+    }
+
     Scaffold { innerPadding ->
-        // Over everything in it, the header and the search included.
-        Box(Modifier.fillMaxSize().liftHost(liftState)) {
+        Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -156,17 +173,23 @@ private fun ListContent(
                     .padding(top = innerPadding.calculateTopPadding(), bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(HEADER_HEIGHT)
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.CenterStart,
+                AnimatedVisibility(
+                    visible = !isSearchFocused,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
                 ) {
-                    HomeHeader(
-                        currentUser = homeState.currentUser,
-                        greeting = homeState.greeting,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(HEADER_HEIGHT)
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        HomeHeader(
+                            currentUser = homeState.currentUser,
+                            greeting = homeState.greeting,
+                        )
+                    }
                 }
 
                 SearchField(
@@ -176,6 +199,7 @@ private fun ListContent(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .fillMaxWidth()
+                        .onFocusChanged { isSearchFocused = it.hasFocus }
                         .focusRequester(searchFocus),
                 )
 
@@ -197,6 +221,7 @@ private fun ListContent(
 private fun ListContentPreview() {
     AppTheme(dynamicColor = false) {
         ListContent(
+            liftState = rememberLiftState(),
             homeState = HomeState(currentUser = PREVIEW_ACCOUNT),
             viewState = ViewState.MailboxWithArchive,
             content = PREVIEW_VIEW_CONTENT,

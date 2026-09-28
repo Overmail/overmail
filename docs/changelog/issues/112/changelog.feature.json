@@ -1,0 +1,10 @@
+{
+  "title": "Archive mails from the stack",
+  "description": "Swiping a card on the stack to the left now archives the mail, so it leaves your inbox for good. Should that fail, the mail comes back and you are told.",
+  "localized": {
+    "de": {
+      "title": "E-Mails vom Stapel archivieren",
+      "description": "Wischt du eine Karte auf dem Stapel nach links, wird die E-Mail jetzt archiviert und verschwindet dauerhaft aus deinem Posteingang. Klappt das nicht, kommt die E-Mail zurück und du bekommst Bescheid."
+    }
+  }
+}

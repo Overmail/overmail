@@ -30,7 +30,7 @@ import es.jvbabi.overmail.data.database.entity.DbParticipant
         DbEmailLabels::class,
         DbEmailRecipients::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(

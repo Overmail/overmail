@@ -146,9 +146,12 @@ class LiftState internal constructor(
     }
 }
 
-/** One piece of content that can be lifted, as [liftable] registers it with the [LiftState]. */
+/**
+ * One piece of content that can be lifted, as [liftable] registers it with the [LiftState]: what
+ * it is drawn into, which the host draws while it is lifted, and what the finger scrolls.
+ */
 @Stable
-internal class LiftTarget(val layer: GraphicsLayer) {
+internal class LiftTarget(val layer: GraphicsLayer?) {
     var scroll: ScrollOffset? = null
 
     /** Where it lies when it is not lifted, in the root. */

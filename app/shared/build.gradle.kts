@@ -38,6 +38,12 @@ kotlin {
         androidResources {
             enable = true
         }
+
+        // commonTest on the JVM. Compose's runtime calls into android.os.Trace, which the stub
+        // android.jar of a host test only answers with defaults when told to.
+        withHostTest {
+            isReturnDefaultValues = true
+        }
     }
 
     listOf(
@@ -111,6 +117,11 @@ kotlin {
             implementation(libs.app.moko.permissions.compose)
             implementation(libs.app.moko.permissions.camera)
             implementation(libs.app.moko.permissions.notifications)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
         }
 
         iosMain.dependencies {

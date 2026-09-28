@@ -64,7 +64,7 @@ fun Modifier.liftHost(state: LiftState, padding: Dp = LIFTED_PADDING): Modifier 
             if (progress > 0f) drawRect(Color.Black, alpha = LIFTED_SCRIM * progress)
             val target = state.lifted?.let { state.targets[it] } ?: return@drawWithContent
             val host = state.hostBounds
-            translate(target.bounds.left - host.left, target.bounds.top - host.top) { drawLayer(target.layer) }
+            translate(target.bounds.left - host.left, target.bounds.top - host.top) { target.layer?.let { drawLayer(it) } }
         }
         // Only what is below the lifted content: that is drawn above, outside this layer.
         .graphicsLayer {

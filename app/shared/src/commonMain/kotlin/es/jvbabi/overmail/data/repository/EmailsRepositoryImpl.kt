@@ -120,6 +120,19 @@ class EmailsRepositoryImpl(
         }.onFailure { overmailDatabase.emailsDao.setArchivedState(email.id, email.archivedState) }
     }
 
+    override suspend fun setRead(email: Email, isRead: Boolean, user: OvermailAccount): Result<Unit> {
+        overmailDatabase.emailsDao.setRead(email.id, isRead)
+        return safeRequest {
+            val response = httpClient.post(URLBuilder(urlString = user.homeserver).apply {
+                appendPathSegments("api", "emails", email.id.toString(), if (isRead) "read" else "unread")
+            }.build()) {
+                bearerAuth(user.token)
+            }
+
+            if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+        }.onFailure { overmailDatabase.emailsDao.setRead(email.id, email.isRead) }
+    }
+
     private suspend fun fetchBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> = safeRequest {
         val response = httpClient.get(URLBuilder(urlString = user.homeserver).apply {
             appendPathSegments("api", "emails", emailId.toString(), "body")

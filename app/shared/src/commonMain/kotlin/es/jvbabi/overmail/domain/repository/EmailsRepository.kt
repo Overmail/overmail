@@ -28,6 +28,9 @@ interface EmailsRepository {
      * it back where it was.
      */
     suspend fun setArchivedState(email: Email, archivedState: ArchivedState, user: OvermailAccount): Result<Unit>
+
+    /** Marks [email] read or unread, the same way as [setArchivedState]: locally first, then on the server. */
+    suspend fun setRead(email: Email, isRead: Boolean, user: OvermailAccount): Result<Unit>
 }
 
 sealed class ViewResult {

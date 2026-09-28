@@ -93,13 +93,24 @@ class EmailStackViewModel(
     fun onEvent(event: EmailStackEvent) {
         when (event) {
             is EmailStackEvent.Archive -> archive(event.email)
-            is EmailStackEvent.Keep -> handled.update { it + event.email.id }
+            is EmailStackEvent.Keep -> {
+                handled.update { it + event.email.id }
+                markRead(event.email)
+            }
+            is EmailStackEvent.Read -> markRead(event.email)
         }
+    }
+
+    /** Quietly: a failed request puts the mail back to unread, which is all the user needs to see. */
+    private fun markRead(email: Email) {
+        if (email.isRead) return
+        viewModelScope.launch { emailsRepository.setRead(email, isRead = true, email.overmailAccount) }
     }
 
     /** Off the pile at once; the request runs on its own, and a failed one puts the mail back. */
     private fun archive(email: Email) {
         handled.update { it + email.id }
+        markRead(email)
         viewModelScope.launch {
             emailsRepository.setArchivedState(email, ArchivedState.Archive, email.overmailAccount).onFailure {
                 handled.update { it - email.id }
@@ -137,4 +148,7 @@ sealed class EmailStackEvent {
 
     /** Swiped to the right: stays in the inbox, but is off the pile. */
     data class Keep(val email: Email) : EmailStackEvent()
+
+    /** Lay on top of the pile long enough to count as seen. */
+    data class Read(val email: Email) : EmailStackEvent()
 }

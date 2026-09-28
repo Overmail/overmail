@@ -38,6 +38,9 @@ interface EmailsDao {
     @Query("UPDATE email SET archive_state = :archivedState WHERE id = :id")
     suspend fun setArchivedState(id: Uuid, archivedState: ArchivedState)
 
+    @Query("UPDATE email SET is_read = :isRead WHERE id = :id")
+    suspend fun setRead(id: Uuid, isRead: Boolean)
+
     /**
      * Stores what the server said about [emails], replacing what was here of them.
      *

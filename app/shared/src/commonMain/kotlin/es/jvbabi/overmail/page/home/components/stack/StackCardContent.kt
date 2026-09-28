@@ -161,6 +161,7 @@ private val OVERFLOW_FADE = 48.dp
  * lifted, see [es.jvbabi.overmail.ui.lift.LiftState], and it goes on behind the header then. A
  * mail that goes on below what shows fades out where the card ends -- or, while the card grows on
  * its way up, where [shownHeight] says it is cut off, so the fade moves with the edge.
+ * [renderOrder] is its place in line for its picture, see [EmailHtml].
  */
 @Composable
 internal fun CardBody(
@@ -169,6 +170,7 @@ internal fun CardBody(
     topInset: Dp,
     modifier: Modifier = Modifier,
     shownHeight: () -> Float? = { null },
+    renderOrder: Int = 0,
 ) {
     // The paper of the card, see cardSurface.
     val paper = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -202,6 +204,7 @@ internal fun CardBody(
                 modifier = Modifier.fillMaxSize(),
                 scroll = scroll,
                 topInset = topInset,
+                renderOrder = renderOrder,
             )
             is StackCardBody.Text -> Text(
                 text = body.text,

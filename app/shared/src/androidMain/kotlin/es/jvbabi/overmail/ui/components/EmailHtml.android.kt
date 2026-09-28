@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -46,7 +47,8 @@ private const val RELAYOUT_DELAY = 100L
  * [EmailSnapshot] for how it is shown.
  */
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp) {
+actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp, renderOrder: Int) {
+    val currentRenderOrder by rememberUpdatedState(renderOrder)
     val window = LocalView.current.rootView as? ViewGroup
     BoxWithConstraints(modifier = modifier) {
         val width = constraints.maxWidth
@@ -56,7 +58,7 @@ actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, top
 
         LaunchedEffect(html, width) {
             if (window != null && width > 0 && viewportHeight > 0) {
-                renderSnapshot(window, emailHtmlDocument(html), width, viewportHeight)?.let { snapshot = it }
+                EmailSnapshotQueue.run({ currentRenderOrder }) { renderSnapshot(window, emailHtmlDocument(html), width, viewportHeight) }?.let { snapshot = it }
             }
         }
 

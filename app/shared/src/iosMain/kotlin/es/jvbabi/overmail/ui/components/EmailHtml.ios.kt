@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -52,7 +53,8 @@ private const val RELAYOUT_DELAY = 100_000_000L
  * at the width it is shown at and as tall as it is; see [EmailSnapshot] for how it is shown.
  */
 @Composable
-actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp) {
+actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, topInset: Dp, renderOrder: Int) {
+    val currentRenderOrder by rememberUpdatedState(renderOrder)
     BoxWithConstraints(modifier = modifier) {
         // Points on iOS are what a dp is.
         val width = maxWidth.value.toDouble()
@@ -61,7 +63,7 @@ actual fun EmailHtml(html: String, modifier: Modifier, scroll: ScrollOffset, top
         var snapshot by remember(html) { mutableStateOf<ImageBitmap?>(null) }
 
         LaunchedEffect(html, width) {
-            if (width > 0 && viewportHeight > 0) renderSnapshot(emailHtmlDocument(html), width, viewportHeight)?.let { snapshot = it }
+            if (width > 0 && viewportHeight > 0) EmailSnapshotQueue.run({ currentRenderOrder }) { renderSnapshot(emailHtmlDocument(html), width, viewportHeight) }?.let { snapshot = it }
         }
 
         EmailSnapshot(snapshot, scroll, topInset)

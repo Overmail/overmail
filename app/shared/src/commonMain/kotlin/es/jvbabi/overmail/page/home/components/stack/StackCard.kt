@@ -85,6 +85,8 @@ internal fun StackCard(
         scroll = scroll,
         shownHeight = shownHeight,
         place = { pose().place },
+        // The card on top is the one read first, so it is pictured first.
+        renderOrder = depth,
         modifier = modifier
             .fillMaxSize()
             .cardPose(pose, depth, email.id.toString()),
@@ -97,7 +99,8 @@ internal fun StackCard(
  * A mail on a sheet of paper: its header over what it says, which [scroll] moves. What a card of
  * the pile is, and what a mail previewed from anywhere else looks like. [place] is how far down a
  * pile the sheet lies, which tints it; [shownHeight] how much of it shows while it is lifted, see
- * [CardBody]; [overlay] lies over all of it.
+ * [CardBody]; [overlay] lies over all of it. [renderOrder] is its place in line for the picture
+ * of an html mail, see [es.jvbabi.overmail.ui.components.EmailHtml].
  */
 @Composable
 internal fun MailCard(
@@ -107,6 +110,7 @@ internal fun MailCard(
     modifier: Modifier = Modifier,
     place: () -> Float = { 0f },
     shownHeight: () -> Float? = { null },
+    renderOrder: Int = 0,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val hazeState = rememberHazeState()
@@ -120,6 +124,7 @@ internal fun MailCard(
             scroll = scroll,
             topInset = headerHeight,
             shownHeight = shownHeight,
+            renderOrder = renderOrder,
             modifier = Modifier
                 .fillMaxSize()
                 .hazeSource(hazeState),

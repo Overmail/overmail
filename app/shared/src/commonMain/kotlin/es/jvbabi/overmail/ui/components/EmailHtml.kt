@@ -38,9 +38,11 @@ private val VIEWPORT = Regex("""<meta[^>]+name\s*=\s*["']?viewport""", RegexOpti
  * it (iOS) nor moves without being rendered again on every frame (Android). It starts [topInset]
  * down its box, below whatever lies over its top; [scroll] moves it up behind that first and
  * through the mail after, and learns from it how far that goes.
+ *
+ * The pictures are taken one at a time, [renderOrder] first the lowest, see [EmailSnapshotQueue].
  */
 @Composable
-expect fun EmailHtml(html: String, modifier: Modifier = Modifier, scroll: ScrollOffset, topInset: Dp = 0.dp)
+expect fun EmailHtml(html: String, modifier: Modifier = Modifier, scroll: ScrollOffset, topInset: Dp = 0.dp, renderOrder: Int = 0)
 
 /**
  * [html] as a document to hand a web view: with the content security policy in its head, and a

@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -171,12 +173,22 @@ private fun Modifier.liftTarget(state: LiftState, key: Any, scroll: ScrollOffset
  * change of the finger is consumed, its release too, so put this inside a `clickable` to keep the
  * long press from also being a click.
  *
+ * [onPress] is told of every finger that goes down, before it is known to be a long press: time to
+ * get ready what is lifted.
+ *
  * For content that decides by itself when it is lifted, like a pile of cards that is also swiped,
  * call [LiftState.lift], [LiftState.moveFinger] and [LiftState.release] instead.
  */
-fun Modifier.liftOnLongPress(state: LiftState, key: Any): Modifier = pointerInput(state, key) {
+@Composable
+fun Modifier.liftOnLongPress(state: LiftState, key: Any, onPress: () -> Unit = {}): Modifier {
+    val currentOnPress by rememberUpdatedState(onPress)
+    return longPressLift(state, key) { currentOnPress() }
+}
+
+private fun Modifier.longPressLift(state: LiftState, key: Any, onPress: () -> Unit): Modifier = pointerInput(state, key) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
+        onPress()
         val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
         state.lift(key)
         try {

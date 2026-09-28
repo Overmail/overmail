@@ -28,6 +28,7 @@ import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.ViewSettings
 import es.jvbabi.overmail.page.home.components.list.ListMailPreview
+import es.jvbabi.overmail.page.home.components.list.ListMailPreviewCard
 import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
 import es.jvbabi.overmail.page.home.components.stack.EmailStack
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
@@ -124,10 +125,7 @@ private fun HomeContent(
     // One for the screen: whatever is lifted lies over all of it, see liftHost.
     val liftState = rememberLiftState()
     val emailStackState = rememberEmailStackState(liftState)
-    val currentOnLoadListBody by rememberUpdatedState(onLoadListBody)
-    val listPreview = remember(liftState, listBodies) {
-        ListMailPreview(lift = liftState, bodies = listBodies, onLoadBody = { currentOnLoadListBody(it) })
-    }
+    val listPreview = remember(liftState) { ListMailPreview(liftState) }
 
     Scaffold{ innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
@@ -284,6 +282,8 @@ private fun HomeContent(
                     )
                 }
             }
+
+            ListMailPreviewCard(preview = listPreview, bodies = listBodies, onLoadBody = onLoadListBody)
 
             // Not the Scaffold's own: it would sit on the search, which is not a bottom bar.
             SnackbarHost(

@@ -17,8 +17,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -193,16 +195,24 @@ internal fun CardBody(
                 )
             },
     ) {
+        // Kept once it is there, with the last html it had, and only hidden while the body is
+        // something else: a web view is expensive to make, and a card that shows one mail after
+        // another -- the list's preview -- keeps the one it has.
+        val lastHtml = remember { LastHtml() }
+        if (body is StackCardBody.Html) lastHtml.html = body.html
+        lastHtml.html?.let { html ->
+            EmailHtml(
+                html = html,
+                modifier = Modifier.fillMaxSize().alpha(if (body is StackCardBody.Html) 1f else 0f),
+                scroll = scroll,
+                topInset = topInset,
+            )
+        }
         when (body) {
             StackCardBody.Loading -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is StackCardBody.Html -> EmailHtml(
-                html = body.html,
-                modifier = Modifier.fillMaxSize(),
-                scroll = scroll,
-                topInset = topInset,
-            )
+            is StackCardBody.Html -> Unit
             is StackCardBody.Text -> Text(
                 text = body.text,
                 style = MaterialTheme.typography.bodyMedium,
@@ -227,4 +237,8 @@ internal fun CardBody(
             }
         }
     }
+}
+
+private class LastHtml {
+    var html: String? = null
 }

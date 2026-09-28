@@ -35,7 +35,7 @@ class EmailViewModel(
 ) : ViewModel() {
     // What is known of the mail already, so the page shows it from its first frame on.
     val state: StateFlow<EmailState>
-        field = MutableStateFlow(EmailState(email = emailsRepository.peekEmail(emailId)))
+        field = MutableStateFlow(EmailState(email = emailsRepository.peekEmail(emailId), body = peekBody()))
 
     private val messageChannel = Channel<EmailMessage>(Channel.BUFFERED)
 
@@ -53,6 +53,7 @@ class EmailViewModel(
     private var hasMarkedRead = false
 
     init {
+        state.value.body.takeIf { it != StackCardBody.Loading }?.let { emailBodies.seed(emailId, it) }
         // The body is on its way while the page is.
         state.value.email?.let(::onEmailLoaded)
         viewModelScope.launch {
@@ -67,6 +68,13 @@ class EmailViewModel(
                     if (email != null) onEmailLoaded(email)
                 }
         }
+    }
+
+    /** What is known of what the mail says without waiting, see [EmailsRepository.peekBody]. */
+    private fun peekBody(): StackCardBody {
+        val body = emailsRepository.peekBody(emailId) ?: return StackCardBody.Loading
+        val html = body.html ?: return StackCardBody.Text(body.text.orEmpty())
+        return StackCardBody.Html(html, emailsRepository.peekPicture(emailId))
     }
 
     private fun onEmailLoaded(email: Email) {

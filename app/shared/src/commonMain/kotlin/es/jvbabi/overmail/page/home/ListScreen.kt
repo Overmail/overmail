@@ -109,6 +109,9 @@ private fun ListContent(
     val edgeTint = MaterialTheme.colorScheme.background
 
     val listPreview = remember(liftState) { ListMailPreview(liftState) }
+    // A finger on a row may be a tap that opens the mail as well as a press that previews it:
+    // either way what it says is wanted, and it is on its way before the finger is lifted.
+    LaunchedEffect(listPreview.email?.id) { listPreview.email?.let { onLoadListBody(it.id) } }
 
     // The mail last opened: its row alone grows into the page and back, see ViewItem. Saved, as
     // the list is composed anew on the way back.

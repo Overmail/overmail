@@ -39,9 +39,9 @@ expect fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifie
 /**
  * An html mail as a page shows it: as wide as it is given and as tall as the mail is, in a live
  * web view. Only while [isLive] -- a web view is drawn outside the Compose layer, so on the way
- * back out of the page the mail is its [picture] instead, which is what it looks like at that
- * width too. On the way in there is nothing yet: the picture is large, and the first time it is
- * drawn costs frames the page is growing in. It is handed to the GPU while the page is open.
+ * to the page and back the mail is its [picture] instead, which is what it looks like at that
+ * width too. The picture also covers the web view until that has drawn the mail. It is handed to
+ * the GPU as soon as it is here, so drawing it first does not cost a frame of the way in.
  */
 @Composable
 fun EmailHtmlBody(
@@ -52,8 +52,6 @@ fun EmailHtmlBody(
 ) {
     val document = remember(html) { emailHtmlDocument(html) }
     var contentHeight by remember(html) { mutableStateOf<Dp?>(null) }
-    var hasBeenLive by remember { mutableStateOf(false) }
-    if (isLive) hasBeenLive = true
     LaunchedEffect(picture) { picture?.prepareToDraw() }
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -74,7 +72,7 @@ fun EmailHtmlBody(
                 .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.TopCenter,
         ) {
-            if (picture != null && hasBeenLive) Image(
+            if (picture != null) Image(
                 bitmap = picture,
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,

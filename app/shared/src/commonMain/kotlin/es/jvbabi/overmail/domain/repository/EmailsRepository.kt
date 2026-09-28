@@ -21,6 +21,13 @@ interface EmailsRepository {
      * fetched while there is no copy: a stored mail never changes.
      */
     suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody>
+
+    /**
+     * Moves [email] to [archivedState]: in the local database at once, so every view takes it
+     * out or in before the server has answered, and then on the server. A failed request puts
+     * it back where it was.
+     */
+    suspend fun setArchivedState(email: Email, archivedState: ArchivedState, user: OvermailAccount): Result<Unit>
 }
 
 sealed class ViewResult {

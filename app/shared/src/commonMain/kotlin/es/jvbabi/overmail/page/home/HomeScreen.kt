@@ -39,7 +39,10 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
+import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.home_stack_archive_failed
 import kotlin.math.roundToInt
 
 @Composable
@@ -53,6 +56,15 @@ fun HomeScreen() {
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
     val stackContent by emailStackViewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(emailStackViewModel) {
+        emailStackViewModel.messages.collect { message ->
+            when (message) {
+                EmailStackMessage.ArchiveFailed -> snackbarHostState.showSnackbar(getString(Res.string.home_stack_archive_failed))
+            }
+        }
+    }
 
     HomeContent(
         homeState = homeState,
@@ -60,6 +72,7 @@ fun HomeScreen() {
         content = content,
         viewSettingsState = viewSettingsState,
         stackContent = stackContent,
+        snackbarHostState = snackbarHostState,
         onViewStateChange = { viewViewModel.onEvent(ViewEvent.SetViewState(it)) },
         onViewSettingsEvent = viewSettingsViewModel::onEvent,
         onStackEvent = emailStackViewModel::onEvent,
@@ -81,6 +94,7 @@ private fun HomeContent(
     content: ViewContentState,
     viewSettingsState: ViewSettingsState,
     stackContent: EmailStackContentState,
+    snackbarHostState: SnackbarHostState,
     onViewStateChange: (ViewState) -> Unit,
     onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
     onStackEvent: (EmailStackEvent) -> Unit,
@@ -246,6 +260,14 @@ private fun HomeContent(
 
             // Over everything above, the header and the search included.
             LiftedCard(state = emailStackState, bodies = stackContent.bodies)
+
+            // Not the Scaffold's own: it would sit on the search, which is not a bottom bar.
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = maxOf(bottomHeight, innerPadding.calculateBottomPadding())),
+            )
         }
     }
 }
@@ -262,6 +284,7 @@ private fun HomeContentPreview() {
             content = PREVIEW_VIEW_CONTENT,
             viewSettingsState = ViewSettingsState(isFetchingImapAccounts = false),
             stackContent = EmailStackContentState(emails = PREVIEW_ITEMS.map { it.email }, isLoading = false),
+            snackbarHostState = remember { SnackbarHostState() },
             onViewStateChange = {},
             onViewSettingsEvent = {},
             onStackEvent = {},

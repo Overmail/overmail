@@ -34,7 +34,7 @@ class ViewSettingsViewModel(
         field = MutableStateFlow(ViewSettingsState())
 
     /** The view the settings are shown for; the labels and contacts it names are loaded. */
-    private val view = MutableStateFlow(ViewState.Mailbox)
+    private val view = MutableStateFlow(ViewState.MailboxWithArchive)
 
     /** Bumped to read the mailboxes afresh; they are read at start and whenever their card opens. */
     private val imapAccountsRefresh = MutableStateFlow(0)

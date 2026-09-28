@@ -36,7 +36,7 @@ class ViewViewModel(
     private val participantsRepository: ParticipantsRepository,
 ) : ViewModel() {
     val viewState: StateFlow<ViewState>
-        field = MutableStateFlow(ViewState.Mailbox)
+        field = MutableStateFlow(ViewState.MailboxWithArchive)
 
     val content: StateFlow<ViewContentState>
         field = MutableStateFlow(ViewContentState())

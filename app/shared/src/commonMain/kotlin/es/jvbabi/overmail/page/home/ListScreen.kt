@@ -3,7 +3,8 @@ package es.jvbabi.overmail.page.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,17 +24,10 @@ import es.jvbabi.overmail.page.home.components.HEADER_HEIGHT
 import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.SearchField
 import es.jvbabi.overmail.page.home.components.ViewSettings
-import es.jvbabi.overmail.page.home.components.list.LIST_SKELETON
-import es.jvbabi.overmail.page.home.components.list.ListMailPreview
-import es.jvbabi.overmail.page.home.components.list.ListMailPreviewCard
-import es.jvbabi.overmail.page.home.components.list.ListReveal
-import es.jvbabi.overmail.page.home.components.list.ListSkeletonRow
-import es.jvbabi.overmail.page.home.components.list.ViewGroupComponent
-import es.jvbabi.overmail.page.home.components.list.ViewItem
-import es.jvbabi.overmail.page.home.components.list.rememberSkeletonPulse
-import es.jvbabi.overmail.page.home.components.list.revealIn
+import es.jvbabi.overmail.page.home.components.list.*
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
-import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.LiftState
+import es.jvbabi.overmail.ui.lift.LocalLiftState
 import es.jvbabi.overmail.ui.lift.rememberLiftState
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
@@ -64,6 +58,7 @@ fun ListScreen(
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
 
     ListContent(
+        liftState = LocalLiftState.current,
         homeState = homeState,
         viewState = viewState,
         content = content,
@@ -79,6 +74,8 @@ fun ListScreen(
 
 @Composable
 private fun ListContent(
+    /** What a card is lifted by; its host lies over the whole app, see [LocalLiftState]. */
+    liftState: LiftState,
     homeState: HomeState,
     viewState: ViewState,
     content: ViewContentState,
@@ -97,8 +94,6 @@ private fun ListContent(
     // Only a tint: an opaque edge would hide the blur exactly where it is strongest.
     val edgeTint = MaterialTheme.colorScheme.background
 
-    // One for the screen: whatever is lifted lies over all of it, see liftHost.
-    val liftState = rememberLiftState()
     val listPreview = remember(liftState) { ListMailPreview(liftState) }
 
     // Only before anything is there: a view that changed keeps showing the old mails meanwhile.
@@ -115,8 +110,7 @@ private fun ListContent(
     }
 
     Scaffold { innerPadding ->
-        // Over everything in it, the header and the search included.
-        Box(Modifier.fillMaxSize().liftHost(liftState)) {
+        Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -197,6 +191,7 @@ private fun ListContent(
 private fun ListContentPreview() {
     AppTheme(dynamicColor = false) {
         ListContent(
+            liftState = rememberLiftState(),
             homeState = HomeState(currentUser = PREVIEW_ACCOUNT),
             viewState = ViewState.MailboxWithArchive,
             content = PREVIEW_VIEW_CONTENT,

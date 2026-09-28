@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -190,6 +191,12 @@ internal class LiftTarget(val layer: GraphicsLayer?) {
     /** What it is cut off in while it grows. */
     var shape: Shape = RectangleShape
 }
+
+/**
+ * The app's one [LiftState], whose [liftHost] lies over every page and the bottom nav bar, so
+ * what is lifted covers all of them.
+ */
+val LocalLiftState = staticCompositionLocalOf<LiftState> { error("No LiftState: App provides the one of its liftHost") }
 
 @Composable
 fun rememberLiftState(): LiftState {

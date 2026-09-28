@@ -16,7 +16,8 @@ import es.jvbabi.overmail.page.home.components.stack.EmailStack
 import es.jvbabi.overmail.page.home.components.stack.StackSwipe
 import es.jvbabi.overmail.page.home.components.stack.emailStackSwipe
 import es.jvbabi.overmail.page.home.components.stack.rememberEmailStackState
-import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.LiftState
+import es.jvbabi.overmail.ui.lift.LocalLiftState
 import es.jvbabi.overmail.ui.lift.rememberLiftState
 import es.jvbabi.overmail.ui.theme.AppTheme
 import kotlinx.coroutines.delay
@@ -46,6 +47,7 @@ fun StackScreen() {
     }
 
     StackContent(
+        liftState = LocalLiftState.current,
         homeState = homeState,
         stackContent = stackContent,
         snackbarHostState = snackbarHostState,
@@ -55,6 +57,8 @@ fun StackScreen() {
 
 @Composable
 private fun StackContent(
+    /** What a card is lifted by; its host lies over the whole app, see [LocalLiftState]. */
+    liftState: LiftState,
     homeState: HomeState,
     stackContent: EmailStackContentState,
     snackbarHostState: SnackbarHostState,
@@ -62,8 +66,6 @@ private fun StackContent(
 ) {
     val localDensity = LocalDensity.current
     val bottomNavBarHeight = LocalBottomNavBarHeight.current
-    // One for the screen: whatever is lifted lies over all of it, see liftHost.
-    val liftState = rememberLiftState()
     val emailStackState = rememberEmailStackState(liftState)
 
     val emailOnTop = stackContent.emails.firstOrNull()
@@ -75,8 +77,7 @@ private fun StackContent(
 
     Scaffold { innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
-        // Over everything in it, the header included.
-        Box(Modifier.fillMaxSize().liftHost(liftState)) {
+        Box(Modifier.fillMaxSize()) {
             EmailStack(
                 emails = stackContent.emails,
                 bodies = stackContent.bodies,
@@ -131,6 +132,7 @@ private fun StackContent(
 private fun StackContentPreview() {
     AppTheme(dynamicColor = false) {
         StackContent(
+            liftState = rememberLiftState(),
             homeState = HomeState(currentUser = PREVIEW_ACCOUNT),
             stackContent = EmailStackContentState(emails = PREVIEW_ITEMS.map { it.email }, isLoading = false),
             snackbarHostState = remember { SnackbarHostState() },

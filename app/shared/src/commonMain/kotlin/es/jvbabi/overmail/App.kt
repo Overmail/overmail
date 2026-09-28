@@ -5,7 +5,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -50,6 +52,9 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import es.jvbabi.overmail.data.network.ServerImageCacheStrategy
 import es.jvbabi.overmail.page.BottomNavBar
 import es.jvbabi.overmail.page.LocalBottomNavBarHeight
+import es.jvbabi.overmail.ui.lift.LocalLiftState
+import es.jvbabi.overmail.ui.lift.liftHost
+import es.jvbabi.overmail.ui.lift.rememberLiftState
 import io.ktor.client.HttpClient
 import okio.Path
 import kotlin.time.Instant
@@ -164,49 +169,56 @@ fun App() {
             var focusListSearch by remember { mutableStateOf(false) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
-            CompositionLocalProvider(LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding) {
-                NavDisplay(
-                    backStack = backstack,
-                    onBack = { backstack.removeLastOrNull() },
-                    entryProvider = { key ->
-                        when (key) {
-                            is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                StackScreen()
-                            }
+            // Around the bottom bar as well: a card lifted off a page lies over it too.
+            val liftState = rememberLiftState()
+            Box(Modifier.fillMaxSize().liftHost(liftState)) {
+                CompositionLocalProvider(
+                    LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding,
+                    LocalLiftState provides liftState,
+                ) {
+                    NavDisplay(
+                        backStack = backstack,
+                        onBack = { backstack.removeLastOrNull() },
+                        entryProvider = { key ->
+                            when (key) {
+                                is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                    StackScreen()
+                                }
 
-                            is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                ListScreen(
-                                    focusSearch = focusListSearch,
-                                    onSearchFocused = { focusListSearch = false },
-                                )
-                            }
+                                is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                    ListScreen(
+                                        focusSearch = focusListSearch,
+                                        onSearchFocused = { focusListSearch = false },
+                                    )
+                                }
 
-                            is Screen.Onboarding -> NavEntry(key = key) {
-                                OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+                                is Screen.Onboarding -> NavEntry(key = key) {
+                                    OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
+                                }
                             }
+                        },
+                    )
+                }
+
+                val currentTab = backstack.lastOrNull() as? Screen.Tab
+                if (currentTab != null) BottomNavBar(
+                    selected = currentTab,
+                    onSelect = { tab ->
+                        if (tab == currentTab) {
+                            if (tab == Screen.List) focusListSearch = true
+                            return@BottomNavBar
                         }
+                        // The stack is the root and every other tab lies on top of it, so back from
+                        // any of them leads there.
+                        backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                        if (tab != Screen.Stack) backstack.add(tab)
                     },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = bottomNavBarPadding)
+                        .onSizeChanged { (_, h) -> bottomNavBarHeight = with(localDensity) { h.toDp() } },
                 )
             }
-
-            val currentTab = backstack.lastOrNull() as? Screen.Tab
-            if (currentTab != null) BottomNavBar(
-                selected = currentTab,
-                onSelect = { tab ->
-                    if (tab == currentTab) {
-                        if (tab == Screen.List) focusListSearch = true
-                        return@BottomNavBar
-                    }
-                    // The stack is the root and every other tab lies on top of it, so back from
-                    // any of them leads there.
-                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
-                    if (tab != Screen.Stack) backstack.add(tab)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomNavBarPadding)
-                    .onSizeChanged { (_, h) -> bottomNavBarHeight = with(localDensity) { h.toDp() } },
-            )
         }
 
     }

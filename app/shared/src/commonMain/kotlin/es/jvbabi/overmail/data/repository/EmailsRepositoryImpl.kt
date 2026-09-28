@@ -31,6 +31,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.http.ParametersBuilder
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
@@ -106,6 +107,32 @@ class EmailsRepositoryImpl(
         return fetchBody(emailId, user).onSuccess { emailBodyCache.put(emailId, it) }
     }
 
+    override suspend fun setArchivedState(email: Email, archivedState: ArchivedState, user: OvermailAccount): Result<Unit> {
+        overmailDatabase.emailsDao.setArchivedState(email.id, archivedState)
+        return safeRequest {
+            val response = httpClient.post(URLBuilder(urlString = user.homeserver).apply {
+                appendPathSegments("api", "emails", email.id.toString(), archivedState.wire)
+            }.build()) {
+                bearerAuth(user.token)
+            }
+
+            if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+        }.onFailure { overmailDatabase.emailsDao.setArchivedState(email.id, email.archivedState) }
+    }
+
+    override suspend fun setRead(email: Email, isRead: Boolean, user: OvermailAccount): Result<Unit> {
+        overmailDatabase.emailsDao.setRead(email.id, isRead)
+        return safeRequest {
+            val response = httpClient.post(URLBuilder(urlString = user.homeserver).apply {
+                appendPathSegments("api", "emails", email.id.toString(), if (isRead) "read" else "unread")
+            }.build()) {
+                bearerAuth(user.token)
+            }
+
+            if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+        }.onFailure { overmailDatabase.emailsDao.setRead(email.id, email.isRead) }
+    }
+
     private suspend fun fetchBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> = safeRequest {
         val response = httpClient.get(URLBuilder(urlString = user.homeserver).apply {
             appendPathSegments("api", "emails", emailId.toString(), "body")
@@ -167,6 +194,14 @@ private val ViewGroupingKind.wire: String
         ViewGroupingKind.ImapAccount -> "imap_account"
         ViewGroupingKind.Read -> "read"
         ViewGroupingKind.Archived -> "archived"
+    }
+
+/** The action path of `POST /api/emails/{emailId}/…`, `http/email/item/archive/setEmailArchiveState.kt`. */
+private val ArchivedState.wire: String
+    get() = when (this) {
+        ArchivedState.Archive -> "archive"
+        ArchivedState.Unarchive -> "unarchive"
+        ArchivedState.Spam -> "spam"
     }
 
 /**

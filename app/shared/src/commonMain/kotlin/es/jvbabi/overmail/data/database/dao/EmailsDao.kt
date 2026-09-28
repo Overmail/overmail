@@ -15,6 +15,7 @@ import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbLabels
 import es.jvbabi.overmail.data.database.entity.DbParticipant
 import es.jvbabi.overmail.data.database.entity.composed.EmbeddedEmail
+import es.jvbabi.overmail.domain.model.ArchivedState
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
 
@@ -33,6 +34,12 @@ interface EmailsDao {
 
     @Query("DELETE FROM email WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Uuid>)
+
+    @Query("UPDATE email SET archive_state = :archivedState WHERE id = :id")
+    suspend fun setArchivedState(id: Uuid, archivedState: ArchivedState)
+
+    @Query("UPDATE email SET is_read = :isRead WHERE id = :id")
+    suspend fun setRead(id: Uuid, isRead: Boolean)
 
     /**
      * Stores what the server said about [emails], replacing what was here of them.

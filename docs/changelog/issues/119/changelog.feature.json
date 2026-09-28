@@ -1,0 +1,10 @@
+{
+  "title": "Mails on the stack are marked read",
+  "description": "A mail that lies on top of the stack for two seconds counts as read, and so does one you archive or keep.",
+  "localized": {
+    "de": {
+      "title": "E-Mails auf dem Stapel werden als gelesen markiert",
+      "description": "Eine E-Mail, die zwei Sekunden oben auf dem Stapel liegt, gilt als gelesen, ebenso eine, die du archivierst oder behältst."
+    }
+  }
+}

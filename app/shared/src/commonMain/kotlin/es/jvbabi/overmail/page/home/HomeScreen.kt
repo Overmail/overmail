@@ -39,8 +39,13 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
+import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.home_stack_archive_failed
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun HomeScreen() {
@@ -53,6 +58,15 @@ fun HomeScreen() {
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
     val stackContent by emailStackViewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(emailStackViewModel) {
+        emailStackViewModel.messages.collect { message ->
+            when (message) {
+                EmailStackMessage.ArchiveFailed -> snackbarHostState.showSnackbar(getString(Res.string.home_stack_archive_failed))
+            }
+        }
+    }
 
     HomeContent(
         homeState = homeState,
@@ -60,6 +74,7 @@ fun HomeScreen() {
         content = content,
         viewSettingsState = viewSettingsState,
         stackContent = stackContent,
+        snackbarHostState = snackbarHostState,
         onViewStateChange = { viewViewModel.onEvent(ViewEvent.SetViewState(it)) },
         onViewSettingsEvent = viewSettingsViewModel::onEvent,
         onStackEvent = emailStackViewModel::onEvent,
@@ -71,6 +86,9 @@ val HEADER_HEIGHT = 64.dp
 /** How much of the listing shows below the pile while the pile is up. */
 private val LIST_PEEK_BELOW_STACK = 92.dp
 
+/** How long an unread mail lies on top of the pile, the pile in view, until it counts as read. */
+private val STACK_READ_AFTER = 2.seconds
+
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
 private val EDGE_BLUR_RADIUS = 48.dp
 
@@ -81,6 +99,7 @@ private fun HomeContent(
     content: ViewContentState,
     viewSettingsState: ViewSettingsState,
     stackContent: EmailStackContentState,
+    snackbarHostState: SnackbarHostState,
     onViewStateChange: (ViewState) -> Unit,
     onViewSettingsEvent: (ViewSettingsEvent) -> Unit,
     onStackEvent: (EmailStackEvent) -> Unit,
@@ -115,6 +134,13 @@ private fun HomeContent(
                         if (emailsListState.firstVisibleItemIndex > 0 || stackHeightPx <= 0f) return@derivedStateOf 0f
                         (1 - emailsListState.firstVisibleItemScrollOffset / stackHeightPx).coerceIn(0f, 1f)
                     }
+                }
+                val isStackInView by remember { derivedStateOf { verticalPercentageOfStackVisible > 0.5f } }
+                val emailOnTop = stackContent.emails.firstOrNull()
+                LaunchedEffect(emailOnTop?.id, emailOnTop?.isRead, isStackInView) {
+                    if (emailOnTop == null || emailOnTop.isRead || !isStackInView) return@LaunchedEffect
+                    delay(STACK_READ_AFTER)
+                    onStackEvent(EmailStackEvent.Read(emailOnTop))
                 }
                 Box(
                     modifier = Modifier
@@ -246,6 +272,14 @@ private fun HomeContent(
 
             // Over everything above, the header and the search included.
             LiftedCard(state = emailStackState, bodies = stackContent.bodies)
+
+            // Not the Scaffold's own: it would sit on the search, which is not a bottom bar.
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = maxOf(bottomHeight, innerPadding.calculateBottomPadding())),
+            )
         }
     }
 }
@@ -262,6 +296,7 @@ private fun HomeContentPreview() {
             content = PREVIEW_VIEW_CONTENT,
             viewSettingsState = ViewSettingsState(isFetchingImapAccounts = false),
             stackContent = EmailStackContentState(emails = PREVIEW_ITEMS.map { it.email }, isLoading = false),
+            snackbarHostState = remember { SnackbarHostState() },
             onViewStateChange = {},
             onViewSettingsEvent = {},
             onStackEvent = {},

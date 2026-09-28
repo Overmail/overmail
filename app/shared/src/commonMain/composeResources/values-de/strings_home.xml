@@ -98,4 +98,5 @@
     <string name="home_stack_overlay_archive">zum Archivieren</string>
     <string name="home_stack_overlay_skip">zum Überspringen</string>
     <string name="home_stack_body_failed">Die E-Mail konnte nicht geladen werden.</string>
+    <string name="home_stack_archive_failed">Die E-Mail konnte nicht archiviert werden und ist wieder im Posteingang.</string>
 </resources>

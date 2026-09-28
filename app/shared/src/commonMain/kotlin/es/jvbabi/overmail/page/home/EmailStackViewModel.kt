@@ -4,6 +4,7 @@ package es.jvbabi.overmail.page.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewSorting
@@ -14,6 +15,8 @@ import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
@@ -36,9 +40,15 @@ class EmailStackViewModel(
     val state: StateFlow<EmailStackContentState>
         field = MutableStateFlow(EmailStackContentState())
 
+    private val messageChannel = Channel<EmailStackMessage>(Channel.BUFFERED)
+
+    /** What the user is told once, as a snackbar, rather than shown for as long as it holds. */
+    val messages: Flow<EmailStackMessage> = messageChannel.receiveAsFlow()
+
     /**
-     * What was swiped off the pile. Nothing reaches the server yet, so this is all that keeps a
-     * handled mail from coming straight back.
+     * What was swiped off the pile. A kept mail stays in the inbox, so this is all that keeps it
+     * from coming straight back; an archived one is held back here too until the database no
+     * longer lists it, and while a sync may still bring the server's older state.
      */
     private val handled = MutableStateFlow(emptySet<Uuid>())
 
@@ -82,8 +92,30 @@ class EmailStackViewModel(
 
     fun onEvent(event: EmailStackEvent) {
         when (event) {
-            is EmailStackEvent.Archive -> handled.update { it + event.email.id }
-            is EmailStackEvent.Keep -> handled.update { it + event.email.id }
+            is EmailStackEvent.Archive -> archive(event.email)
+            is EmailStackEvent.Keep -> {
+                handled.update { it + event.email.id }
+                markRead(event.email)
+            }
+            is EmailStackEvent.Read -> markRead(event.email)
+        }
+    }
+
+    /** Quietly: a failed request puts the mail back to unread, which is all the user needs to see. */
+    private fun markRead(email: Email) {
+        if (email.isRead) return
+        viewModelScope.launch { emailsRepository.setRead(email, isRead = true, email.overmailAccount) }
+    }
+
+    /** Off the pile at once; the request runs on its own, and a failed one puts the mail back. */
+    private fun archive(email: Email) {
+        handled.update { it + email.id }
+        markRead(email)
+        viewModelScope.launch {
+            emailsRepository.setArchivedState(email, ArchivedState.Archive, email.overmailAccount).onFailure {
+                handled.update { it - email.id }
+                messageChannel.send(EmailStackMessage.ArchiveFailed)
+            }
         }
     }
 }
@@ -105,10 +137,18 @@ data class EmailStackContentState(
     val isLoading: Boolean = true,
 )
 
+enum class EmailStackMessage {
+    /** Archiving a mail did not reach the server; it is back on the pile. */
+    ArchiveFailed,
+}
+
 sealed class EmailStackEvent {
     /** Swiped to the left. */
     data class Archive(val email: Email) : EmailStackEvent()
 
     /** Swiped to the right: stays in the inbox, but is off the pile. */
     data class Keep(val email: Email) : EmailStackEvent()
+
+    /** Lay on top of the pile long enough to count as seen. */
+    data class Read(val email: Email) : EmailStackEvent()
 }

@@ -83,6 +83,7 @@ internal fun StackCard(
         email = email,
         body = body,
         scroll = scroll,
+        shownHeight = shownHeight,
         place = { pose().place },
         modifier = modifier
             .fillMaxSize()
@@ -95,7 +96,8 @@ internal fun StackCard(
 /**
  * A mail on a sheet of paper: its header over what it says, which [scroll] moves. What a card of
  * the pile is, and what a mail previewed from anywhere else looks like. [place] is how far down a
- * pile the sheet lies, which tints it; [overlay] lies over all of it.
+ * pile the sheet lies, which tints it; [shownHeight] how much of it shows while it is lifted, see
+ * [CardBody]; [overlay] lies over all of it.
  */
 @Composable
 internal fun MailCard(
@@ -104,6 +106,7 @@ internal fun MailCard(
     scroll: ScrollOffset,
     modifier: Modifier = Modifier,
     place: () -> Float = { 0f },
+    shownHeight: () -> Float? = { null },
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val hazeState = rememberHazeState()

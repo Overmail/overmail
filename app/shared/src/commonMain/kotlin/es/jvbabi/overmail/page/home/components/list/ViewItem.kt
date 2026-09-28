@@ -87,6 +87,7 @@ fun ListMailPreviewCard(
         email = email,
         body = bodies[email.id] ?: StackCardBody.Loading,
         scroll = preview.scroll,
+        shownHeight = { preview.lift.shownHeight(preview) },
         modifier = Modifier
             .liftStandIn(preview.lift, preview, origin = { preview.origin }, scroll = preview.scroll, shape = CARD_SHAPE)
             .graphicsLayer { alpha = (preview.lift.progress / PREVIEW_FADE_IN).coerceIn(0f, 1f) },

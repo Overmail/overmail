@@ -2,6 +2,7 @@ package es.jvbabi.overmail.page.home.components.stack
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -78,16 +79,38 @@ internal fun StackCard(
     scroll: ScrollOffset = remember(body) { ScrollOffset() },
     shownHeight: () -> Float? = { null },
 ) {
+    MailCard(
+        email = email,
+        body = body,
+        scroll = scroll,
+        place = { pose().place },
+        modifier = modifier
+            .fillMaxSize()
+            .cardPose(pose, depth, email.id.toString()),
+    ) {
+        if (drag?.towards != null) SwipeOverlay(towards = drag.towards, progress = drag.progress, isEnough = drag.action != null)
+    }
+}
+
+/**
+ * A mail on a sheet of paper: its header over what it says, which [scroll] moves. What a card of
+ * the pile is, and what a mail previewed from anywhere else looks like. [place] is how far down a
+ * pile the sheet lies, which tints it; [overlay] lies over all of it.
+ */
+@Composable
+internal fun MailCard(
+    email: Email,
+    body: StackCardBody,
+    scroll: ScrollOffset,
+    modifier: Modifier = Modifier,
+    place: () -> Float = { 0f },
+    overlay: @Composable BoxScope.() -> Unit = {},
+) {
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .cardPose(pose, depth, email.id.toString())
-            .cardSurface(place = { pose().place }),
-    ) {
+    Box(modifier = modifier.cardSurface(place)) {
         // The whole card, starting below the header: scrolled, it goes on behind it.
         CardBody(
             body = body,
@@ -104,7 +127,7 @@ internal fun StackCard(
             modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
         )
 
-        if (drag?.towards != null) SwipeOverlay(towards = drag.towards, progress = drag.progress, isEnough = drag.action != null)
+        overlay()
     }
 }
 

@@ -1,5 +1,10 @@
 package es.jvbabi.overmail.page.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
@@ -34,6 +41,9 @@ import es.jvbabi.overmail.utils.ProgressiveDirection
 import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlin.uuid.Uuid
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
@@ -109,6 +119,19 @@ private fun ListContent(
         onSearchFocused()
     }
 
+    // While searching, the header makes room for the results.
+    var isSearchFocused by remember { mutableStateOf(false) }
+    // Putting the keyboard away is done with searching, though it leaves the focus where it was.
+    val focusManager = LocalFocusManager.current
+    val ime = WindowInsets.ime
+    LaunchedEffect(focusManager, ime, localDensity) {
+        snapshotFlow { ime.getBottom(localDensity) > 0 }
+            .distinctUntilChanged()
+            .drop(1)
+            .filter { !it }
+            .collect { focusManager.clearFocus() }
+    }
+
     Scaffold { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -150,17 +173,23 @@ private fun ListContent(
                     .padding(top = innerPadding.calculateTopPadding(), bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(HEADER_HEIGHT)
-                        .padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.CenterStart,
+                AnimatedVisibility(
+                    visible = !isSearchFocused,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
                 ) {
-                    HomeHeader(
-                        currentUser = homeState.currentUser,
-                        greeting = homeState.greeting,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(HEADER_HEIGHT)
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        HomeHeader(
+                            currentUser = homeState.currentUser,
+                            greeting = homeState.greeting,
+                        )
+                    }
                 }
 
                 SearchField(
@@ -170,6 +199,7 @@ private fun ListContent(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .fillMaxWidth()
+                        .onFocusChanged { isSearchFocused = it.hasFocus }
                         .focusRequester(searchFocus),
                 )
 

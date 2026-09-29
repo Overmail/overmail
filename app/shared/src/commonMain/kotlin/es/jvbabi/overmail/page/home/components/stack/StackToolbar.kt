@@ -1,7 +1,12 @@
 package es.jvbabi.overmail.page.home.components.stack
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -25,10 +30,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -50,7 +61,8 @@ import overmail.app.shared.generated.resources.home_stack_toolbar_undo
 /**
  * Under the pile once a card has been swiped: what happened to the last one, with a button that
  * takes it back, see [onUndo], and how far through the pile the reader is -- [done] of [total],
- * which also fills the bar from the left.
+ * which also fills the bar from the left. Every swipe that adds to [done] presses it down for a
+ * moment, as if the card had been put down on it.
  */
 @Composable
 fun StackToolbar(
@@ -63,8 +75,26 @@ fun StackToolbar(
     val progress by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total)
     val filled = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
 
+    // 0 at rest, 1 pressed all the way down. Only when more is done: an undo takes nothing off it.
+    val press = remember { Animatable(0f) }
+    var pressedFor by remember { mutableIntStateOf(done) }
+    LaunchedEffect(done) {
+        val isMore = done > pressedFor
+        pressedFor = done
+        if (!isMore) return@LaunchedEffect
+        press.animateTo(1f, tween(PRESS_DOWN_MILLIS, easing = FastOutLinearInEasing))
+        press.animateTo(0f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+    }
+
     Surface(
         modifier = modifier
+            .graphicsLayer {
+                // Squashed from below, a little wider as it goes down.
+                transformOrigin = TransformOrigin(0.5f, 1f)
+                translationY = press.value * PRESS_DEPTH.toPx()
+                scaleX = 1f + press.value * 0.02f
+                scaleY = 1f - press.value * 0.06f
+            }
             .fillMaxWidth(),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -109,6 +139,12 @@ fun StackToolbar(
         }
     }
 }
+
+/** How far the toolbar goes down when a card is put down on it. */
+private val PRESS_DEPTH = 6.dp
+
+/** How long it takes to go down; it springs back up after. */
+private const val PRESS_DOWN_MILLIS = 90
 
 /** The swipe's own icon in its colors, what it did, and to which mail. */
 @Composable

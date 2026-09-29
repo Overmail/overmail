@@ -53,10 +53,8 @@ import es.jvbabi.overmail.ui.components.EmailHtmlBody
 import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.ui.theme.displayFontFamily
-import es.jvbabi.overmail.ui.transition.MailPart
 import es.jvbabi.overmail.ui.transition.isScreenSettled
 import es.jvbabi.overmail.ui.transition.mailPage
-import es.jvbabi.overmail.ui.transition.mailPart
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -141,17 +139,13 @@ private fun EmailContent(
                     style = MaterialTheme.typography.headlineSmall,
                     fontFamily = displayFontFamily(),
                     color = if (email.subject == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .mailPart(email.id, MailPart.Subject, isRow = false),
+                    modifier = Modifier.padding(horizontal = 24.dp),
                 )
 
                 EmailParticipants(email = email, modifier = Modifier.padding(horizontal = 24.dp))
 
                 if (email.labels.isNotEmpty()) FlowRow(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .mailPart(email.id, MailPart.Labels, isRow = false),
+                    modifier = Modifier.padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {

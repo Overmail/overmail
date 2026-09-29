@@ -138,7 +138,6 @@ internal fun MailCard(
         CardHeader(
             email = email,
             hazeState = hazeState,
-            isShared = isShared,
             modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
         )
 

@@ -2,11 +2,11 @@ package es.jvbabi.overmail.ui.transition
 
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -14,7 +14,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
@@ -22,15 +21,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.graphics.shadow.ShadowContext
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
@@ -42,11 +44,17 @@ import kotlin.uuid.Uuid
  */
 const val MAIL_TRANSITION_MILLIS = 250
 
-/** How round the corners of the page are while it is on the way, as round as a row's at the start. */
+/** How round the corners of the card are while it grows, as round as a row's at the start. */
 private val ROW_CORNER = 16.dp
 
 /** How dark what lies behind the page gets once it is all the way open. */
 private const val SCRIM_ALPHA = 0.16f
+
+/** How far the row slides up as it fades out, and the page slides up into place as it fades in. */
+private val CONTENT_SLIDE = 24.dp
+
+/** The shadow of the card while it is lifted off the screen below, at its strongest. */
+private val CARD_SHADOW = Shadow(radius = 24.dp, color = Color.Black.copy(alpha = 0.18f), offset = DpOffset(0.dp, 8.dp))
 
 /**
  * How far the screen this is composed in has come: 0 before it comes in and once it has gone, 1
@@ -89,43 +97,18 @@ fun rememberScreenProgress(): () -> Float {
     }
 }
 
-/**
- * A part of a mail that both a row and its page show, carried from the one place to the other on
- * the way and crossfaded from how the one shows it into how the other does. [scale] is how the
- * picture of one end is fitted into where the part is on the way.
- */
-enum class MailPart(internal val scale: PartScale, internal val alignEnd: Boolean = false) {
-    Avatar(PartScale.Width),
 
-    /** One line in a row, a heading on the page: another font, and larger. */
-    Subject(PartScale.Width),
-
-    /** One line at both ends. */
-    Sender(PartScale.Height),
-
-    /** Short in a row and in full on the page, right-aligned at both. */
-    SentAt(PartScale.Height, alignEnd = true),
-
-    /** As many as fit in a line in a row, all of them on the page: moved, not scaled. */
-    Labels(PartScale.None),
-}
-
-internal enum class PartScale { Width, Height, None }
-
-/** What one end draws of the mail, and where; the picture is kept up to date as it draws. */
-internal class Snapshot(val emailId: Uuid, val layer: GraphicsLayer) {
+/** What the row draws of the mail, and where; the picture is kept up to date as it draws. */
+internal class RowSnapshot(val emailId: Uuid, val layer: GraphicsLayer) {
     var bounds by mutableStateOf(Rect.Zero)
 }
 
-/** The row and the page of a mail, or one of their parts. */
-internal data class SnapshotKey(val part: MailPart?)
-
 /**
  * A mail growing out of the row that was tapped into its page, and back: the page's background
- * grows out of the row's bounds and clip, what the row shows fades out in it, the page fades in,
- * and the [MailPart]s both show move between their two places. Drawn by the page, see [mailPage],
- * from pictures the row and the page take of themselves, see [mailRow] and [mailPart]; how far it
- * is comes from the page's NavDisplay transition, so the back gesture drives it.
+ * grows out of the row's bounds as a card with round corners and a shadow, what the row shows
+ * fades out sliding up, and the page fades in sliding up into place. Drawn by the page, see
+ * [mailPage], from a picture the row takes of itself, see [mailRow]; how far it is comes from the
+ * page's NavDisplay transition, so the back gesture drives it.
  *
  * One for the whole app, [LocalMailTransition]: one page is on its way at a time.
  */
@@ -135,8 +118,7 @@ class MailTransition {
     private var progress: (() -> Float)? by mutableStateOf(null)
     private var pageEmailId: Uuid? by mutableStateOf(null)
 
-    private val rows = mutableStateMapOf<SnapshotKey, Snapshot>()
-    private val pages = mutableStateMapOf<SnapshotKey, Snapshot>()
+    private var row: RowSnapshot? by mutableStateOf(null)
 
     /** Whether the mail of [emailId] is on its way into or out of its page; read while drawing. */
     fun isOnTheWay(emailId: Uuid): Boolean {
@@ -160,18 +142,17 @@ class MailTransition {
         this.pageEmailId = null
     }
 
-    internal fun register(isRow: Boolean, key: SnapshotKey, snapshot: Snapshot) {
-        (if (isRow) rows else pages)[key] = snapshot
+    internal fun register(snapshot: RowSnapshot) {
+        row = snapshot
     }
 
-    internal fun unregister(isRow: Boolean, key: SnapshotKey, snapshot: Snapshot) {
-        val map = if (isRow) rows else pages
-        if (map[key] === snapshot) map.remove(key)
+    internal fun unregister(snapshot: RowSnapshot) {
+        if (row === snapshot) row = null
     }
 
     /**
      * Everything of the transition, the page's content included, drawn by the page at [progress];
-     * [pageBounds] is where the page is, in the root, [drawContent] draws what it shows.
+     * [pageBounds] is where the page is, in the root, [pageLayer] what it shows.
      */
     internal fun DrawScope.draw(
         emailId: Uuid,
@@ -181,77 +162,51 @@ class MailTransition {
         background: Color,
         cardColor: Color,
         corner: Dp,
+        shadows: ShadowContext,
     ) {
-        val row = rows[SnapshotKey(null)]?.takeIf { it.emailId == emailId }
+        val row = row?.takeIf { it.emailId == emailId }
         val eased = FastOutSlowInEasing.transform(progress)
         val origin = row?.bounds?.takeIf { it != Rect.Zero }
+        val slide = CONTENT_SLIDE.toPx()
+        // The page coming in: faded in and slid up into place, over the second half of the way.
+        val pageIn = fraction(progress, 0.3f, 0.9f)
 
-        // Opened from somewhere that does not show the mail: the page only fades in.
+        // Opened from somewhere that does not show the mail: the page only fades in, sliding up.
         if (origin == null) {
-            pageLayer.alpha = progress
             drawRect(background, alpha = progress)
-            drawLayer(pageLayer)
+            translate(top = (1f - pageIn) * slide) {
+                pageLayer.alpha = pageIn
+                drawLayer(pageLayer)
+            }
             return
         }
 
         val card = lerp(origin, pageBounds, eased)
         val local = card.translate(-pageBounds.topLeft)
-        val radius = lerp(ROW_CORNER.toPx(), corner.toPx(), eased)
-        val clip = Path().apply { addRoundRect(RoundRect(local, CornerRadius(radius))) }
+        // Round until the card has nearly filled the screen, then as square as the page is.
+        val radius = lerp(ROW_CORNER.toPx(), corner.toPx(), fraction(progress, 0.6f, 1f))
 
         drawRect(Color.Black, alpha = SCRIM_ALPHA * eased)
+        // Lifted off the screen below as it leaves the row, set down as it becomes the page.
+        val lift = fraction(progress, 0f, 0.3f) * (1f - fraction(progress, 0.7f, 1f))
+        if (lift > 0f) translate(local.left, local.top) {
+            val shadow = shadows.createDropShadowPainter(RoundedCornerShape(radius), CARD_SHADOW)
+            with(shadow) { draw(local.size, alpha = lift) }
+        }
+
+        val clip = Path().apply { addRoundRect(RoundRect(local, CornerRadius(radius))) }
         clipPath(clip) {
             drawRect(lerp(cardColor, background, eased))
-            // The row, going along with the top of the card as it grows.
-            translate(local.left, local.top) {
-                row.layer.alpha = 1f - fraction(progress, 0f, 0.35f)
+            // The row, going along with the top of the card as it grows, fading out sliding up.
+            val rowOut = fraction(progress, 0f, 0.35f)
+            translate(local.left, local.top - rowOut * slide) {
+                row.layer.alpha = 1f - rowOut
                 drawLayer(row.layer)
             }
             // The page, laid out as it is when it is there, its top at the card's.
-            translate(local.left, local.top) {
-                pageLayer.alpha = fraction(progress, 0.25f, 0.8f)
+            translate(local.left, local.top + (1f - pageIn) * slide) {
+                pageLayer.alpha = pageIn
                 drawLayer(pageLayer)
-            }
-            MailPart.entries.forEach { part -> drawPart(emailId, part, progress, eased, pageBounds, local.topLeft) }
-        }
-    }
-
-    private fun DrawScope.drawPart(emailId: Uuid, part: MailPart, progress: Float, eased: Float, pageBounds: Rect, cardOffset: Offset) {
-        val key = SnapshotKey(part)
-        val from = rows[key]?.takeIf { it.emailId == emailId }
-        val to = pages[key]?.takeIf { it.emailId == emailId }
-        val crossfade = fraction(progress, 0.15f, 0.75f)
-        when {
-            from != null && to != null -> {
-                val bounds = lerp(from.bounds, to.bounds, eased).translate(-pageBounds.topLeft)
-                drawSnapshot(from, part, bounds, 1f - crossfade)
-                drawSnapshot(to, part, bounds, crossfade)
-            }
-            // Only the page has it: where it is on the page, with the page.
-            to != null -> drawSnapshot(to, part, to.bounds.translate(-pageBounds.topLeft + cardOffset), fraction(progress, 0.25f, 0.8f))
-            // Only the row has it: where it is in the row, with the row.
-            from != null -> {
-                val row = rows[SnapshotKey(null)] ?: return
-                val inRow = from.bounds.translate(-row.bounds.topLeft + cardOffset)
-                drawSnapshot(from, part, inRow, 1f - fraction(progress, 0f, 0.35f))
-            }
-        }
-    }
-
-    private fun DrawScope.drawSnapshot(snapshot: Snapshot, part: MailPart, bounds: Rect, alpha: Float) {
-        if (alpha <= 0f) return
-        val size = snapshot.layer.size
-        if (size.width <= 0 || size.height <= 0) return
-        val factor = when (part.scale) {
-            PartScale.Width -> bounds.width / size.width
-            PartScale.Height -> bounds.height / size.height
-            PartScale.None -> 1f
-        }
-        val left = if (part.alignEnd) bounds.right - size.width * factor else bounds.left
-        translate(left, bounds.top) {
-            scale(factor, pivot = Offset.Zero) {
-                snapshot.layer.alpha = alpha
-                drawLayer(snapshot.layer)
             }
         }
     }
@@ -269,21 +224,13 @@ val LocalMailTransition = staticCompositionLocalOf<MailTransition?> { null }
  * Only for the one row that is to grow: every row taking pictures of itself costs.
  */
 @Composable
-fun Modifier.mailRow(emailId: Uuid): Modifier = snapshot(emailId, part = null, isRow = true)
-
-/** [part] of the mail of [emailId] in its row, or on its page when not [isRow]; see [MailTransition]. */
-@Composable
-fun Modifier.mailPart(emailId: Uuid, part: MailPart, isRow: Boolean): Modifier = snapshot(emailId, part, isRow)
-
-@Composable
-private fun Modifier.snapshot(emailId: Uuid, part: MailPart?, isRow: Boolean): Modifier {
+fun Modifier.mailRow(emailId: Uuid): Modifier {
     val transition = LocalMailTransition.current ?: return this
     val layer = rememberGraphicsLayer()
-    val snapshot = remember(emailId, layer) { Snapshot(emailId, layer) }
-    val key = SnapshotKey(part)
-    DisposableEffect(transition, snapshot, isRow, key) {
-        transition.register(isRow, key, snapshot)
-        onDispose { transition.unregister(isRow, key, snapshot) }
+    val snapshot = remember(emailId, layer) { RowSnapshot(emailId, layer) }
+    DisposableEffect(transition, snapshot) {
+        transition.register(snapshot)
+        onDispose { transition.unregister(snapshot) }
     }
     return this
         .onGloballyPositioned { snapshot.bounds = it.boundsInRoot() }
@@ -309,6 +256,7 @@ fun Modifier.mailPage(emailId: Uuid, background: Color, cardColor: Color, corner
         transition.attachPage(emailId, progress)
         onDispose { transition.detachPage(progress) }
     }
+    val shadows = LocalGraphicsContext.current.shadowContext
     val layer = rememberGraphicsLayer()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     return this
@@ -321,6 +269,6 @@ fun Modifier.mailPage(emailId: Uuid, background: Color, cardColor: Color, corner
                 return@drawWithContent
             }
             layer.record { this@drawWithContent.drawContent() }
-            with(transition) { draw(emailId, now, bounds, layer, background, cardColor, corner) }
+            with(transition) { draw(emailId, now, bounds, layer, background, cardColor, corner, shadows) }
         }
 }

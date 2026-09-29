@@ -14,6 +14,14 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.CoreGraphics.CGRectMake
+import platform.CoreHaptics.CHHapticEngine
+import platform.CoreHaptics.CHHapticEvent
+import platform.CoreHaptics.CHHapticEventParameter
+import platform.CoreHaptics.CHHapticEventParameterIDHapticIntensity
+import platform.CoreHaptics.CHHapticEventParameterIDHapticSharpness
+import platform.CoreHaptics.CHHapticEventTypeHapticTransient
+import platform.CoreHaptics.CHHapticPattern
+import kotlin.random.Random
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSLocale
@@ -96,6 +104,48 @@ actual fun shareUrl(url: String, title: String?) {
 }
 
 actual fun getClipboardText(): String? = UIPasteboard.generalPasteboard.string
+
+/** Kept until the firework is over: an engine that is let go of stops what it plays. */
+private var fireworkEngine: CHHapticEngine? = null
+
+@OptIn(ExperimentalForeignApi::class)
+actual fun hapticFirework() {
+    // Core Haptics is what makes single taps; a device without it only knows the system's buzz.
+    if (!CHHapticEngine.capabilitiesForHardware().supportsHaptics) return
+    val events = buildList {
+        var time = 0.0
+        // The launch, a rising rumble of soft taps.
+        repeat(Random.nextInt(3, 6)) { index ->
+            add(tap(time, intensity = 0.3 + index * 0.1, sharpness = 0.1))
+            time += Random.nextDouble(0.025, 0.045)
+        }
+        // The bursts: sharp pops and faint crackles scattered over half a second.
+        repeat(Random.nextInt(8, 14)) {
+            val isPop = Random.nextDouble() < 0.35
+            add(
+                tap(
+                    time,
+                    intensity = if (isPop) Random.nextDouble(0.6, 1.0) else Random.nextDouble(0.2, 0.7),
+                    sharpness = if (isPop) Random.nextDouble(0.5, 1.0) else Random.nextDouble(0.2, 0.6),
+                )
+            )
+            time += Random.nextDouble(0.015, 0.07)
+        }
+    }
+    val engine = fireworkEngine ?: CHHapticEngine(null).also { fireworkEngine = it }
+    engine.startAndReturnError(null)
+    val pattern = CHHapticPattern(events = events, parameters = emptyList<Any>(), error = null)
+    engine.createPlayerWithPattern(pattern, null)?.startAtTime(0.0, null)
+}
+
+private fun tap(time: Double, intensity: Double, sharpness: Double) = CHHapticEvent(
+    eventType = CHHapticEventTypeHapticTransient,
+    parameters = listOf(
+        CHHapticEventParameter(parameterID = CHHapticEventParameterIDHapticIntensity, value = intensity.toFloat()),
+        CHHapticEventParameter(parameterID = CHHapticEventParameterIDHapticSharpness, value = sharpness.toFloat()),
+    ),
+    relativeTime = time,
+)
 
 /** `UIDevice.model` is only "iPhone"; the machine name is the exact model, e.g. "iPhone16,2". */
 actual fun deviceInfo(): DeviceInfo = DeviceInfo(

@@ -136,6 +136,13 @@ expect fun shareUrl(url: String, title: String?)
 
 expect fun getClipboardText(): String?
 
+/**
+ * A little firework felt in the hand: a burst of taps, a little different every time. Only on a
+ * device whose vibration is precise enough for single taps; everywhere else nothing, rather than
+ * a buzz.
+ */
+expect fun hapticFirework()
+
 expect fun deviceInfo(): DeviceInfo
 
 /**

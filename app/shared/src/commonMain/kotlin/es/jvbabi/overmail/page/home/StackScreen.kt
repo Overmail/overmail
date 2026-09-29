@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import es.jvbabi.overmail.hapticFirework
 import es.jvbabi.overmail.page.LocalBottomNavBarHeight
 import es.jvbabi.overmail.page.home.components.HEADER_HEIGHT
 import es.jvbabi.overmail.page.home.components.HomeHeader
@@ -104,7 +105,10 @@ private fun StackContent(
     var celebrates by remember { mutableStateOf(false) }
     LaunchedEffect(isDone) {
         if (!isDone) hadMails = !stackContent.isLoading
-        else if (hadMails) celebrates = true
+        else if (hadMails) {
+            celebrates = true
+            hapticFirework()
+        }
     }
 
     Scaffold { innerPadding ->

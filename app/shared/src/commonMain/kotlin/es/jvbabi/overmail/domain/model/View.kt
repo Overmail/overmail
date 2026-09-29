@@ -31,6 +31,11 @@ data class ViewState(
         val MailboxWithArchive = Mailbox.copy(
             filter = ViewFilter(archivedState = listOf(ArchivedState.Unarchive, ArchivedState.Archive)),
         )
+
+        /** Only what has been archived, laid out like the [Mailbox]: where a worked-through stack leads. */
+        val Archive = Mailbox.copy(
+            filter = ViewFilter(archivedState = listOf(ArchivedState.Archive)),
+        )
     }
 }
 

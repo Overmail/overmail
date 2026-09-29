@@ -221,6 +221,8 @@ fun App() {
             var bottomNavBarHeight by remember { mutableStateOf(0.dp) }
             // The list tab tapped again while it is open: the search is what is wanted next.
             var focusListSearch by remember { mutableStateOf(false) }
+            // A stack worked through leads on to the archive, in the list.
+            var openListArchive by remember { mutableStateOf(false) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             // Around the bottom bar as well: a card lifted off a page lies over it too.
@@ -247,7 +249,14 @@ fun App() {
                                 when (key) {
                                     is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
                                         ScreenEntry(appViewModelStoreOwner) {
-                                            StackScreen(onOpenEmail = { backstack.add(Screen.Email(it)) })
+                                            StackScreen(
+                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
+                                                onOpenArchive = {
+                                                    openListArchive = true
+                                                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                                                    backstack.add(Screen.List)
+                                                },
+                                            )
                                         }
                                     }
 
@@ -256,6 +265,8 @@ fun App() {
                                             ListScreen(
                                                 focusSearch = focusListSearch,
                                                 onSearchFocused = { focusListSearch = false },
+                                                openArchive = openListArchive,
+                                                onArchiveOpened = { openListArchive = false },
                                                 onOpenEmail = { backstack.add(Screen.Email(it)) },
                                             )
                                         }

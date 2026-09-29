@@ -15,7 +15,10 @@ import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.stack.EmailStack
 import es.jvbabi.overmail.page.home.components.stack.StackSwipe
 import es.jvbabi.overmail.page.home.components.stack.StackToolbar
+import es.jvbabi.overmail.page.home.components.stack.StackConfetti
+import es.jvbabi.overmail.page.home.components.stack.StackEnd
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,9 +44,12 @@ import kotlin.uuid.Uuid
 /** How long an unread mail lies on top of the pile until it counts as read. */
 private val STACK_READ_AFTER = 2.seconds
 
-/** [onOpenEmail] opens the page of the mail on top, tapped twice. */
+/**
+ * [onOpenEmail] opens the page of the mail on top, tapped twice; [onOpenArchive] the archive, from
+ * a stack worked through.
+ */
 @Composable
-fun StackScreen(onOpenEmail: (Uuid) -> Unit = {}) {
+fun StackScreen(onOpenEmail: (Uuid) -> Unit = {}, onOpenArchive: () -> Unit = {}) {
     val homeViewModel = koinViewModel<HomeViewModel>()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
@@ -66,6 +72,7 @@ fun StackScreen(onOpenEmail: (Uuid) -> Unit = {}) {
         snackbarHostState = snackbarHostState,
         onStackEvent = emailStackViewModel::onEvent,
         onOpenEmail = onOpenEmail,
+        onOpenArchive = onOpenArchive,
     )
 }
 
@@ -78,6 +85,7 @@ private fun StackContent(
     snackbarHostState: SnackbarHostState,
     onStackEvent: (EmailStackEvent) -> Unit,
     onOpenEmail: (Uuid) -> Unit = {},
+    onOpenArchive: () -> Unit = {},
 ) {
     val localDensity = LocalDensity.current
     val bottomNavBarHeight = LocalBottomNavBarHeight.current
@@ -90,13 +98,21 @@ private fun StackContent(
         onStackEvent(EmailStackEvent.Read(emailOnTop))
     }
 
+    // Confetti only for a pile worked through here, not for one that was empty to begin with.
+    val isDone = !stackContent.isLoading && emailStackState.isEmpty
+    var hadMails by remember { mutableStateOf(false) }
+    var celebrates by remember { mutableStateOf(false) }
+    LaunchedEffect(isDone) {
+        if (!isDone) hadMails = !stackContent.isLoading
+        else if (hadMails) celebrates = true
+    }
+
     Scaffold { innerPadding ->
         val topOfStack = innerPadding.calculateTopPadding() + HEADER_HEIGHT
         Box(Modifier.fillMaxSize()) {
             EmailStack(
                 emails = stackContent.emails,
                 bodies = stackContent.bodies,
-                isLoading = stackContent.isLoading,
                 state = emailStackState,
                 onSwiped = { email, swipe ->
                     onStackEvent(
@@ -118,6 +134,18 @@ private fun StackContent(
                     bottom = maxOf(bottomNavBarHeight, innerPadding.calculateBottomPadding()),
                 ),
             )
+
+            // Where the pile was; over it rather than in it, so its button gets its touches.
+            AnimatedVisibility(
+                visible = isDone,
+                enter = scaleIn(spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow), initialScale = 0.6f) + fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = topOfStack, bottom = maxOf(bottomNavBarHeight, innerPadding.calculateBottomPadding())),
+            ) {
+                StackEnd(onOpenArchive = onOpenArchive, modifier = Modifier.fillMaxSize())
+            }
 
             Box(
                 modifier = Modifier
@@ -166,6 +194,8 @@ private fun StackContent(
                     )
                 }
             }
+
+            if (celebrates) StackConfetti(onEnded = { celebrates = false })
         }
     }
 }

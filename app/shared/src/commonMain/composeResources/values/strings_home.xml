@@ -108,6 +108,8 @@
     <!-- The heading of a card on the pile for a mail without a subject. -->
     <string name="home_stack_no_subject">No subject</string>
     <string name="home_stack_empty">All done</string>
+    <string name="home_stack_empty_description">Nothing left in your inbox. What you archived is waiting in the archive.</string>
+    <string name="home_stack_open_archive">Open archive</string>
     <!-- On a card pulled aside: "Pull" until letting go would do it, then "Let go"; followed by what it does. -->
     <string name="home_stack_overlay_pull">Pull</string>
     <string name="home_stack_overlay_let_go">Let go</string>

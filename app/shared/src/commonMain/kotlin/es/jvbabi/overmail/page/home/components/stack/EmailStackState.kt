@@ -160,6 +160,13 @@ class EmailStackState internal constructor(
 
     /** The ids of every mail the list handed the pile last; null until it handed any. */
     internal var listed: Set<Uuid>? by mutableStateOf(null)
+
+    /**
+     * Nothing on the pile, nothing on its way out and nothing on its way back: what the end of the
+     * pile shows for. Not the list alone, which is empty while the last card still flies off and
+     * again after an undo, before the mail is back in it.
+     */
+    val isEmpty: Boolean get() = listed != null && cards.isEmpty() && thrown.isEmpty() && motions.values.none { it.returning }
     internal var onSwiped: (Email, StackSwipe) -> Unit = { _, _ -> }
     internal var onOpen: (Email) -> Unit = {}
 

@@ -61,7 +61,6 @@ private val DEAL_EASING = CubicBezierEasing(0.2f, 1.04f, 0.32f, 1f)
 fun EmailStack(
     emails: List<Email>,
     bodies: Map<Uuid, StackCardBody>,
-    isLoading: Boolean,
     state: EmailStackState,
     onSwiped: (Email, StackSwipe) -> Unit,
     contentPaddingValues: PaddingValues,
@@ -106,21 +105,6 @@ fun EmailStack(
                 state.cardPosition = it.positionInRoot()
             },
     ) {
-        if (cards.isEmpty() && leaving.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                if (!isLoading) Text(
-                    text = stringResource(Res.string.home_stack_empty),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            return@Box
-        }
-
         // Back to front, so the top card is drawn last, and the ones on their way out over all of
         // them. One loop for both: a card that is thrown keeps its node, and with it its state.
         for (email in cards.asReversed() + leaving) {
@@ -211,7 +195,6 @@ private fun EmailStackPreview() {
         EmailStack(
             emails = PREVIEW_ITEMS.map { it.email },
             bodies = emptyMap(),
-            isLoading = false,
             state = state,
             onSwiped = { _, _ -> },
             contentPaddingValues = PaddingValues(),

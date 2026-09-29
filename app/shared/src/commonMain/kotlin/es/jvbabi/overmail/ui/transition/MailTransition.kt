@@ -156,14 +156,16 @@ class MailTransition {
 
     /**
      * Everything of the transition, the page's content included, drawn by the page at [progress];
-     * [pageBounds] is where the page is, in the root, [pageLayer] what it shows. [card] is how much
-     * of a card it is, round corners and shadow: all of one on its way, none once it has settled.
+     * [pageBounds] is where the page is, in the root, [pageLayer] what it shows, [rowFade] what
+     * fades the row's picture. [card] is how much of a card it is, round corners and shadow: all of
+     * one on its way, none once it has settled.
      */
     internal fun DrawScope.draw(
         emailId: Uuid,
         progress: Float,
         pageBounds: Rect,
         pageLayer: GraphicsLayer,
+        rowFade: GraphicsLayer,
         background: Color,
         cardColor: Color,
         corner: Dp,
@@ -204,8 +206,13 @@ class MailTransition {
             // The row, going along with the top of the card as it grows, fading out sliding up.
             val rowOut = fraction(progress, 0f, 0.35f)
             translate(local.left, local.top - rowOut * slide) {
-                row.layer.alpha = 1f - rowOut
-                drawLayer(row.layer)
+                // Faded in a layer of the page's own: the row's picture is drawn in the listing
+                // below as well, and an alpha set on it would hold there too, in the same frame.
+                if (rowOut < 1f) {
+                    rowFade.record { drawLayer(row.layer) }
+                    rowFade.alpha = 1f - rowOut
+                    drawLayer(rowFade)
+                }
             }
             // The page, laid out as it is when it is there, its top at the card's.
             translate(local.left, local.top + (1f - pageIn) * slide) {
@@ -241,8 +248,6 @@ fun Modifier.mailRow(emailId: Uuid): Modifier {
         .drawWithContent {
             layer.record { this@drawWithContent.drawContent() }
             if (transition.isOnTheWay(emailId)) return@drawWithContent
-            // The page may have faded it on the way.
-            layer.alpha = 1f
             drawLayer(layer)
         }
 }
@@ -271,6 +276,7 @@ fun Modifier.mailPage(emailId: Uuid, background: Color, cardColor: Color, corner
         }
     }
     val layer = rememberGraphicsLayer()
+    val rowFade = rememberGraphicsLayer()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     return this
         .onGloballyPositioned { bounds = it.boundsInRoot() }
@@ -282,6 +288,6 @@ fun Modifier.mailPage(emailId: Uuid, background: Color, cardColor: Color, corner
                 return@drawWithContent
             }
             layer.record { this@drawWithContent.drawContent() }
-            with(transition) { draw(emailId, now, bounds, layer, background, cardColor, corner, card.value, shadows) }
+            with(transition) { draw(emailId, now, bounds, layer, rowFade, background, cardColor, corner, card.value, shadows) }
         }
 }

@@ -39,8 +39,6 @@ import es.jvbabi.overmail.ui.lift.liftOnLongPress
 import es.jvbabi.overmail.ui.lift.liftStandIn
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.ui.theme.AppTheme
-import es.jvbabi.overmail.ui.transition.MailPart
-import es.jvbabi.overmail.ui.transition.mailPart
 import es.jvbabi.overmail.ui.transition.mailRow
 import es.jvbabi.overmail.utils.sentAtLabel
 import kotlinx.serialization.builtins.serializer
@@ -64,6 +62,8 @@ class ListMailPreview(val lift: LiftState) {
 
     /** A finger went down on the row of [email], at [origin]: the card turns to that mail, in case it is held. */
     internal fun prepare(email: Email, origin: Rect) {
+        // One card for every mail: another one is read from its top.
+        if (email.id != this.email?.id) scroll.scrollTo(0f)
         this.email = email
         this.origin = origin
     }
@@ -134,9 +134,6 @@ private fun ViewItemRow(
     onOpen: (() -> Unit)? = null,
     isShared: Boolean = false,
 ) {
-    @Composable
-    fun Modifier.shared(part: MailPart) = if (isShared) mailPart(item.email.id, part, isRow = true) else this
-
     Row(
         modifier = modifier
             .then(if (isShared) Modifier.mailRow(item.email.id) else Modifier)
@@ -151,7 +148,6 @@ private fun ViewItemRow(
             participant = item.email.sentBy,
             size = 36.dp,
             modifier = Modifier
-                .shared(MailPart.Avatar)
                 .clip(RoundedCornerShape(8.dp))
         )
         Column {
@@ -172,8 +168,7 @@ private fun ViewItemRow(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = fontWeight,
                         modifier = Modifier
-                            .weight(1f, fill = false)
-                            .shared(MailPart.Sender),
+                            .weight(1f, fill = false),
                     )
                     if (!item.email.isRead) Spacer(
                         modifier = Modifier
@@ -192,8 +187,7 @@ private fun ViewItemRow(
                     style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                     fontWeight = fontWeight,
                     modifier = Modifier
-                        .alignByBaseline()
-                        .shared(MailPart.SentAt),
+                        .alignByBaseline(),
                 )
             }
             run(subject@{
@@ -206,7 +200,6 @@ private fun ViewItemRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = fontWeight,
                     color = color,
-                    modifier = Modifier.shared(MailPart.Subject),
                 )
             })
             if (!item.email.preview.isNullOrEmpty()) Text(
@@ -218,8 +211,7 @@ private fun ViewItemRow(
             if (item.email.labels.isNotEmpty()) LabelBadges(
                 labels = item.email.labels,
                 modifier = Modifier
-                    .padding(top = 4.dp)
-                    .shared(MailPart.Labels),
+                    .padding(top = 4.dp),
             )
         }
     }

@@ -92,6 +92,8 @@
     <!-- The heading of a card on the pile for a mail without a subject. -->
     <string name="home_stack_no_subject">Kein Betreff</string>
     <string name="home_stack_empty">Alles erledigt</string>
+    <string name="home_stack_empty_description">Dein Posteingang ist leer. Was du archiviert hast, wartet im Archiv.</string>
+    <string name="home_stack_open_archive">Archiv öffnen</string>
     <!-- Auf einer zur Seite gezogenen Karte: "Ziehen", bis Loslassen es tut, dann "Loslassen"; danach, was es tut. -->
     <string name="home_stack_overlay_pull">Ziehen</string>
     <string name="home_stack_overlay_let_go">Loslassen</string>
@@ -99,6 +101,11 @@
     <string name="home_stack_overlay_skip">zum Überspringen</string>
     <string name="home_stack_body_failed">Die E-Mail konnte nicht geladen werden.</string>
     <string name="home_stack_archive_failed">Die E-Mail konnte nicht archiviert werden und ist wieder im Posteingang.</string>
+    <string name="home_stack_undo_failed">Die E-Mail konnte nicht aus dem Archiv geholt werden.</string>
+    <string name="home_stack_toolbar_archived">Archiviert</string>
+    <string name="home_stack_toolbar_skipped">Übersprungen</string>
+    <string name="home_stack_toolbar_undo">Rückgängig</string>
+    <string name="home_stack_toolbar_progress">%1$d/%2$d</string>
 
     <string name="home_nav_stack">Stack</string>
     <string name="home_nav_list">Liste</string>

@@ -103,6 +103,9 @@ kotlin {
             // Only the weight in use: every weight is a module of its own, and each holds the whole set.
             implementation(libs.app.phosphor.regular)
 
+            // The confetti of a stack worked through.
+            implementation(libs.app.confettikit)
+
             // Avatars: loaded through the app's own HttpClient, kept in a disk cache.
             implementation(libs.app.coil.compose)
             implementation(libs.app.coil.network.ktor)

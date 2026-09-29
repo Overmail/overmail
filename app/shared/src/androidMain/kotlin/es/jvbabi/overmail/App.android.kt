@@ -7,6 +7,9 @@ import okio.Path.Companion.toPath
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.VibratorManager
+import kotlin.random.Random
 import android.text.format.DateFormat
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.material3.ColorScheme
@@ -31,6 +34,31 @@ const val KOIN_ACTIVITY_CONTEXT = "koin_activity_context"
 
 private fun activityContext(): Context =
     KoinPlatformTools.defaultContext().get().get(named(KOIN_ACTIVITY_CONTEXT))
+
+actual fun hapticFirework() {
+    // Single primitives are what makes it precise; a device without them only buzzes.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val context = KoinPlatformTools.defaultContext().get().get<Context>()
+    val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator ?: return
+    val tick = VibrationEffect.Composition.PRIMITIVE_TICK
+    val click = VibrationEffect.Composition.PRIMITIVE_CLICK
+    val lowTick = VibrationEffect.Composition.PRIMITIVE_LOW_TICK
+    if (!vibrator.hasVibrator() || !vibrator.areAllPrimitivesSupported(tick, click, lowTick)) return
+
+    val composition = VibrationEffect.startComposition()
+    // The launch, a rising rumble of low ticks.
+    repeat(Random.nextInt(3, 6)) { index -> composition.addPrimitive(lowTick, 0.3f + index * 0.1f, if (index == 0) 0 else Random.nextInt(25, 45)) }
+    // The bursts: clicks and ticks scattered over half a second, some strong, most faint.
+    repeat(Random.nextInt(8, 14)) {
+        val isPop = Random.nextFloat() < 0.35f
+        composition.addPrimitive(
+            if (isPop) click else tick,
+            if (isPop) Random.nextFloat() * 0.4f + 0.6f else Random.nextFloat() * 0.5f + 0.2f,
+            Random.nextInt(15, 70),
+        )
+    }
+    vibrator.vibrate(composition.compose())
+}
 
 actual fun imageCacheDirectory(context: PlatformContext): Path =
     context.cacheDir.resolve("avatars").absolutePath.toPath()

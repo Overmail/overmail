@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
@@ -31,6 +32,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.runtime.snapshotFlow
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
@@ -46,6 +51,9 @@ private val CONFIRM_AFTER = 50.milliseconds
 
 /** How long a finger has to rest on a card, unmoved, for the card to be lifted off the pile. */
 internal val LIFT_AFTER = 200.milliseconds
+
+/** How long a card brought back waits for its mail to be on the pile again. */
+private val BRING_BACK_TIMEOUT = 2.seconds
 
 /** How big the top card is while a finger is on it. */
 private const val PRESSED_SCALE = 0.96f
@@ -103,6 +111,9 @@ internal class CardMotion {
     /** What it was thrown off for, once it is [leaving]. */
     var thrownFor: StackSwipe? by mutableStateOf(null)
 
+    /** Brought back onto the pile, see [EmailStackState.bringBack]: it flies in, it does not rise out of it. */
+    var returning = false
+
     /** How big it is while a finger is on it: a little smaller, as if pressed into the pile. */
     val press = Animatable(1f)
 
@@ -138,8 +149,37 @@ class EmailStackState internal constructor(
      */
     internal val gone = mutableStateSetOf<Uuid>()
 
-    /** What the pile shows, top first, the cards on their way out included. */
+    /** What the pile shows, top first; not the cards on their way out, see [thrown]. */
     internal var cards: List<Email> by mutableStateOf(emptyList())
+
+    /**
+     * The cards thrown off the pile and still on their way out, first thrown first. Their swipe is
+     * done with the moment they are let go, so the list may no longer have them.
+     */
+    internal val thrown = mutableStateListOf<Email>()
+
+    /** The ids of every mail the list handed the pile last; null until it handed any. */
+    internal var listed: Set<Uuid>? by mutableStateOf(null)
+
+    /**
+     * Nothing on the pile, nothing on its way out and nothing on its way back: what the end of the
+     * pile shows for. Not the list alone, which is empty while the last card still flies off and
+     * again after an undo, before the mail is back in it.
+     */
+    val isEmpty: Boolean get() = listed != null && cards.isEmpty() && thrown.isEmpty() && motions.values.none { it.returning }
+
+    /**
+     * The last card of the pile was swiped off it here, rather than the pile being empty when it
+     * came up or emptied by a sync: what a worked-through pile is celebrated for. Taken back by an
+     * undo or a card that comes onto the pile after all; [consumeFinishedBySwipe] once it has been
+     * celebrated.
+     */
+    var finishedBySwipe by mutableStateOf(false)
+        internal set
+
+    fun consumeFinishedBySwipe() {
+        finishedBySwipe = false
+    }
     internal var onSwiped: (Email, StackSwipe) -> Unit = { _, _ -> }
     internal var onOpen: (Email) -> Unit = {}
 
@@ -167,6 +207,8 @@ class EmailStackState internal constructor(
     /** How the card of [id] is being moved, or null while it lies in its place. */
     internal fun dragOf(id: Uuid): CardDrag? {
         val motion = motions[id] ?: return null
+        // On its way back it says nothing: letting go of it does not do anything.
+        if (motion.returning && held?.second !== motion) return null
         val x = motion.offset.x
         val progress = if (cardSize.width == 0) 0f else abs(x) / threshold
         return CardDrag(
@@ -240,6 +282,34 @@ class EmailStackState internal constructor(
         top?.let(onOpen)
     }
 
+    /**
+     * The swipe of [email] is taken back: once the mail is on the pile again, its card flies back
+     * in from where it was thrown to, the other way round from how it left.
+     */
+    fun bringBack(email: Email, swipe: StackSwipe) {
+        finishedBySwipe = false
+        gone -= email.id
+        thrown.removeAll { it.id == email.id }
+        motions[email.id]?.job?.cancel()
+        val motion = CardMotion().apply {
+            returning = true
+            offset = Offset(
+                x = (if (swipe == StackSwipe.Archive) -1 else 1) * cardSize.width * 1.5f,
+                y = 0f,
+            )
+        }
+        motions[email.id] = motion
+        motion.job = scope.launch {
+            // The pile gets it back from the view model, which may take a moment -- or not at all,
+            // when putting it back fails.
+            val isBack = withTimeoutOrNull(BRING_BACK_TIMEOUT) { snapshotFlow { cards.any { it.id == email.id } }.first { it } }
+            if (isBack != null) {
+                animate(Offset.VectorConverter, motion.offset, Offset.Zero, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) { value, _ -> motion.offset = value }
+            }
+            if (motions[email.id] === motion) motions.remove(email.id)
+        }
+    }
+
     internal fun dragBy(delta: Offset) {
         val (email, motion) = held ?: return
         // A lifted card is there to be read, not swiped: it stays where it is until it is let go,
@@ -252,14 +322,13 @@ class EmailStackState internal constructor(
         liftJob?.cancel()
         val wasBeyond = abs(motion.offset.x) > threshold
         motion.offset += delta
-        // Felt where letting go starts to mean something, and again where it stops to.
+        // Felt where letting go starts to mean something; going back below it is not.
         val isBeyond = abs(motion.offset.x) > threshold
         if (isBeyond && !wasBeyond) {
             beyondSince = TimeSource.Monotonic.markNow()
             haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
         } else if (wasBeyond && !isBeyond) {
             beyondSince = null
-            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
         }
     }
 
@@ -292,9 +361,13 @@ class EmailStackState internal constructor(
         val heldPast = beyondSince?.let { it.elapsedNow() >= CONFIRM_AFTER } == true
         beyondSince = null
         if (heldPast) haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-        // Right away rather than once it is out: the next touch already goes to the card below.
+        // Right away rather than once it is out: the next touch already goes to the card below,
+        // and the swipe is done with the moment the finger lets go -- the card only shows it.
         motion.leaving = true
         motion.thrownFor = swipe
+        thrown += email
+        finishedBySwipe = cards.none { it.id != email.id && !isLeaving(it.id) }
+        onSwiped(email, swipe)
         motion.job = scope.launch {
             // On along the way it was thrown, up or down included.
             val target = Offset(
@@ -302,9 +375,10 @@ class EmailStackState internal constructor(
                 y = offset.y + velocity.y * 0.15f,
             )
             animate(Offset.VectorConverter, offset, target, initialVelocity, tween(durationMillis = 250)) { value, _ -> motion.offset = value }
-            gone += email.id
+            // Only while the list still has it: once it has caught up, nothing would let it go again.
+            if (listed?.contains(email.id) == true) gone += email.id
+            thrown.remove(email)
             motions.remove(email.id)
-            onSwiped(email, swipe)
         }
     }
 }

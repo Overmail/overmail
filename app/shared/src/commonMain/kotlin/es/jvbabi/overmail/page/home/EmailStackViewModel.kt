@@ -13,7 +13,10 @@ import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
+import es.jvbabi.overmail.page.home.components.stack.StackSwipe
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -51,7 +54,10 @@ class EmailStackViewModel(
      * from coming straight back; an archived one is held back here too until the database no
      * longer lists it, and while a sync may still bring the server's older state.
      */
-    private val handled = MutableStateFlow(emptySet<Uuid>())
+    private val handled = MutableStateFlow(emptyList<HandledEmail>())
+
+    /** Archive requests still on their way, so an undo comes after them rather than before. */
+    private val archiving = mutableMapOf<Uuid, Deferred<Result<Unit>>>()
 
     private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
 
@@ -72,7 +78,10 @@ class EmailStackViewModel(
                         .flowOn(Dispatchers.Default)
                         .map { emails -> account to emails }
                 }
-                .combine(handled) { (account, emails), handled -> account to emails.filter { it.id !in handled } }
+                .combine(handled) { (account, emails), handled ->
+                    val handledIds = handled.mapTo(HashSet()) { it.email.id }
+                    account to emails.filter { it.id !in handledIds }
+                }
                 .collect { (account, emails) ->
                     state.update { it.copy(emails = emails, isLoading = false) }
                     // One that failed is asked for again, the next time the pile changes with it
@@ -86,6 +95,9 @@ class EmailStackViewModel(
         viewModelScope.launch {
             bodies.bodies.collect { known -> state.update { it.copy(bodies = known) } }
         }
+        viewModelScope.launch {
+            handled.collect { handled -> state.update { it.copy(handled = handled) } }
+        }
     }
 
     /** Where the mail of [emailId] lies on the pile now, 0 on top; far down once it is off it. */
@@ -96,10 +108,11 @@ class EmailStackViewModel(
         when (event) {
             is EmailStackEvent.Archive -> archive(event.email)
             is EmailStackEvent.Keep -> {
-                handled.update { it + event.email.id }
+                handled.update { it + HandledEmail(event.email, StackSwipe.Keep) }
                 markRead(event.email)
             }
             is EmailStackEvent.Read -> markRead(event.email)
+            is EmailStackEvent.Undo -> undo(event.email)
         }
     }
 
@@ -111,12 +124,38 @@ class EmailStackViewModel(
 
     /** Off the pile at once; the request runs on its own, and a failed one puts the mail back. */
     private fun archive(email: Email) {
-        handled.update { it + email.id }
+        handled.update { it + HandledEmail(email, StackSwipe.Archive) }
         markRead(email)
+        val request = viewModelScope.async { emailsRepository.setArchivedState(email, ArchivedState.Archive, email.overmailAccount) }
+        archiving[email.id] = request
         viewModelScope.launch {
-            emailsRepository.setArchivedState(email, ArchivedState.Archive, email.overmailAccount).onFailure {
-                handled.update { it - email.id }
+            request.await().onFailure {
+                handled.update { handled -> handled.filterNot { it.email.id == email.id } }
                 messageChannel.send(EmailStackMessage.ArchiveFailed)
+            }
+            if (archiving[email.id] === request) archiving.remove(email.id)
+        }
+    }
+
+    /**
+     * Puts the mail of [email] back on top of the pile. A kept one only needs to be let through
+     * again; an archived one is taken back out of the archive, once the archive itself is through.
+     */
+    private fun undo(email: Email) {
+        val entry = handled.value.firstOrNull { it.email.id == email.id } ?: return
+        if (entry.swipe == StackSwipe.Keep) {
+            handled.update { handled -> handled - entry }
+            return
+        }
+        viewModelScope.launch {
+            // Failed, the archive has put the mail back already and said so.
+            if (archiving[email.id]?.await()?.isFailure == true) return@launch
+            handled.update { handled -> handled - entry }
+            // The archived state is what a failed request goes back to.
+            val archived = entry.email.copy(archivedState = ArchivedState.Archive)
+            emailsRepository.setArchivedState(archived, ArchivedState.Unarchive, email.overmailAccount).onFailure {
+                handled.update { handled -> handled + entry }
+                messageChannel.send(EmailStackMessage.UndoFailed)
             }
         }
     }
@@ -136,13 +175,24 @@ data class EmailStackContentState(
     val emails: List<Email> = emptyList(),
     /** What the mails near the top of the pile say, as far as it is asked for. */
     val bodies: Map<Uuid, StackCardBody> = emptyMap(),
+    /**
+     * What was swiped off the pile, archived or kept, since the app started, in the order it was
+     * swiped: the last one swiped last. Not in [emails].
+     */
+    val handled: List<HandledEmail> = emptyList(),
     val isLoading: Boolean = true,
 )
 
 enum class EmailStackMessage {
     /** Archiving a mail did not reach the server; it is back on the pile. */
     ArchiveFailed,
+
+    /** Taking a mail back out of the archive did not reach the server; it stays archived. */
+    UndoFailed,
 }
+
+/** A mail swiped off the pile, and which way. */
+data class HandledEmail(val email: Email, val swipe: StackSwipe)
 
 sealed class EmailStackEvent {
     /** Swiped to the left. */
@@ -153,4 +203,7 @@ sealed class EmailStackEvent {
 
     /** Lay on top of the pile long enough to count as seen. */
     data class Read(val email: Email) : EmailStackEvent()
+
+    /** The swipe of [email] taken back: it goes back on the pile, out of the archive if need be. */
+    data class Undo(val email: Email) : EmailStackEvent()
 }

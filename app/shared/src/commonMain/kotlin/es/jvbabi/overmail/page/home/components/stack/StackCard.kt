@@ -66,8 +66,8 @@ internal data class CardHand(
  * One sheet of the pile, drawn where [pose] says. [depth] is its place in the pile as a whole
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
  * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
- * scrolled; only a lifted card is, see [es.jvbabi.overmail.ui.lift.LiftState], the others lie at
- * its top. [shownHeight] is how much of it shows while it is lifted, see [CardBody]. [isShared]: the
+ * scrolled; only while lifted is it moved, see [es.jvbabi.overmail.ui.lift.LiftState], and it
+ * stays there once it is put back. [shownHeight] is how much of it shows while it is lifted, see [CardBody]. [isShared]: the
  * page of its mail grows out of it, see [mailRow].
  */
 @Composable
@@ -138,7 +138,6 @@ internal fun MailCard(
         CardHeader(
             email = email,
             hazeState = hazeState,
-            isShared = isShared,
             modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
         )
 

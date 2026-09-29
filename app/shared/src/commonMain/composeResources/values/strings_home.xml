@@ -108,6 +108,8 @@
     <!-- The heading of a card on the pile for a mail without a subject. -->
     <string name="home_stack_no_subject">No subject</string>
     <string name="home_stack_empty">All done</string>
+    <string name="home_stack_empty_description">Nothing left in your inbox. What you archived is waiting in the archive.</string>
+    <string name="home_stack_open_archive">Open archive</string>
     <!-- On a card pulled aside: "Pull" until letting go would do it, then "Let go"; followed by what it does. -->
     <string name="home_stack_overlay_pull">Pull</string>
     <string name="home_stack_overlay_let_go">Let go</string>
@@ -115,6 +117,13 @@
     <string name="home_stack_overlay_skip">to skip</string>
     <string name="home_stack_body_failed">The mail could not be loaded.</string>
     <string name="home_stack_archive_failed">The mail could not be archived and is back in your inbox.</string>
+    <string name="home_stack_undo_failed">The mail could not be taken out of the archive.</string>
+    <!-- Under the pile: what happened to the card swiped last, and a button that takes it back. -->
+    <string name="home_stack_toolbar_archived">Archived</string>
+    <string name="home_stack_toolbar_skipped">Skipped</string>
+    <string name="home_stack_toolbar_undo">Undo</string>
+    <!-- How many mails of the pile are dealt with, of how many there are: "3/5". -->
+    <string name="home_stack_toolbar_progress">%1$d/%2$d</string>
 
     <string name="home_nav_stack">Stack</string>
     <string name="home_nav_list">List</string>

@@ -1,0 +1,10 @@
+{
+  "title": "Undo a swipe on the stack",
+  "description": "Swiped a card the wrong way? The bar under the stack shows what happened to the last card and brings it back with a tap, out of the archive too.",
+  "localized": {
+    "de": {
+      "title": "Wischen im Stapel rückgängig machen",
+      "description": "Eine Karte in die falsche Richtung gewischt? Die Leiste unter dem Stapel zeigt, was mit der letzten Karte passiert ist, und holt sie mit einem Tipp zurück, auch aus dem Archiv."
+    }
+  }
+}

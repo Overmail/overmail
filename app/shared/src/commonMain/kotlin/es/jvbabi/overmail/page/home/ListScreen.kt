@@ -52,12 +52,15 @@ private val EDGE_BLUR_RADIUS = 48.dp
 
 /**
  * [focusSearch] puts the cursor into the search, once: [onSearchFocused] says it is done, and the
- * request is taken back. [onOpenEmail] opens the page of a mail that was tapped.
+ * request is taken back. [openArchive] turns the view to the archive the same way, see
+ * [onArchiveOpened]. [onOpenEmail] opens the page of a mail that was tapped.
  */
 @Composable
 fun ListScreen(
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
+    openArchive: Boolean = false,
+    onArchiveOpened: () -> Unit = {},
     onOpenEmail: (Uuid) -> Unit = {},
 ) {
     val homeViewModel = koinViewModel<HomeViewModel>()
@@ -68,6 +71,12 @@ fun ListScreen(
     val listBodies by viewViewModel.bodies.collectAsStateWithLifecycle()
     val viewSettingsViewModel = koinViewModel<ViewSettingsViewModel>()
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(openArchive) {
+        if (!openArchive) return@LaunchedEffect
+        viewViewModel.onEvent(ViewEvent.SetViewState(ViewState.Archive))
+        onArchiveOpened()
+    }
 
     ListContent(
         liftState = LocalLiftState.current,

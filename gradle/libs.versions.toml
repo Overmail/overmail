@@ -38,6 +38,7 @@ room = "2.8.5"
 sqlite = "2.7.1"
 haze = "2.0.0"
 phosphor = "1.0.5"
+confettikit = "0.9.0"
 human-readable = "2.0.0-alpha02"
 moko-permissions = "0.20.1"
 camerax = "1.6.2"
@@ -136,6 +137,7 @@ app-haze-blur-materials = { module = "dev.chrisbanes.haze:haze-blur-materials", 
 app-coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 app-coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 app-phosphor-regular = { module = "io.github.dev778g-me:phosphoricon-compose", version.ref = "phosphor" }
+app-confettikit = { module = "io.github.vinceglb:confettikit", version.ref = "confettikit" }
 app-human-readable = { module = "nl.jacobras:Human-Readable", version.ref = "human-readable" }
 app-moko-permissions-api = { module = "dev.icerock.moko:permissions", version.ref = "moko-permissions" }
 app-moko-permissions-compose = { module= "dev.icerock.moko:permissions-compose", version.ref = "moko-permissions" }

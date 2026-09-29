@@ -11,6 +11,9 @@
     <!-- Asked for in the onboarding, from Android 13 on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- The haptic firework of a worked-through stack plays its own taps, see hapticFirework(). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!--
       Only for saving an update to the user's Downloads folder, and only on the versions that had no
       MediaStore to do it through. From Android 10 on the Downloads collection needs no permission

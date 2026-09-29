@@ -155,8 +155,9 @@ private fun SwipeHint(towards: StackSwipe, isEnough: Boolean, side: Alignment.Ho
     }
 }
 
+/** The colors of a swipe: the overlay of a card pulled that way, and the toolbar after it. */
 @Composable
-private fun StackSwipe.colors(): BaseColor = when (this) {
+internal fun StackSwipe.colors(): BaseColor = when (this) {
     StackSwipe.Archive -> MaterialTheme.baseColors.emerald
     StackSwipe.Keep -> MaterialTheme.baseColors.blue
 }

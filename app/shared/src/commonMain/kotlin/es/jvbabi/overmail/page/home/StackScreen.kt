@@ -26,12 +26,14 @@ import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_stack_archive_failed
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 
 /** How long an unread mail lies on top of the pile until it counts as read. */
 private val STACK_READ_AFTER = 2.seconds
 
+/** [onOpenEmail] opens the page of the mail on top, tapped twice. */
 @Composable
-fun StackScreen() {
+fun StackScreen(onOpenEmail: (Uuid) -> Unit = {}) {
     val homeViewModel = koinViewModel<HomeViewModel>()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
@@ -52,6 +54,7 @@ fun StackScreen() {
         stackContent = stackContent,
         snackbarHostState = snackbarHostState,
         onStackEvent = emailStackViewModel::onEvent,
+        onOpenEmail = onOpenEmail,
     )
 }
 
@@ -63,6 +66,7 @@ private fun StackContent(
     stackContent: EmailStackContentState,
     snackbarHostState: SnackbarHostState,
     onStackEvent: (EmailStackEvent) -> Unit,
+    onOpenEmail: (Uuid) -> Unit = {},
 ) {
     val localDensity = LocalDensity.current
     val bottomNavBarHeight = LocalBottomNavBarHeight.current
@@ -91,6 +95,7 @@ private fun StackContent(
                         }
                     )
                 },
+                onOpen = { onOpenEmail(it.id) },
                 modifier = Modifier
                     .fillMaxSize()
                     // Below the header only, so its buttons still get their touches.

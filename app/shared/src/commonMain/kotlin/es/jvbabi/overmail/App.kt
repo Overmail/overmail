@@ -246,7 +246,9 @@ fun App() {
                             entryProvider = { key ->
                                 when (key) {
                                     is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                        ScreenEntry(appViewModelStoreOwner) { StackScreen() }
+                                        ScreenEntry(appViewModelStoreOwner) {
+                                            StackScreen(onOpenEmail = { backstack.add(Screen.Email(it)) })
+                                        }
                                     }
 
                                     is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {

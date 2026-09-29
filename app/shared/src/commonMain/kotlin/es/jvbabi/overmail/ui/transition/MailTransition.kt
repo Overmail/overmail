@@ -141,8 +141,13 @@ class MailTransition {
     /** Whether the mail of [emailId] is on its way into or out of its page; read while drawing. */
     fun isOnTheWay(emailId: Uuid): Boolean {
         val progress = progress ?: return false
-        return pageEmailId == emailId && progress() < 1f
+        // Not at 0 either: a page whose way out has ended is no longer drawn, but it is attached
+        // until it is disposed a frame later, and the row would be missing in that frame.
+        return pageEmailId == emailId && progress().let { it > 0f && it < 1f }
     }
+
+    /** Whether a mail's page is there, or on its way in or out. */
+    fun hasPage(): Boolean = pageEmailId != null
 
     internal fun attachPage(emailId: Uuid, progress: () -> Float) {
         this.pageEmailId = emailId

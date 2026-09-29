@@ -86,6 +86,7 @@ fun EmailStack(
     SideEffect {
         state.listed = emails.mapTo(HashSet()) { it.id }
         state.cards = visible
+        if (visible.isNotEmpty()) state.finishedBySwipe = false
         state.onSwiped = { email, swipe -> currentOnSwiped(email, swipe) }
         state.onOpen = { email -> currentOnOpen(email) }
     }

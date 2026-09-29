@@ -167,6 +167,19 @@ class EmailStackState internal constructor(
      * again after an undo, before the mail is back in it.
      */
     val isEmpty: Boolean get() = listed != null && cards.isEmpty() && thrown.isEmpty() && motions.values.none { it.returning }
+
+    /**
+     * The last card of the pile was swiped off it here, rather than the pile being empty when it
+     * came up or emptied by a sync: what a worked-through pile is celebrated for. Taken back by an
+     * undo or a card that comes onto the pile after all; [consumeFinishedBySwipe] once it has been
+     * celebrated.
+     */
+    var finishedBySwipe by mutableStateOf(false)
+        internal set
+
+    fun consumeFinishedBySwipe() {
+        finishedBySwipe = false
+    }
     internal var onSwiped: (Email, StackSwipe) -> Unit = { _, _ -> }
     internal var onOpen: (Email) -> Unit = {}
 
@@ -274,6 +287,7 @@ class EmailStackState internal constructor(
      * in from where it was thrown to, the other way round from how it left.
      */
     fun bringBack(email: Email, swipe: StackSwipe) {
+        finishedBySwipe = false
         gone -= email.id
         thrown.removeAll { it.id == email.id }
         motions[email.id]?.job?.cancel()
@@ -352,6 +366,7 @@ class EmailStackState internal constructor(
         motion.leaving = true
         motion.thrownFor = swipe
         thrown += email
+        finishedBySwipe = cards.none { it.id != email.id && !isLeaving(it.id) }
         onSwiped(email, swipe)
         motion.job = scope.launch {
             // On along the way it was thrown, up or down included.

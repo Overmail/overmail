@@ -99,13 +99,13 @@ private fun StackContent(
         onStackEvent(EmailStackEvent.Read(emailOnTop))
     }
 
-    // Confetti only for a pile worked through here, not for one that was empty to begin with.
+    // Confetti only for the last card swiped off here: not for a pile that was empty when it came
+    // up, or that a sync emptied.
     val isDone = !stackContent.isLoading && emailStackState.isEmpty
-    var hadMails by remember { mutableStateOf(false) }
     var celebrates by remember { mutableStateOf(false) }
     LaunchedEffect(isDone) {
-        if (!isDone) hadMails = !stackContent.isLoading
-        else if (hadMails) {
+        if (isDone && emailStackState.finishedBySwipe) {
+            emailStackState.consumeFinishedBySwipe()
             celebrates = true
             hapticFirework()
         }

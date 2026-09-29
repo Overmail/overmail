@@ -2,7 +2,6 @@ package es.jvbabi.overmail.ui.lift
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.Composable
@@ -93,13 +92,12 @@ class LiftState internal constructor(
     fun isLifted(key: Any): Boolean = lifted == key
 
     /**
-     * Lifts the content made [liftable] with [key] and starts scrolling it by the finger. What was
-     * lifted before is dropped back into its place at once.
+     * Lifts the content made [liftable] with [key] and starts scrolling it by the finger, from
+     * where it was scrolled to before. What was lifted before is dropped back into its place at once.
      */
     fun lift(key: Any) {
         scrollJob?.cancel()
         fingerY = 0f
-        targets[key]?.scroll?.scrollTo(0f)
         lifted = key
         isHeld = true
         haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -121,7 +119,10 @@ class LiftState internal constructor(
         fingerY += deltaY
     }
 
-    /** The finger let go: the content goes back into its place, scrolled back to its top on the way. */
+    /**
+     * The finger let go: the content goes back into its place, scrolled as far as it was -- lifted
+     * again, it is read on from there.
+     */
     fun release() {
         val key = lifted ?: return
         if (!isHeld) return
@@ -129,10 +130,6 @@ class LiftState internal constructor(
         scrollJob?.cancel()
         fingerY = 0f
         scope.launch {
-            // Back to its top on the way down: what it turns back into in its place is there.
-            targets[key]?.scroll?.let { scroll ->
-                launch { animate(scroll.value, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { value, _ -> scroll.scrollTo(value) } }
-            }
             progressAnimatable.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
             // Not if something else was lifted meanwhile, which takes the animation over.
             if (lifted == key) lifted = null

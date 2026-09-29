@@ -64,6 +64,8 @@ class ListMailPreview(val lift: LiftState) {
 
     /** A finger went down on the row of [email], at [origin]: the card turns to that mail, in case it is held. */
     internal fun prepare(email: Email, origin: Rect) {
+        // One card for every mail: another one is read from its top.
+        if (email.id != this.email?.id) scroll.scrollTo(0f)
         this.email = email
         this.origin = origin
     }

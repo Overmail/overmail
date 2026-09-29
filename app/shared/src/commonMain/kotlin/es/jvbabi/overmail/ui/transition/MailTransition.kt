@@ -40,7 +40,7 @@ import kotlin.uuid.Uuid
  * How long a mail takes to grow out of its row into its page, and back. What the NavDisplay's
  * transitions for the page last: the page reads how far it is from theirs, see [rememberScreenProgress].
  */
-const val MAIL_TRANSITION_MILLIS = 450
+const val MAIL_TRANSITION_MILLIS = 250
 
 /** How round the corners of the page are while it is on the way, as round as a row's at the start. */
 private val ROW_CORNER = 16.dp

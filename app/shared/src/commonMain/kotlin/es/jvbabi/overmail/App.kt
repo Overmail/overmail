@@ -1,7 +1,6 @@
 package es.jvbabi.overmail
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.lifecycle.ViewModelStoreOwner
@@ -9,15 +8,12 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import es.jvbabi.overmail.page.email.EmailScreen
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.slideIn
-import androidx.compose.animation.slideOut
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.tween
 import es.jvbabi.overmail.ui.transition.LocalMailTransition
 import es.jvbabi.overmail.ui.transition.LocalScreenProgress
-import es.jvbabi.overmail.ui.transition.MAIL_TRANSITION_MILLIS
 import es.jvbabi.overmail.ui.transition.MailTransition
+import es.jvbabi.overmail.ui.transition.MailPageEntry
+import es.jvbabi.overmail.ui.transition.MailSceneStrategy
 import es.jvbabi.overmail.ui.transition.rememberScreenProgress
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -94,33 +90,19 @@ private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(twee
 private const val TAB_FADE_MILLIS = 200
 
 /**
- * A mail's page grows out of the row that was tapped and shrinks back into it, see
- * `MailTransition`, which draws all of it from how far these have played. So they show nothing
- * of their own -- a pixel of a slide -- and only last as long: the screen below stays as it is,
- * under the page, and a predictive back seeks them, and the page with them. Not an alpha from 1
- * to 1: an animation that changes nothing takes no time, and the transition would have none.
- */
-private val MAIL_TRANSITION: Map<String, Any> =
-    NavDisplay.transitionSpec { mailHold() togetherWith ExitTransition.KeepUntilTransitionsFinished } +
-        NavDisplay.popTransitionSpec { mailHold() togetherWith mailHoldOut() } +
-        NavDisplay.predictivePopTransitionSpec { mailHold() togetherWith mailHoldOut() }
-
-private fun mailHold() = slideIn(tween(MAIL_TRANSITION_MILLIS, easing = LinearEasing)) { IntOffset(0, 1) }
-
-private fun mailHoldOut() = slideOut(tween(MAIL_TRANSITION_MILLIS, easing = LinearEasing)) { IntOffset(0, 1) }
-
-/**
- * The content of a NavEntry: told how far its screen has come, see [LocalScreenProgress].
- * [viewModelStoreOwner] replaces the entry's own store.
+ * The content of a NavEntry: told how far its screen has come, see [LocalScreenProgress], from
+ * the NavDisplay's transition -- unless [ownProgress], for a mail's page, whose `MailScene` tells
+ * it. [viewModelStoreOwner] replaces the entry's own store.
  */
 @Composable
 private fun ScreenEntry(
     viewModelStoreOwner: ViewModelStoreOwner? = null,
+    ownProgress: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val owner = viewModelStoreOwner ?: checkNotNull(LocalViewModelStoreOwner.current)
     CompositionLocalProvider(
-        LocalScreenProgress provides rememberScreenProgress(),
+        LocalScreenProgress provides if (ownProgress) LocalScreenProgress.current else rememberScreenProgress(),
         LocalViewModelStoreOwner provides owner,
         content = content,
     )
@@ -248,6 +230,9 @@ fun App() {
                         NavDisplay(
                             backStack = backstack,
                             onBack = { backstack.removeLastOrNull() },
+                            // A mail's page lies over the screen it was opened from, which stays
+                            // composed below it, so going back starts at once.
+                            sceneStrategies = listOf(MailSceneStrategy()),
                             entryDecorators = listOf(
                                 rememberSaveableStateHolderNavEntryDecorator(),
                                 rememberViewModelStoreNavEntryDecorator(),
@@ -285,8 +270,8 @@ fun App() {
                                         }
                                     }
 
-                                    is Screen.Email -> NavEntry(key = key, metadata = MAIL_TRANSITION) {
-                                        ScreenEntry() {
+                                    is Screen.Email -> NavEntry(key = key, metadata = MailPageEntry.metadata) {
+                                        ScreenEntry(ownProgress = true) {
                                             EmailScreen(emailId = key.emailId, onBack = { backstack.remove(key) })
                                         }
                                     }

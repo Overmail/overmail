@@ -44,8 +44,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlin.uuid.Uuid
 
 /**
- * How long a mail takes to grow out of its row into its page, and back. What the NavDisplay's
- * transitions for the page last: the page reads how far it is from theirs, see [rememberScreenProgress].
+ * How long a mail takes to grow out of its row into its page, and back, see [MailScene], which
+ * runs the page's progress over it.
  */
 const val MAIL_TRANSITION_MILLIS = 250
 
@@ -66,8 +66,8 @@ private val CARD_SHADOW = Shadow(radius = 24.dp, color = Color.Black.copy(alpha 
 
 /**
  * How far the screen this is composed in has come: 0 before it comes in and once it has gone, 1
- * while it is all there. Follows the NavDisplay's transition, so a predictive back moves it with
- * the finger. 1 outside of a NavDisplay.
+ * while it is all there. Follows the NavDisplay's transition, or a mail's page's own, see
+ * [MailScene]; a predictive back moves it with the finger either way. 1 outside of a NavDisplay.
  */
 val LocalScreenProgress = staticCompositionLocalOf<() -> Float> { { 1f } }
 
@@ -75,11 +75,7 @@ val LocalScreenProgress = staticCompositionLocalOf<() -> Float> { { 1f } }
 @Composable
 fun isScreenSettled(): Boolean = LocalScreenProgress.current() >= 1f
 
-/**
- * [LocalScreenProgress] for the NavEntry this is composed in, read from how far its transition has
- * played. The transitions of a mail's page show nothing of their own and only last
- * [MAIL_TRANSITION_MILLIS], so that is what the progress runs over; how it looks is drawn from it.
- */
+/** [LocalScreenProgress] for the NavEntry this is composed in, read from how far its transition has played. */
 @Composable
 fun rememberScreenProgress(): () -> Float {
     val transition = LocalNavAnimatedContentScope.current.transition
@@ -116,7 +112,7 @@ internal class RowSnapshot(val emailId: Uuid, val layer: GraphicsLayer) {
  * grows out of the row's bounds as a card with round corners and a shadow, what the row shows
  * fades out sliding up, and the page fades in sliding up into place. Drawn by the page, see
  * [mailPage], from a picture the row takes of itself, see [mailRow]; how far it is comes from the
- * page's NavDisplay transition, so the back gesture drives it.
+ * page's [MailScene], so the back gesture drives it.
  *
  * One for the whole app, [LocalMailTransition]: one page is on its way at a time.
  */

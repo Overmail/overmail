@@ -70,9 +70,11 @@ fun EmailStack(
 ) {
     val currentOnSwiped by rememberUpdatedState(onSwiped)
     val currentOnOpen by rememberUpdatedState(onOpen)
-    val visible = emails.filter { it.id !in state.gone }
-    val leaving = visible.filter { state.isLeaving(it.id) }
-    val cards = visible.filterNot { state.isLeaving(it.id) }.take(VISIBLE_CARDS)
+    val visible = emails.filter { it.id !in state.gone && !state.isLeaving(it.id) }
+    // Thrown off the pile: their swipe is done with and the list may no longer have them, but
+    // they are still on their way out.
+    val leaving = state.thrown.toList()
+    val cards = visible.take(VISIBLE_CARDS)
 
     // The first cards there are come in as a fan pushed up from below; everything after that
     // only moves up the pile. Not state: it is decided once, while composing those cards. Back
@@ -83,6 +85,7 @@ fun EmailStack(
     if (firstDeal.ids == null && cards.isNotEmpty()) firstDeal.ids = cards.mapTo(HashSet()) { it.id }
 
     SideEffect {
+        state.listed = emails.mapTo(HashSet()) { it.id }
         state.cards = visible
         state.onSwiped = { email, swipe -> currentOnSwiped(email, swipe) }
         state.onOpen = { email -> currentOnOpen(email) }

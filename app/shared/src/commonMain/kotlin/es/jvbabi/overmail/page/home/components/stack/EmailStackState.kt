@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
@@ -148,8 +149,17 @@ class EmailStackState internal constructor(
      */
     internal val gone = mutableStateSetOf<Uuid>()
 
-    /** What the pile shows, top first, the cards on their way out included. */
+    /** What the pile shows, top first; not the cards on their way out, see [thrown]. */
     internal var cards: List<Email> by mutableStateOf(emptyList())
+
+    /**
+     * The cards thrown off the pile and still on their way out, first thrown first. Their swipe is
+     * done with the moment they are let go, so the list may no longer have them.
+     */
+    internal val thrown = mutableStateListOf<Email>()
+
+    /** The ids of every mail the list handed the pile last; null until it handed any. */
+    internal var listed: Set<Uuid>? by mutableStateOf(null)
     internal var onSwiped: (Email, StackSwipe) -> Unit = { _, _ -> }
     internal var onOpen: (Email) -> Unit = {}
 
@@ -258,6 +268,7 @@ class EmailStackState internal constructor(
      */
     fun bringBack(email: Email, swipe: StackSwipe) {
         gone -= email.id
+        thrown.removeAll { it.id == email.id }
         motions[email.id]?.job?.cancel()
         val motion = CardMotion().apply {
             returning = true
@@ -329,9 +340,12 @@ class EmailStackState internal constructor(
         val heldPast = beyondSince?.let { it.elapsedNow() >= CONFIRM_AFTER } == true
         beyondSince = null
         if (heldPast) haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-        // Right away rather than once it is out: the next touch already goes to the card below.
+        // Right away rather than once it is out: the next touch already goes to the card below,
+        // and the swipe is done with the moment the finger lets go -- the card only shows it.
         motion.leaving = true
         motion.thrownFor = swipe
+        thrown += email
+        onSwiped(email, swipe)
         motion.job = scope.launch {
             // On along the way it was thrown, up or down included.
             val target = Offset(
@@ -339,9 +353,10 @@ class EmailStackState internal constructor(
                 y = offset.y + velocity.y * 0.15f,
             )
             animate(Offset.VectorConverter, offset, target, initialVelocity, tween(durationMillis = 250)) { value, _ -> motion.offset = value }
-            gone += email.id
+            // Only while the list still has it: once it has caught up, nothing would let it go again.
+            if (listed?.contains(email.id) == true) gone += email.id
+            thrown.remove(email)
             motions.remove(email.id)
-            onSwiped(email, swipe)
         }
     }
 }

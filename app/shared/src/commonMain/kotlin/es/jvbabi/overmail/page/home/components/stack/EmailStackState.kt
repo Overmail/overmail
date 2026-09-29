@@ -31,6 +31,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.runtime.snapshotFlow
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
@@ -46,6 +50,9 @@ private val CONFIRM_AFTER = 50.milliseconds
 
 /** How long a finger has to rest on a card, unmoved, for the card to be lifted off the pile. */
 internal val LIFT_AFTER = 200.milliseconds
+
+/** How long a card brought back waits for its mail to be on the pile again. */
+private val BRING_BACK_TIMEOUT = 2.seconds
 
 /** How big the top card is while a finger is on it. */
 private const val PRESSED_SCALE = 0.96f
@@ -102,6 +109,9 @@ internal class CardMotion {
 
     /** What it was thrown off for, once it is [leaving]. */
     var thrownFor: StackSwipe? by mutableStateOf(null)
+
+    /** Brought back onto the pile, see [EmailStackState.bringBack]: it flies in, it does not rise out of it. */
+    var returning = false
 
     /** How big it is while a finger is on it: a little smaller, as if pressed into the pile. */
     val press = Animatable(1f)
@@ -167,6 +177,8 @@ class EmailStackState internal constructor(
     /** How the card of [id] is being moved, or null while it lies in its place. */
     internal fun dragOf(id: Uuid): CardDrag? {
         val motion = motions[id] ?: return null
+        // On its way back it says nothing: letting go of it does not do anything.
+        if (motion.returning && held?.second !== motion) return null
         val x = motion.offset.x
         val progress = if (cardSize.width == 0) 0f else abs(x) / threshold
         return CardDrag(
@@ -238,6 +250,32 @@ class EmailStackState internal constructor(
     /** The top card was tapped twice: its mail is opened on its page, which grows out of the card. */
     internal fun open() {
         top?.let(onOpen)
+    }
+
+    /**
+     * The swipe of [email] is taken back: once the mail is on the pile again, its card flies back
+     * in from where it was thrown to, the other way round from how it left.
+     */
+    fun bringBack(email: Email, swipe: StackSwipe) {
+        gone -= email.id
+        motions[email.id]?.job?.cancel()
+        val motion = CardMotion().apply {
+            returning = true
+            offset = Offset(
+                x = (if (swipe == StackSwipe.Archive) -1 else 1) * cardSize.width * 1.5f,
+                y = 0f,
+            )
+        }
+        motions[email.id] = motion
+        motion.job = scope.launch {
+            // The pile gets it back from the view model, which may take a moment -- or not at all,
+            // when putting it back fails.
+            val isBack = withTimeoutOrNull(BRING_BACK_TIMEOUT) { snapshotFlow { cards.any { it.id == email.id } }.first { it } }
+            if (isBack != null) {
+                animate(Offset.VectorConverter, motion.offset, Offset.Zero, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) { value, _ -> motion.offset = value }
+            }
+            if (motions[email.id] === motion) motions.remove(email.id)
+        }
     }
 
     internal fun dragBy(delta: Offset) {

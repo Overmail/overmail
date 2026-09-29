@@ -124,7 +124,9 @@ fun EmailStack(
         // them. One loop for both: a card that is thrown keeps its node, and with it its state.
         for (email in cards.asReversed() + leaving) {
             val depth = cards.indexOf(email).coerceAtLeast(0)
-            val isFirst = firstDeal.ids?.contains(email.id) == true
+            // Brought back, it flies in rather than being dealt or rising out of the pile.
+            val isReturning = state.motionOf(email.id)?.returning == true
+            val isFirst = firstDeal.ids?.contains(email.id) == true && !isReturning
             key(email.id) {
                 PiledCard(
                     email = email,
@@ -132,7 +134,7 @@ fun EmailStack(
                     depth = depth,
                     state = state,
                     dealDelay = if (isFirst && !firstDeal.isReturn) (cards.lastIndex - depth) * DEAL_STAGGER else null,
-                    inPlace = isFirst && firstDeal.isReturn,
+                    inPlace = (isFirst && firstDeal.isReturn) || isReturning,
                     isShared = email.id == cards.firstOrNull()?.id,
                 )
             }

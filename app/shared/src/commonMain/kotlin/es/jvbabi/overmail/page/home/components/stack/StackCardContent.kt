@@ -43,6 +43,8 @@ import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
 import es.jvbabi.overmail.utils.sentAtLabel
+import es.jvbabi.overmail.ui.transition.MailPart
+import es.jvbabi.overmail.ui.transition.mailPart
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_stack_body_failed
@@ -80,10 +82,13 @@ private val HEADER_EASING = Easing { fraction -> EaseInOut.transform(((fraction 
 /**
  * What a card says of its mail before the mail itself: the subject, who sent it, its labels. It
  * lies over the mail, which [hazeState] captures, and blurs and covers it where the mail is
- * scrolled behind it.
+ * scrolled behind it. [isShared]: its parts move along into the page of the mail, see [mailPart].
  */
 @Composable
-internal fun CardHeader(email: Email, hazeState: HazeState, modifier: Modifier = Modifier) {
+internal fun CardHeader(email: Email, hazeState: HazeState, modifier: Modifier = Modifier, isShared: Boolean = false) {
+    @Composable
+    fun Modifier.shared(part: MailPart) = if (isShared) mailPart(email.id, part, isRow = true) else this
+
     // The paper of the card, see cardSurface.
     val paper = MaterialTheme.colorScheme.surfaceContainerLowest
 
@@ -101,17 +106,21 @@ internal fun CardHeader(email: Email, hazeState: HazeState, modifier: Modifier =
             color = if (email.subject == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.shared(MailPart.Subject),
         )
-        CardSender(email = email, modifier = Modifier.padding(top = 12.dp))
-        if (email.labels.isNotEmpty()) CardLabels(email = email, modifier = Modifier.padding(top = 8.dp))
+        CardSender(email = email, shared = { shared(it) }, modifier = Modifier.padding(top = 12.dp))
+        if (email.labels.isNotEmpty()) CardLabels(email = email, modifier = Modifier.padding(top = 8.dp).shared(MailPart.Labels))
     }
 }
 
-/** Who sent the mail, and when: the name and the address under it, where they differ. */
+/**
+ * Who sent the mail, and when: the name and the address under it, where they differ. [shared]
+ * marks a part that moves along into the page, see [CardHeader].
+ */
 @Composable
-private fun CardSender(email: Email, modifier: Modifier = Modifier) {
+private fun CardSender(email: Email, shared: @Composable Modifier.(MailPart) -> Modifier, modifier: Modifier = Modifier) {
     Row(modifier = modifier) {
-        ParticipantAvatar(email.sentBy, size = 32.dp)
+        ParticipantAvatar(email.sentBy, size = 32.dp, modifier = Modifier.shared(MailPart.Avatar))
         Spacer(Modifier.width(8.dp))
         Column {
             val primary = email.sentBy.name ?: email.sentBy.email
@@ -123,7 +132,8 @@ private fun CardSender(email: Email, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier
                         .weight(1f, false)
-                        .alignByBaseline(),
+                        .alignByBaseline()
+                        .shared(MailPart.Sender),
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
                 )
@@ -133,7 +143,9 @@ private fun CardSender(email: Email, modifier: Modifier = Modifier) {
                 Text(
                     text = sentAtLabel(email.sentAt),
                     style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                    modifier = Modifier.alignByBaseline(),
+                    modifier = Modifier
+                        .alignByBaseline()
+                        .shared(MailPart.SentAt),
                 )
             }
 

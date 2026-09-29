@@ -31,6 +31,8 @@ import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
 import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.lift.liftable
 import es.jvbabi.overmail.ui.theme.AppTheme
+import es.jvbabi.overmail.ui.transition.LocalMailTransition
+import es.jvbabi.overmail.ui.transition.mailRow
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
@@ -54,7 +56,8 @@ private val DEAL_EASING = CubicBezierEasing(0.2f, 1.04f, 0.32f, 1f)
 
 /**
  * The pile of [emails], the first one on top, each saying what [bodies] has of it. Only draws; the
- * swipe comes in through [state], see [emailStackSwipe].
+ * swipe comes in through [state], see [emailStackSwipe]. [onOpen] opens the page of the mail on
+ * top, which grows out of its card.
  */
 @Composable
 fun EmailStack(
@@ -65,20 +68,26 @@ fun EmailStack(
     onSwiped: (Email, StackSwipe) -> Unit,
     contentPaddingValues: PaddingValues,
     modifier: Modifier = Modifier,
+    onOpen: (Email) -> Unit = {},
 ) {
     val currentOnSwiped by rememberUpdatedState(onSwiped)
+    val currentOnOpen by rememberUpdatedState(onOpen)
     val visible = emails.filter { it.id !in state.gone }
     val leaving = visible.filter { state.isLeaving(it.id) }
     val cards = visible.filterNot { state.isLeaving(it.id) }.take(VISIBLE_CARDS)
 
     // The first cards there are come in as a fan pushed up from below; everything after that
-    // only moves up the pile. Not state: it is decided once, while composing those cards.
-    val firstDeal = remember { FirstDeal() }
+    // only moves up the pile. Not state: it is decided once, while composing those cards. Back
+    // from a mail's page, which the pile is composed anew for, they lie where they were: the
+    // page shrinks back into the top one.
+    val mailTransition = LocalMailTransition.current
+    val firstDeal = remember { FirstDeal(isReturn = mailTransition?.hasPage() == true) }
     if (firstDeal.ids == null && cards.isNotEmpty()) firstDeal.ids = cards.mapTo(HashSet()) { it.id }
 
     SideEffect {
         state.cards = visible
         state.onSwiped = { email, swipe -> currentOnSwiped(email, swipe) }
+        state.onOpen = { email -> currentOnOpen(email) }
     }
 
     // Once the list has caught up with a swipe, the mail no longer needs holding back here.
@@ -115,27 +124,32 @@ fun EmailStack(
         // them. One loop for both: a card that is thrown keeps its node, and with it its state.
         for (email in cards.asReversed() + leaving) {
             val depth = cards.indexOf(email).coerceAtLeast(0)
+            val isFirst = firstDeal.ids?.contains(email.id) == true
             key(email.id) {
                 PiledCard(
                     email = email,
                     body = bodies[email.id] ?: StackCardBody.Loading,
                     depth = depth,
                     state = state,
-                    dealDelay = if (firstDeal.ids?.contains(email.id) == true) (cards.lastIndex - depth) * DEAL_STAGGER else null,
+                    dealDelay = if (isFirst && !firstDeal.isReturn) (cards.lastIndex - depth) * DEAL_STAGGER else null,
+                    inPlace = isFirst && firstDeal.isReturn,
+                    isShared = email.id == cards.firstOrNull()?.id,
                 )
             }
         }
     }
 }
 
-private class FirstDeal {
+/** [isReturn]: the pile was left for a mail's page and is back, its first cards lie in place. */
+private class FirstDeal(val isReturn: Boolean) {
     var ids: Set<Uuid>? = null
 }
 
 /**
  * A [StackCard] in the pile: where [state] and the card's own way into the pile put it.
  * [dealDelay] is set for a card of the first deal, which comes in from below after that long --
- * the bottom of the pile is put down first and the top one lands last.
+ * the bottom of the pile is put down first and the top one lands last. A card [inPlace] is
+ * there from the start. The top card [isShared] with the page of its mail, see [mailRow].
  */
 @Composable
 private fun PiledCard(
@@ -144,14 +158,17 @@ private fun PiledCard(
     depth: Int,
     state: EmailStackState,
     dealDelay: Long?,
+    inPlace: Boolean,
+    isShared: Boolean,
 ) {
     val haptics = LocalHapticFeedback.current
 
     val dealt = remember { Animatable(if (dealDelay == null) 1f else 0f) }
     // A card that turns up later -- the next one coming into view as the top one leaves -- does
     // not pop up behind the others but comes up out of the pile, from one place further down.
-    val appeared = remember { Animatable(if (dealDelay == null) 0f else 1f) }
+    val appeared = remember { Animatable(if (dealDelay == null && !inPlace) 0f else 1f) }
     LaunchedEffect(Unit) {
+        if (inPlace) return@LaunchedEffect
         if (dealDelay == null) {
             appeared.animateTo(1f, tween(durationMillis = 400))
             return@LaunchedEffect
@@ -181,6 +198,7 @@ private fun PiledCard(
         drag = state.dragOf(email.id),
         scroll = scroll,
         shownHeight = { state.lift.shownHeight(email.id) },
+        isShared = isShared,
         // Held still, the card is lifted off the pile as it is, see EmailStackState.press.
         modifier = Modifier.liftable(state.lift, email.id, scroll, CARD_SHAPE),
     )

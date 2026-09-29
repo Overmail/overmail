@@ -45,7 +45,7 @@ private const val SWIPE_THRESHOLD = 0.3f
 private val CONFIRM_AFTER = 50.milliseconds
 
 /** How long a finger has to rest on a card, unmoved, for the card to be lifted off the pile. */
-private val LIFT_AFTER = 200.milliseconds
+internal val LIFT_AFTER = 200.milliseconds
 
 /** How big the top card is while a finger is on it. */
 private const val PRESSED_SCALE = 0.96f
@@ -141,6 +141,7 @@ class EmailStackState internal constructor(
     /** What the pile shows, top first, the cards on their way out included. */
     internal var cards: List<Email> by mutableStateOf(emptyList())
     internal var onSwiped: (Email, StackSwipe) -> Unit = { _, _ -> }
+    internal var onOpen: (Email) -> Unit = {}
 
     /** The card being held, from the touch that picked it up until it is let go. */
     private var held: Pair<Email, CardMotion>? by mutableStateOf(null)
@@ -232,6 +233,11 @@ class EmailStackState internal constructor(
         }
         scope.launch { motion.press.animateTo(PRESSED_SCALE, spring(stiffness = Spring.StiffnessMedium)) }
         return true
+    }
+
+    /** The top card was tapped twice: its mail is opened on its page, which grows out of the card. */
+    internal fun open() {
+        top?.let(onOpen)
     }
 
     internal fun dragBy(delta: Offset) {

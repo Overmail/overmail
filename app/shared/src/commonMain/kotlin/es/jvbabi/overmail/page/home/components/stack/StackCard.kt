@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.ScrollOffset
+import es.jvbabi.overmail.ui.transition.mailRow
 
 internal val CARD_SHAPE = RoundedCornerShape(16.dp)
 
@@ -66,7 +67,8 @@ internal data class CardHand(
  * number, which is what the fan of the first deal opens by. [drag] is what the card is told
  * about the hand on it, see [EmailStackState.dragOf]. [scroll] is how far the mail on it is
  * scrolled; only a lifted card is, see [es.jvbabi.overmail.ui.lift.LiftState], the others lie at
- * its top. [shownHeight] is how much of it shows while it is lifted, see [CardBody].
+ * its top. [shownHeight] is how much of it shows while it is lifted, see [CardBody]. [isShared]: the
+ * page of its mail grows out of it, see [mailRow].
  */
 @Composable
 internal fun StackCard(
@@ -78,6 +80,7 @@ internal fun StackCard(
     modifier: Modifier = Modifier,
     scroll: ScrollOffset = remember(body) { ScrollOffset() },
     shownHeight: () -> Float? = { null },
+    isShared: Boolean = false,
 ) {
     MailCard(
         email = email,
@@ -85,6 +88,7 @@ internal fun StackCard(
         scroll = scroll,
         shownHeight = shownHeight,
         place = { pose().place },
+        isShared = isShared,
         modifier = modifier
             .fillMaxSize()
             .cardPose(pose, depth, email.id.toString()),
@@ -97,7 +101,8 @@ internal fun StackCard(
  * A mail on a sheet of paper: its header over what it says, which [scroll] moves. What a card of
  * the pile is, and what a mail previewed from anywhere else looks like. [place] is how far down a
  * pile the sheet lies, which tints it; [shownHeight] how much of it shows while it is lifted, see
- * [CardBody]; [overlay] lies over all of it.
+ * [CardBody]; [overlay] lies over all of it. [isShared]: the page of the mail grows out of the
+ * sheet, see [mailRow].
  */
 @Composable
 internal fun MailCard(
@@ -107,13 +112,19 @@ internal fun MailCard(
     modifier: Modifier = Modifier,
     place: () -> Float = { 0f },
     shownHeight: () -> Float? = { null },
+    isShared: Boolean = false,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val hazeState = rememberHazeState()
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
 
-    Box(modifier = modifier.cardSurface(place)) {
+    Box(
+        modifier = modifier
+            // Inside the card's pose, so the page grows out of where the card is drawn.
+            .then(if (isShared) Modifier.mailRow(email.id) else Modifier)
+            .cardSurface(place),
+    ) {
         // The whole card, starting below the header: scrolled, it goes on behind it.
         CardBody(
             body = body,
@@ -127,6 +138,7 @@ internal fun MailCard(
         CardHeader(
             email = email,
             hazeState = hazeState,
+            isShared = isShared,
             modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
         )
 

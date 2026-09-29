@@ -1,0 +1,10 @@
+{
+  "title": "Open a mail from the stack",
+  "description": "Tap the card on top of the stack twice to read the mail on its own page, which grows right out of the card and shrinks back into it.",
+  "localized": {
+    "de": {
+      "title": "E-Mails aus dem Stapel öffnen",
+      "description": "Tippe zweimal auf die oberste Karte des Stapels, um die E-Mail auf ihrer eigenen Seite zu lesen, die direkt aus der Karte herauswächst und wieder in sie zurückschrumpft."
+    }
+  }
+}

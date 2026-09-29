@@ -61,7 +61,7 @@ fun isScreenSettled(): Boolean = LocalScreenProgress.current() >= 1f
 
 /**
  * [LocalScreenProgress] for the NavEntry this is composed in, read from how far its transition has
- * played. The transitions of a mail's page are an alpha that does not change and only lasts
+ * played. The transitions of a mail's page show nothing of their own and only last
  * [MAIL_TRANSITION_MILLIS], so that is what the progress runs over; how it looks is drawn from it.
  */
 @Composable
@@ -70,12 +70,20 @@ fun rememberScreenProgress(): () -> Float {
     return remember(transition) {
         {
             val total = transition.totalDurationNanos
-            val played = if (total <= 0L) 1f else (transition.playTimeNanos.toFloat() / total).coerceIn(0f, 1f)
+            val played = { (transition.playTimeNanos.toFloat() / total).coerceIn(0f, 1f) }
             when {
                 transition.currentState == transition.targetState ->
                     if (transition.currentState == EnterExitState.Visible) 1f else 0f
-                transition.targetState == EnterExitState.Visible -> played
-                else -> 1f - played
+                // Nothing to play: on the way in that is its first frame, before its animations
+                // are in; otherwise a back gesture that was let go of, which leaves it headed for
+                // where it already is.
+                total <= 0L -> when {
+                    transition.targetState != EnterExitState.Visible -> 1f
+                    transition.currentState == EnterExitState.PreEnter -> 0f
+                    else -> 1f
+                }
+                transition.targetState == EnterExitState.Visible -> played()
+                else -> 1f - played()
             }
         }
     }

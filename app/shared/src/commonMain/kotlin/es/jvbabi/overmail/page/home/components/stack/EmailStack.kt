@@ -20,10 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import es.jvbabi.overmail.domain.model.Email
@@ -163,8 +161,6 @@ private fun PiledCard(
     inPlace: Boolean,
     isShared: Boolean,
 ) {
-    val haptics = LocalHapticFeedback.current
-
     val dealt = remember { Animatable(if (dealDelay == null) 1f else 0f) }
     // A card that turns up later -- the next one coming into view as the top one leaves -- does
     // not pop up behind the others but comes up out of the pile, from one place further down.
@@ -177,8 +173,6 @@ private fun PiledCard(
         }
         delay(dealDelay.milliseconds)
         dealt.animateTo(1f, tween(DEAL_DURATION, easing = DEAL_EASING))
-        // Every sheet is felt landing, one after the other.
-        haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
     }
 
     val scroll = remember(body) { ScrollOffset() }

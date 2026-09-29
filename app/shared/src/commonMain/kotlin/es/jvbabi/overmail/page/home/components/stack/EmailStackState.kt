@@ -290,14 +290,13 @@ class EmailStackState internal constructor(
         liftJob?.cancel()
         val wasBeyond = abs(motion.offset.x) > threshold
         motion.offset += delta
-        // Felt where letting go starts to mean something, and again where it stops to.
+        // Felt where letting go starts to mean something; going back below it is not.
         val isBeyond = abs(motion.offset.x) > threshold
         if (isBeyond && !wasBeyond) {
             beyondSince = TimeSource.Monotonic.markNow()
             haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
         } else if (wasBeyond && !isBeyond) {
             beyondSince = null
-            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
         }
     }
 

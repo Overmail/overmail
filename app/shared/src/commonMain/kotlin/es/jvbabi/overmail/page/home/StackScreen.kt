@@ -16,6 +16,7 @@ import es.jvbabi.overmail.page.home.components.stack.EmailStack
 import es.jvbabi.overmail.page.home.components.stack.StackSwipe
 import es.jvbabi.overmail.page.home.components.stack.StackToolbar
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -146,7 +147,7 @@ private fun StackContent(
                 if (lastHandled != null) shownHandled = lastHandled
                 AnimatedVisibility(
                     visible = lastHandled != null,
-                    enter = fadeIn() + slideInVertically { it / 3 } + scaleIn(initialScale = .8f),
+                    enter = fadeIn() + slideInVertically { it / 3 } + scaleIn(initialScale = .8f, animationSpec = spring()),
                     exit = fadeOut() + slideOutVertically { it / 3 } + scaleOut(targetScale = .8f),
                 ) {
                     val shown = shownHandled ?: return@AnimatedVisibility

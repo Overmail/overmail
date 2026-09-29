@@ -173,9 +173,10 @@ private fun StackContent(
                 val lastHandled = stackContent.handled.lastOrNull()
                 var shownHandled by remember { mutableStateOf(lastHandled) }
                 if (lastHandled != null) shownHandled = lastHandled
+                fun <T> toolbarSpring() = spring<T>(dampingRatio = Spring.DampingRatioMediumBouncy)
                 AnimatedVisibility(
                     visible = lastHandled != null,
-                    enter = fadeIn() + slideInVertically { it / 3 } + scaleIn(initialScale = .8f, animationSpec = spring()),
+                    enter = fadeIn() + slideInVertically(toolbarSpring()) { it / 3 } + scaleIn(initialScale = .8f, animationSpec = toolbarSpring()),
                     exit = fadeOut() + slideOutVertically { it / 3 } + scaleOut(targetScale = .8f),
                 ) {
                     val shown = shownHandled ?: return@AnimatedVisibility

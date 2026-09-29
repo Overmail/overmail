@@ -35,7 +35,9 @@ modules are entry points and nothing else.
   declares everything shared; `platformModule()` is for dependencies whose interface *and*
   implementation are platform-specific.
 - **Navigation is Navigation3**: the back stack is a `SnapshotStateList<Screen>` in `App.kt`,
-  pushing navigates and popping goes back. `Screen` is a serializable sealed class.
+  pushing navigates and popping goes back. `Screen` is a serializable sealed class. A mail's
+  page is an overlay (`ui/transition/MailScene.kt`): the screen below stays composed, and the page
+  runs its own transition and predictive back instead of the NavDisplay's.
 - **Platform glue** is `expect`/`actual` on top-level functions in `App.kt` (`openUrl`,
   `shareUrl`, `getClipboardText`, `dynamicTheme`) rather than an interface per platform.
 - **Build-time values come from BuildKonfig** (`app/shared/build.gradle.kts`): `SERVER_URL`,

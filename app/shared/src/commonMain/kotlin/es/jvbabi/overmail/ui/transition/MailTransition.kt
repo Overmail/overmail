@@ -1,10 +1,14 @@
 package es.jvbabi.overmail.ui.transition
 
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +40,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.uuid.Uuid
 
 /**
@@ -52,6 +57,9 @@ private const val SCRIM_ALPHA = 0.16f
 
 /** How far the row slides up as it fades out, and the page slides up into place as it fades in. */
 private val CONTENT_SLIDE = 24.dp
+
+/** How long the page takes to lose its corners and shadow once it has settled, and to get them back. */
+private const val CARD_SETTLE_MILLIS = 180
 
 /** The shadow of the card while it is lifted off the screen below, at its strongest. */
 private val CARD_SHADOW = Shadow(radius = 24.dp, color = Color.Black.copy(alpha = 0.18f), offset = DpOffset(0.dp, 8.dp))
@@ -152,7 +160,8 @@ class MailTransition {
 
     /**
      * Everything of the transition, the page's content included, drawn by the page at [progress];
-     * [pageBounds] is where the page is, in the root, [pageLayer] what it shows.
+     * [pageBounds] is where the page is, in the root, [pageLayer] what it shows. [card] is how much
+     * of a card it is, round corners and shadow: all of one on its way, none once it has settled.
      */
     internal fun DrawScope.draw(
         emailId: Uuid,
@@ -162,6 +171,7 @@ class MailTransition {
         background: Color,
         cardColor: Color,
         corner: Dp,
+        card: Float,
         shadows: ShadowContext,
     ) {
         val row = row?.takeIf { it.emailId == emailId }
@@ -181,17 +191,15 @@ class MailTransition {
             return
         }
 
-        val card = lerp(origin, pageBounds, eased)
-        val local = card.translate(-pageBounds.topLeft)
-        // Round until the card has nearly filled the screen, then as square as the page is.
-        val radius = lerp(ROW_CORNER.toPx(), corner.toPx(), fraction(progress, 0.6f, 1f))
+        val bounds = lerp(origin, pageBounds, eased)
+        val local = bounds.translate(-pageBounds.topLeft)
+        val radius = lerp(corner.toPx(), ROW_CORNER.toPx(), card)
 
         drawRect(Color.Black, alpha = SCRIM_ALPHA * eased)
-        // Lifted off the screen below as it leaves the row, set down as it becomes the page.
-        val lift = fraction(progress, 0f, 0.3f) * (1f - fraction(progress, 0.7f, 1f))
-        if (lift > 0f) translate(local.left, local.top) {
+        // Lifted off the screen below for as long as it is a card.
+        if (card > 0f) translate(local.left, local.top) {
             val shadow = shadows.createDropShadowPainter(RoundedCornerShape(radius), CARD_SHADOW)
-            with(shadow) { draw(local.size, alpha = lift) }
+            with(shadow) { draw(local.size, alpha = card) }
         }
 
         val clip = Path().apply { addRoundRect(RoundRect(local, CornerRadius(radius))) }
@@ -257,18 +265,27 @@ fun Modifier.mailPage(emailId: Uuid, background: Color, cardColor: Color, corner
         onDispose { transition.detachPage(progress) }
     }
     val shadows = LocalGraphicsContext.current.shadowContext
+    // How much of a card the page is, see MailTransition.draw. Not drawn from the progress: the
+    // corners and the shadow go once the page has settled, and come back as soon as it leaves --
+    // the last frame of the way in is rarely at its very end, and they would vanish in one step.
+    val card = remember { Animatable(1f) }
+    LaunchedEffect(progress) {
+        snapshotFlow { progress() >= 1f }.collectLatest { isSettled ->
+            card.animateTo(if (isSettled) 0f else 1f, tween(CARD_SETTLE_MILLIS))
+        }
+    }
     val layer = rememberGraphicsLayer()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     return this
         .onGloballyPositioned { bounds = it.boundsInRoot() }
         .drawWithContent {
             val now = progress()
-            if (transition == null || now >= 1f) {
+            if (transition == null || (now >= 1f && card.value <= 0f)) {
                 drawRect(background)
                 drawContent()
                 return@drawWithContent
             }
             layer.record { this@drawWithContent.drawContent() }
-            with(transition) { draw(emailId, now, bounds, layer, background, cardColor, corner, shadows) }
+            with(transition) { draw(emailId, now, bounds, layer, background, cardColor, corner, card.value, shadows) }
         }
 }

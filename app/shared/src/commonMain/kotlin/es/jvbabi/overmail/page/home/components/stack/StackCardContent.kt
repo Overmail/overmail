@@ -153,7 +153,11 @@ private fun CardLabels(email: Email, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        email.labels.forEach { label -> LabelBadge(name = label.name, color = label.color) }
+        email.labels.forEach { label -> LabelBadge(
+            name = label.name,
+            color = label.color,
+            small = true,
+        ) }
     }
 }
 

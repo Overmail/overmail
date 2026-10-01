@@ -33,6 +33,7 @@ import es.jvbabi.overmail.page.home.EmailStackViewModel
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
 import es.jvbabi.overmail.page.home.ViewViewModel
+import es.jvbabi.overmail.page.home.components.search.SearchViewModel
 import es.jvbabi.overmail.page.onboarding.OnboardingViewModel
 import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
@@ -169,6 +170,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         viewModelOf(::OnboardingSuccessViewModel)
         // Takes the id of the mail as a parameter.
         viewModelOf(::EmailViewModel)
+        viewModelOf(::SearchViewModel)
     })
 
     modules(platformModule())

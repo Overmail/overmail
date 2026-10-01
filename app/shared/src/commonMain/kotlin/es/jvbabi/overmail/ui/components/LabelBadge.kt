@@ -3,12 +3,7 @@ package es.jvbabi.overmail.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +38,7 @@ private val BadgeGap = 4.dp
 @Composable
 fun LabelBadges(
     labels: List<Label>,
+    small: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val candidates = labels.take(MAX_BADGES)
@@ -51,11 +48,11 @@ fun LabelBadges(
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
 
         val badges = subcompose("badges") {
-            candidates.forEach { LabelBadge(name = it.name, color = it.color) }
+            candidates.forEach { LabelBadge(name = it.name, color = it.color, small = small) }
         }.map { it.measure(loose) }
         // The widest the count can get, whatever it ends up saying.
         val moreWidth = subcompose("more-probe") {
-            LabelBadge(name = "+${labels.size}", color = null)
+            LabelBadge(name = "+${labels.size}", color = null, small = small)
         }.single().measure(loose).width
 
         var used = 0
@@ -71,7 +68,7 @@ fun LabelBadges(
 
         val hidden = labels.size - shownCount
         val more = if (hidden > 0) subcompose("more") {
-            LabelBadge(name = "+$hidden", color = null)
+            LabelBadge(name = "+$hidden", color = null, small = small)
         }.single().measure(loose) else null
 
         val placed = badges.take(shownCount) + listOfNotNull(more)
@@ -97,29 +94,39 @@ fun LabelBadges(
  */
 @Composable
 fun LabelBadge(
+    modifier: Modifier = Modifier,
     name: String,
     color: Color?,
-    modifier: Modifier = Modifier,
+    small: Boolean,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    fontStyle: TextStyle? = null,
 ) {
+    val font = fontStyle ?: MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 16.sp)
     val fill = if (color != null) Modifier.background(color.labelContainerColor(), BadgeShape)
     else Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), BadgeShape)
 
-    Box(
+    Row(
         modifier = modifier
-            .height(18.dp)
             .clip(BadgeShape)
             .then(fill)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.Center,
+            .let { modifier ->
+                if (small) modifier.padding(horizontal = 4.dp)
+                else modifier.padding(4.dp)
+            },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        if (leadingIcon != null) leadingIcon()
         Text(
             text = name,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+            style = font,
             fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        if (trailingIcon != null) trailingIcon()
     }
 }
 
@@ -133,10 +140,10 @@ private fun LabelBadgePreview() {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LabelBadge(name = "Uni", color = Color(0xFF3B82F6))
-                    LabelBadge(name = "Rechnungen", color = Color(0xFFEF4444))
-                    LabelBadge(name = "HPI", color = Color(0xFF22C55E))
-                    LabelBadge(name = "+2", color = null)
+                    LabelBadge(name = "Uni", color = Color(0xFF3B82F6), small = true)
+                    LabelBadge(name = "Rechnungen", color = Color(0xFFEF4444), small = true)
+                    LabelBadge(name = "HPI", color = Color(0xFF22C55E), small = false)
+                    LabelBadge(name = "+2", color = null, small = true)
                 }
             }
         }

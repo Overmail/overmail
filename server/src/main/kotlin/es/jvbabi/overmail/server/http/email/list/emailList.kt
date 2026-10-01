@@ -38,6 +38,7 @@ fun Route.emailList() {
          *   - sent_by [String] Comma-separated sender ids; `self` stands for the user's own addresses
          *   - sent_to [String] Comma-separated recipient ids; `self` stands for the user's own addresses
          *   - has_labels [String] Comma-separated label ids; a mail has to carry at least one of them
+         *   - query [String] Words to search the subject, preview and text for; each has to turn up, as part of a word or as a word's beginning with a typo
          *   - sort [String] `date`, `sender` or `subject`, with `:r` appended to reverse it; defaults to `date`, newest first
          *   - limit [Int] How many ids to answer, 1 to 500; defaults to 100
          *   - offset [Int] Where in the group the page starts; defaults to 0

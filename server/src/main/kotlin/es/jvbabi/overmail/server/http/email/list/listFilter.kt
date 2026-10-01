@@ -2,16 +2,22 @@ package es.jvbabi.overmail.server.http.email.list
 
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.database.models.EmailLabels
+import es.jvbabi.overmail.server.database.models.EmailPreviews
 import es.jvbabi.overmail.server.database.models.EmailRecipients
 import es.jvbabi.overmail.server.database.models.EmailUsers
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.database.models.emailArchiveStateIs
 import es.jvbabi.overmail.server.http.api.invalidRequest
+import es.jvbabi.overmail.server.util.TextSearch
 import io.ktor.http.Parameters
 import kotlin.uuid.Uuid
+import org.jetbrains.exposed.v1.core.ColumnType
 import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.anyFrom
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.exists
 import org.jetbrains.exposed.v1.core.inList
@@ -70,12 +76,41 @@ data class MailFilter(
     val sentTo: Correspondents?,
     /** Mails carrying any of them, not all of them: a filter narrows a list, it does not build one. */
     val hasLabels: Set<Uuid>?,
+    /** Mails whose subject, preview or text has every word of it, see [TextSearch]; null searches nothing. */
+    val query: String?,
 ) {
     /**
      * The predicate behind the filter. Correlates on [Emails], so it goes into the `where` of a
      * query over that table -- next to the one that says whose mails these are.
+     *
+     * Runs a query of its own when there is text to search for: a fuzzy match is nothing a
+     * database answers, so the texts of [userId]'s mails that pass the rest of the filter are read
+     * and matched here, and the predicate names the ones that did. Inside the transaction of the
+     * query it goes into, then.
      */
-    fun predicate(): Op<Boolean> {
+    fun predicate(userId: User.Id): Op<Boolean> {
+        val rest = attributePredicate()
+        val search = query?.let(::TextSearch)
+        if (search == null || search.isEmpty) return rest
+
+        val matching = Emails
+            .leftJoin(ImapAccounts)
+            .leftJoin(EmailPreviews)
+            .select(Emails.id, Emails.subject, EmailPreviews.preview, Emails.textContent)
+            .where { (ImapAccounts.user eq userId) and rest }
+            .filter { row -> search.matches(row[Emails.subject], row.getOrNull(EmailPreviews.preview), row[Emails.textContent]) }
+            .map { row -> row[Emails.id] }
+
+        if (matching.isEmpty()) return Op.FALSE
+        // One array rather than a parameter per mail: a search that hits most of a large mailbox
+        // would go past what a statement can bind.
+        @Suppress("UNCHECKED_CAST")
+        val idType = Emails.id.columnType as ColumnType<EntityID<Uuid>>
+        return rest and (Emails.id eq anyFrom(matching, idType))
+    }
+
+    /** Everything but the [query]: what the database can answer on its own. */
+    private fun attributePredicate(): Op<Boolean> {
         var predicate: Op<Boolean> = Op.TRUE
 
         if (archivedState != null) {
@@ -209,6 +244,7 @@ internal fun mailFilter(parameters: Parameters): MailFilter {
         sentBy = correspondents("sent_by"),
         sentTo = correspondents("sent_to"),
         hasLabels = idSets["has_labels"],
+        query = parameters["query"]?.takeIf { it.isNotBlank() },
     )
 }
 

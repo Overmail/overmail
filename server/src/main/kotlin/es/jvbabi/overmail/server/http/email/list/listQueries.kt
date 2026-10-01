@@ -68,7 +68,7 @@ internal fun listingGroups(
                 count = Emails
                     .leftJoin(ImapAccounts)
                     .select(Emails.id)
-                    .where { (ImapAccounts.user eq userId) and filter.predicate() }
+                    .where { (ImapAccounts.user eq userId) and filter.predicate(userId) }
                     .count(),
             )
         )
@@ -85,7 +85,7 @@ internal fun listingGroups(
         val mailsOf = Emails
             .leftJoin(ImapAccounts)
             .select(named + Emails.id)
-            .where { (ImapAccounts.user eq userId) and filter.predicate() }
+            .where { (ImapAccounts.user eq userId) and filter.predicate(userId) }
             .alias("grouped_mails")
 
         val counted = mailsOf[Emails.id].count()
@@ -137,7 +137,7 @@ internal fun listingPage(
 
     val mails = source
         .select(Emails.id)
-        .where { (ImapAccounts.user eq userId) and filter.predicate() and group }
+        .where { (ImapAccounts.user eq userId) and filter.predicate(userId) and group }
 
     // The count comes from the same query as the page, so the length a client checks its layout
     // against and the ids it draws cannot disagree.
@@ -166,7 +166,7 @@ internal fun listingIds(userId: User.Id, filter: MailFilter, group: Op<Boolean>)
     val stretch = Emails
         .leftJoin(ImapAccounts)
         .select(Emails.id)
-        .where { (ImapAccounts.user eq userId) and filter.predicate() and group }
+        .where { (ImapAccounts.user eq userId) and filter.predicate(userId) and group }
 
     // From the same query as the ids, so a client can tell an answer that was cut from one that
     // holds the whole group.

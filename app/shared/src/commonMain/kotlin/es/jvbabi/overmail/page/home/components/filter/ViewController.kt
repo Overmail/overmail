@@ -52,6 +52,11 @@ fun ViewController(
     accountNames: List<String> = emptyList(),
     onAccountsClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
+    /**
+     * Whether the labels, from and to chips are shown. Off while the search takes these filters
+     * over; their pickers stay, as they are wanted again later.
+     */
+    showPickerChips: Boolean = false,
 ) {
     val filter = viewState.filter
 
@@ -61,7 +66,7 @@ fun ViewController(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        LabelsChip(
+        if (showPickerChips) LabelsChip(
             picked = pickedLabels,
             onClick = onLabelsClick,
         )
@@ -83,14 +88,14 @@ fun ViewController(
             primary = ArchivedState.Archive,
             quickLabel = stringResource(Res.string.home_filter_archive_quick),
         )
-        NamesChip(
+        if (showPickerChips) NamesChip(
             names = fromNames,
             title = stringResource(Res.string.home_filter_from),
             activeTitle = { stringResource(Res.string.home_filter_from_active, it) },
             icon = PhIcons.Regular.User,
             onClick = onFromClick,
         )
-        NamesChip(
+        if (showPickerChips) NamesChip(
             names = toNames,
             title = stringResource(Res.string.home_filter_to),
             activeTitle = { stringResource(Res.string.home_filter_to_active, it) },
@@ -200,6 +205,7 @@ private fun ViewControllerPreviewFrame(filter: ViewFilter, darkTheme: Boolean = 
             pickedLabels = viewState.filter.hasLabels.orEmpty().map { PickedLabel(it, "Uni", null) },
             readSelection = readSelection,
             onReadSelectionChange = { readSelection = it },
+            showPickerChips = true,
         )
     }
 }

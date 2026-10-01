@@ -2,36 +2,24 @@ package es.jvbabi.overmail.page.home
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.phosphor.icons.PhIcons
-import com.phosphor.icons.regular.Plus
-import com.phosphor.icons.regular.Sparkle
-import com.phosphor.icons.regular.Tag
-import com.phosphor.icons.regular.X
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import es.jvbabi.overmail.domain.model.ViewState
@@ -42,11 +30,12 @@ import es.jvbabi.overmail.page.home.components.HomeHeader
 import es.jvbabi.overmail.page.home.components.SearchField
 import es.jvbabi.overmail.page.home.components.ViewSettings
 import es.jvbabi.overmail.page.home.components.list.*
+import es.jvbabi.overmail.page.home.components.search.ActiveSearchFilters
 import es.jvbabi.overmail.page.home.components.search.SearchEvent
 import es.jvbabi.overmail.page.home.components.search.SearchState
+import es.jvbabi.overmail.page.home.components.search.SearchSuggestions
 import es.jvbabi.overmail.page.home.components.search.SearchViewModel
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
-import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.lift.LiftState
 import es.jvbabi.overmail.ui.lift.LocalLiftState
 import es.jvbabi.overmail.ui.lift.rememberLiftState
@@ -57,7 +46,10 @@ import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.home_search_placeholder
 import kotlin.uuid.Uuid
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
@@ -214,169 +206,77 @@ private fun ListContent(
             }
 
             // The header, the search and the filters in one: all of it at the top, the bottom is
-            // the nav bar's.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
-                    .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
-                    .onSizeChanged { (_, h) ->
-                        topHeight = with(localDensity) { h.toDp() }
-                    }
-                    .padding(top = innerPadding.calculateTopPadding(), bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AnimatedVisibility(
-                    visible = !isSearchFocused,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(HEADER_HEIGHT)
-                            .padding(horizontal = 8.dp),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        HomeHeader(
-                            currentUser = homeState.currentUser,
-                            greeting = homeState.greeting,
-                        )
-                    }
-                }
-
-                SearchField(
-                    value = searchState.query,
-                    onValueChange = { onSearchEvent(SearchEvent.SetQuery(it)) },
-                    placeholder = "Q2 Budget report",
+            // the nav bar's. Held above the keyboard, so the suggestions end where it begins and
+            // scroll from there instead of going on behind it.
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.ime.only(WindowInsetsSides.Bottom))) {
+                Column(
                     modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .padding(top = animateDpAsState(if (isSearchFocused) 16.dp else 0.dp).value)
                         .fillMaxWidth()
-                        .onFocusChanged { isSearchFocused = it.hasFocus }
-                        .focusRequester(searchFocus),
-                )
-
-                AnimatedVisibility(
-                    visible = isSearchFocused,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
+                        .progressiveBackgroundBlur(hazeState = hazeState, direction = ProgressiveDirection.TopToBottom, backgroundColor = MaterialTheme.colorScheme.background, startRadius = EDGE_BLUR_RADIUS)
+                        .progressiveBackground(edgeTint, ProgressiveDirection.TopToBottom)
+                        .onSizeChanged { (_, h) ->
+                            topHeight = with(localDensity) { h.toDp() }
+                        }
+                        .padding(top = innerPadding.calculateTopPadding(), bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize()
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = .4f)),
+                    AnimatedVisibility(
+                        visible = !isSearchFocused,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
                     ) {
-                        Row(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable {}
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                .height(HEADER_HEIGHT)
+                                .padding(horizontal = 8.dp),
+                            contentAlignment = Alignment.CenterStart,
                         ) {
-                            Icon(
-                                imageVector = PhIcons.Regular.Sparkle,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
+                            HomeHeader(
+                                currentUser = homeState.currentUser,
+                                greeting = homeState.greeting,
                             )
-                            Column {
-                                Text(
-                                    text = "Overmail AI fragen",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                                Text(
-                                    text = if (searchState.query.isBlank()) "z.B. \"Finde alle Mails zum Thema Mietvertrag\"" else "\"${searchState.query}\"",
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        if (searchState.suggestedLabels.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            ) {
-                                Icon(
-                                    imageVector = PhIcons.Regular.Tag,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .padding(top = 4.dp)
-                                        .size(20.dp),
-                                )
-                                Column {
-                                    Text(
-                                        text = "Labels",
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                    FlowRow(
-                                        modifier = Modifier
-                                            .padding(top = 4.dp)
-                                            .fillMaxWidth(),
-                                        maxLines = 3,
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        searchState.activeLavels.forEach { label ->
-                                            LabelBadge(
-                                                fontStyle = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier
-                                                    .clickable { onSearchEvent(SearchEvent.AddLavel(label)) },
-                                                name = label.name,
-                                                color = label.color,
-                                                small = false,
-                                                trailingIcon = {
-                                                    Icon(
-                                                        imageVector = PhIcons.Regular.X,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                }
-                                            )
-                                        }
-                                        searchState.suggestedLabels.forEach { label ->
-                                            LabelBadge(
-                                                fontStyle = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier
-                                                    .clickable { onSearchEvent(SearchEvent.AddLavel(label)) },
-                                                name = label.name,
-                                                color = label.color,
-                                                small = false,
-                                                leadingIcon = {
-                                                    Icon(
-                                                        imageVector = PhIcons.Regular.Plus,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
-                }
 
-                AnimatedVisibility(
-                    visible = !isSearchFocused,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
-                ) {
-                    ViewSettings(
-                        viewState = viewState,
-                        state = viewSettingsState,
-                        onViewStateChange = onViewStateChange,
-                        onEvent = onViewSettingsEvent,
+                    SearchField(
+                        value = searchState.query,
+                        onValueChange = { onSearchEvent(SearchEvent.SetQuery(it)) },
+                        placeholder = stringResource(Res.string.home_search_placeholder),
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .padding(top = animateDpAsState(if (isSearchFocused) 16.dp else 0.dp).value)
+                            .fillMaxWidth()
+                            .onFocusChanged { isSearchFocused = it.hasFocus }
+                            .focusRequester(searchFocus),
                     )
+
+                    // Under the field rather than in the suggestions: what the search is on stays in
+                    // sight once the keyboard is put away.
+                    ActiveSearchFilters(state = searchState, onEvent = onSearchEvent)
+
+                    AnimatedVisibility(
+                        visible = isSearchFocused,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                        // Whatever is left of the height, and no more than it needs.
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) {
+                        SearchSuggestions(state = searchState, onEvent = onSearchEvent)
+                    }
+
+                    AnimatedVisibility(
+                        visible = !isSearchFocused,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        ViewSettings(
+                            viewState = viewState,
+                            state = viewSettingsState,
+                            onViewStateChange = onViewStateChange,
+                            onEvent = onViewSettingsEvent,
+                        )
+                    }
                 }
             }
 
@@ -415,7 +315,8 @@ private fun ListContentSearchPreview() {
             viewState = ViewState.MailboxWithArchive,
             searchState = SearchState(
                 query = "test",
-                allSuggestedLabels = PREVIEW_ITEMS.first().email.labels,
+                suggestedLabels = PREVIEW_ITEMS.first().email.labels,
+                activeLabels = PREVIEW_ITEMS.first().email.labels.take(1),
             ),
             onSearchEvent = {},
             content = PREVIEW_VIEW_CONTENT,

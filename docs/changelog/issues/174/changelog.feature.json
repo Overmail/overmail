@@ -1,0 +1,10 @@
+{
+  "title": "A search that finds your mail",
+  "description": "Type into the search bar to find mails by their subject and text, even with a typo. While you type it suggests people and labels: pick a person as sender or recipient, or a label, and the list only shows the mails that fit. What you picked stays under the search bar, and the X next to it clears the whole search.",
+  "localized": {
+    "de": {
+      "title": "Eine Suche, die deine Mails findet",
+      "description": "Tippe in die Suchleiste, um Mails nach Betreff und Text zu finden, auch mit Tippfehler. Beim Tippen schlägt sie Personen und Labels vor: Wähle eine Person als Absender oder Empfänger oder ein Label, und die Liste zeigt nur noch die passenden Mails. Was du gewählt hast, bleibt unter der Suchleiste stehen, und das X daneben setzt die ganze Suche zurück."
+    }
+  }
+}

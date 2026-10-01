@@ -28,6 +28,7 @@ import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.utils.TextSearch
 import es.jvbabi.overmail.utils.takeFrom
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -42,6 +43,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -79,16 +82,26 @@ class EmailsRepositoryImpl(
         instantLocalEmission: Boolean,
         user: OvermailAccount
     ): Flow<List<ViewResult>> = channelFlow {
+        // What the server answered for the view. Only read for a search: the cache holds the
+        // preview of a mail, not its text, so a mail the server found by its text would be
+        // filtered out here again without it.
+        val serverMatches = MutableStateFlow(emptySet<Uuid>())
+
         launch {
             overmailDatabase.imapAccountsDao.allForAccount(user.id).collectLatest { imapAccountsForUser ->
                 val emailsForUser = (imapAccountsForUser.map { it.imapAccount.username } + user.email).toSet()
                 overmailDatabase.participantsDao.getAllParticipantsWithEmails(emailsForUser.toList())
                     .map { it.map { participant -> participant.participant.id }.toSet() }
                     .collectLatest { participantIdsWhichAreCurrentUser ->
-                        overmailDatabase.emailsDao.getAllEmailsForAccount(user.id).collectLatest { rawEmails ->
+                        combine(
+                            overmailDatabase.emailsDao.getAllEmailsForAccount(user.id),
+                            serverMatches,
+                            ::Pair,
+                        ).collectLatest { (rawEmails, serverMatches) ->
                             val filtered = rawEmails.applyFilter(
                                 filter = viewSettingsState.filter,
-                                usersParticipantIds = participantIdsWhichAreCurrentUser
+                                usersParticipantIds = participantIdsWhichAreCurrentUser,
+                                serverMatches = serverMatches,
                             )
 
                             val emails = filtered.map { it.toModel() }
@@ -108,6 +121,7 @@ class EmailsRepositoryImpl(
             // chunk in flight, or a view that changes faster than a chunk loads never gets it.
             // What is stored stays stored, so the next round only asks for what is still missing.
             followViewIds(viewSettingsState, user).conflate().collect { groups ->
+                if (viewSettingsState.filter.query != null) serverMatches.value = groups.flatMap { it.ids }.toSet()
                 groups.filter { it.total > it.ids.size }.forEach { group ->
                     logger.w { "Group ${group.keys} holds ${group.total} mails, the server sent ${group.ids.size} of them" }
                 }
@@ -260,6 +274,7 @@ private fun ParametersBuilder.appendFilter(filter: ViewFilter) {
     filter.sentBy?.let { correspondents -> append("sent_by", correspondents.joinToString(",") { it.wire }) }
     filter.sentTo?.let { correspondents -> append("sent_to", correspondents.joinToString(",") { it.wire }) }
     filter.hasLabels?.let { ids -> append("has_labels", ids.joinToString(",")) }
+    filter.query?.let { append("query", it) }
 }
 
 private val Correspondent.wire: String
@@ -298,9 +313,17 @@ private sealed class ApiIdsStreamEvent {
  */
 private fun Collection<EmbeddedEmail>.applyFilter(
     filter: ViewFilter,
-    usersParticipantIds: Set<Uuid>
+    usersParticipantIds: Set<Uuid>,
+    /** The mails the server found for [ViewFilter.query]; they pass it whatever the cache knows of them. */
+    serverMatches: Set<Uuid>,
 ): List<EmbeddedEmail> {
     val filtered = this.toMutableList()
+    if (filter.query != null) {
+        val search = TextSearch(filter.query)
+        filtered.removeAll { email ->
+            email.dbEmail.id !in serverMatches && !search.matches(email.dbEmail.subject, email.dbEmail.preview)
+        }
+    }
     if (filter.readState != null) filtered.removeAll { email -> email.dbEmail.isRead != filter.readState }
     if (filter.sentBy != null) {
         val allowedSenderIds = filter.sentBy.participantIds(usersParticipantIds)

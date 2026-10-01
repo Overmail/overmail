@@ -63,6 +63,9 @@ class SearchViewModel(
 
     fun onEvent(event: SearchEvent) {
         when (event) {
+            // Everything but the account, which is not the search's to forget.
+            SearchEvent.Reset -> state.update { SearchState(overmailAccount = it.overmailAccount, suggestedLabels = it.suggestedLabels, suggestedParticipants = it.suggestedParticipants) }
+
             is SearchEvent.SetQuery -> {
                 state.update { it.copy(query = event.query) }
             }
@@ -110,6 +113,10 @@ data class SearchState(
     val activeSentByIds: Set<Uuid> = activeSentBy.map { it.id }.toSet()
     val activeSentToIds: Set<Uuid> = activeSentTo.map { it.id }.toSet()
 
+    /** Whether the search narrows the listing at all: something typed or something picked. */
+    val isActive: Boolean =
+        query.isNotBlank() || activeLabels.isNotEmpty() || activeSentBy.isNotEmpty() || activeSentTo.isNotEmpty()
+
     fun activeParticipants(direction: ParticipantDirection) = when (direction) {
         ParticipantDirection.From -> activeSentBy
         ParticipantDirection.To -> activeSentTo
@@ -126,6 +133,8 @@ enum class ParticipantDirection { From, To }
 
 sealed class SearchEvent {
     data class SetQuery(val query: String) : SearchEvent()
+    /** Back to no search at all: nothing typed, nothing picked. */
+    data object Reset : SearchEvent()
     data class ToggleLabel(val label: Label) : SearchEvent()
     data class RemoveLabel(val label: Label) : SearchEvent()
     data class ToggleParticipant(val participant: Participant, val direction: ParticipantDirection) : SearchEvent()

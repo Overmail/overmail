@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
@@ -50,6 +52,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.home_search_placeholder
+import overmail.app.shared.generated.resources.home_search_reset
+import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.X
 import kotlin.uuid.Uuid
 
 /** Blur at the very top and bottom edge, strong enough that the list behind turns into colour. */
@@ -78,6 +83,15 @@ fun ListScreen(
     val viewSettingsState by viewSettingsViewModel.state.collectAsStateWithLifecycle()
     val searchViewModel = koinViewModel<SearchViewModel>()
     val searchState by searchViewModel.state.collectAsStateWithLifecycle()
+
+    // The search builds the filter now: what it picked and what is typed narrow the listing.
+    val searchFilter = SearchFilter(
+        labels = searchState.activeLabels.map { it.id },
+        sentBy = searchState.activeSentBy.map { it.id },
+        sentTo = searchState.activeSentTo.map { it.id },
+        query = searchState.query,
+    )
+    LaunchedEffect(searchFilter) { viewViewModel.onEvent(ViewEvent.SetSearchFilter(searchFilter)) }
 
     LaunchedEffect(openArchive) {
         if (!openArchive) return@LaunchedEffect
@@ -239,17 +253,44 @@ private fun ListContent(
                         }
                     }
 
-                    SearchField(
-                        value = searchState.query,
-                        onValueChange = { onSearchEvent(SearchEvent.SetQuery(it)) },
-                        placeholder = stringResource(Res.string.home_search_placeholder),
+                    Row(
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .padding(top = animateDpAsState(if (isSearchFocused) 16.dp else 0.dp).value)
-                            .fillMaxWidth()
-                            .onFocusChanged { isSearchFocused = it.hasFocus }
-                            .focusRequester(searchFocus),
-                    )
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SearchField(
+                            value = searchState.query,
+                            onValueChange = { onSearchEvent(SearchEvent.SetQuery(it)) },
+                            placeholder = stringResource(Res.string.home_search_placeholder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .onFocusChanged { isSearchFocused = it.hasFocus }
+                                .focusRequester(searchFocus),
+                        )
+
+                        // Beside the field rather than in it: it takes back what was picked as
+                        // well, not only what is typed.
+                        AnimatedVisibility(
+                            visible = searchState.isActive,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally(),
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = { onSearchEvent(SearchEvent.Reset) },
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(40.dp),
+                            ) {
+                                Icon(
+                                    imageVector = PhIcons.Regular.X,
+                                    contentDescription = stringResource(Res.string.home_search_reset),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
 
                     // Under the field rather than in the suggestions: what the search is on stays in
                     // sight once the keyboard is put away.

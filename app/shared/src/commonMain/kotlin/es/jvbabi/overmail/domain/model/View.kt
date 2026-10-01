@@ -89,6 +89,11 @@ data class ViewFilter(
     val sentBy: List<Correspondent>? = null,
     val sentTo: List<Correspondent>? = null,
     val hasLabels: List<Uuid>? = null,
+    /**
+     * Words every mail has to have in its subject, preview or text, see `utils/search.kt`. Null
+     * searches nothing; it is never blank.
+     */
+    val query: String? = null,
 )
 
 /** What an archived state can be, the server's `EmailArchiveAction` names. */

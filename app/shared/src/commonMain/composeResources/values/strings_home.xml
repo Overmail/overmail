@@ -128,7 +128,8 @@
     <string name="home_nav_stack">Stack</string>
     <string name="home_nav_list">List</string>
 
-    <string name="home_search_placeholder">Q2 budget report</string>
+    <string name="home_search_placeholder">Search mails, people and labels</string>
+    <string name="home_search_reset">Reset search</string>
     <string name="home_search_people">People</string>
     <string name="home_search_ai_title">Ask Overmail AI</string>
     <string name="home_search_ai_example">e.g. “Find all mails about the rental agreement”</string>

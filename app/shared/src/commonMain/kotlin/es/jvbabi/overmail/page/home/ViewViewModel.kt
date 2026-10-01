@@ -1,9 +1,11 @@
-@file:OptIn(ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 
 package es.jvbabi.overmail.page.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import es.jvbabi.overmail.domain.model.Correspondent
+import es.jvbabi.overmail.domain.model.ViewFilter
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.model.Participant
@@ -12,9 +14,11 @@ import es.jvbabi.overmail.domain.repository.ParticipantsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -38,6 +42,15 @@ class ViewViewModel(
     val viewState: StateFlow<ViewState>
         field = MutableStateFlow(ViewState.MailboxWithArchive)
 
+    /** What the search has picked, laid over [viewState] for the listing, see [withSearch]. */
+    private val searchFilter = MutableStateFlow(SearchFilter())
+
+    /**
+     * What is typed into the search, apart from the rest: it changes with every key, and each
+     * change opens the server's stream anew, so it waits for a pause. Emptying it does not.
+     */
+    private val searchQuery = MutableStateFlow("")
+
     val content: StateFlow<ViewContentState>
         field = MutableStateFlow(ViewContentState())
 
@@ -53,7 +66,13 @@ class ViewViewModel(
 
     init {
         viewModelScope.launch {
-            combine(account, viewState, ::Pair)
+            combine(
+                account,
+                viewState,
+                searchFilter,
+                searchQuery.debounce { if (it.isBlank()) 0 else SEARCH_QUERY_DEBOUNCE_MILLIS },
+            ) { account, view, search, query -> account to view.withSearch(search.copy(query = query)) }
+                .distinctUntilChanged()
                 .flatMapLatest { (account, view) ->
                     if (account == null) flowOf(ViewContentState(isLoading = false))
                     // A view that changed shows what it had until the new one is read, marked
@@ -75,6 +94,10 @@ class ViewViewModel(
     fun onEvent(event: ViewEvent) {
         when (event) {
             is ViewEvent.SetViewState -> viewState.value = event.viewState
+            is ViewEvent.SetSearchFilter -> {
+                searchFilter.value = event.filter.copy(query = "")
+                searchQuery.value = event.filter.query
+            }
             is ViewEvent.LoadBody -> viewModelScope.launch {
                 val account = account.first() ?: return@launch
                 // One mail is previewed at a time, and it is wanted now: ahead of whatever the pile
@@ -114,8 +137,39 @@ private fun List<ViewResult>.senderIds(): Set<Uuid> = buildSet {
 /** Where a previewed mail goes in line for its picture: before any card of the pile. */
 private const val PREVIEW_RENDER_ORDER = -1
 
+/** How long the listing waits for the next key before it searches for what is typed. */
+private const val SEARCH_QUERY_DEBOUNCE_MILLIS = 250L
+
+/**
+ * What the search is on. Each kind narrows the listing on its own, any of its entries will do --
+ * the view filter's own and-between, or-within, see [ViewFilter]. The [query] is one more kind:
+ * every word of it has to turn up in a mail.
+ */
+data class SearchFilter(
+    val labels: List<Uuid> = emptyList(),
+    val sentBy: List<Uuid> = emptyList(),
+    val sentTo: List<Uuid> = emptyList(),
+    val query: String = "",
+)
+
+/**
+ * The view with the search laid over it: what the search has picked of a kind stands in for the
+ * view's own filter of that kind, a kind it has nothing of leaves the view's as it is.
+ */
+private fun ViewState.withSearch(search: SearchFilter): ViewState = copy(
+    filter = filter.copy(
+        hasLabels = search.labels.ifEmpty { null } ?: filter.hasLabels,
+        sentBy = search.sentBy.ifEmpty { null }?.map(Correspondent::Contact) ?: filter.sentBy,
+        sentTo = search.sentTo.ifEmpty { null }?.map(Correspondent::Contact) ?: filter.sentTo,
+        query = search.query.trim().ifEmpty { null } ?: filter.query,
+    ),
+)
+
 sealed class ViewEvent {
     data class SetViewState(val viewState: ViewState) : ViewEvent()
+
+    /** The search picked or dropped a person or label. */
+    data class SetSearchFilter(val filter: SearchFilter) : ViewEvent()
 
     /** A mail of the listing is previewed and needs what it says. */
     data class LoadBody(val emailId: Uuid) : ViewEvent()

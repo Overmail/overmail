@@ -109,4 +109,11 @@
 
     <string name="home_nav_stack">Stack</string>
     <string name="home_nav_list">Liste</string>
+
+    <string name="home_search_placeholder">Mails, Personen und Labels durchsuchen</string>
+    <string name="home_search_reset">Suche zurücksetzen</string>
+    <string name="home_search_people">Personen</string>
+    <string name="home_search_ai_title">Overmail AI fragen</string>
+    <string name="home_search_ai_example">z.B. „Finde alle Mails zum Thema Mietvertrag“</string>
+    <string name="home_search_ai_query">„%1$s“</string>
 </resources>

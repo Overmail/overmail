@@ -346,6 +346,35 @@ class EmailListTest {
     }
 
     @Test
+    fun `a query finds mails by their subject and their text, typos and all`() = testApplication {
+        val mails = setUp(count = 3)
+        installRoute()
+        setText(mails[0], "Ihre Stromrechnung für Oktober liegt bei.")
+        setText(mails[2], "Nothing of interest here.")
+
+        // In the text, inside a word; the subject of the others is "Mail 1", "Mail 2".
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?query=rechnung").ids())
+        // A typo still finds it, and every word has to turn up.
+        assertEquals(listOf(mails[0].toString()), client.get("/api/emails/list?query=oktobr+strom").ids())
+        assertEquals(emptyList(), client.get("/api/emails/list?query=rechnung+november").ids())
+        // The subject counts as much as the text.
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?query=mail+1").ids())
+    }
+
+    @Test
+    fun `a query narrows the rest of the filter rather than replacing it`() = testApplication {
+        val mails = setUp(count = 2)
+        installRoute()
+        setText(mails[0], "Rechnung")
+        setText(mails[1], "Rechnung")
+        markRead(mails[1])
+
+        assertEquals(listOf(mails[1].toString()), client.get("/api/emails/list?query=rechnung&read_state=true").ids())
+        // Blank is no search at all.
+        assertEquals(mails.map { it.toString() }, client.get("/api/emails/list?query=%20").ids())
+    }
+
+    @Test
     fun `a mail taken back out of the archive is in the listing again`() = testApplication {
         val mails = setUp(count = 1)
         installRoute()
@@ -490,6 +519,10 @@ class EmailListTest {
         database.query {
             ImapAccount.all().first { it.user.id == signedIn.id }.username = login
         }
+    }
+
+    private suspend fun setText(emailId: Uuid, text: String) {
+        database.query { Email.findById(emailId)!!.textContent = text }
     }
 
     private suspend fun addMail(sentAt: kotlin.time.Instant, subject: String? = null): Uuid = database.query {

@@ -210,6 +210,7 @@ private fun ViewItemRow(
             )
             if (item.email.labels.isNotEmpty()) LabelBadges(
                 labels = item.email.labels,
+                small = true,
                 modifier = Modifier
                     .padding(top = 4.dp),
             )

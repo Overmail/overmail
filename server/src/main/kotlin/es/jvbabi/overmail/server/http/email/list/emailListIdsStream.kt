@@ -64,6 +64,7 @@ fun Route.emailListIdsStream(keepAlive: Duration = KEEP_ALIVE) {
          *   - sent_by [String] Comma-separated sender ids; `self` stands for the user's own addresses
          *   - sent_to [String] Comma-separated recipient ids; `self` stands for the user's own addresses
          *   - has_labels [String] Comma-separated label ids; a mail has to carry at least one of them
+         *   - query [String] Words to search the subject, preview and text for; each has to turn up, as part of a word or as a word's beginning with a typo
          *
          * Responses:
          *   - 200 text/event-stream [IdsStreamEvent] The events

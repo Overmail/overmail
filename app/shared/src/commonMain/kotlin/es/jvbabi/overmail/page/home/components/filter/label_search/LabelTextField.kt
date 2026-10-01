@@ -149,7 +149,7 @@ fun LabelTextField(
  * tag in the label's hue, the name in the normal text color and an X to take it out.
  */
 @Composable
-private fun ItemBadge(
+fun ItemBadge(
     item: PickedItem,
     onRemove: () -> Unit
 ) {

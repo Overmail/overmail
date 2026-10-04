@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.users.me.totp
 import es.jvbabi.overmail.server.database.models.Users
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -27,10 +28,15 @@ fun Route.getTotp() {
          */
         get {
             val userId = call.requireAuthenticatedUserId()
-            val isEnabled = call.database().query {
-                Users.select(Users.totpSecret).where { Users.id eq userId }.single()[Users.totpSecret] != null
+            val row = call.database().query {
+                Users.select(Users.totpSecret, Users.totpEmailFallback).where { Users.id eq userId }.single()
             }
-            call.respond(TotpStatusResponse(isEnabled))
+            call.respond(
+                TotpStatusResponse(
+                    isEnabled = row[Users.totpSecret] != null,
+                    emailFallback = row[Users.totpEmailFallback],
+                )
+            )
         }
     }
 }
@@ -38,4 +44,6 @@ fun Route.getTotp() {
 @Serializable
 data class TotpStatusResponse(
     @SerialName("is_enabled") val isEnabled: Boolean,
+    @JsonSchema.Description("Whether the sign-in offers a mailed code instead of the app's. Only asked for with a password set")
+    @SerialName("email_fallback") val emailFallback: Boolean,
 )

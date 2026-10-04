@@ -578,6 +578,42 @@
           "failed": "Something went wrong. Please try again."
         },
         "retry": "Try again"
+      },
+      "twoFactor": {
+        "title": "Two-factor authentication"
+      },
+      "totp": {
+        "title": "Authenticator app",
+        "statusEnabled": "Set up. After your password, the sign-in asks for a code from the app.",
+        "statusDisabled": "Not set up.",
+        "loadFailed": "Whether an authenticator app is set up could not be read.",
+        "retry": "Try again",
+        "cancel": "Cancel",
+        "code": "Code",
+        "setup": {
+          "action": "Set up",
+          "title": "Set up an authenticator app",
+          "description": "Scan the QR code with your authenticator app.",
+          "orKey": "or enter this key",
+          "copy": "Copy key",
+          "enterCode": "Enter the code the app shows to confirm",
+          "confirm": "Done",
+          "loadFailed": "The setup could not be started."
+        },
+        "remove": {
+          "action": "Remove authenticator app",
+          "title": "Remove the authenticator app?",
+          "description": "Enter a current code from the app to confirm.",
+          "confirm": "Remove"
+        },
+        "fallback": {
+          "title": "Code by email as an alternative",
+          "description": "At sign-in, a code to your mailbox can be used instead of the one from the app."
+        },
+        "errors": {
+          "codeWrong": "That code is not valid. Please try again.",
+          "failed": "Something went wrong. Please try again."
+        }
       }
     },
     "devices": {

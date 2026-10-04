@@ -21,6 +21,7 @@ import type {CachedEmail, CachedLabel, CachedSender} from "$lib/app/entities/cac
 import {DevicesSettingsRepository} from "$lib/repository/DevicesSettingsRepository.ts";
 import {SessionsRepository} from "$lib/repository/SessionsRepository";
 import {PasswordRepository} from "$lib/repository/PasswordRepository";
+import {TotpRepository} from "$lib/repository/TotpRepository";
 
 /**
  * Every repository the app talks to, in one place.
@@ -58,6 +59,8 @@ export type Repositories = {
     sessions: SessionsRepository;
     /** Whether the user signs in with a password, as the security settings show and change it. */
     password: PasswordRepository;
+    /** The authenticator app, as the security settings set it up and remove it. */
+    totp: TotpRepository;
 };
 
 /** One builder per key, so nothing is constructed before somebody asks for it. */
@@ -77,6 +80,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     deviceSettingsRepository: () => new DevicesSettingsRepository(),
     sessions: () => new SessionsRepository(),
     password: () => new PasswordRepository(),
+    totp: () => new TotpRepository(),
     emails: createEmailRepository,
     labels: createLabelRepository,
     senders: createSenderRepository,

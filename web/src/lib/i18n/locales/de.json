@@ -578,6 +578,42 @@
           "failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
         },
         "retry": "Erneut versuchen"
+      },
+      "twoFactor": {
+        "title": "Zwei-Faktor-Authentifizierung"
+      },
+      "totp": {
+        "title": "Authenticator-App",
+        "statusEnabled": "Eingerichtet. Nach dem Passwort fragt die Anmeldung nach einem Code aus der App.",
+        "statusDisabled": "Nicht eingerichtet.",
+        "loadFailed": "Ob eine Authenticator-App eingerichtet ist, konnte nicht gelesen werden.",
+        "retry": "Erneut versuchen",
+        "cancel": "Abbrechen",
+        "code": "Code",
+        "setup": {
+          "action": "Einrichten",
+          "title": "Authenticator-App einrichten",
+          "description": "Scanne den QR-Code mit deiner Authenticator-App.",
+          "orKey": "oder nutze diesen Schlüssel",
+          "copy": "Schlüssel kopieren",
+          "enterCode": "Gib den erzeugten Code zur Bestätigung ein",
+          "confirm": "Fertig",
+          "loadFailed": "Die Einrichtung konnte nicht gestartet werden."
+        },
+        "remove": {
+          "action": "Authenticator-App entfernen",
+          "title": "Authenticator-App entfernen?",
+          "description": "Gib zur Bestätigung einen aktuellen Code aus der App ein.",
+          "confirm": "Entfernen"
+        },
+        "fallback": {
+          "title": "Code per E-Mail als Alternative",
+          "description": "Bei der Anmeldung kann statt des App-Codes ein Code an dein Postfach verwendet werden."
+        },
+        "errors": {
+          "codeWrong": "Der eingegebene Code war ungültig. Bitte versuche es erneut.",
+          "failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+        }
       }
     },
     "devices": {

@@ -9,6 +9,7 @@
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@fontsource-variable/playfair-display": "^5.3.0",
         "@humanspeak/svelte-markdown": "^1.9.0",
+        "@julius-babies/authentikt-svelte": "^0.4.8",
         "@tanstack/svelte-hotkeys": "^0.10.0",
         "@tanstack/svelte-table": "^9.2.4",
         "@tanstack/svelte-virtual": "^3.13.36",
@@ -136,6 +137,10 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.6.0", "", {}, "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@julius-babies/authentikt-svelte": ["@julius-babies/authentikt-svelte@0.4.8", "", { "dependencies": { "@lucide/svelte": "^1.8.0", "@zerodevx/svelte-json-view": "^1.0.11" }, "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-Uw5kTBZxj6hLghrIARpYd1dmvvr5ywTWqCTAZRH5IW6YgC7d+4p5WLxweSomXrFUzaWycQYtIoEoJfL5vhJgbA=="],
+
+    "@lucide/svelte": ["@lucide/svelte@1.52.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-bQ8t3IcZxWqAdmdMZPyZEv8Qf+MDgBAf7n43eRQoXyBeLWr8HWToiMIO6vKlHxC/lnMiCDdTzm09hjy92ch46A=="],
 
     "@napi-rs/lzma-linux-x64-gnu": ["@napi-rs/lzma-linux-x64-gnu@1.5.1", "", { "os": "linux", "cpu": "x64" }, "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="],
 
@@ -308,6 +313,8 @@
     "@use-gesture/core": ["@use-gesture/core@10.3.1", "", {}, "sha512-WcINiDt8WjqBdUXye25anHiNxPc0VOrlT8F6LLkU6cycrOGUDyY/yyFmsg3k8i5OLvv25llc0QC45GhR/C8llw=="],
 
     "@use-gesture/vanilla": ["@use-gesture/vanilla@10.3.1", "", { "dependencies": { "@use-gesture/core": "10.3.1" } }, "sha512-lT4scGLu59ovA3zmtUonukAGcA0AdOOh+iwNDS05Bsu7Lq9aZToDHhI6D8Q2qvsVraovtsLLYwPrWdG/noMAKw=="],
+
+    "@zerodevx/svelte-json-view": ["@zerodevx/svelte-json-view@1.0.11", "", { "peerDependencies": { "svelte": "^3.57.0 || ^4.0.0 || ^5.0.0" } }, "sha512-mIjj0H1al/P4FPlbeDoiey93lNEUqBEAe5LIdD5GttZfEYt3awexD2lHwKNfUeY4jHizOJkoWTPN/2iO0GBqpw=="],
 
     "acorn": ["acorn@8.18.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ=="],
 

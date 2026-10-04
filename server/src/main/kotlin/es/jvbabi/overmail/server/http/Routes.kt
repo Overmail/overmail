@@ -55,6 +55,10 @@ import es.jvbabi.overmail.server.http.users.me.password.deletePassword
 import es.jvbabi.overmail.server.http.users.me.password.getPassword
 import es.jvbabi.overmail.server.http.users.me.password.setPassword
 import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
+import es.jvbabi.overmail.server.http.users.me.totp.disableTotp
+import es.jvbabi.overmail.server.http.users.me.totp.enableTotp
+import es.jvbabi.overmail.server.http.users.me.totp.getTotp
+import es.jvbabi.overmail.server.http.users.me.totp.setupTotp
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.views.createView
 import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
@@ -386,6 +390,17 @@ internal fun Application.configureRouting() {
                         getPassword()
                         setPassword()
                         deletePassword()
+                    }
+
+                    // The authenticator app the sign-in asks for a code from, after the password.
+                    route("/totp") {
+                        getTotp()
+                        enableTotp()
+                        disableTotp()
+
+                        route("/setup") {
+                            setupTotp()
+                        }
                     }
 
                     // Where this user is signed in, and signing a device out again.

@@ -4,6 +4,7 @@ import es.jvbabi.authentikt.core.installAuthentikt
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.PasswordPlugin
+import es.jvbabi.authentikt.core.step.plugins.builtin.TotpPlugin
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -42,9 +43,9 @@ val SESSION_VALIDITY = 30.days
 private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 
 /**
- * Two steps: identify the account by username or email, then its password -- or, for an account
- * that has none, a one-time code to its mailbox. No account is ever created; an unknown identifier
- * is simply rejected.
+ * Identify the account by username or email, then its password -- or, for an account that has
+ * none, a one-time code to its mailbox -- and then, where one is set up, a code from the
+ * authenticator app. No account is ever created; an unknown identifier is simply rejected.
  */
 fun Application.installOvermailAuthentikt() {
     // Resolved eagerly because none of these touch the database; the database itself is pulled
@@ -74,6 +75,16 @@ fun Application.installOvermailAuthentikt() {
     }
 
     val verificationPlugin = EmailVerificationPlugin(smtpConfig)
+
+    val totpPlugin = TotpPlugin<User> {
+        validate { user, code ->
+            // Read fresh, like the password: a second factor removed mid-flow must not be asked for.
+            val secret = dependencies.resolve<OvermailDatabase>()
+                .query { Users.select(Users.totpSecret).where { Users.id eq user.id }.firstOrNull()?.get(Users.totpSecret) }
+                ?: return@validate false
+            verifyTotp(secret, code)
+        }
+    }
 
     val donePlugin = DonePlugin<User> {
         onSuccess { session, user ->
@@ -109,14 +120,17 @@ fun Application.installOvermailAuthentikt() {
         install(identifierPlugin)
         install(passwordPlugin)
         install(verificationPlugin)
+        install(totpPlugin)
         install(donePlugin)
 
         authorization { session ->
             val user = session.identifiedUser
+            // The columns were read with the row, so none of this needs a transaction.
             when {
                 user == null -> identifierPlugin
-                user.user.password != null -> if (session.has(passwordPlugin)) donePlugin else passwordPlugin
-                !session.has(verificationPlugin) -> verificationPlugin
+                user.user.password != null && !session.has(passwordPlugin) -> passwordPlugin
+                user.user.password == null && !session.has(verificationPlugin) -> verificationPlugin
+                user.user.totpSecret != null && !session.has(totpPlugin) -> totpPlugin
                 else -> donePlugin
             }
         }

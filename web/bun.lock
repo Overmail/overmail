@@ -9,7 +9,7 @@
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@fontsource-variable/playfair-display": "^5.3.0",
         "@humanspeak/svelte-markdown": "^1.9.0",
-        "@julius-babies/authentikt-svelte": "^0.4.8",
+        "@julius-babies/authentikt-svelte": "^0.5.0",
         "@tanstack/svelte-hotkeys": "^0.10.0",
         "@tanstack/svelte-table": "^9.2.4",
         "@tanstack/svelte-virtual": "^3.13.36",
@@ -138,7 +138,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@julius-babies/authentikt-svelte": ["@julius-babies/authentikt-svelte@0.4.8", "", { "dependencies": { "@lucide/svelte": "^1.8.0", "@zerodevx/svelte-json-view": "^1.0.11" }, "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-Uw5kTBZxj6hLghrIARpYd1dmvvr5ywTWqCTAZRH5IW6YgC7d+4p5WLxweSomXrFUzaWycQYtIoEoJfL5vhJgbA=="],
+    "@julius-babies/authentikt-svelte": ["@julius-babies/authentikt-svelte@0.5.0", "", { "dependencies": { "@lucide/svelte": "^1.8.0", "@zerodevx/svelte-json-view": "^1.0.11" }, "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-Yz7TgJo+meJ+t7OtXwqfIMEc9ToGeObaOHP+kZyD3tHh0xwgi8DNOy2C9T+N2Jcs1v4teFB0RBfJqMZGYJkgnw=="],
 
     "@lucide/svelte": ["@lucide/svelte@1.52.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-bQ8t3IcZxWqAdmdMZPyZEv8Qf+MDgBAf7n43eRQoXyBeLWr8HWToiMIO6vKlHxC/lnMiCDdTzm09hjy92ch46A=="],
 

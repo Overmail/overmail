@@ -4,11 +4,12 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon} from "phosphor-svelte";
+    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, SignOutIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
     import DevicesSettings from "$lib/app/settings/devices/DevicesSettings.svelte";
+    import {SidebarGroupContent} from "$lib/components/ui/sidebar/index.ts";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
 
@@ -30,6 +31,10 @@
         const url = new URL(page.url);
         url.searchParams.set("settings", key);
         goto(url, {replaceState: false, noScroll: true});
+    }
+
+    function logout() {
+        window.location.href = "/api/webapp/auth/logout"
     }
 </script>
 
@@ -81,6 +86,16 @@
                         </Sidebar.GroupContent>
                     </Sidebar.Group>
                 </Sidebar.Content>
+
+                <Sidebar.Footer>
+                    <Sidebar.Menu>
+                        <Sidebar.MenuItem>
+                            <Sidebar.MenuButton variant="destructive" onclick={logout}>
+                                <SignOutIcon /> Logout
+                            </Sidebar.MenuButton>
+                        </Sidebar.MenuItem>
+                    </Sidebar.Menu>
+                </Sidebar.Footer>
             </Sidebar.Root>
             <!--
               `min-w-0`: a flex item defaults to `min-width: auto`, so it refuses to shrink below

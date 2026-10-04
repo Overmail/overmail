@@ -62,6 +62,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
 import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
+import es.jvbabi.overmail.server.http.webapp.auth.logout.logout
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
 import es.jvbabi.overmail.server.http.webapp.devices.createAuthCode
 import es.jvbabi.overmail.server.http.webapp.home.homeSocket
@@ -497,6 +498,12 @@ internal fun Application.configureRouting() {
                 route("/content") {
                     route("/socket") {
                         contentSocket()
+                    }
+                }
+
+                route("/auth") {
+                    route("/logout") {
+                        logout()
                     }
                 }
 

@@ -6,6 +6,7 @@
 	import EmailStep from '$lib/app/auth/EmailStep.svelte';
 	import PasswordStep from '$lib/app/auth/PasswordStep.svelte';
 	import EmailVerificationStep from '$lib/app/auth/EmailVerificationStep.svelte';
+	import TotpStep from '$lib/app/auth/TotpStep.svelte';
 	import DoneStep from '$lib/app/auth/DoneStep.svelte';
 	import { initStepTransitions } from '$lib/app/auth/stepTransition';
 
@@ -30,6 +31,8 @@
 				return 'auth.signin.password.pageTitle';
 			case 'overmail/email-verification':
 				return 'auth.signin.code.pageTitle';
+			case 'authentikt-builtin/totp':
+				return 'auth.signin.totp.pageTitle';
 			case 'authentikt-builtin/done':
 				return 'auth.signin.done.pageTitle';
 			default:
@@ -56,6 +59,7 @@
 			<EmailStep />
 			<PasswordStep onRestart={start} />
 			<EmailVerificationStep onRestart={start} />
+			<TotpStep onRestart={start} />
 			<DoneStep />
 		{/key}
 	{/if}

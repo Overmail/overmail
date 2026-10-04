@@ -47,7 +47,16 @@
         "sent": "Wir haben einen Code an {email} geschickt.",
         "label": "Code",
         "submit": "Anmelden",
-        "error": "Dieser Code stimmt nicht."
+        "error": "Dieser Code stimmt nicht.",
+        "useTotp": "Stattdessen Authenticator-App verwenden"
+      },
+      "totp": {
+        "pageTitle": "Code aus der App",
+        "description": "Gib den Code aus deiner Authenticator-App ein.",
+        "label": "Code",
+        "submit": "Anmelden",
+        "error": "Dieser Code stimmt nicht.",
+        "useEmail": "Stattdessen Code per E-Mail senden"
       }
     }
   },

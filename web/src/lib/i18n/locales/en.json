@@ -47,7 +47,16 @@
         "sent": "We sent a code to {email}.",
         "label": "Code",
         "submit": "Sign in",
-        "error": "That code is not right."
+        "error": "That code is not right.",
+        "useTotp": "Use the authenticator app instead"
+      },
+      "totp": {
+        "pageTitle": "Authenticator code",
+        "description": "Enter the code from your authenticator app.",
+        "label": "Code",
+        "submit": "Sign in",
+        "error": "That code is not right.",
+        "useEmail": "Send a code by email instead"
       }
     }
   },

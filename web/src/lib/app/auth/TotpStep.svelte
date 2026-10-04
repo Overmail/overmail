@@ -1,50 +1,49 @@
 <script lang="ts" module>
-    import EmailVerificationStep from "./EmailVerificationStep.svelte";
+    import TotpStep from "./TotpStep.svelte";
 </script>
 
 <script lang="ts">
     import {tick} from "svelte";
-    import {useAuthentiktContext} from "@julius-babies/authentikt-svelte";
+    import {TotpPlugin, useAuthentiktContext, type TotpPluginInstance} from "@julius-babies/authentikt-svelte";
     import {_} from "svelte-i18n";
     import {slide} from "svelte/transition";
-    import {ArrowLeftIcon, ArrowRightIcon, DeviceMobileIcon, WarningCircleIcon} from "phosphor-svelte";
+    import {ArrowLeftIcon, ArrowRightIcon, EnvelopeSimpleIcon, WarningCircleIcon} from "phosphor-svelte";
     import * as InputOTP from "$lib/components/ui/input-otp";
     import {Spinner} from "$lib/components/ui/spinner";
     import AuthStep from "./AuthStep.svelte";
-    import {EmailVerificationPlugin} from "./EmailVerificationPlugin.svelte";
 
     let {onRestart}: { onRestart: () => void } = $props();
 
-    /** As long as the server's `CODE_LENGTH`. */
+    /** What authenticator apps show by default, and what the server checks. */
     const CODE_LENGTH = 6;
 
     /** The pin input's hidden <input>, the one that takes the keyboard. */
-    const INPUT_ID = "signin-code";
+    const INPUT_ID = "signin-totp";
 
     const auth = useAuthentiktContext();
 
-    const plugin = auth.registerPlugin<EmailVerificationPlugin>(
-        "overmail/email-verification",
-        EmailVerificationStep,
-        (a, ns) => new EmailVerificationPlugin(a, ns),
+    const plugin = auth.registerPlugin<TotpPluginInstance>(
+        "authentikt-builtin/totp",
+        TotpStep,
+        (a, ns) => new TotpPlugin(a, ns),
     );
 
-    /** The authenticator app, when this code was taken in its place. */
-    const TOTP = "authentikt-builtin/totp";
-    const canUseTotp = $derived(auth.alternatives.includes(TOTP));
+    /** The mailed code, where the account allows it in place of the app. */
+    const EMAIL_CODE = "overmail/email-verification";
+    const canUseEmailCode = $derived(auth.alternatives.includes(EMAIL_CODE));
 
     const loading = $derived(plugin.status === "loading");
-    const invalid = $derived(plugin.status === "invalid_code" || plugin.status === "error");
+    const invalid = $derived(plugin.status === "totp_incorrect" || plugin.status === "error");
 
     // Set by the email step. authentikt's check does not send the user yet, so after a reload in the
     // middle of the flow it is gone and the greeting goes without the name.
     const name = $derived(auth.currentFlow?.user?.displayName);
 
     async function submit() {
-        if (loading || plugin.code.length < CODE_LENGTH) return;
+        if (loading || plugin.totp.length < CODE_LENGTH) return;
         await plugin.submit();
         // All six boxes are full, so a wrong code would have to be deleted digit by digit first.
-        if (plugin.status === "invalid_code") plugin.code = "";
+        if (plugin.status === "totp_incorrect") plugin.totp = "";
         // The input was disabled while the code was checked, which took the focus away from it.
         if (invalid) {
             await tick();
@@ -63,7 +62,7 @@
                         : $_("auth.signin.greeting")}
                 </h1>
                 <p class="text-muted-foreground">
-                    {$_("auth.signin.code.sent", {values: {email: plugin.maskedEmail}})}
+                    {$_("auth.signin.totp.description")}
                 </p>
             </div>
 
@@ -72,14 +71,14 @@
                     <!-- The one thing on the page to type into, so the cursor starts there. -->
                     <!-- svelte-ignore a11y_autofocus -->
                     <InputOTP.Root
-                            bind:value={plugin.code}
+                            bind:value={plugin.totp}
                             inputId={INPUT_ID}
                             maxlength={CODE_LENGTH}
                             pattern={"^\\d+$"}
                             disabled={loading}
-                            onValueChange={() => { if (invalid && plugin.code) plugin.status = "ready"; }}
+                            onValueChange={() => { if (invalid && plugin.totp) plugin.status = "ready"; }}
                             onComplete={() => void submit()}
-                            aria-label={$_("auth.signin.code.label")}
+                            aria-label={$_("auth.signin.totp.label")}
                             class="min-w-0 flex-1"
                             autofocus
                     >
@@ -101,8 +100,8 @@
                     <button
                             type="submit"
                             class="group/submit flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            disabled={loading || plugin.code.length < CODE_LENGTH}
-                            aria-label={$_("auth.signin.code.submit")}
+                            disabled={loading || plugin.totp.length < CODE_LENGTH}
+                            aria-label={$_("auth.signin.totp.submit")}
                     >
                         {#if loading}
                             <Spinner class="size-4" />
@@ -115,20 +114,21 @@
                 {#if invalid}
                     <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
                         <WarningCircleIcon class="size-4 shrink-0" />
-                        {plugin.status === "invalid_code" ? $_("auth.signin.code.error") : $_("auth.signin.error")}
+                        {plugin.status === "totp_incorrect" ? $_("auth.signin.totp.error") : $_("auth.signin.error")}
                     </p>
                 {/if}
             </form>
 
-            {#if canUseTotp}
+            {#if canUseEmailCode}
+                <!-- Sends the mail only now: the code step mails it as it is entered. -->
                 <button
                         type="button"
                         class="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                        onclick={() => void auth.switchToAlternative(TOTP)}
+                        onclick={() => void auth.switchToAlternative(EMAIL_CODE)}
                         disabled={loading}
                 >
-                    <DeviceMobileIcon class="size-4" />
-                    {$_("auth.signin.code.useTotp")}
+                    <EnvelopeSimpleIcon class="size-4" />
+                    {$_("auth.signin.totp.useEmail")}
                 </button>
             {/if}
 

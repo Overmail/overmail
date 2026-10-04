@@ -18,7 +18,11 @@
     "signin": {
       "title": "Sign in",
       "loading": "Loading…",
+      "error": "Something went wrong.",
+      "done": "Signing you in…",
       "identifier": {
+        "headline": "Your mail has a new home.",
+        "description": "Sign in with your username or email address.",
         "label": "Username or email",
         "submit": "Continue",
         "error": "No account for that username or email."

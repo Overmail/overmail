@@ -11,5 +11,5 @@ import es.jvbabi.overmail.server.database.models.User
 class OvermailAuthentiktUser(user: User) : AuthentiktUser<User>(user) {
     override suspend fun getEmail(): String = user.email
     override suspend fun getUsername(): String = user.username
-    override suspend fun getDisplayName(): String = user.username
+    override suspend fun getDisplayName(): String = user.firstname
 }

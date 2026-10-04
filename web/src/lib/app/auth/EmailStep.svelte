@@ -24,6 +24,14 @@
 
     const loading = $derived(plugin.status === "loading");
     const invalid = $derived(plugin.status === "user_not_existing" || plugin.status === "error");
+
+    let input = $state<HTMLInputElement>();
+
+    async function submit() {
+        await plugin.submit();
+        // Sent with the button, the focus is on it; the answer is to correct the field.
+        if (invalid) input?.focus();
+    }
 </script>
 
 {#if plugin.isActive}
@@ -37,7 +45,7 @@
             </div>
 
             <!-- The server accepts the username as well (withUsername), the field is still `email`. -->
-            <form class="flex flex-col gap-2" onsubmit={(e) => { e.preventDefault(); plugin.submit(); }}>
+            <form class="flex flex-col gap-2" onsubmit={(e) => { e.preventDefault(); void submit(); }}>
                 <div class="flex gap-2">
                     <!-- The whole box is the field and takes the focus ring, the icon included. -->
                     <label
@@ -52,6 +60,7 @@
                         <!-- The one thing on the page to type into, so the cursor starts there. -->
                         <!-- svelte-ignore a11y_autofocus -->
                         <input
+                                bind:this={input}
                                 bind:value={plugin.email}
                                 oninput={() => { if (invalid) plugin.status = "ready"; }}
                                 class="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"

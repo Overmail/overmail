@@ -32,10 +32,12 @@
       },
       "code": {
         "pageTitle": "Enter code",
+        "headline": "Welcome back.",
+        "headlineNamed": "Welcome back, {name}.",
         "sent": "We sent a code to {email}.",
         "label": "Code",
         "submit": "Sign in",
-        "restart": "Start over",
+        "restart": "Use another account",
         "error": "That code is not right."
       }
     }

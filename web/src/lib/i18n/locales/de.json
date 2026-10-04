@@ -32,10 +32,12 @@
       },
       "code": {
         "pageTitle": "Code eingeben",
+        "headline": "Willkommen zurück.",
+        "headlineNamed": "Willkommen zurück, {name}.",
         "sent": "Wir haben einen Code an {email} geschickt.",
         "label": "Code",
         "submit": "Anmelden",
-        "restart": "Neu beginnen",
+        "restart": "Anderes Konto verwenden",
         "error": "Dieser Code stimmt nicht."
       }
     }

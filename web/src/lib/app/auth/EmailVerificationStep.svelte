@@ -3,12 +3,23 @@
 </script>
 
 <script lang="ts">
+    import {tick} from "svelte";
     import {useAuthentiktContext} from "@julius-babies/authentikt-svelte";
     import {_} from "svelte-i18n";
+    import {slide} from "svelte/transition";
+    import {ArrowLeftIcon, ArrowRightIcon, WarningCircleIcon} from "phosphor-svelte";
+    import * as InputOTP from "$lib/components/ui/input-otp";
+    import {Spinner} from "$lib/components/ui/spinner";
     import AuthStep from "./AuthStep.svelte";
     import {EmailVerificationPlugin} from "./EmailVerificationPlugin.svelte";
 
     let {onRestart}: { onRestart: () => void } = $props();
+
+    /** As long as the server's `CODE_LENGTH`. */
+    const CODE_LENGTH = 6;
+
+    /** The pin input's hidden <input>, the one that takes the keyboard. */
+    const INPUT_ID = "signin-code";
 
     const auth = useAuthentiktContext();
 
@@ -17,29 +28,103 @@
         EmailVerificationStep,
         (a, ns) => new EmailVerificationPlugin(a, ns),
     );
+
+    const loading = $derived(plugin.status === "loading");
+    const invalid = $derived(plugin.status === "invalid_code" || plugin.status === "error");
+
+    // Set by the email step. authentikt's check does not send the user yet, so after a reload in the
+    // middle of the flow it is gone and the greeting goes without the name.
+    const name = $derived(auth.currentFlow?.user?.displayName);
+
+    async function submit() {
+        if (loading || plugin.code.length < CODE_LENGTH) return;
+        await plugin.submit();
+        // All six boxes are full, so a wrong code would have to be deleted digit by digit first.
+        if (plugin.status === "invalid_code") plugin.code = "";
+        // The input was disabled while the code was checked, which took the focus away from it.
+        if (invalid) {
+            await tick();
+            document.getElementById(INPUT_ID)?.focus();
+        }
+    }
 </script>
 
 {#if plugin.isActive}
     <AuthStep>
-        <form onsubmit={(e) => { e.preventDefault(); plugin.submit(); }}>
-            <p>{$_("auth.signin.code.sent", {values: {email: plugin.maskedEmail}})}</p>
-            <label>
-                {$_("auth.signin.code.label")}
-                <input bind:value={plugin.code} inputmode="numeric" autocomplete="one-time-code" />
-            </label>
+        <div class="flex w-full max-w-md flex-col gap-8">
+            <div class="flex flex-col gap-3">
+                <h1 class="font-display text-4xl leading-tight text-balance sm:text-5xl">
+                    {name
+                        ? $_("auth.signin.code.headlineNamed", {values: {name}})
+                        : $_("auth.signin.code.headline")}
+                </h1>
+                <p class="text-muted-foreground">
+                    {$_("auth.signin.code.sent", {values: {email: plugin.maskedEmail}})}
+                </p>
+            </div>
 
-            {#if plugin.status === "invalid_code"}
-                <p role="alert">{$_("auth.signin.code.error")}</p>
-            {:else if plugin.status === "error"}
-                <p role="alert">{$_("auth.signin.error")}</p>
-            {/if}
+            <form class="flex flex-col gap-2" onsubmit={(e) => { e.preventDefault(); void submit(); }}>
+                <div class="flex gap-2">
+                    <!-- The one thing on the page to type into, so the cursor starts there. -->
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <InputOTP.Root
+                            bind:value={plugin.code}
+                            inputId={INPUT_ID}
+                            maxlength={CODE_LENGTH}
+                            pattern={"^\\d+$"}
+                            disabled={loading}
+                            onValueChange={() => { if (invalid && plugin.code) plugin.status = "ready"; }}
+                            onComplete={() => void submit()}
+                            aria-label={$_("auth.signin.code.label")}
+                            class="min-w-0 flex-1"
+                            autofocus
+                    >
+                        {#snippet children({cells})}
+                            <!-- The slots are apart, so each marks itself invalid; the group's ring around all of them
+                                 would be drawn across the gaps. -->
+                            <InputOTP.Group class="w-full gap-2 has-aria-invalid:ring-0">
+                                {#each cells as cell (cell)}
+                                    <!-- Filled boxes like the email field, apart instead of joined. -->
+                                    <InputOTP.Slot
+                                            {cell}
+                                            aria-invalid={invalid}
+                                            class="size-11 min-w-0 flex-1 rounded-xl border border-transparent bg-muted text-base font-medium first:rounded-xl last:rounded-xl data-[active=true]:ring-ring/20"
+                                    />
+                                {/each}
+                            </InputOTP.Group>
+                        {/snippet}
+                    </InputOTP.Root>
+                    <button
+                            type="submit"
+                            class="group/submit flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={loading || plugin.code.length < CODE_LENGTH}
+                            aria-label={$_("auth.signin.code.submit")}
+                    >
+                        {#if loading}
+                            <Spinner class="size-4" />
+                        {:else}
+                            <ArrowRightIcon class="size-4 transition-transform group-hover/submit:translate-x-0.5" weight="bold" />
+                        {/if}
+                    </button>
+                </div>
 
-            <button type="submit" disabled={plugin.status === "loading" || !plugin.code}>
-                {$_("auth.signin.code.submit")}
-            </button>
-            <button type="button" onclick={onRestart} disabled={plugin.status === "loading"}>
+                {#if invalid}
+                    <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
+                        <WarningCircleIcon class="size-4 shrink-0" />
+                        {plugin.status === "invalid_code" ? $_("auth.signin.code.error") : $_("auth.signin.error")}
+                    </p>
+                {/if}
+            </form>
+
+            <button
+                    type="button"
+                    class="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    onclick={onRestart}
+                    disabled={loading}
+            >
+                <ArrowLeftIcon class="size-4" />
                 {$_("auth.signin.code.restart")}
             </button>
-        </form>
+        </div>
     </AuthStep>
 {/if}

@@ -49,7 +49,10 @@ export function stepIn(_node: Element, {animate}: { animate: boolean }): Transit
     };
 }
 
-export function stepOut(_node: Element): TransitionConfig {
+export function stepOut(node: Element): TransitionConfig {
+    // Still in the DOM for the whole transition, but done with: out of the tab order, and the
+    // focus it holds is let go so the arriving step can take it.
+    (node as HTMLElement).inert = true;
     if (reducedMotion()) return {duration: DURATION / 2, css: (t) => `opacity: ${t};`};
     return {
         duration: DURATION,

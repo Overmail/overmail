@@ -19,7 +19,10 @@
       "title": "Anmelden",
       "loading": "Wird geladen…",
       "error": "Etwas ist schiefgelaufen.",
-      "done": "Du wirst angemeldet…",
+      "done": {
+        "pageTitle": "Anmeldung läuft",
+        "message": "Du wirst angemeldet…"
+      },
       "identifier": {
         "headline": "Deine E-Mails haben ein neues Zuhause.",
         "description": "Melde dich mit deinem Benutzernamen oder deiner E-Mail-Adresse an.",
@@ -28,6 +31,7 @@
         "error": "Zu diesem Benutzernamen oder dieser E-Mail-Adresse gibt es kein Konto."
       },
       "code": {
+        "pageTitle": "Code eingeben",
         "sent": "Wir haben einen Code an {email} geschickt.",
         "label": "Code",
         "submit": "Anmelden",

@@ -19,10 +19,6 @@
     };
 </script>
 
-<svelte:head>
-    <title>Overmail Anmeldung</title>
-</svelte:head>
-
 <div class="w-screen h-screen flex flex-row">
     <div class="flex-1">
         <Authentikt {config}>

@@ -6,6 +6,7 @@
     import {DonePlugin, useAuthentiktContext} from "@julius-babies/authentikt-svelte";
     import {goto} from "$app/navigation";
     import {_} from "svelte-i18n";
+    import AuthStep from "./AuthStep.svelte";
 
     const auth = useAuthentiktContext();
 
@@ -28,5 +29,7 @@
 </script>
 
 {#if plugin.isActive}
-    <p>{$_("auth.signin.done")}</p>
+    <AuthStep>
+        <p>{$_("auth.signin.done.message")}</p>
+    </AuthStep>
 {/if}

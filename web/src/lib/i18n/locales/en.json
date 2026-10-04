@@ -19,7 +19,10 @@
       "title": "Sign in",
       "loading": "Loading…",
       "error": "Something went wrong.",
-      "done": "Signing you in…",
+      "done": {
+        "pageTitle": "Signing in",
+        "message": "Signing you in…"
+      },
       "identifier": {
         "headline": "Your mail has a new home.",
         "description": "Sign in with your username or email address.",
@@ -28,6 +31,7 @@
         "error": "No account for that username or email."
       },
       "code": {
+        "pageTitle": "Enter code",
         "sent": "We sent a code to {email}.",
         "label": "Code",
         "submit": "Sign in",

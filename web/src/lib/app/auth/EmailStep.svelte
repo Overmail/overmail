@@ -38,7 +38,7 @@
     <AuthStep>
         <div class="flex w-full max-w-md flex-col gap-8">
             <div class="flex flex-col gap-3">
-                <h1 class="font-display text-4xl leading-tight text-balance sm:text-5xl">
+                <h1 class="font-display text-3xl leading-tight text-balance sm:text-4xl lg:text-5xl">
                     {$_("auth.signin.identifier.headline")}
                 </h1>
                 <p class="text-muted-foreground">{$_("auth.signin.identifier.description")}</p>

@@ -20,7 +20,7 @@
      overlap for the length of the transition instead of stacking. Each one is a whole page and
      scrolls on its own when it does not fit. -->
 <div bind:this={element}
-     class="col-start-1 row-start-1 h-full min-h-0 overflow-y-auto p-16 pt-32 will-change-transform"
+     class="col-start-1 row-start-1 h-full min-h-0 overflow-y-auto p-6 pt-10 lg:p-16 lg:pt-32 will-change-transform"
      in:stepIn={{animate}} out:stepOut>
     {@render children()}
 </div>

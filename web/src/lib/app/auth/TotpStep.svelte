@@ -56,7 +56,7 @@
     <AuthStep>
         <div class="flex w-full max-w-md flex-col gap-8">
             <div class="flex flex-col gap-3">
-                <h1 class="font-display text-4xl leading-tight text-balance sm:text-5xl">
+                <h1 class="font-display text-3xl leading-tight text-balance sm:text-4xl lg:text-5xl">
                     {name
                         ? $_("auth.signin.greetingNamed", {values: {name}})
                         : $_("auth.signin.greeting")}

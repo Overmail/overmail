@@ -44,7 +44,7 @@
             <KeyIcon class="size-5" weight={isSet ? "fill" : "regular"} />
         </div>
 
-        <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex min-w-0 flex-1 flex-col">
             <span class="font-medium">{$_("settings.security.password.title")}</span>
 
             {#if failed}

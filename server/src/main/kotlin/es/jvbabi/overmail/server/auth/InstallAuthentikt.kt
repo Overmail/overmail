@@ -2,8 +2,6 @@ package es.jvbabi.overmail.server.auth
 
 import es.jvbabi.authentikt.core.installAuthentikt
 import es.jvbabi.authentikt.core.step.plugins.alternative
-// Collides with the sessions this server issues, which this file names as well.
-import es.jvbabi.authentikt.core.session.Session as AuthentiktSession
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.PasswordPlugin
@@ -46,9 +44,9 @@ val SESSION_VALIDITY = 30.days
 private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 
 /**
- * Identify the account by username or email, then its password -- or, for an account that has
- * none, a one-time code to its mailbox -- and then, where one is set up, a code from the
- * authenticator app. No account is ever created; an unknown identifier is simply rejected.
+ * Identify the account by username or email, then its password where it has one, then one code:
+ * the authenticator app's, or -- where the account allows it or has no app -- one mailed to it. No
+ * account is ever created; an unknown identifier is simply rejected.
  */
 fun Application.installOvermailAuthentikt() {
     // Resolved eagerly because none of these touch the database; the database itself is pulled
@@ -133,17 +131,13 @@ fun Application.installOvermailAuthentikt() {
             when {
                 account == null -> identifierPlugin
                 account.password != null && !session.has(passwordPlugin) -> passwordPlugin
-                account.password == null && !session.has(verificationPlugin) -> verificationPlugin
-                account.totpSecret != null && !hasSecondFactor(session, account, totpPlugin, verificationPlugin) -> {
-                    // The mailed code stands in for the app where the account allows it. Not without a
-                    // password: there the code was the first factor already, and twice is not two.
-                    if (account.password != null && account.emailOtpActive) {
-                        totpPlugin alternative listOf(verificationPlugin)
-                    } else {
-                        totpPlugin
-                    }
-                }
-                else -> donePlugin
+                // One code, the app's or the mailed one -- whichever was taken, never both.
+                session.has(totpPlugin) || session.has(verificationPlugin) -> donePlugin
+                // Without an app the mailbox is all an account without a password has.
+                account.totpSecret == null -> if (account.password == null) verificationPlugin else donePlugin
+                // Either way round: switching to the mailed code offers the app again, and back.
+                account.emailOtpActive -> totpPlugin alternative listOf(verificationPlugin)
+                else -> totpPlugin
             }
         }
     }
@@ -226,14 +220,3 @@ private data class SessionResponse(
     @SerialName("username") val username: String,
     @SerialName("email") val email: String,
 )
-
-/**
- * Whether the second factor is in: the authenticator app's code, or the mailed one taken as its
- * alternative. The mailed code only counts here behind a password -- without one it was the first.
- */
-private suspend fun hasSecondFactor(
-    session: AuthentiktSession<User>,
-    account: User,
-    totpPlugin: TotpPlugin<User>,
-    verificationPlugin: EmailVerificationPlugin,
-): Boolean = session.has(totpPlugin) || (account.password != null && session.has(verificationPlugin))

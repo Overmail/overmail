@@ -19,7 +19,7 @@ fun Route.getTotp() {
         /**
          * Get whether an authenticator app is set up.
          *
-         * Description: With one, the sign-in asks for its code after the password.
+         * Description: With one, the sign-in asks for its code, or for a mailed one where that is allowed.
          *
          * Tag: Account
          *

@@ -593,7 +593,7 @@
       },
       "totp": {
         "title": "Authenticator app",
-        "statusEnabled": "Set up. After your password, the sign-in asks for a code from the app.",
+        "statusEnabled": "Set up. The sign-in asks for a code from the app.",
         "statusDisabled": "Not set up.",
         "loadFailed": "Whether an authenticator app is set up could not be read.",
         "retry": "Try again",

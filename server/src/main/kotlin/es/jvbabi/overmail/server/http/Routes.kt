@@ -393,7 +393,7 @@ internal fun Application.configureRouting() {
                         deletePassword()
                     }
 
-                    // The authenticator app the sign-in asks for a code from, after the password.
+                    // The authenticator app the sign-in asks for a code from.
                     route("/totp") {
                         getTotp()
                         enableTotp()

@@ -593,7 +593,7 @@
       },
       "totp": {
         "title": "Authenticator-App",
-        "statusEnabled": "Eingerichtet. Nach dem Passwort fragt die Anmeldung nach einem Code aus der App.",
+        "statusEnabled": "Eingerichtet. Die Anmeldung fragt nach einem Code aus der App.",
         "statusDisabled": "Nicht eingerichtet.",
         "loadFailed": "Ob eine Authenticator-App eingerichtet ist, konnte nicht gelesen werden.",
         "retry": "Erneut versuchen",

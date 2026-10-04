@@ -1,8 +1,10 @@
 package es.jvbabi.overmail.server.auth
 
+import at.favre.lib.crypto.bcrypt.BCrypt
 import es.jvbabi.authentikt.core.installAuthentikt
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
+import es.jvbabi.authentikt.core.step.plugins.builtin.PasswordPlugin
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -29,6 +31,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.time.Duration.Companion.days
 
 /** Mounted below the `/api` prefix Caddy forwards, so the flow routes end up under `/api/auth`. */
@@ -40,9 +43,9 @@ val SESSION_VALIDITY = 30.days
 private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 
 /**
- * Two steps: identify the account by username or email, then prove control of its mailbox with a
- * one-time code. There is no password anywhere in this flow, and no account is ever created —
- * an unknown identifier is simply rejected.
+ * Two steps: identify the account by username or email, then its password -- or, for an account
+ * that has none, a one-time code to its mailbox. No account is ever created; an unknown identifier
+ * is simply rejected.
  */
 fun Application.installOvermailAuthentikt() {
     // Resolved eagerly because none of these touch the database; the database itself is pulled
@@ -59,6 +62,16 @@ fun Application.installOvermailAuthentikt() {
                 ?.let(::OvermailAuthentiktUser)
         }
         withUsername = true
+    }
+
+    val passwordPlugin = PasswordPlugin<User> {
+        checkPassword { user, password ->
+            // Read fresh rather than off the entity the flow holds, which is as old as the flow.
+            val hash = dependencies.resolve<OvermailDatabase>()
+                .query { Users.select(Users.password).where { Users.id eq user.id }.firstOrNull()?.get(Users.password) }
+                ?: return@checkPassword false
+            BCrypt.verifyer().verify(password.toCharArray(), hash).verified
+        }
     }
 
     val verificationPlugin = EmailVerificationPlugin(smtpConfig)
@@ -95,12 +108,15 @@ fun Application.installOvermailAuthentikt() {
         uiLoginBaseUrl = URLBuilder(config.baseUrl).appendPathSegments("auth").buildString()
 
         install(identifierPlugin)
+        install(passwordPlugin)
         install(verificationPlugin)
         install(donePlugin)
 
         authorization { session ->
+            val user = session.identifiedUser
             when {
-                session.identifiedUser == null -> identifierPlugin
+                user == null -> identifierPlugin
+                user.user.password != null -> if (session.has(passwordPlugin)) donePlugin else passwordPlugin
                 !session.has(verificationPlugin) -> verificationPlugin
                 else -> donePlugin
             }

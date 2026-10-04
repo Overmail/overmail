@@ -11,6 +11,8 @@ object Users : UuidTable("users") {
     val email = varchar("email", 255).uniqueIndex()
     val firstname = varchar("firstname", 255)
     val lastname = varchar("lastname", 255)
+    /** A BCrypt hash. Null for an account without a password, which signs in with a mailed code. */
+    val password = varchar("password", 255).nullable()
 }
 
 class User(id: EntityID<Id>) : UuidEntity(id) {
@@ -18,6 +20,7 @@ class User(id: EntityID<Id>) : UuidEntity(id) {
     typealias Id = Uuid
 
     var username by Users.username
+    var password by Users.password
     var email by Users.email
     var firstname by Users.firstname
     var lastname by Users.lastname

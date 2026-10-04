@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.server.auth
 
-import at.favre.lib.crypto.bcrypt.BCrypt
 import es.jvbabi.authentikt.core.installAuthentikt
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
@@ -70,7 +69,7 @@ fun Application.installOvermailAuthentikt() {
             val hash = dependencies.resolve<OvermailDatabase>()
                 .query { Users.select(Users.password).where { Users.id eq user.id }.firstOrNull()?.get(Users.password) }
                 ?: return@checkPassword false
-            BCrypt.verifyer().verify(password.toCharArray(), hash).verified
+            verifyPassword(password, hash)
         }
     }
 

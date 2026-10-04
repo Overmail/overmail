@@ -51,6 +51,9 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.password.deletePassword
+import es.jvbabi.overmail.server.http.users.me.password.getPassword
+import es.jvbabi.overmail.server.http.users.me.password.setPassword
 import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.views.createView
@@ -376,6 +379,13 @@ internal fun Application.configureRouting() {
                             updateKnowledgeEntry()
                             deleteKnowledgeEntry()
                         }
+                    }
+
+                    // Whether this user signs in with a password, and setting, changing or removing it.
+                    route("/password") {
+                        getPassword()
+                        setPassword()
+                        deletePassword()
                     }
 
                     // Where this user is signed in, and signing a device out again.

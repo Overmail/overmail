@@ -1,6 +1,9 @@
 package es.jvbabi.overmail.server.auth
 
 import es.jvbabi.authentikt.core.installAuthentikt
+import es.jvbabi.authentikt.core.step.plugins.alternative
+// Collides with the sessions this server issues, which this file names as well.
+import es.jvbabi.authentikt.core.session.Session as AuthentiktSession
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.PasswordPlugin
@@ -126,11 +129,20 @@ fun Application.installOvermailAuthentikt() {
         authorization { session ->
             val user = session.identifiedUser
             // The columns were read with the row, so none of this needs a transaction.
+            val account = user?.user
             when {
-                user == null -> identifierPlugin
-                user.user.password != null && !session.has(passwordPlugin) -> passwordPlugin
-                user.user.password == null && !session.has(verificationPlugin) -> verificationPlugin
-                user.user.totpSecret != null && !session.has(totpPlugin) -> totpPlugin
+                account == null -> identifierPlugin
+                account.password != null && !session.has(passwordPlugin) -> passwordPlugin
+                account.password == null && !session.has(verificationPlugin) -> verificationPlugin
+                account.totpSecret != null && !hasSecondFactor(session, account, totpPlugin, verificationPlugin) -> {
+                    // The mailed code stands in for the app where the account allows it. Not without a
+                    // password: there the code was the first factor already, and twice is not two.
+                    if (account.password != null && account.totpEmailFallback) {
+                        totpPlugin alternative listOf(verificationPlugin)
+                    } else {
+                        totpPlugin
+                    }
+                }
                 else -> donePlugin
             }
         }
@@ -214,3 +226,14 @@ private data class SessionResponse(
     @SerialName("username") val username: String,
     @SerialName("email") val email: String,
 )
+
+/**
+ * Whether the second factor is in: the authenticator app's code, or the mailed one taken as its
+ * alternative. The mailed code only counts here behind a password -- without one it was the first.
+ */
+private suspend fun hasSecondFactor(
+    session: AuthentiktSession<User>,
+    account: User,
+    totpPlugin: TotpPlugin<User>,
+    verificationPlugin: EmailVerificationPlugin,
+): Boolean = session.has(totpPlugin) || (account.password != null && session.has(verificationPlugin))

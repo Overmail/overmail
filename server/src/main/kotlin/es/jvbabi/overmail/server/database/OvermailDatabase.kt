@@ -37,6 +37,7 @@ class OvermailDatabase(private val database: Database) {
             // create() leaves an existing table alone, so a column added later has to be added here.
             exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255)")
             exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64)")
+            exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_email_fallback BOOLEAN DEFAULT TRUE NOT NULL")
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
             SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(EmailAvatars)

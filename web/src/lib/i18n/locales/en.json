@@ -544,8 +544,8 @@
       },
       "password": {
         "title": "Password",
-        "statusSet": "Set",
-        "statusUnset": "Not set",
+        "statusSet": "Set. You sign in to Overmail with it.",
+        "statusUnset": "No password set yet.",
         "loadFailed": "Whether a password is set could not be read.",
         "minLength": "{count, plural, one {At least # character.} other {At least # characters.}}",
         "save": "Save",
@@ -577,7 +577,6 @@
           "mismatch": "The passwords do not match.",
           "failed": "Something went wrong. Please try again."
         },
-        "description": "The password you sign in to Overmail with.",
         "retry": "Try again"
       }
     },

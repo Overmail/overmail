@@ -1,7 +1,7 @@
 <script lang="ts">
     import {onMount} from "svelte";
     import {_} from "svelte-i18n";
-    import {KeyIcon, TrashIcon, WarningCircleIcon} from "phosphor-svelte";
+    import {CheckCircleIcon, KeyIcon, TrashIcon, WarningCircleIcon} from "phosphor-svelte";
     import {Button} from "$lib/components/ui/button";
     import {Skeleton} from "$lib/components/ui/skeleton";
     import * as Tooltip from "$lib/components/ui/tooltip";
@@ -30,29 +30,22 @@
     onMount(() => void load());
 </script>
 
-<section class="flex flex-col gap-1">
+<section class="flex flex-col gap-3">
     <h2 class="text-xl">{$_("settings.security.signIn.title")}</h2>
 
-    <div class="flex flex-row flex-wrap items-center gap-4 rounded-lg border p-4">
-        <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <KeyIcon class="size-5" />
+    <div class="flex flex-row flex-wrap items-center gap-4">
+        <!-- The tile carries the state: tinted once a password is set, plain while there is none. -->
+        <div
+                class={[
+                    "flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
+                    isSet ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                ]}
+        >
+            <KeyIcon class="size-5" weight={isSet ? "fill" : "regular"} />
         </div>
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-            <div class="flex flex-row items-center gap-2">
-                <span class="font-medium">{$_("settings.security.password.title")}</span>
-                {#if isSet !== null}
-                    <span
-                            class={[
-                                "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-                                isSet ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                            ]}
-                    >
-                        <span class={["size-1.5 rounded-full", isSet ? "bg-primary" : "bg-muted-foreground"]}></span>
-                        {isSet ? $_("settings.security.password.statusSet") : $_("settings.security.password.statusUnset")}
-                    </span>
-                {/if}
-            </div>
+            <span class="font-medium">{$_("settings.security.password.title")}</span>
 
             {#if failed}
                 <span class="flex flex-row items-center gap-1 text-sm text-destructive">
@@ -62,8 +55,15 @@
                         {$_("settings.security.password.retry")}
                     </button>
                 </span>
+            {:else if isSet === null}
+                <Skeleton class="h-4 w-48" />
+            {:else if isSet}
+                <span class="flex flex-row items-center gap-1.5 text-sm text-muted-foreground">
+                    <CheckCircleIcon class="size-4 shrink-0 text-primary" weight="fill" />
+                    {$_("settings.security.password.statusSet")}
+                </span>
             {:else}
-                <span class="text-sm text-muted-foreground">{$_("settings.security.password.description")}</span>
+                <span class="text-sm text-muted-foreground">{$_("settings.security.password.statusUnset")}</span>
             {/if}
         </div>
 

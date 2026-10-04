@@ -544,8 +544,8 @@
       },
       "password": {
         "title": "Passwort",
-        "statusSet": "Festgelegt",
-        "statusUnset": "Nicht festgelegt",
+        "statusSet": "Festgelegt. Damit meldest du dich bei Overmail an.",
+        "statusUnset": "Noch kein Passwort festgelegt.",
         "loadFailed": "Ob ein Passwort festgelegt ist, konnte nicht gelesen werden.",
         "minLength": "{count, plural, one {Mindestens # Zeichen.} other {Mindestens # Zeichen.}}",
         "save": "Speichern",
@@ -577,7 +577,6 @@
           "mismatch": "Die Passwörter stimmen nicht überein.",
           "failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
         },
-        "description": "Das Passwort, mit dem du dich bei Overmail anmeldest.",
         "retry": "Erneut versuchen"
       }
     },

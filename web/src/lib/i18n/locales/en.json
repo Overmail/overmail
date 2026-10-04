@@ -23,6 +23,9 @@
         "pageTitle": "Signing in",
         "message": "Signing you in…"
       },
+      "greeting": "Welcome back.",
+      "greetingNamed": "Welcome back, {name}.",
+      "restart": "Use another account",
       "identifier": {
         "headline": "Your mail has a new home.",
         "description": "Sign in with your username or email address.",
@@ -30,14 +33,20 @@
         "submit": "Continue",
         "error": "No account for that username or email."
       },
+      "password": {
+        "pageTitle": "Enter password",
+        "description": "Enter your password to sign in.",
+        "label": "Password",
+        "submit": "Sign in",
+        "show": "Show password",
+        "hide": "Hide password",
+        "error": "That password is not right."
+      },
       "code": {
         "pageTitle": "Enter code",
-        "headline": "Welcome back.",
-        "headlineNamed": "Welcome back, {name}.",
         "sent": "We sent a code to {email}.",
         "label": "Code",
         "submit": "Sign in",
-        "restart": "Use another account",
         "error": "That code is not right."
       }
     }

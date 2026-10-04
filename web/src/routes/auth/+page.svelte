@@ -4,6 +4,7 @@
 	import { _ } from 'svelte-i18n';
 	import { useRepositories } from '$lib/repository/repositories';
 	import EmailStep from '$lib/app/auth/EmailStep.svelte';
+	import PasswordStep from '$lib/app/auth/PasswordStep.svelte';
 	import EmailVerificationStep from '$lib/app/auth/EmailVerificationStep.svelte';
 	import DoneStep from '$lib/app/auth/DoneStep.svelte';
 	import { initStepTransitions } from '$lib/app/auth/stepTransition';
@@ -25,6 +26,8 @@
 		const step = auth.currentFlow?.step;
 		if (step?.type !== 'step') return 'auth.signin.title';
 		switch (step.namespace) {
+			case 'authentikt-builtin/password':
+				return 'auth.signin.password.pageTitle';
 			case 'overmail/email-verification':
 				return 'auth.signin.code.pageTitle';
 			case 'authentikt-builtin/done':
@@ -51,6 +54,7 @@
 		<!-- Keyed by the flow, so starting over gives every step a fresh plugin and empty fields. -->
 		{#key auth.currentFlow.session_id}
 			<EmailStep />
+			<PasswordStep onRestart={start} />
 			<EmailVerificationStep onRestart={start} />
 			<DoneStep />
 		{/key}

@@ -55,8 +55,8 @@
             <div class="flex flex-col gap-3">
                 <h1 class="font-display text-4xl leading-tight text-balance sm:text-5xl">
                     {name
-                        ? $_("auth.signin.code.headlineNamed", {values: {name}})
-                        : $_("auth.signin.code.headline")}
+                        ? $_("auth.signin.greetingNamed", {values: {name}})
+                        : $_("auth.signin.greeting")}
                 </h1>
                 <p class="text-muted-foreground">
                     {$_("auth.signin.code.sent", {values: {email: plugin.maskedEmail}})}
@@ -123,7 +123,7 @@
                     disabled={loading}
             >
                 <ArrowLeftIcon class="size-4" />
-                {$_("auth.signin.code.restart")}
+                {$_("auth.signin.restart")}
             </button>
         </div>
     </AuthStep>

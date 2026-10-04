@@ -23,6 +23,9 @@
         "pageTitle": "Anmeldung läuft",
         "message": "Du wirst angemeldet…"
       },
+      "greeting": "Willkommen zurück.",
+      "greetingNamed": "Willkommen zurück, {name}.",
+      "restart": "Anderes Konto verwenden",
       "identifier": {
         "headline": "Deine E-Mails haben ein neues Zuhause.",
         "description": "Melde dich mit deinem Benutzernamen oder deiner E-Mail-Adresse an.",
@@ -30,14 +33,20 @@
         "submit": "Weiter",
         "error": "Zu diesem Benutzernamen oder dieser E-Mail-Adresse gibt es kein Konto."
       },
+      "password": {
+        "pageTitle": "Passwort eingeben",
+        "description": "Gib dein Passwort ein, um dich anzumelden.",
+        "label": "Passwort",
+        "submit": "Anmelden",
+        "show": "Passwort anzeigen",
+        "hide": "Passwort verbergen",
+        "error": "Dieses Passwort stimmt nicht."
+      },
       "code": {
         "pageTitle": "Code eingeben",
-        "headline": "Willkommen zurück.",
-        "headlineNamed": "Willkommen zurück, {name}.",
         "sent": "Wir haben einen Code an {email} geschickt.",
         "label": "Code",
         "submit": "Anmelden",
-        "restart": "Anderes Konto verwenden",
         "error": "Dieser Code stimmt nicht."
       }
     }

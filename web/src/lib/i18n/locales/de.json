@@ -327,6 +327,7 @@
   "settings": {
     "title": "Einstellungen",
     "description": "Verwalte deine Einstellungen.",
+    "logout": "Abmelden",
     "emailAccounts": {
       "title": "E-Mail-Konten",
       "add": "Neues Postfach hinzufügen",
@@ -576,6 +577,7 @@
       }
     },
     "devices": {
+      "name": "Geräte",
       "title": "Overmail-App verbinden",
       "scan": "Scanne diesen Code mit der Overmail-App, um dich anzumelden.",
       "revealHint": "Fahre mit der Maus über den Code, um ihn anzuzeigen.",

@@ -20,16 +20,17 @@
         goto(url, {replaceState: true, noScroll: true});
     }
 
-    const nav = [
+    // Derived, so a change of language renames the pages too.
+    const nav = $derived([
         {name: $_("settings.emailAccounts.title"), icon: EnvelopeSimpleIcon, key: "email-accounts"},
         {name: $_("settings.knowledge.title"), icon: BrainIcon, key: "knowledge"},
         {name: $_("settings.security.title"), icon: LockIcon, key: "security"},
-        {name: "Geräte", icon: DeviceMobileIcon, key: "devices"}
-    ];
+        {name: $_("settings.devices.name"), icon: DeviceMobileIcon, key: "devices"},
+    ]);
 
     const currentNavItem = $derived(nav.find((item) => item.key === page.url.searchParams.get("settings")) ?? nav[0]);
 
-    function navigateToPage(key: typeof nav[number]['key']) {
+    function navigateToPage(key: string) {
         const url = new URL(page.url);
         url.searchParams.set("settings", key);
         goto(url, {replaceState: false, noScroll: true});
@@ -71,7 +72,7 @@
                     <Sidebar.Group>
                         <Sidebar.GroupContent>
                             <Sidebar.Menu>
-                                {#each nav as item (item.name)}
+                                {#each nav as item (item.key)}
                                     {@const Icon = item.icon}
                                     <Sidebar.MenuItem>
                                         <Sidebar.MenuButton isActive={item.key === currentNavItem.key}>
@@ -93,7 +94,7 @@
                     <Sidebar.Menu>
                         <Sidebar.MenuItem>
                             <Sidebar.MenuButton variant="destructive" onclick={logout}>
-                                <SignOutIcon /> Logout
+                                <SignOutIcon /> {$_("settings.logout")}
                             </Sidebar.MenuButton>
                         </Sidebar.MenuItem>
                     </Sidebar.Menu>

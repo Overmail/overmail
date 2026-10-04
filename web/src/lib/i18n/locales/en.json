@@ -327,6 +327,7 @@
   "settings": {
     "title": "Settings",
     "description": "Manage your settings.",
+    "logout": "Sign out",
     "emailAccounts": {
       "title": "Email accounts",
       "add": "Add a new inbox",
@@ -576,6 +577,7 @@
       }
     },
     "devices": {
+      "name": "Devices",
       "title": "Connect the Overmail app",
       "scan": "Scan this code with the Overmail app to sign in.",
       "revealHint": "Hover over the code to reveal it.",

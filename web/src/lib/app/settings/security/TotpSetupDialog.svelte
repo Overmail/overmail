@@ -77,14 +77,14 @@
 </script>
 
 <Dialog.Root bind:open={() => open, (value) => { if (!verifying) open = value; }}>
-    <Dialog.Content class="sm:max-w-2xl">
+    <Dialog.Content class="sm:max-w-xl">
         <Dialog.Header>
             <Dialog.Title>{$_("settings.security.totp.setup.title")}</Dialog.Title>
             <Dialog.Description>{$_("settings.security.totp.setup.description")}</Dialog.Description>
         </Dialog.Header>
 
         {#if setup.type === "loading"}
-            <div class="flex h-64 items-center justify-center">
+            <div class="flex h-40 items-center justify-center">
                 <Spinner class="size-6" />
             </div>
         {:else if setup.type === "failed"}
@@ -97,13 +97,13 @@
             </div>
         {:else}
             {@const secret = setup.value.secret}
-            <div class="flex w-full flex-col gap-4">
-                <div class="flex flex-row flex-wrap items-center justify-center gap-4">
-                    <div class="my-4 size-48 shrink-0 overflow-hidden rounded-md">
-                        <QRCode data={setup.value.uri} size={192} shape="circle" />
+            <div class="flex w-full flex-col gap-3">
+                <div class="flex flex-row flex-wrap items-center justify-center gap-6">
+                    <div class="size-40 shrink-0 overflow-hidden rounded-md">
+                        <QRCode data={setup.value.uri} size={160} shape="circle" />
                     </div>
 
-                    <div class="h-48 w-px bg-muted max-sm:hidden"></div>
+                    <div class="h-32 w-px bg-muted max-sm:hidden"></div>
 
                     <div class="flex min-w-0 flex-col items-center gap-2">
                         <span class="text-center text-sm text-muted-foreground">{$_("settings.security.totp.setup.orKey")}</span>
@@ -124,7 +124,7 @@
                     </div>
                 </div>
 
-                <div class="flex w-full flex-col items-center gap-2 pb-4">
+                <div class="flex w-full flex-col items-center gap-2">
                     <span class="text-sm">{$_("settings.security.totp.setup.enterCode")}</span>
 
                     <InputOTP.Root
@@ -152,7 +152,7 @@
                     </InputOTP.Root>
 
                     {#if failure}
-                        <p role="alert" class="mt-2 text-sm text-destructive">
+                        <p role="alert" class="text-sm text-destructive">
                             {failure === "code" ? $_("settings.security.totp.errors.codeWrong") : $_("settings.security.totp.errors.failed")}
                         </p>
                     {/if}

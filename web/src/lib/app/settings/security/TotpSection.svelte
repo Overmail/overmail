@@ -16,8 +16,8 @@
     /** Null until the server answered. */
     let status: TotpStatus | null = $state(null);
     let failed = $state(false);
-    let savingFallback = $state(false);
-    let fallbackFailed = $state(false);
+    let savingEmailOtp = $state(false);
+    let emailOtpFailed = $state(false);
 
     let settingUp = $state(false);
     let removing = $state(false);
@@ -34,19 +34,19 @@
     }
 
     /** Shown switched right away, and put back if the server does not take it. */
-    async function setEmailFallback(enabled: boolean) {
-        if (!status || savingFallback) return;
-        const before = status.emailFallback;
-        status.emailFallback = enabled;
-        savingFallback = true;
-        fallbackFailed = false;
+    async function setEmailOtpActive(enabled: boolean) {
+        if (!status || savingEmailOtp) return;
+        const before = status.emailOtpActive;
+        status.emailOtpActive = enabled;
+        savingEmailOtp = true;
+        emailOtpFailed = false;
         try {
-            await totpRepository.setEmailFallback(enabled);
+            await totpRepository.setEmailOtpActive(enabled);
         } catch {
-            status.emailFallback = before;
-            fallbackFailed = true;
+            status.emailOtpActive = before;
+            emailOtpFailed = true;
         } finally {
-            savingFallback = false;
+            savingEmailOtp = false;
         }
     }
 
@@ -120,19 +120,19 @@
     <!-- Only with an app: until there is one, the mailed code is not standing in for anything. -->
     {#if status?.isEnabled}
         <div class="flex flex-row items-start gap-4 ps-14">
-            <label for={"totp-fallback-" + id} class="flex min-w-0 flex-1 cursor-pointer flex-col">
-                <span class="text-sm font-medium">{$_("settings.security.totp.fallback.title")}</span>
-                <span class="text-sm text-muted-foreground">{$_("settings.security.totp.fallback.description")}</span>
-                {#if fallbackFailed}
+            <label for={"totp-email-otp-" + id} class="flex min-w-0 flex-1 cursor-pointer flex-col">
+                <span class="text-sm font-medium">{$_("settings.security.totp.emailOtp.title")}</span>
+                <span class="text-sm text-muted-foreground">{$_("settings.security.totp.emailOtp.description")}</span>
+                {#if emailOtpFailed}
                     <span role="alert" class="text-sm text-destructive">{$_("settings.security.totp.errors.failed")}</span>
                 {/if}
             </label>
             <Switch
-                    id={"totp-fallback-" + id}
+                    id={"totp-email-otp-" + id}
                     class="mt-0.5"
-                    checked={status.emailFallback}
-                    disabled={savingFallback}
-                    onCheckedChange={(checked) => void setEmailFallback(checked)}
+                    checked={status.emailOtpActive}
+                    disabled={savingEmailOtp}
+                    onCheckedChange={(checked) => void setEmailOtpActive(checked)}
             />
         </div>
     {/if}

@@ -3,7 +3,7 @@ const ENDPOINT = "/api/users/me/totp";
 export type TotpStatus = {
     isEnabled: boolean;
     /** Whether the sign-in offers a mailed code instead of the app's. */
-    emailFallback: boolean;
+    emailOtpActive: boolean;
 };
 
 /** A secret to scan; nothing is stored until a code from it is confirmed. */
@@ -28,7 +28,7 @@ export class TotpRepository {
         const response = await fetch(ENDPOINT, {credentials: "include", signal});
         if (!response.ok) throw new TotpError("failed");
         const body = await response.json();
-        return {isEnabled: body.is_enabled, emailFallback: body.email_fallback};
+        return {isEnabled: body.is_enabled, emailOtpActive: body.email_otp_active};
     }
 
     async setup(): Promise<TotpSetup> {
@@ -45,8 +45,8 @@ export class TotpRepository {
         await this.send("DELETE", ENDPOINT, {code});
     }
 
-    async setEmailFallback(enabled: boolean): Promise<void> {
-        await this.send("PUT", `${ENDPOINT}/email-fallback`, {enabled});
+    async setEmailOtpActive(enabled: boolean): Promise<void> {
+        await this.send("PUT", `${ENDPOINT}/email-otp`, {enabled});
     }
 
     private async send(method: "PUT" | "DELETE", url: string, body: unknown): Promise<void> {

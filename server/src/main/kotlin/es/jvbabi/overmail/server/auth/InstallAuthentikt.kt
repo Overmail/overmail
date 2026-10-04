@@ -137,7 +137,7 @@ fun Application.installOvermailAuthentikt() {
                 account.totpSecret != null && !hasSecondFactor(session, account, totpPlugin, verificationPlugin) -> {
                     // The mailed code stands in for the app where the account allows it. Not without a
                     // password: there the code was the first factor already, and twice is not two.
-                    if (account.password != null && account.totpEmailFallback) {
+                    if (account.password != null && account.emailOtpActive) {
                         totpPlugin alternative listOf(verificationPlugin)
                     } else {
                         totpPlugin

@@ -16,7 +16,7 @@ object Users : UuidTable("users") {
     /** The base32 TOTP secret of the authenticator app. Null while there is no second factor. */
     val totpSecret = varchar("totp_secret", 64).nullable()
     /** Whether the sign-in offers a mailed code instead of the authenticator app's. */
-    val totpEmailFallback = bool("totp_email_fallback").default(true)
+    val emailOtpActive = bool("email_otp_active").default(true)
 }
 
 class User(id: EntityID<Id>) : UuidEntity(id) {
@@ -26,7 +26,7 @@ class User(id: EntityID<Id>) : UuidEntity(id) {
     var username by Users.username
     var password by Users.password
     var totpSecret by Users.totpSecret
-    var totpEmailFallback by Users.totpEmailFallback
+    var emailOtpActive by Users.emailOtpActive
     var email by Users.email
     var firstname by Users.firstname
     var lastname by Users.lastname

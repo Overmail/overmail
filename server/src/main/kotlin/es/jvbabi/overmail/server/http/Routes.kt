@@ -58,7 +58,7 @@ import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
 import es.jvbabi.overmail.server.http.users.me.totp.disableTotp
 import es.jvbabi.overmail.server.http.users.me.totp.enableTotp
 import es.jvbabi.overmail.server.http.users.me.totp.getTotp
-import es.jvbabi.overmail.server.http.users.me.totp.setTotpEmailFallback
+import es.jvbabi.overmail.server.http.users.me.totp.setEmailOtpActive
 import es.jvbabi.overmail.server.http.users.me.totp.setupTotp
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.views.createView
@@ -403,8 +403,8 @@ internal fun Application.configureRouting() {
                             setupTotp()
                         }
 
-                        route("/email-fallback") {
-                            setTotpEmailFallback()
+                        route("/email-otp") {
+                            setEmailOtpActive()
                         }
                     }
 

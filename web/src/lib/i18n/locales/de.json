@@ -615,7 +615,7 @@
           "description": "Gib zur Bestätigung einen aktuellen Code aus der App ein.",
           "confirm": "Entfernen"
         },
-        "fallback": {
+        "emailOtp": {
           "title": "Code per E-Mail als Alternative",
           "description": "Bei der Anmeldung kann statt des App-Codes ein Code an dein Postfach verwendet werden."
         },

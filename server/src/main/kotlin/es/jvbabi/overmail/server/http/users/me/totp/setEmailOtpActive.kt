@@ -16,12 +16,12 @@ import org.jetbrains.exposed.v1.jdbc.update
 
 /**
  * Whether a mailed code may stand in for the authenticator app at sign-in:
- * `PUT /api/users/me/totp/email-fallback`.
+ * `PUT /api/users/me/totp/email-otp`.
  *
  * Kept while no app is set up, so the choice is still there when one is. Either way takes no code:
  * turning it off only asks more of a sign-in, and turning it on still takes the mailbox.
  */
-fun Route.setTotpEmailFallback() {
+fun Route.setEmailOtpActive() {
     authenticate {
         /**
          * Allow or forbid the mailed code instead of the authenticator app.
@@ -30,17 +30,17 @@ fun Route.setTotpEmailFallback() {
          *
          * Tag: Account
          *
-         * Body: [TotpEmailFallbackRequest] Whether it is allowed
+         * Body: [EmailOtpActiveRequest] Whether it is allowed
          *
          * Responses:
          *   - 204 The setting is saved
          */
         put {
             val userId = call.requireAuthenticatedUserId()
-            val request = call.receive<TotpEmailFallbackRequest>()
+            val request = call.receive<EmailOtpActiveRequest>()
 
             call.database().query {
-                Users.update({ Users.id eq userId }) { it[totpEmailFallback] = request.enabled }
+                Users.update({ Users.id eq userId }) { it[emailOtpActive] = request.enabled }
             }
 
             call.respond(HttpStatusCode.NoContent)
@@ -49,6 +49,6 @@ fun Route.setTotpEmailFallback() {
 }
 
 @Serializable
-data class TotpEmailFallbackRequest(
+data class EmailOtpActiveRequest(
     @SerialName("enabled") val enabled: Boolean,
 )

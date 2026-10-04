@@ -615,7 +615,7 @@
           "description": "Enter a current code from the app to confirm.",
           "confirm": "Remove"
         },
-        "fallback": {
+        "emailOtp": {
           "title": "Code by email as an alternative",
           "description": "At sign-in, a code to your mailbox can be used instead of the one from the app."
         },

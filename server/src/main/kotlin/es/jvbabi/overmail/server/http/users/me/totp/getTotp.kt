@@ -29,12 +29,12 @@ fun Route.getTotp() {
         get {
             val userId = call.requireAuthenticatedUserId()
             val row = call.database().query {
-                Users.select(Users.totpSecret, Users.totpEmailFallback).where { Users.id eq userId }.single()
+                Users.select(Users.totpSecret, Users.emailOtpActive).where { Users.id eq userId }.single()
             }
             call.respond(
                 TotpStatusResponse(
                     isEnabled = row[Users.totpSecret] != null,
-                    emailFallback = row[Users.totpEmailFallback],
+                    emailOtpActive = row[Users.emailOtpActive],
                 )
             )
         }
@@ -45,5 +45,5 @@ fun Route.getTotp() {
 data class TotpStatusResponse(
     @SerialName("is_enabled") val isEnabled: Boolean,
     @JsonSchema.Description("Whether the sign-in offers a mailed code instead of the app's. Only asked for with a password set")
-    @SerialName("email_fallback") val emailFallback: Boolean,
+    @SerialName("email_otp_active") val emailOtpActive: Boolean,
 )

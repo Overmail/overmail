@@ -101,15 +101,15 @@ class TotpRoutesTest {
     }
 
     @Test
-    fun `the mailed code is allowed until it is turned off`() = testApplication {
+    fun `the mailed code is active until it is turned off`() = testApplication {
         setUpUser(totpSecret = SECRET)
         installRoutes()
 
-        assertEquals(true, emailFallback())
+        assertEquals(true, emailOtpActive())
 
-        val off = client.put("$ROUTE/email-fallback") { json("""{"enabled": false}""") }
+        val off = client.put("$ROUTE/email-otp") { json("""{"enabled": false}""") }
         assertEquals(HttpStatusCode.NoContent, off.status)
-        assertEquals(false, emailFallback())
+        assertEquals(false, emailOtpActive())
     }
 
     @Test
@@ -123,9 +123,9 @@ class TotpRoutesTest {
         assertNull(storedSecret(user))
     }
 
-    private suspend fun ApplicationTestBuilder.emailFallback(): Boolean {
+    private suspend fun ApplicationTestBuilder.emailOtpActive(): Boolean {
         val body = Json.parseToJsonElement(client.get(ROUTE).bodyAsText()).jsonObject
-        return body["email_fallback"]!!.jsonPrimitive.content.toBoolean()
+        return body["email_otp_active"]!!.jsonPrimitive.content.toBoolean()
     }
 
     private fun codeFor(secret: String): String = GoogleAuthenticator(secret).generate()
@@ -169,7 +169,7 @@ class TotpRoutesTest {
                     enableTotp()
                     disableTotp()
                     route("/setup") { setupTotp() }
-                    route("/email-fallback") { setTotpEmailFallback() }
+                    route("/email-otp") { setEmailOtpActive() }
                 }
             }
         }

@@ -1,8 +1,10 @@
 <script lang="ts">
     import {onMount} from "svelte";
     import {_} from "svelte-i18n";
-    import {CheckCircleIcon, EnvelopeSimpleIcon, WarningCircleIcon} from "phosphor-svelte";
+    import {KeyIcon, TrashIcon, WarningCircleIcon} from "phosphor-svelte";
     import {Button} from "$lib/components/ui/button";
+    import {Skeleton} from "$lib/components/ui/skeleton";
+    import * as Tooltip from "$lib/components/ui/tooltip";
     import {useRepositories} from "$lib/repository/repositories";
     import PasswordDialog from "./PasswordDialog.svelte";
     import RemovePasswordDialog from "./RemovePasswordDialog.svelte";
@@ -17,9 +19,9 @@
     let removing = $state(false);
 
     async function load() {
+        failed = false;
         try {
             isSet = await passwordRepository.isSet();
-            failed = false;
         } catch {
             failed = true;
         }
@@ -29,37 +31,73 @@
 </script>
 
 <section class="flex flex-col gap-1">
-    <h2 class="text-xl">{$_("settings.security.password.title")}</h2>
+    <h2 class="text-xl">{$_("settings.security.signIn.title")}</h2>
 
-    {#if failed}
-        <span class="flex flex-row gap-1 items-center text-sm text-muted-foreground">
-            <WarningCircleIcon class="size-4" />
-            {$_("settings.security.password.loadFailed")}
-        </span>
-    {:else if isSet === null}
-        <div class="h-6 w-6 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-    {:else}
-        <p class="flex flex-row gap-2 items-center text-sm text-muted-foreground">
-            {#if isSet}
-                <CheckCircleIcon class="size-4 shrink-0" />
-                {$_("settings.security.password.statusSet")}
+    <div class="flex flex-row flex-wrap items-center gap-4 rounded-lg border p-4">
+        <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <KeyIcon class="size-5" />
+        </div>
+
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+            <div class="flex flex-row items-center gap-2">
+                <span class="font-medium">{$_("settings.security.password.title")}</span>
+                {#if isSet !== null}
+                    <span
+                            class={[
+                                "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                                isSet ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                            ]}
+                    >
+                        <span class={["size-1.5 rounded-full", isSet ? "bg-primary" : "bg-muted-foreground"]}></span>
+                        {isSet ? $_("settings.security.password.statusSet") : $_("settings.security.password.statusUnset")}
+                    </span>
+                {/if}
+            </div>
+
+            {#if failed}
+                <span class="flex flex-row items-center gap-1 text-sm text-destructive">
+                    <WarningCircleIcon class="size-4 shrink-0" />
+                    {$_("settings.security.password.loadFailed")}
+                    <button class="cursor-pointer underline underline-offset-2" onclick={() => void load()}>
+                        {$_("settings.security.password.retry")}
+                    </button>
+                </span>
             {:else}
-                <EnvelopeSimpleIcon class="size-4 shrink-0" />
-                {$_("settings.security.password.statusUnset")}
-            {/if}
-        </p>
-
-        <div class="flex flex-row flex-wrap gap-2 pt-2">
-            <Button variant="outline" onclick={() => (editing = true)}>
-                {isSet ? $_("settings.security.password.change.action") : $_("settings.security.password.set.action")}
-            </Button>
-            {#if isSet}
-                <Button variant="destructive" onclick={() => (removing = true)}>
-                    {$_("settings.security.password.remove.action")}
-                </Button>
+                <span class="text-sm text-muted-foreground">{$_("settings.security.password.description")}</span>
             {/if}
         </div>
-    {/if}
+
+        {#if isSet === null}
+            {#if !failed}
+                <Skeleton class="h-9 w-28 rounded-4xl" />
+            {/if}
+        {:else}
+            <div class="flex flex-row items-center gap-1">
+                <Button variant={isSet ? "outline" : "default"} onclick={() => (editing = true)}>
+                    {isSet ? $_("settings.security.password.change.action") : $_("settings.security.password.set.action")}
+                </Button>
+                {#if isSet}
+                    <Tooltip.Root>
+                        <Tooltip.Trigger>
+                            {#snippet child({props})}
+                                <Button
+                                        {...props}
+                                        variant="ghost"
+                                        size="icon"
+                                        class="text-muted-foreground hover:text-destructive"
+                                        aria-label={$_("settings.security.password.remove.action")}
+                                        onclick={() => (removing = true)}
+                                >
+                                    <TrashIcon />
+                                </Button>
+                            {/snippet}
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>{$_("settings.security.password.remove.action")}</Tooltip.Content>
+                    </Tooltip.Root>
+                {/if}
+            </div>
+        {/if}
+    </div>
 </section>
 
 <!-- Only once the state is known: the dialog's wording and fields depend on it. -->

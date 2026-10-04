@@ -539,10 +539,13 @@
     },
     "security": {
       "title": "Security",
+      "signIn": {
+        "title": "Sign-in"
+      },
       "password": {
         "title": "Password",
-        "statusSet": "You sign in with your password.",
-        "statusUnset": "You sign in with a code we email you. Set a password to sign in without it.",
+        "statusSet": "Set",
+        "statusUnset": "Not set",
         "loadFailed": "Whether a password is set could not be read.",
         "minLength": "{count, plural, one {At least # character.} other {At least # characters.}}",
         "save": "Save",
@@ -555,7 +558,7 @@
         "set": {
           "action": "Set password",
           "title": "Set a password",
-          "description": "From now on you sign in with it instead of a code by email."
+          "description": "You sign in to Overmail with this password."
         },
         "change": {
           "action": "Change password",
@@ -565,7 +568,7 @@
         "remove": {
           "action": "Remove password",
           "title": "Remove your password?",
-          "description": "You will sign in with a code we email you again.",
+          "description": "You can set a new one at any time.",
           "confirm": "Remove"
         },
         "errors": {
@@ -573,7 +576,9 @@
           "newRejected": "This password cannot be used.",
           "mismatch": "The passwords do not match.",
           "failed": "Something went wrong. Please try again."
-        }
+        },
+        "description": "The password you sign in to Overmail with.",
+        "retry": "Try again"
       }
     },
     "devices": {

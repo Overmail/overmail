@@ -539,10 +539,13 @@
     },
     "security": {
       "title": "Sicherheit",
+      "signIn": {
+        "title": "Anmeldung"
+      },
       "password": {
         "title": "Passwort",
-        "statusSet": "Du meldest dich mit deinem Passwort an.",
-        "statusUnset": "Du meldest dich mit einem Code per E-Mail an. Lege ein Passwort fest, um dich ohne ihn anzumelden.",
+        "statusSet": "Festgelegt",
+        "statusUnset": "Nicht festgelegt",
         "loadFailed": "Ob ein Passwort festgelegt ist, konnte nicht gelesen werden.",
         "minLength": "{count, plural, one {Mindestens # Zeichen.} other {Mindestens # Zeichen.}}",
         "save": "Speichern",
@@ -555,7 +558,7 @@
         "set": {
           "action": "Passwort festlegen",
           "title": "Passwort festlegen",
-          "description": "Ab jetzt meldest du dich damit an statt mit einem Code per E-Mail."
+          "description": "Mit diesem Passwort meldest du dich bei Overmail an."
         },
         "change": {
           "action": "Passwort ändern",
@@ -565,7 +568,7 @@
         "remove": {
           "action": "Passwort entfernen",
           "title": "Passwort entfernen?",
-          "description": "Du meldest dich dann wieder mit einem Code per E-Mail an.",
+          "description": "Du kannst jederzeit ein neues festlegen.",
           "confirm": "Entfernen"
         },
         "errors": {
@@ -573,7 +576,9 @@
           "newRejected": "Dieses Passwort kann nicht verwendet werden.",
           "mismatch": "Die Passwörter stimmen nicht überein.",
           "failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
-        }
+        },
+        "description": "Das Passwort, mit dem du dich bei Overmail anmeldest.",
+        "retry": "Erneut versuchen"
       }
     },
     "devices": {

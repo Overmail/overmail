@@ -536,6 +536,45 @@
         "failed": "The change could not be saved."
       }
     },
+    "security": {
+      "title": "Security",
+      "password": {
+        "title": "Password",
+        "statusSet": "You sign in with your password.",
+        "statusUnset": "You sign in with a code we email you. Set a password to sign in without it.",
+        "loadFailed": "Whether a password is set could not be read.",
+        "minLength": "{count, plural, one {At least # character.} other {At least # characters.}}",
+        "save": "Save",
+        "cancel": "Cancel",
+        "fields": {
+          "current": "Current password",
+          "new": "New password",
+          "repeat": "Repeat new password"
+        },
+        "set": {
+          "action": "Set password",
+          "title": "Set a password",
+          "description": "From now on you sign in with it instead of a code by email."
+        },
+        "change": {
+          "action": "Change password",
+          "title": "Change your password",
+          "description": "Enter your current password first."
+        },
+        "remove": {
+          "action": "Remove password",
+          "title": "Remove your password?",
+          "description": "You will sign in with a code we email you again.",
+          "confirm": "Remove"
+        },
+        "errors": {
+          "currentWrong": "That is not your current password.",
+          "newRejected": "This password cannot be used.",
+          "mismatch": "The passwords do not match.",
+          "failed": "Something went wrong. Please try again."
+        }
+      }
+    },
     "devices": {
       "title": "Connect the Overmail app",
       "scan": "Scan this code with the Overmail app to sign in.",

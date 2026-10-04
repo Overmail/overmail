@@ -536,6 +536,45 @@
         "failed": "Die Änderung konnte nicht gespeichert werden."
       }
     },
+    "security": {
+      "title": "Sicherheit",
+      "password": {
+        "title": "Passwort",
+        "statusSet": "Du meldest dich mit deinem Passwort an.",
+        "statusUnset": "Du meldest dich mit einem Code per E-Mail an. Lege ein Passwort fest, um dich ohne ihn anzumelden.",
+        "loadFailed": "Ob ein Passwort festgelegt ist, konnte nicht gelesen werden.",
+        "minLength": "{count, plural, one {Mindestens # Zeichen.} other {Mindestens # Zeichen.}}",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "fields": {
+          "current": "Aktuelles Passwort",
+          "new": "Neues Passwort",
+          "repeat": "Neues Passwort wiederholen"
+        },
+        "set": {
+          "action": "Passwort festlegen",
+          "title": "Passwort festlegen",
+          "description": "Ab jetzt meldest du dich damit an statt mit einem Code per E-Mail."
+        },
+        "change": {
+          "action": "Passwort ändern",
+          "title": "Passwort ändern",
+          "description": "Gib zuerst dein aktuelles Passwort ein."
+        },
+        "remove": {
+          "action": "Passwort entfernen",
+          "title": "Passwort entfernen?",
+          "description": "Du meldest dich dann wieder mit einem Code per E-Mail an.",
+          "confirm": "Entfernen"
+        },
+        "errors": {
+          "currentWrong": "Das ist nicht dein aktuelles Passwort.",
+          "newRejected": "Dieses Passwort kann nicht verwendet werden.",
+          "mismatch": "Die Passwörter stimmen nicht überein.",
+          "failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+        }
+      }
+    },
     "devices": {
       "title": "Overmail-App verbinden",
       "scan": "Scanne diesen Code mit der Overmail-App, um dich anzumelden.",

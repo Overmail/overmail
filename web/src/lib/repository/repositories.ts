@@ -20,6 +20,7 @@ import {
 import type {CachedEmail, CachedLabel, CachedSender} from "$lib/app/entities/cache";
 import {DevicesSettingsRepository} from "$lib/repository/DevicesSettingsRepository.ts";
 import {SessionsRepository} from "$lib/repository/SessionsRepository";
+import {PasswordRepository} from "$lib/repository/PasswordRepository";
 
 /**
  * Every repository the app talks to, in one place.
@@ -55,6 +56,8 @@ export type Repositories = {
     deviceSettingsRepository: DevicesSettingsRepository;
     /** Where the user is signed in, as the devices settings list it. */
     sessions: SessionsRepository;
+    /** Whether the user signs in with a password, as the security settings show and change it. */
+    password: PasswordRepository;
 };
 
 /** One builder per key, so nothing is constructed before somebody asks for it. */
@@ -73,6 +76,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     views: () => new ViewRepository(),
     deviceSettingsRepository: () => new DevicesSettingsRepository(),
     sessions: () => new SessionsRepository(),
+    password: () => new PasswordRepository(),
     emails: createEmailRepository,
     labels: createLabelRepository,
     senders: createSenderRepository,

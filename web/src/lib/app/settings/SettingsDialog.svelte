@@ -4,11 +4,12 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, SignOutIcon} from "phosphor-svelte";
+    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon, SignOutIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
     import DevicesSettings from "$lib/app/settings/devices/DevicesSettings.svelte";
+    import SecuritySettings from "$lib/app/settings/security/SecuritySettings.svelte";
     import {SidebarGroupContent} from "$lib/components/ui/sidebar/index.ts";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
@@ -22,6 +23,7 @@
     const nav = [
         {name: $_("settings.emailAccounts.title"), icon: EnvelopeSimpleIcon, key: "email-accounts"},
         {name: $_("settings.knowledge.title"), icon: BrainIcon, key: "knowledge"},
+        {name: $_("settings.security.title"), icon: LockIcon, key: "security"},
         {name: "Geräte", icon: DeviceMobileIcon, key: "devices"}
     ];
 
@@ -125,6 +127,8 @@
                         <EmailAccountsSettings />
                     {:else if currentNavItem.key === "knowledge"}
                         <KnowledgeSettings />
+                    {:else if currentNavItem.key === "security"}
+                        <SecuritySettings />
                     {:else if currentNavItem.key === "devices"}
                         <DevicesSettings />
                     {/if}

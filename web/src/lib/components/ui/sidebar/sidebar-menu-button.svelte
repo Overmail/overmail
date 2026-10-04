@@ -2,11 +2,12 @@
 	import { tv, type VariantProps } from "tailwind-variants";
 
 	export const sidebarMenuButtonVariants = tv({
-		base: "gap-2 rounded-xl px-3 py-2 text-left text-sm ring-sidebar-ring transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate group-data-[compact=true]/sidebar-root:px-2.5 group-data-[compact=true]/sidebar-root:py-1.5",
+		base: "gap-2 rounded-xl px-3 py-2 text-left text-sm ring-sidebar-ring duration-100 transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate group-data-[compact=true]/sidebar-root:px-2.5 group-data-[compact=true]/sidebar-root:py-1.5 cursor-pointer",
 		variants: {
 			variant: {
 				default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 				outline: "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
+				destructive: "text-destructive hover:bg-sidebar-accent focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
 			},
 			size: {
 				default: "h-9 text-sm group-data-[compact=true]/sidebar-root:h-8",

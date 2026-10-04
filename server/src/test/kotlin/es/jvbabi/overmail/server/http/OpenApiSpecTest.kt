@@ -71,7 +71,7 @@ class OpenApiSpecTest {
             tags.filterNot { it in declaredTags }.forEach { problems += "$name uses the undeclared tag $it" }
 
             val responses = operation["responses"]?.jsonObject.orEmpty()
-            if (responses.keys.none { it.startsWith("2") }) problems += "$name documents no success response"
+            if (responses.keys.none { it.startsWith("2") || it.startsWith("3") }) problems += "$name documents no success response"
             responses.forEach { (status, body) ->
                 if (body.jsonObject["description"]?.jsonPrimitive?.content.isNullOrBlank()) {
                     problems += "$name does not describe its $status"

@@ -105,7 +105,10 @@
 		     of the window's inline end it takes right now (nothing while it is closed), and how
 		     long a change of the two may take -- nothing at all while it is being dragged, or
 		     whatever follows the width would trail a fifth of a second behind the pointer. -->
+		<!-- min-h-svh here rather than in the component: the settings dialog has a provider of
+		     its own, and a window-high one breaks its sidebar. -->
 		<Sidebar.Provider
+				class="min-h-svh"
 				style="--panel-width: {panel.width}px;
 				       --panel-offset: {panel.open ? panel.width : 0}px;
 				       --panel-duration: {panel.isResizing ? 0 : 200}ms;"

@@ -50,7 +50,7 @@
 	<title>{$_(titleKey)} - {$_('app.name')}</title>
 </svelte:head>
 
-<!-- A grid of one cell the height of the column: the steps share it, see AuthStep. Clipped, so
+<!-- A grid of one cell the height of the column: the steps share it, see AuthShell. Clipped, so
      a step on its way in or out never shows a scrollbar. -->
 <div class="grid h-full overflow-hidden">
 	{#if auth.currentFlow}

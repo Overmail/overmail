@@ -54,6 +54,12 @@ export class EmailVerificationPlugin implements PluginLike {
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({code: this.code}),
             });
+            if (response.status === 409) {
+                // No longer this step, e.g. a duplicate submission; show the one that is.
+                await this.auth.updateState();
+                this.status = "ready";
+                return;
+            }
             if (response.status === 429) {
                 // The lock itself comes with the step's state.
                 await this.auth.updateState();

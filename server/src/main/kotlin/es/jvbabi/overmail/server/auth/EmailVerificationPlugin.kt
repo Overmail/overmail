@@ -4,6 +4,7 @@ import es.jvbabi.authentikt.core.AuthentiktInstance
 import es.jvbabi.authentikt.core.ratelimit.RateLimiter
 import es.jvbabi.authentikt.core.ratelimit.respondRateLimited
 import es.jvbabi.authentikt.core.ratelimit.triesPer
+import es.jvbabi.authentikt.core.routes.flow.respondStepNotActive
 import es.jvbabi.authentikt.core.session.Session
 import es.jvbabi.authentikt.core.session.SessionKey
 import es.jvbabi.authentikt.core.step.BaseState
@@ -112,7 +113,12 @@ class EmailVerificationPlugin(
         with(inRoute) {
             post("/verify") {
                 val request = call.receive<VerificationRequest>()
-                val session = call.attributes[SessionKey]
+                // SessionKey is untyped; every session of this instance is one of ours.
+                @Suppress("UNCHECKED_CAST")
+                val session = call.attributes[SessionKey] as Session<User>
+                // Before the limiter, so a late duplicate or a code sent after switching to the app
+                // neither costs a try nor completes a step that is no longer this one.
+                if (!session.isActive(this@EmailVerificationPlugin)) return@post call.respondStepNotActive()
 
                 val attempt = rateLimiter.tryAcquire(session)
                 if (!attempt.allowed) {
@@ -132,9 +138,11 @@ class EmailVerificationPlugin(
                 codesBySession.remove(session.sessionId)
                 rateLimiter.reset(session)
 
-                val state = session.authenticationSteps.last().second as EmailVerificationState
-                state.isVerified = true
-                session.nextStep()
+                // Checks again under the session's lock, as a concurrent request may have moved on.
+                val state = session.authenticationSteps.last().second as? EmailVerificationState
+                if (state == null || !session.completeStep(this@EmailVerificationPlugin, state.verified())) {
+                    return@post call.respondStepNotActive()
+                }
 
                 call.respondGson(buildGenericMap { put("type", "success") })
             }
@@ -149,8 +157,10 @@ private fun String.matches(candidate: String): Boolean =
 class EmailVerificationState(
     private val email: String,
     private val rateLimiter: RateLimiter,
-    var isVerified: Boolean = false,
+    val isVerified: Boolean = false,
 ) : BaseState {
+    fun verified() = EmailVerificationState(email, rateLimiter, isVerified = true)
+
     override suspend fun isCompleted(): Boolean = isVerified
 
     override suspend fun createClientState(session: Session<*>): Map<String, Any?> = buildGenericMap {

@@ -16,6 +16,7 @@
     import * as InputOTP from "$lib/components/ui/input-otp";
     import {Spinner} from "$lib/components/ui/spinner";
     import AuthStep from "./AuthStep.svelte";
+    import {shake} from "./shake";
 
     let {onRestart}: { onRestart: () => void } = $props();
 
@@ -26,6 +27,20 @@
     const INPUT_ID = "signin-totp";
 
     const auth = useAuthentiktContext();
+
+    let field = $state<HTMLElement | null>(null);
+
+    /** How long the boxes stay red after a code is turned down; the message below them stays. */
+    const REJECTED_MS = 1500;
+    let rejected = $state(false);
+    let rejectedTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    function reject() {
+        rejected = true;
+        shake(field);
+        clearTimeout(rejectedTimeout);
+        rejectedTimeout = setTimeout(() => (rejected = false), REJECTED_MS);
+    }
 
     const plugin = auth.registerPlugin<TotpPluginInstance>(
         "authentikt-builtin/totp",
@@ -53,6 +68,7 @@
         if (plugin.status === "totp_incorrect" || plugin.status === "rate_limited") plugin.totp = "";
         // The input was disabled while the code was checked, which took the focus away from it.
         if (invalid) {
+            reject();
             await tick();
             document.getElementById(INPUT_ID)?.focus();
         }
@@ -78,12 +94,13 @@
                     <!-- The one thing on the page to type into, so the cursor starts there. -->
                     <!-- svelte-ignore a11y_autofocus -->
                     <InputOTP.Root
+                            bind:ref={field}
                             bind:value={plugin.totp}
                             inputId={INPUT_ID}
                             maxlength={CODE_LENGTH}
                             pattern={"^\\d+$"}
                             disabled={loading || locked}
-                            onValueChange={() => { if (invalid && plugin.totp) plugin.status = "ready"; }}
+                            onValueChange={() => { if (plugin.totp) rejected = false; if (invalid && plugin.totp) plugin.status = "ready"; }}
                             onComplete={() => void submit()}
                             aria-label={$_("auth.signin.totp.label")}
                             class="min-w-0 flex-1"
@@ -94,11 +111,11 @@
                                  would be drawn across the gaps. -->
                             <InputOTP.Group class="w-full gap-2 has-aria-invalid:ring-0">
                                 {#each cells as cell (cell)}
-                                    <!-- Filled boxes like the email field, apart instead of joined. -->
+                                    <!-- Filled boxes like the email field, apart instead of joined; reddish for a moment when a code is turned down. -->
                                     <InputOTP.Slot
                                             {cell}
-                                            aria-invalid={invalid}
-                                            class="size-11 min-w-0 flex-1 rounded-xl border border-transparent bg-muted text-base font-medium first:rounded-xl last:rounded-xl data-[active=true]:ring-ring/20"
+                                            aria-invalid={rejected}
+                                            class="size-11 min-w-0 flex-1 rounded-xl border border-transparent bg-muted text-base font-medium transition-[color,background-color,border-color,box-shadow] first:rounded-xl last:rounded-xl data-[active=true]:ring-ring/20 aria-invalid:border-transparent aria-invalid:bg-destructive/10"
                                     />
                                 {/each}
                             </InputOTP.Group>
@@ -119,7 +136,7 @@
                 </div>
 
                 {#if invalid}
-                    <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
+                    <p role="alert" class="flex items-center gap-2 text-sm text-destructive" transition:slide={{duration: 150}}>
                         <WarningCircleIcon class="size-4 shrink-0" />
                         {#if locked}
                             {$_("auth.signin.rateLimited", {values: {time: formatLockDuration(plugin.rateLimit!.remainingLockSeconds)}})}

@@ -51,7 +51,15 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.getKnowledgeEntries
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.deleteKnowledgeEntry
 import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEntry
+import es.jvbabi.overmail.server.http.users.me.password.deletePassword
+import es.jvbabi.overmail.server.http.users.me.password.getPassword
+import es.jvbabi.overmail.server.http.users.me.password.setPassword
 import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
+import es.jvbabi.overmail.server.http.users.me.totp.disableTotp
+import es.jvbabi.overmail.server.http.users.me.totp.enableTotp
+import es.jvbabi.overmail.server.http.users.me.totp.getTotp
+import es.jvbabi.overmail.server.http.users.me.totp.setEmailOtpActive
+import es.jvbabi.overmail.server.http.users.me.totp.setupTotp
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.views.createView
 import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
@@ -375,6 +383,28 @@ internal fun Application.configureRouting() {
                         route("/{knowledgeId}") {
                             updateKnowledgeEntry()
                             deleteKnowledgeEntry()
+                        }
+                    }
+
+                    // Whether this user signs in with a password, and setting, changing or removing it.
+                    route("/password") {
+                        getPassword()
+                        setPassword()
+                        deletePassword()
+                    }
+
+                    // The authenticator app the sign-in asks for a code from.
+                    route("/totp") {
+                        getTotp()
+                        enableTotp()
+                        disableTotp()
+
+                        route("/setup") {
+                            setupTotp()
+                        }
+
+                        route("/email-otp") {
+                            setEmailOtpActive()
                         }
                     }
 

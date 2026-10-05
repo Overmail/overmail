@@ -19,10 +19,15 @@
       "title": "Sign in",
       "loading": "Loading…",
       "error": "Something went wrong.",
+      "rateLimited": "Too many attempts. Try again in {time}.",
+      "triesLeft": "{count, plural, one {# try left.} other {# tries left.}}",
       "done": {
         "pageTitle": "Signing in",
         "message": "Signing you in…"
       },
+      "greeting": "Welcome back.",
+      "greetingNamed": "Welcome back, {name}.",
+      "restart": "Use another account",
       "identifier": {
         "headline": "Your mail has a new home.",
         "description": "Sign in with your username or email address.",
@@ -30,15 +35,30 @@
         "submit": "Continue",
         "error": "No account for that username or email."
       },
+      "password": {
+        "pageTitle": "Enter password",
+        "description": "Enter your password to sign in.",
+        "label": "Password",
+        "submit": "Sign in",
+        "show": "Show password",
+        "hide": "Hide password",
+        "error": "That password is not right."
+      },
       "code": {
         "pageTitle": "Enter code",
-        "headline": "Welcome back.",
-        "headlineNamed": "Welcome back, {name}.",
         "sent": "We sent a code to {email}.",
         "label": "Code",
         "submit": "Sign in",
-        "restart": "Use another account",
-        "error": "That code is not right."
+        "error": "That code is not right.",
+        "useTotp": "Use the authenticator app instead"
+      },
+      "totp": {
+        "pageTitle": "Authenticator code",
+        "description": "Enter the code from your authenticator app.",
+        "label": "Code",
+        "submit": "Sign in",
+        "error": "That code is not right.",
+        "useEmail": "Send a code by email instead"
       }
     }
   },
@@ -318,6 +338,7 @@
   "settings": {
     "title": "Settings",
     "description": "Manage your settings.",
+    "logout": "Sign out",
     "emailAccounts": {
       "title": "Email accounts",
       "add": "Add a new inbox",
@@ -527,7 +548,87 @@
         "failed": "The change could not be saved."
       }
     },
+    "security": {
+      "title": "Security",
+      "signIn": {
+        "title": "Sign-in"
+      },
+      "password": {
+        "title": "Password",
+        "statusSet": "Set. You sign in to Overmail with it.",
+        "statusUnset": "No password set yet.",
+        "loadFailed": "Whether a password is set could not be read.",
+        "minLength": "{count, plural, one {At least # character.} other {At least # characters.}}",
+        "save": "Save",
+        "cancel": "Cancel",
+        "fields": {
+          "current": "Current password",
+          "new": "New password",
+          "repeat": "Repeat new password"
+        },
+        "set": {
+          "action": "Set password",
+          "title": "Set a password",
+          "description": "You sign in to Overmail with this password."
+        },
+        "change": {
+          "action": "Change password",
+          "title": "Change your password",
+          "description": "Enter your current password first."
+        },
+        "remove": {
+          "action": "Remove password",
+          "title": "Remove your password?",
+          "description": "You can set a new one at any time.",
+          "confirm": "Remove"
+        },
+        "errors": {
+          "currentWrong": "That is not your current password.",
+          "newRejected": "This password cannot be used.",
+          "mismatch": "The passwords do not match.",
+          "failed": "Something went wrong. Please try again."
+        },
+        "retry": "Try again"
+      },
+      "twoFactor": {
+        "title": "Two-factor authentication"
+      },
+      "totp": {
+        "title": "Authenticator app",
+        "statusEnabled": "Set up. The sign-in asks for a code from the app.",
+        "statusDisabled": "Not set up.",
+        "loadFailed": "Whether an authenticator app is set up could not be read.",
+        "retry": "Try again",
+        "cancel": "Cancel",
+        "code": "Code",
+        "setup": {
+          "action": "Set up",
+          "title": "Set up an authenticator app",
+          "description": "Scan the QR code with your authenticator app.",
+          "orKey": "or enter this key",
+          "copy": "Copy key",
+          "enterCode": "Enter the code the app shows to confirm",
+          "confirm": "Done",
+          "loadFailed": "The setup could not be started."
+        },
+        "remove": {
+          "action": "Remove authenticator app",
+          "title": "Remove the authenticator app?",
+          "description": "Enter a current code from the app to confirm.",
+          "confirm": "Remove"
+        },
+        "emailOtp": {
+          "title": "Code by email as an alternative",
+          "description": "At sign-in, a code to your mailbox can be used instead of the one from the app."
+        },
+        "errors": {
+          "codeWrong": "That code is not valid. Please try again.",
+          "failed": "Something went wrong. Please try again."
+        }
+      }
+    },
     "devices": {
+      "name": "Devices",
       "title": "Connect the Overmail app",
       "scan": "Scan this code with the Overmail app to sign in.",
       "revealHint": "Hover over the code to reveal it.",

@@ -1,6 +1,5 @@
 <script lang="ts">
     import type {Snippet} from "svelte";
-    import {dev} from "$app/environment";
     import {page} from "$app/state";
     import {Authentikt, type AuthentiktConfiguration} from "@julius-babies/authentikt-svelte";
     import background from "$lib/assets/img.png"
@@ -15,18 +14,18 @@
     // from the URL. Same origin through Caddy, which is what lets the done step's cookie stick.
     const config: AuthentiktConfiguration = {
         baseUrl: new URL("/api/auth/authentikt/", page.url.origin).toString(),
-        debug: {show_overlay: dev},
+        debug: {show_overlay: false},
     };
 </script>
 
-<div class="w-screen h-screen flex flex-row">
-    <div class="flex-1">
+<div class="relative flex h-dvh w-screen flex-row max-sm:p-4">
+    <div class="relative z-10 min-h-0 flex-1 max-sm:overflow-hidden max-sm:rounded-2xl max-sm:bg-background">
         <Authentikt {config}>
             {@render children()}
         </Authentikt>
     </div>
 
-    <div class="flex-1 max-sm:hidden p-4">
-        <img class="h-full w-full rounded-2xl object-cover" alt="" src={background} >
+    <div class="flex-1 max-sm:absolute max-sm:inset-0 sm:pl-0 sm:p-4">
+        <img class="h-full w-full object-cover sm:rounded-2xl" alt="" src={background} >
     </div>
 </div>

@@ -4,11 +4,12 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, SignOutIcon} from "phosphor-svelte";
+    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon, SignOutIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
     import DevicesSettings from "$lib/app/settings/devices/DevicesSettings.svelte";
+    import SecuritySettings from "$lib/app/settings/security/SecuritySettings.svelte";
     import {SidebarGroupContent} from "$lib/components/ui/sidebar/index.ts";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
@@ -19,15 +20,17 @@
         goto(url, {replaceState: true, noScroll: true});
     }
 
-    const nav = [
+    // Derived, so a change of language renames the pages too.
+    const nav = $derived([
         {name: $_("settings.emailAccounts.title"), icon: EnvelopeSimpleIcon, key: "email-accounts"},
         {name: $_("settings.knowledge.title"), icon: BrainIcon, key: "knowledge"},
-        {name: "Geräte", icon: DeviceMobileIcon, key: "devices"}
-    ];
+        {name: $_("settings.security.title"), icon: LockIcon, key: "security"},
+        {name: $_("settings.devices.name"), icon: DeviceMobileIcon, key: "devices"},
+    ]);
 
     const currentNavItem = $derived(nav.find((item) => item.key === page.url.searchParams.get("settings")) ?? nav[0]);
 
-    function navigateToPage(key: typeof nav[number]['key']) {
+    function navigateToPage(key: string) {
         const url = new URL(page.url);
         url.searchParams.set("settings", key);
         goto(url, {replaceState: false, noScroll: true});
@@ -69,7 +72,7 @@
                     <Sidebar.Group>
                         <Sidebar.GroupContent>
                             <Sidebar.Menu>
-                                {#each nav as item (item.name)}
+                                {#each nav as item (item.key)}
                                     {@const Icon = item.icon}
                                     <Sidebar.MenuItem>
                                         <Sidebar.MenuButton isActive={item.key === currentNavItem.key}>
@@ -91,7 +94,7 @@
                     <Sidebar.Menu>
                         <Sidebar.MenuItem>
                             <Sidebar.MenuButton variant="destructive" onclick={logout}>
-                                <SignOutIcon /> Logout
+                                <SignOutIcon /> {$_("settings.logout")}
                             </Sidebar.MenuButton>
                         </Sidebar.MenuItem>
                     </Sidebar.Menu>
@@ -125,6 +128,8 @@
                         <EmailAccountsSettings />
                     {:else if currentNavItem.key === "knowledge"}
                         <KnowledgeSettings />
+                    {:else if currentNavItem.key === "security"}
+                        <SecuritySettings />
                     {:else if currentNavItem.key === "devices"}
                         <DevicesSettings />
                     {/if}

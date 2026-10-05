@@ -1,8 +1,11 @@
 package es.jvbabi.overmail.server.auth
 
 import es.jvbabi.authentikt.core.installAuthentikt
+import es.jvbabi.authentikt.core.step.plugins.alternative
 import es.jvbabi.authentikt.core.step.plugins.builtin.DonePlugin
 import es.jvbabi.authentikt.core.step.plugins.builtin.EmailUserSelectionPlugin
+import es.jvbabi.authentikt.core.step.plugins.builtin.PasswordPlugin
+import es.jvbabi.authentikt.core.step.plugins.builtin.TotpPlugin
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -29,6 +32,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.time.Duration.Companion.days
 
 /** Mounted below the `/api` prefix Caddy forwards, so the flow routes end up under `/api/auth`. */
@@ -40,9 +44,9 @@ val SESSION_VALIDITY = 30.days
 private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 
 /**
- * Two steps: identify the account by username or email, then prove control of its mailbox with a
- * one-time code. There is no password anywhere in this flow, and no account is ever created —
- * an unknown identifier is simply rejected.
+ * Identify the account by username or email, then its password where it has one, then one code:
+ * the authenticator app's, or -- where the account allows it or has no app -- one mailed to it. No
+ * account is ever created; an unknown identifier is simply rejected.
  */
 fun Application.installOvermailAuthentikt() {
     // Resolved eagerly because none of these touch the database; the database itself is pulled
@@ -61,7 +65,27 @@ fun Application.installOvermailAuthentikt() {
         withUsername = true
     }
 
+    val passwordPlugin = PasswordPlugin<User> {
+        checkPassword { user, password ->
+            // Read fresh rather than off the entity the flow holds, which is as old as the flow.
+            val hash = dependencies.resolve<OvermailDatabase>()
+                .query { Users.select(Users.password).where { Users.id eq user.id }.firstOrNull()?.get(Users.password) }
+                ?: return@checkPassword false
+            verifyPassword(password, hash)
+        }
+    }
+
     val verificationPlugin = EmailVerificationPlugin(smtpConfig)
+
+    val totpPlugin = TotpPlugin<User> {
+        validate { user, code ->
+            // Read fresh, like the password: a second factor removed mid-flow must not be asked for.
+            val secret = dependencies.resolve<OvermailDatabase>()
+                .query { Users.select(Users.totpSecret).where { Users.id eq user.id }.firstOrNull()?.get(Users.totpSecret) }
+                ?: return@validate false
+            verifyTotp(secret, code)
+        }
+    }
 
     val donePlugin = DonePlugin<User> {
         onSuccess { session, user ->
@@ -95,14 +119,25 @@ fun Application.installOvermailAuthentikt() {
         uiLoginBaseUrl = URLBuilder(config.baseUrl).appendPathSegments("auth").buildString()
 
         install(identifierPlugin)
+        install(passwordPlugin)
         install(verificationPlugin)
+        install(totpPlugin)
         install(donePlugin)
 
         authorization { session ->
+            val user = session.identifiedUser
+            // The columns were read with the row, so none of this needs a transaction.
+            val account = user?.user
             when {
-                session.identifiedUser == null -> identifierPlugin
-                !session.has(verificationPlugin) -> verificationPlugin
-                else -> donePlugin
+                account == null -> identifierPlugin
+                account.password != null && !session.has(passwordPlugin) -> passwordPlugin
+                // One code, the app's or the mailed one -- whichever was taken, never both.
+                session.has(totpPlugin) || session.has(verificationPlugin) -> donePlugin
+                // Without an app the mailbox is all an account without a password has.
+                account.totpSecret == null -> if (account.password == null) verificationPlugin else donePlugin
+                // Either way round: switching to the mailed code offers the app again, and back.
+                account.emailOtpActive -> totpPlugin alternative listOf(verificationPlugin)
+                else -> totpPlugin
             }
         }
     }

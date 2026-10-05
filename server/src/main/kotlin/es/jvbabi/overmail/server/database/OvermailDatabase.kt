@@ -34,6 +34,10 @@ class OvermailDatabase(private val database: Database) {
     suspend fun init() {
         query {
             SchemaUtils.create(Users)
+            // create() leaves an existing table alone, so a column added later has to be added here.
+            exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255)")
+            exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64)")
+            exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_active BOOLEAN DEFAULT TRUE NOT NULL")
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
             SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(EmailAvatars)

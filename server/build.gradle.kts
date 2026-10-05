@@ -76,6 +76,10 @@ dependencies {
 
     implementation(libs.authentikt.core)
     implementation(libs.java.jwt)
+    // Password hashes, the same library Trails checks them with.
+    implementation(libs.bcrypt)
+    // TOTP codes. authentikt brings it at runtime scope only; the version it was built against.
+    implementation(libs.kotlin.onetimepassword)
     implementation(libs.kotlinx.serialization.json)
     // Eclipse Angus, the Jakarta Mail implementation. Kamel already pulls it, but only at
     // runtime scope, so it has to be declared here to compile against jakarta.mail.

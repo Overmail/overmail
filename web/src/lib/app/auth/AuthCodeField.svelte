@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {tick} from "svelte";
+    import {tick, untrack} from "svelte";
     import * as InputOTP from "$lib/components/ui/input-otp";
     import {shake} from "./shake";
 
@@ -43,7 +43,10 @@
     }
 </script>
 
-<!-- The one thing on the page to type into, so the cursor starts there. -->
+<!-- The one thing on the page to type into, so the cursor starts there.
+     bits-ui calls onComplete from inside an effect. Untracked, or whatever the submit reads (the
+     step's status, its rate limit) becomes that effect's dependency: every answer re-runs it, it
+     still sees the code as just completed and sends it again, endlessly. -->
 <!-- svelte-ignore a11y_autofocus -->
 <InputOTP.Root
         bind:ref={field}
@@ -56,7 +59,7 @@
             if (value) rejected = false;
             oninput?.();
         }}
-        onComplete={() => oncomplete?.()}
+        onComplete={() => untrack(() => oncomplete?.())}
         aria-label={label}
         class="min-w-0 flex-1"
         autofocus

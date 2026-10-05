@@ -1,6 +1,9 @@
 package es.jvbabi.overmail.server.auth
 
 import es.jvbabi.authentikt.core.AuthentiktInstance
+import es.jvbabi.authentikt.core.ratelimit.RateLimiter
+import es.jvbabi.authentikt.core.ratelimit.respondRateLimited
+import es.jvbabi.authentikt.core.ratelimit.triesPer
 import es.jvbabi.authentikt.core.session.Session
 import es.jvbabi.authentikt.core.session.SessionKey
 import es.jvbabi.authentikt.core.step.BaseState
@@ -26,6 +29,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.minutes
 // Collides with authentikt's own Session, which this file is full of.
 import jakarta.mail.Session as MailSession
 
@@ -39,6 +43,9 @@ private const val UTF_8 = "UTF-8"
  *
  * Codes live in memory only: they are worthless a minute later, and a restart invalidating every
  * pending sign-in is the safe direction to fail in.
+ *
+ * Wrong codes are limited per user like authentikt's own TOTP step, so a new flow -- and with it a
+ * new code -- does not buy another round of guesses.
  */
 class EmailVerificationPlugin(
     private val smtpConfig: SmtpConfig,
@@ -46,6 +53,7 @@ class EmailVerificationPlugin(
 
     private val codesBySession = ConcurrentHashMap<String, String>()
     private val random = SecureRandom()
+    private val rateLimiter = RateLimiter.perUser(5 triesPer 5.minutes)
 
     /**
      * Sessions are immutable and cheap to share; built lazily so a broken SMTP block only breaks
@@ -84,7 +92,7 @@ class EmailVerificationPlugin(
             )
         }.onFailure { logger.warn("Could not mail the sign-in code, use the one logged above", it) }
 
-        return EmailVerificationState(email)
+        return EmailVerificationState(email, rateLimiter)
     }
 
     /** Hands the mail to the configured SMTP server; delivery beyond that is not observable here. */
@@ -105,15 +113,24 @@ class EmailVerificationPlugin(
             post("/verify") {
                 val request = call.receive<VerificationRequest>()
                 val session = call.attributes[SessionKey]
-                val expected = codesBySession[session.sessionId]
 
+                val attempt = rateLimiter.tryAcquire(session)
+                if (!attempt.allowed) {
+                    return@post call.respondRateLimited(attempt.status, buildGenericMap { put("type", "rate_limited") })
+                }
+
+                val expected = codesBySession[session.sessionId]
                 if (expected == null || !expected.matches(request.code)) {
-                    call.respondGson(buildGenericMap { put("type", "invalid_code") })
+                    call.respondGson(buildGenericMap {
+                        put("type", "invalid_code")
+                        put("rate_limit", attempt.status.toClientState())
+                    })
                     return@post
                 }
 
                 // One code, one attempt: it must not survive to be replayed.
                 codesBySession.remove(session.sessionId)
+                rateLimiter.reset(session)
 
                 val state = session.authenticationSteps.last().second as EmailVerificationState
                 state.isVerified = true
@@ -131,12 +148,15 @@ private fun String.matches(candidate: String): Boolean =
 
 class EmailVerificationState(
     private val email: String,
+    private val rateLimiter: RateLimiter,
     var isVerified: Boolean = false,
 ) : BaseState {
     override suspend fun isCompleted(): Boolean = isVerified
 
     override suspend fun createClientState(session: Session<*>): Map<String, Any?> = buildGenericMap {
         put("email", email.masked())
+        // The same shape authentikt's own steps send, so the client reads it the same way.
+        put("rate_limit", rateLimiter.status(session).toClientState())
     }
 }
 

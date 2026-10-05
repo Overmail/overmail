@@ -5,6 +5,7 @@
 <script lang="ts">
     import {
         PasswordPlugin,
+        formatLockDuration,
         useAuthentiktContext,
         type PasswordPluginInstance,
     } from "@julius-babies/authentikt-svelte";
@@ -25,7 +26,9 @@
     );
 
     const loading = $derived(plugin.status === "loading");
-    const invalid = $derived(plugin.status === "password_incorrect" || plugin.status === "error");
+    // Locked once the tries are used up; the countdown and the reload afterwards come with the plugin.
+    const locked = $derived(plugin.rateLimit?.isLocked ?? false);
+    const invalid = $derived(locked || plugin.status === "password_incorrect" || plugin.status === "error");
 
     // Set by the email step. authentikt's check does not send the user yet, so after a reload in the
     // middle of the flow it is gone and the greeting goes without the name.
@@ -79,6 +82,7 @@
                                 placeholder={$_("auth.signin.password.label")}
                                 aria-label={$_("auth.signin.password.label")}
                                 aria-invalid={invalid}
+                                disabled={locked}
                                 autocomplete="current-password"
                                 autocapitalize="none"
                                 spellcheck="false"
@@ -103,7 +107,7 @@
                     <button
                             type="submit"
                             class="group/submit flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            disabled={loading || !plugin.password}
+                            disabled={loading || locked || !plugin.password}
                             aria-label={$_("auth.signin.password.submit")}
                     >
                         {#if loading}
@@ -117,7 +121,14 @@
                 {#if invalid}
                     <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
                         <WarningCircleIcon class="size-4 shrink-0" />
-                        {plugin.status === "password_incorrect" ? $_("auth.signin.password.error") : $_("auth.signin.error")}
+                        {#if locked}
+                            {$_("auth.signin.rateLimited", {values: {time: formatLockDuration(plugin.rateLimit!.remainingLockSeconds)}})}
+                        {:else if plugin.status === "password_incorrect"}
+                            {$_("auth.signin.password.error")}
+                            {#if plugin.rateLimit}{$_("auth.signin.triesLeft", {values: {count: plugin.rateLimit.remainingTries}})}{/if}
+                        {:else}
+                            {$_("auth.signin.error")}
+                        {/if}
                     </p>
                 {/if}
             </form>

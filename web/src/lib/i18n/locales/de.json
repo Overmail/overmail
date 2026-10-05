@@ -19,6 +19,8 @@
       "title": "Anmelden",
       "loading": "Wird geladen…",
       "error": "Etwas ist schiefgelaufen.",
+      "rateLimited": "Zu viele Versuche. Versuch es in {time} noch einmal.",
+      "triesLeft": "{count, plural, one {Noch # Versuch.} other {Noch # Versuche.}}",
       "done": {
         "pageTitle": "Anmeldung läuft",
         "message": "Du wirst angemeldet…"

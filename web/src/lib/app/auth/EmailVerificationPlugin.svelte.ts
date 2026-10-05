@@ -1,8 +1,9 @@
-import {useAuthentiktContext, type PluginLike} from "@julius-babies/authentikt-svelte";
+import {useAuthentiktContext, type PluginLike, type RateLimitState} from "@julius-babies/authentikt-svelte";
+import {RateLimitTracker} from "./rateLimit.svelte";
 
 type AuthentiktClient = ReturnType<typeof useAuthentiktContext>;
 
-export type EmailVerificationStatus = "ready" | "loading" | "invalid_code" | "error";
+export type EmailVerificationStatus = "ready" | "loading" | "invalid_code" | "rate_limited" | "error";
 
 /**
  * The client half of the server's `EmailVerificationPlugin`: the code it mailed to the account,
@@ -14,10 +15,17 @@ export class EmailVerificationPlugin implements PluginLike {
 
     private readonly auth: AuthentiktClient;
     private readonly _ns: string;
+    private readonly rateLimitTracker: RateLimitTracker;
 
     constructor(auth: AuthentiktClient, namespace: string) {
         this.auth = auth;
         this._ns = namespace;
+        this.rateLimitTracker = new RateLimitTracker(auth, namespace);
+    }
+
+    /** Wrong codes left, and the lock once they are used up; like authentikt's own steps. */
+    get rateLimit(): RateLimitState | null {
+        return this.rateLimitTracker.state;
     }
 
     get namespace(): string {
@@ -37,6 +45,7 @@ export class EmailVerificationPlugin implements PluginLike {
     }
 
     submit = async (): Promise<void> => {
+        if (this.rateLimit?.isLocked) return;
         this.status = "loading";
         try {
             const url = new URL("steps/plugins/" + this._ns + "/verify", this.auth.sessionUrl);
@@ -45,12 +54,20 @@ export class EmailVerificationPlugin implements PluginLike {
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({code: this.code}),
             });
+            if (response.status === 429) {
+                // The lock itself comes with the step's state.
+                await this.auth.updateState();
+                this.status = "rate_limited";
+                return;
+            }
             const data = await response.json();
 
             if (data.type === "success") {
                 await this.auth.updateState();
                 this.status = "ready";
             } else {
+                // For the tries that are left.
+                await this.auth.updateState();
                 this.status = "invalid_code";
             }
         } catch (e) {

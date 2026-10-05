@@ -4,7 +4,7 @@
 
 <script lang="ts">
     import {tick} from "svelte";
-    import {useAuthentiktContext} from "@julius-babies/authentikt-svelte";
+    import {formatLockDuration, useAuthentiktContext} from "@julius-babies/authentikt-svelte";
     import {_} from "svelte-i18n";
     import {slide} from "svelte/transition";
     import {ArrowLeftIcon, ArrowRightIcon, DeviceMobileIcon, WarningCircleIcon} from "phosphor-svelte";
@@ -34,17 +34,19 @@
     const canUseTotp = $derived(auth.alternatives.includes(TOTP));
 
     const loading = $derived(plugin.status === "loading");
-    const invalid = $derived(plugin.status === "invalid_code" || plugin.status === "error");
+    // Locked once the tries are used up; the countdown and the reload afterwards come with the plugin.
+    const locked = $derived(plugin.rateLimit?.isLocked ?? false);
+    const invalid = $derived(locked || plugin.status === "invalid_code" || plugin.status === "error");
 
     // Set by the email step. authentikt's check does not send the user yet, so after a reload in the
     // middle of the flow it is gone and the greeting goes without the name.
     const name = $derived(auth.currentFlow?.user?.displayName);
 
     async function submit() {
-        if (loading || plugin.code.length < CODE_LENGTH) return;
+        if (loading || locked || plugin.code.length < CODE_LENGTH) return;
         await plugin.submit();
         // All six boxes are full, so a wrong code would have to be deleted digit by digit first.
-        if (plugin.status === "invalid_code") plugin.code = "";
+        if (plugin.status === "invalid_code" || plugin.status === "rate_limited") plugin.code = "";
         // The input was disabled while the code was checked, which took the focus away from it.
         if (invalid) {
             await tick();
@@ -76,7 +78,7 @@
                             inputId={INPUT_ID}
                             maxlength={CODE_LENGTH}
                             pattern={"^\\d+$"}
-                            disabled={loading}
+                            disabled={loading || locked}
                             onValueChange={() => { if (invalid && plugin.code) plugin.status = "ready"; }}
                             onComplete={() => void submit()}
                             aria-label={$_("auth.signin.code.label")}
@@ -101,7 +103,7 @@
                     <button
                             type="submit"
                             class="group/submit flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            disabled={loading || plugin.code.length < CODE_LENGTH}
+                            disabled={loading || locked || plugin.code.length < CODE_LENGTH}
                             aria-label={$_("auth.signin.code.submit")}
                     >
                         {#if loading}
@@ -115,7 +117,14 @@
                 {#if invalid}
                     <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
                         <WarningCircleIcon class="size-4 shrink-0" />
-                        {plugin.status === "invalid_code" ? $_("auth.signin.code.error") : $_("auth.signin.error")}
+                        {#if locked}
+                            {$_("auth.signin.rateLimited", {values: {time: formatLockDuration(plugin.rateLimit!.remainingLockSeconds)}})}
+                        {:else if plugin.status === "invalid_code"}
+                            {$_("auth.signin.code.error")}
+                            {#if plugin.rateLimit}{$_("auth.signin.triesLeft", {values: {count: plugin.rateLimit.remainingTries}})}{/if}
+                        {:else}
+                            {$_("auth.signin.error")}
+                        {/if}
                     </p>
                 {/if}
             </form>

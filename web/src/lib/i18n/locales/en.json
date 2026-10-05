@@ -19,6 +19,8 @@
       "title": "Sign in",
       "loading": "Loading…",
       "error": "Something went wrong.",
+      "rateLimited": "Too many attempts. Try again in {time}.",
+      "triesLeft": "{count, plural, one {# try left.} other {# tries left.}}",
       "done": {
         "pageTitle": "Signing in",
         "message": "Signing you in…"

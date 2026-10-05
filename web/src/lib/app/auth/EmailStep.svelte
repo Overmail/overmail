@@ -5,6 +5,7 @@
 <script lang="ts">
     import {
         EmailUserSelectionPlugin,
+        formatLockDuration,
         useAuthentiktContext,
         type EmailUserSelectionPluginInstance,
     } from "@julius-babies/authentikt-svelte";
@@ -23,7 +24,9 @@
     );
 
     const loading = $derived(plugin.status === "loading");
-    const invalid = $derived(plugin.status === "user_not_existing" || plugin.status === "error");
+    // Locked once the tries are used up; the countdown and the reload afterwards come with the plugin.
+    const locked = $derived(plugin.rateLimit?.isLocked ?? false);
+    const invalid = $derived(locked || plugin.status === "user_not_existing" || plugin.status === "error");
 
     let input = $state<HTMLInputElement>();
 
@@ -67,6 +70,7 @@
                                 placeholder={$_("auth.signin.identifier.label")}
                                 aria-label={$_("auth.signin.identifier.label")}
                                 aria-invalid={invalid}
+                                disabled={locked}
                                 autocomplete="username"
                                 autocapitalize="none"
                                 spellcheck="false"
@@ -76,7 +80,7 @@
                     <button
                             type="submit"
                             class="group/submit flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            disabled={loading || !plugin.email.trim()}
+                            disabled={loading || locked || !plugin.email.trim()}
                             aria-label={$_("auth.signin.identifier.submit")}
                     >
                         {#if loading}
@@ -90,7 +94,11 @@
                 {#if invalid}
                     <p role="alert" class="flex items-center gap-2 ps-3.5 text-sm text-destructive" transition:slide={{duration: 150}}>
                         <WarningCircleIcon class="size-4 shrink-0" />
-                        {plugin.status === "user_not_existing" ? $_("auth.signin.identifier.error") : $_("auth.signin.error")}
+                        {#if locked}
+                            {$_("auth.signin.rateLimited", {values: {time: formatLockDuration(plugin.rateLimit!.remainingLockSeconds)}})}
+                        {:else}
+                            {plugin.status === "user_not_existing" ? $_("auth.signin.identifier.error") : $_("auth.signin.error")}
+                        {/if}
                     </p>
                 {/if}
             </form>

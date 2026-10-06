@@ -6,6 +6,12 @@
     import {DEFAULT_IMAP_PORT, type NewEmailAccountViewModel} from "./NewEmailAccountViewModel.svelte.ts";
     import {CheckCircleIcon, WarningCircleIcon, WarningIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
+    import {Button} from "$lib/components/ui/button";
+    import outlookLogo from "$lib/assets/microsoft-outlook.svg";
+    import gmailLogo from "$lib/assets/gmail.svg";
+    import appleLogoDark from "$lib/assets/apple_dark.svg";
+    import appleLogoLight from "$lib/assets/apple_light.svg";
+    import {mode} from "mode-watcher";
 
     let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
 
@@ -114,4 +120,19 @@
       not checked out -- which is when Enter still has something to do, see `submit`.
     -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
+
+    <span class="self-center text-xs text-muted-foreground font-semibold">Oder weiter mit</span>
+    <hr />
+    <div class="flex flex-row gap-2 items-center">
+        <Button variant="outline" class="flex-1">
+            <img src={outlookLogo} class="size-4" alt="">
+        </Button>
+        <Button variant="outline" class="flex-1">
+            <img src={gmailLogo} class="size-4" alt="">
+        </Button>
+
+        <Button variant="outline" class="flex-1">
+            <img src={mode.current === "light" ? appleLogoLight : appleLogoDark} class="size-4" alt="">
+        </Button>
+    </div>
 </form>

@@ -7,9 +7,11 @@ import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.oauth.oauthCallback
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthStateStore
+import es.jvbabi.overmail.server.oauth.OAuthTokenClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
@@ -22,14 +24,19 @@ import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -38,6 +45,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
 
 private const val PROVIDERS = "/api/users/me/inboxes/create/oauth"
+private const val GOOD_CODE = "the-code"
+private const val ACCESS_TOKEN = "the-bearer"
 
 class OAuthRoutesTest {
 
@@ -46,6 +55,9 @@ class OAuthRoutesTest {
     )
 
     private var signedIn: User? = null
+
+    /** The forms the fake token endpoint received, in order. */
+    private val tokenRequests = mutableListOf<Map<String, String>>()
 
     /** Microsoft has a client, Google has none, and the typo is ignored rather than fatal. */
     private val providers = OAuthProviders(
@@ -114,7 +126,7 @@ class OAuthRoutesTest {
         installRoutes()
         val client = createClient { followRedirects = false }
 
-        val state = Url(client.get("$PROVIDERS/microsoft").headers[HttpHeaders.Location]!!).parameters["state"]!!
+        val state = client.startSignIn()
 
         // From the provider's page, so no session -- the state is what says who this is.
         signedIn = null
@@ -131,8 +143,57 @@ class OAuthRoutesTest {
         assertEquals(HttpStatusCode.BadRequest, client.get("/api/oauth/microsoft/callback").status)
     }
 
-    private suspend fun io.ktor.client.HttpClient.callback(provider: String, state: String): HttpResponse =
-        get("/api/oauth/$provider/callback?state=$state&code=whatever")
+    @Test
+    fun `the callback trades the code for tokens with the client's credentials`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val response = client.callback("microsoft", client.startSignIn())
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val request = assertNotNull(tokenRequests.singleOrNull())
+        assertEquals("authorization_code", request["grant_type"])
+        assertEquals(GOOD_CODE, request["code"])
+        assertEquals("https://overmail.example/api/oauth/microsoft/callback", request["redirect_uri"])
+        assertEquals("the-client", request["client_id"])
+        assertEquals("the-secret", request["client_secret"])
+
+        // The bearer stays on the server.
+        assertFalse(response.bodyAsText().contains(ACCESS_TOKEN))
+    }
+
+    @Test
+    fun `a code the provider refuses is a bad request and uses up the state`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val state = client.startSignIn()
+        assertEquals(HttpStatusCode.BadRequest, client.callback("microsoft", state, code = "stale").status)
+        assertEquals(HttpStatusCode.BadRequest, client.callback("microsoft", state).status)
+        assertEquals(1, tokenRequests.size)
+    }
+
+    @Test
+    fun `a sign-in cancelled at the provider asks for no tokens`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val response = client.get("/api/oauth/microsoft/callback?state=${client.startSignIn()}&error=access_denied")
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(tokenRequests.isEmpty())
+    }
+
+    private suspend fun io.ktor.client.HttpClient.startSignIn(): String =
+        Url(get("$PROVIDERS/microsoft").headers[HttpHeaders.Location]!!).parameters["state"]!!
+
+    private suspend fun io.ktor.client.HttpClient.callback(
+        provider: String,
+        state: String,
+        code: String = GOOD_CODE,
+    ): HttpResponse = get("/api/oauth/$provider/callback?state=$state&code=$code")
 
     private suspend fun setUpUser(): User {
         database.init()
@@ -147,6 +208,30 @@ class OAuthRoutesTest {
     }
 
     private fun ApplicationTestBuilder.installRoutes() {
+        // Microsoft's token endpoint, as far as the code exchange is concerned.
+        externalServices {
+            hosts("https://login.microsoftonline.com") {
+                routing {
+                    post("/common/oauth2/v2.0/token") {
+                        val form = call.receiveParameters()
+                        tokenRequests += form.entries().associate { it.key to it.value.single() }
+                        if (form["code"] == GOOD_CODE) {
+                            call.respondText(
+                                """{"access_token":"$ACCESS_TOKEN","token_type":"Bearer","expires_in":3599,"refresh_token":"refresh"}""",
+                                ContentType.Application.Json,
+                            )
+                        } else {
+                            call.respondText(
+                                """{"error":"invalid_grant","error_description":"The code has expired"}""",
+                                ContentType.Application.Json,
+                                HttpStatusCode.BadRequest,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         application {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
@@ -155,6 +240,8 @@ class OAuthRoutesTest {
                 provide<OvermailDatabase> { database }
                 provide<OAuthProviders> { providers }
                 provide<OAuthStateStore> { OAuthStateStore() }
+                // The test client, which sends the token request to the fake endpoint below.
+                provide<OAuthTokenClient> { OAuthTokenClient(this@installRoutes.client) }
             }
             routing {
                 route(PROVIDERS) {

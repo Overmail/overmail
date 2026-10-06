@@ -10,6 +10,7 @@ import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthStateStore
+import es.jvbabi.overmail.server.oauth.OAuthTokenClient
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
@@ -31,6 +32,9 @@ import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -93,6 +97,9 @@ private fun Application.configureDependencies() {
 
         provide<OAuthProviders> { resolve<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
         provide<OAuthStateStore> { OAuthStateStore() }
+        provide<OAuthTokenClient> {
+            OAuthTokenClient(HttpClient(CIO) { install(HttpTimeout) { requestTimeoutMillis = 10_000 } })
+        }
 
         provide {
             val config = resolve<ApplicationConfig>()

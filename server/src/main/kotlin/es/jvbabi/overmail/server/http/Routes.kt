@@ -48,7 +48,6 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthOnbo
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthProviders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.startOAuth
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.streamOAuthOnboardingFolders
-import es.jvbabi.overmail.server.http.oauth.oauthCallback
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
@@ -493,13 +492,14 @@ internal fun Application.configureRouting() {
                             }
 
                             // Connecting an inbox by signing in at its provider rather than with
-                            // an imap password. The provider comes back to /api/oauth, below.
+                            // an imap password. The sign-in itself is an authentikt flow under
+                            // /api/oauth, see OAuthOnboardings.
                             route("/oauth") {
                                 getOAuthProviders()
 
                                 // A sign-in that came back, as the dialog continues it.
                                 /**
-                                 * Path: onboardingId [String] What the callback put into `continue_onboarding_oauth_imap_account`
+                                 * Path: onboardingId [String] The sign-in flow, as the provider's sign-in put it into `_authentikt_session_id`
                                  *
                                  * Responses:
                                  *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such sign-in, it ran out, or it is not the current user's
@@ -537,19 +537,6 @@ internal fun Application.configureRouting() {
                                 }
                             }
                         }
-                    }
-                }
-            }
-
-            // Where a provider sends the browser back to. No session needed: the state says whose
-            // sign-in it was, and this path is what every provider has registered as redirect.
-            route("/oauth") {
-                /**
-                 * Path: provider [String] The provider the sign-in was at
-                 */
-                route("/{provider}") {
-                    route("/callback") {
-                        oauthCallback()
                     }
                 }
             }

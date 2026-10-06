@@ -27,15 +27,15 @@ fun Route.streamOAuthOnboardingFolders() {
          *   - 200 text/event-stream [es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.FolderStreamEvent] The events
          */
         get {
-            val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
+            val mailbox = call.requireOwnedOAuthOnboardingFromUrl()
             call.respondTextWriter(ContentType.Text.EventStream) {
                 scanMailbox(
                     writer = this,
-                    host = onboarding.provider.imapHost,
-                    port = onboarding.provider.imapPort,
+                    host = mailbox.provider.imapHost,
+                    port = mailbox.provider.imapPort,
                     // The access token of the sign-in, which lasts an hour -- far longer than the
                     // dialog it is scanned for stays open.
-                    auth = ImapClient.Auth.BearerAuth(onboarding.address, onboarding.tokens.accessToken),
+                    auth = ImapClient.Auth.BearerAuth(mailbox.address, mailbox.tokens.accessToken),
                 )
             }
         }

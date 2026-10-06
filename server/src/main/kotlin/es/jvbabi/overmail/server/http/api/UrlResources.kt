@@ -14,7 +14,8 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.oauth.OAuthClient
-import es.jvbabi.overmail.server.oauth.OAuthOnboardingStore
+import es.jvbabi.overmail.server.oauth.OAuthMailbox
+import es.jvbabi.overmail.server.oauth.OAuthOnboardings
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
@@ -248,11 +249,11 @@ suspend fun ApplicationCall.requireOAuthClientFromUrl(): OAuthClient {
 }
 
 /**
- * `{onboardingId}` as a sign-in of the caller's that is waiting for "new inbox" to finish. One that
- * ran out, one of somebody else's and a made-up id are the same miss: the id is a secret, and
- * telling them apart would only say which ones exist.
+ * `{onboardingId}` as the mailbox of a sign-in of the caller's that is waiting for "new inbox" to
+ * finish. One that ran out, one of somebody else's and a made-up id are the same miss: the id is a
+ * secret, and telling them apart would only say which ones exist.
  */
-suspend fun ApplicationCall.requireOwnedOAuthOnboardingFromUrl(): OAuthOnboardingStore.Onboarding {
+suspend fun ApplicationCall.requireOwnedOAuthOnboardingFromUrl(): OAuthMailbox {
     val id = parameters["onboardingId"] ?: error("this route has no {onboardingId}, so its onboarding cannot be resolved")
-    return dependency<OAuthOnboardingStore>().get(id, requireAuthenticatedUserId()) ?: notFound("oauth_onboarding")
+    return dependency<OAuthOnboardings>().get(id, requireAuthenticatedUserId()) ?: notFound("oauth_onboarding")
 }

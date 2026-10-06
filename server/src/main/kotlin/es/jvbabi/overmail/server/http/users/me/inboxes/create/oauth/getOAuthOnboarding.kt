@@ -18,7 +18,7 @@ fun Route.getOAuthOnboarding() {
         /**
          * Read the mailbox a sign-in at a provider came back with.
          *
-         * Description: What the settings open "new inbox" on when the url carries `continue_onboarding_oauth_imap_account`.
+         * Description: What the settings open "new inbox" on when the url carries `_authentikt_session_id`.
          *
          * Tag: Setup
          *
@@ -26,13 +26,13 @@ fun Route.getOAuthOnboarding() {
          *   - 200 [OAuthOnboardingResponse] The mailbox
          */
         get {
-            val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
+            val mailbox = call.requireOwnedOAuthOnboardingFromUrl()
             call.respond(
                 OAuthOnboardingResponse(
-                    provider = onboarding.provider.id,
-                    host = onboarding.provider.imapHost,
-                    port = onboarding.provider.imapPort,
-                    username = onboarding.address,
+                    provider = mailbox.provider.id,
+                    host = mailbox.provider.imapHost,
+                    port = mailbox.provider.imapPort,
+                    username = mailbox.address,
                 )
             )
         }

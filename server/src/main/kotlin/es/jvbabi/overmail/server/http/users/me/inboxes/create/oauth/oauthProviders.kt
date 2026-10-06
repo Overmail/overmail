@@ -5,7 +5,7 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.api.requireOAuthClientFromUrl
 import es.jvbabi.overmail.server.oauth.OAuthProviders
-import es.jvbabi.overmail.server.oauth.OAuthStateStore
+import es.jvbabi.overmail.server.oauth.OAuthOnboardings
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -41,14 +41,14 @@ fun Route.getOAuthProviders() {
  *
  * A plain link from the dialog rather than a call that answers with a url: the browser has to
  * leave for the provider's page anyway, and this way it never sees the client id or the state
- * before it does. The state is what the callback finds the user by, see [OAuthStateStore].
+ * before it does. The sign-in runs as a flow of its own, see [OAuthOnboardings].
  */
 fun Route.startOAuth() {
     authenticate {
         /**
          * Sign in at a provider to connect an inbox.
          *
-         * Description: Redirects to the provider's sign-in page, which sends the browser back to `/api/oauth/{provider}/callback`.
+         * Description: Redirects to the provider's sign-in page, which sends the browser back to the email account settings with `_authentikt_session_id`.
          *
          * Tag: Setup
          *
@@ -60,9 +60,7 @@ fun Route.startOAuth() {
             val client = call.requireOAuthClientFromUrl()
             val userId = call.requireAuthenticatedUserId()
 
-            val providers = call.dependency<OAuthProviders>()
-            val state = call.dependency<OAuthStateStore>().create(userId, client.provider)
-            call.respondRedirect(providers.authorizeUrl(client, state))
+            call.respondRedirect(call.dependency<OAuthOnboardings>().start(userId, client))
         }
     }
 }

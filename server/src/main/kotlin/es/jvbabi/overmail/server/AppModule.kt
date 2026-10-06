@@ -180,6 +180,10 @@ private fun Application.configureDependencies() {
 
 private fun Application.startJobs() {
     launch {
+        dependencies.resolve<OAuthProviders>().logConfigured()
+    }
+
+    launch {
         dependencies.resolve<ImporterManager>().start()
     }
 

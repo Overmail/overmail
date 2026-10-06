@@ -389,6 +389,10 @@
           "description": "Verbinde deinen E-Mail-Anbieter. Die IMAP-Daten bekommst du dort.",
           "host": "IMAP-Server",
           "port": "Port",
+          "oauth": {
+            "or": "Oder weiter mit",
+            "continueWith": "Weiter mit {provider}"
+          },
           "test": {
             "testing": "Verbinde…",
             "reachable": "Server erreichbar",

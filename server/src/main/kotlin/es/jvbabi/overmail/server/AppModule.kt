@@ -8,6 +8,8 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.ai.chat.ChatAgent
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
+import es.jvbabi.overmail.server.oauth.OAuthProviders
+import es.jvbabi.overmail.server.oauth.OAuthStateStore
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
@@ -88,6 +90,9 @@ private fun Application.configureDependencies() {
         provide<OvermailDatabase> { OvermailDatabase(resolve<DatabaseConfig>()).also { it.init() } }
 
         provide<JwtService> { JwtService() }
+
+        provide<OAuthProviders> { resolve<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
+        provide<OAuthStateStore> { OAuthStateStore() }
 
         provide {
             val config = resolve<ApplicationConfig>()

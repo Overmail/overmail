@@ -9,11 +9,32 @@
     import {Button} from "$lib/components/ui/button";
     import outlookLogo from "$lib/assets/microsoft-outlook.svg";
     import gmailLogo from "$lib/assets/gmail.svg";
-    import appleLogoDark from "$lib/assets/apple_dark.svg";
-    import appleLogoLight from "$lib/assets/apple_light.svg";
-    import {mode} from "mode-watcher";
+    import {oauthStartUrl, type OAuthProviderId} from "$lib/repository/InboxSetupRepository";
+    import {useRepositories} from "$lib/repository/repositories";
 
     let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
+
+    /** How each provider the server may offer looks here. One it lists that is missing is skipped. */
+    const OAUTH_PROVIDERS: Record<string, {name: string; logo: string}> = {
+        microsoft: {name: "Microsoft", logo: outlookLogo},
+        google: {name: "Google", logo: gmailLogo},
+    };
+
+    /**
+     * The providers the server has a client for -- the only ones a button would lead anywhere.
+     * Not while editing: signing in creates a mailbox, it does not change the one being edited.
+     */
+    let oauthProviders: OAuthProviderId[] = $state([]);
+    const {inboxSetup} = useRepositories();
+    $effect(() => {
+        if (viewModel.isEditing) return;
+        const controller = new AbortController();
+        inboxSetup.oauthProviders(controller.signal)
+            .then((providers) => (oauthProviders = providers.filter((id) => id in OAUTH_PROVIDERS)))
+            // Without the list the form still works with a password, which is all that is lost.
+            .catch(() => {});
+        return () => controller.abort();
+    });
 
     const id = $props.id();
     const test = $derived(viewModel.imapServerTest);
@@ -121,18 +142,22 @@
     -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
 
-    <span class="self-center text-xs text-muted-foreground font-semibold">Oder weiter mit</span>
-    <hr />
-    <div class="flex flex-row gap-2 items-center">
-        <Button variant="outline" class="flex-1">
-            <img src={outlookLogo} class="size-4" alt="">
-        </Button>
-        <Button variant="outline" class="flex-1">
-            <img src={gmailLogo} class="size-4" alt="">
-        </Button>
-
-        <Button variant="outline" class="flex-1">
-            <img src={mode.current === "light" ? appleLogoLight : appleLogoDark} class="size-4" alt="">
-        </Button>
-    </div>
+    {#if oauthProviders.length > 0}
+        <span class="self-center text-xs text-muted-foreground font-semibold">{$_("settings.emailAccounts.new.server.oauth.or")}</span>
+        <hr />
+        <div class="flex flex-row gap-2 items-center">
+            {#each oauthProviders as provider (provider)}
+                <!-- A full page load: the server redirects to the provider, which SvelteKit's router cannot follow. -->
+                <Button
+                        variant="outline"
+                        class="flex-1"
+                        href={oauthStartUrl(provider)}
+                        data-sveltekit-reload
+                        aria-label={$_("settings.emailAccounts.new.server.oauth.continueWith", {values: {provider: OAUTH_PROVIDERS[provider].name}})}
+                >
+                    <img src={OAUTH_PROVIDERS[provider].logo} class="size-4" alt="">
+                </Button>
+            {/each}
+        </div>
+    {/if}
 </form>

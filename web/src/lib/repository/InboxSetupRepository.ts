@@ -31,6 +31,21 @@ const TEST_IMAP_HOST_ENDPOINT = "/api/users/me/inboxes/create/test/imap-host";
 const TEST_IMAP_LOGIN_ENDPOINT = "/api/users/me/inboxes/create/test/imap-login";
 const FOLDER_STREAM_ENDPOINT = "/api/users/me/inboxes/create/folders/stream";
 const SUBMIT_ENDPOINT = "/api/users/me/inboxes/create/submit";
+const OAUTH_ENDPOINT = "/api/users/me/inboxes/create/oauth";
+
+/**
+ * A provider an inbox can be connected through by signing in there. Mirrors `OAuthProvider` on
+ * the server; open like the outcomes above, so a provider added there is skipped here, not fatal.
+ */
+export type OAuthProviderId = "microsoft" | "google" | (string & {});
+
+/**
+ * Where the browser goes to sign in at [provider]. A link, not a request: the server answers with
+ * a redirect to the provider's page, which the browser has to follow itself.
+ */
+export function oauthStartUrl(provider: OAuthProviderId): string {
+    return `${OAUTH_ENDPOINT}/${encodeURIComponent(provider)}`;
+}
 
 /** The connection an inbox is created for. */
 export type InboxConnection = {
@@ -143,6 +158,15 @@ export class InboxSetupRepository {
             outcome: body.outcome as ImapHostOutcome,
             capabilities: (body.capabilities ?? []) as string[],
         };
+    }
+
+    /** The providers the server has a client for. Only these can be offered. */
+    async oauthProviders(signal?: AbortSignal): Promise<OAuthProviderId[]> {
+        const response = await fetch(OAUTH_ENDPOINT, {credentials: "include", signal});
+        if (!response.ok) throw new Error(`Could not list the oauth providers: ${response.status}`);
+
+        const body = await response.json();
+        return (body.providers as {id: string}[]).map((provider) => provider.id);
     }
 
     /**

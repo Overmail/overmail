@@ -44,6 +44,9 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthProviders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.startOAuth
+import es.jvbabi.overmail.server.http.oauth.oauthCallback
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
@@ -487,6 +490,19 @@ internal fun Application.configureRouting() {
                                 }
                             }
 
+                            // Connecting an inbox by signing in at its provider rather than with
+                            // an imap password. The provider comes back to /api/oauth, below.
+                            route("/oauth") {
+                                getOAuthProviders()
+
+                                /**
+                                 * Path: provider [String] The provider, as the list names it
+                                 */
+                                route("/{provider}") {
+                                    startOAuth()
+                                }
+                            }
+
                             // The only step of the dialog that writes anything.
                             route("/submit") {
                                 inboxSubmitRoute()
@@ -504,6 +520,19 @@ internal fun Application.configureRouting() {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Where a provider sends the browser back to. No session needed: the state says whose
+            // sign-in it was, and this path is what every provider has registered as redirect.
+            route("/oauth") {
+                /**
+                 * Path: provider [String] The provider the sign-in was at
+                 */
+                route("/{provider}") {
+                    route("/callback") {
+                        oauthCallback()
                     }
                 }
             }

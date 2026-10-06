@@ -389,6 +389,10 @@
           "description": "Connect your email provider. They have the imap details.",
           "host": "IMAP server",
           "port": "Port",
+          "oauth": {
+            "or": "Or continue with",
+            "continueWith": "Continue with {provider}"
+          },
           "test": {
             "testing": "Connecting…",
             "reachable": "Server reachable",

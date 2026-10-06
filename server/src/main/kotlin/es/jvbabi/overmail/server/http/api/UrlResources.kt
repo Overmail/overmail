@@ -13,6 +13,8 @@ import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.oauth.OAuthClient
+import es.jvbabi.overmail.server.oauth.OAuthProviders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
 import kotlin.uuid.Uuid
@@ -233,4 +235,13 @@ suspend fun ApplicationCall.requireOwnedSessionFromUrl(): Session {
 
     rememberOwned("session")
     return session
+}
+
+/**
+ * `{provider}` as a provider this server has an oauth client for. One without a client is a miss
+ * like an unknown one: it cannot be used, so as far as the api is concerned it does not exist.
+ */
+suspend fun ApplicationCall.requireOAuthClientFromUrl(): OAuthClient {
+    val id = parameters["provider"] ?: error("this route has no {provider}, so its oauth provider cannot be resolved")
+    return dependency<OAuthProviders>().byId(id) ?: notFound("oauth_provider", id)
 }

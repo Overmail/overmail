@@ -24,16 +24,21 @@
      * The providers the server has a client for -- the only ones a button would lead anywhere.
      * Not while editing: signing in creates a mailbox, it does not change the one being edited.
      */
-    let oauthProviders: OAuthProviderId[] = $state([]);
     const {inboxSetup} = useRepositories();
+    const known = (providers: OAuthProviderId[]) => providers.filter((id) => id in OAUTH_PROVIDERS);
+    // Usually there already: the dialog asks as soon as it is mounted. Read synchronously then, so
+    // the buttons are part of the first frame instead of growing the dialog a moment later.
+    let oauthProviders: OAuthProviderId[] = $state(known(inboxSetup.cachedOAuthProviders ?? []));
     $effect(() => {
-        if (viewModel.isEditing) return;
-        const controller = new AbortController();
-        inboxSetup.oauthProviders(controller.signal)
-            .then((providers) => (oauthProviders = providers.filter((id) => id in OAUTH_PROVIDERS)))
+        if (viewModel.isEditing || inboxSetup.cachedOAuthProviders) return;
+        let cancelled = false;
+        inboxSetup.oauthProviders()
+            .then((providers) => {
+                if (!cancelled) oauthProviders = known(providers);
+            })
             // Without the list the form still works with a password, which is all that is lost.
             .catch(() => {});
-        return () => controller.abort();
+        return () => (cancelled = true);
     });
 
     const id = $props.id();

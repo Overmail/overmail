@@ -160,9 +160,34 @@ export class InboxSetupRepository {
         };
     }
 
-    /** The providers the server has a client for. Only these can be offered. */
-    async oauthProviders(signal?: AbortSignal): Promise<OAuthProviderId[]> {
-        const response = await fetch(OAUTH_ENDPOINT, {credentials: "include", signal});
+    /**
+     * The providers the server has a client for. Only these can be offered.
+     *
+     * The one answer here that is kept: it is the server's configuration, not something the user
+     * is typing, and the dialog wants it on its first frame. So it is fetched once, shared by
+     * everybody who asks in the meantime, and only a failure is asked again.
+     */
+    oauthProviders(): Promise<OAuthProviderId[]> {
+        this.oauthProvidersRequest ??= this.fetchOAuthProviders().then(
+            (providers) => (this.loadedOAuthProviders = providers),
+            (error) => {
+                this.oauthProvidersRequest = null;
+                throw error;
+            },
+        );
+        return this.oauthProvidersRequest;
+    }
+
+    /** What [oauthProviders] came to, or null while it has not answered yet. */
+    get cachedOAuthProviders(): OAuthProviderId[] | null {
+        return this.loadedOAuthProviders;
+    }
+
+    private oauthProvidersRequest: Promise<OAuthProviderId[]> | null = null;
+    private loadedOAuthProviders: OAuthProviderId[] | null = null;
+
+    private async fetchOAuthProviders(): Promise<OAuthProviderId[]> {
+        const response = await fetch(OAUTH_ENDPOINT, {credentials: "include"});
         if (!response.ok) throw new Error(`Could not list the oauth providers: ${response.status}`);
 
         const body = await response.json();

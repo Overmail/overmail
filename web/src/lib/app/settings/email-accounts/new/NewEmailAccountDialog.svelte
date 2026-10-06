@@ -22,6 +22,10 @@
     const {inboxSetup} = useRepositories();
     const viewModel = new NewEmailAccountViewModel(inboxSetup);
 
+    // Asked now, while the dialog is still closed, so the server step can open with its sign-in
+    // buttons in place. A failure is left to the step, which asks again.
+    inboxSetup.oauthProviders().catch(() => {});
+
     // The dialog outlives one opening of it, so a check scheduled for a host the user walked away
     // from would still run -- and still connect to somebody's server.
     $effect(() => {

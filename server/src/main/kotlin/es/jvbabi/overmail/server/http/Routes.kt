@@ -44,8 +44,10 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthOnboarding
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthProviders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.startOAuth
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.streamOAuthOnboardingFolders
 import es.jvbabi.overmail.server.http.oauth.oauthCallback
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
@@ -494,6 +496,21 @@ internal fun Application.configureRouting() {
                             // an imap password. The provider comes back to /api/oauth, below.
                             route("/oauth") {
                                 getOAuthProviders()
+
+                                // A sign-in that came back, as the dialog continues it.
+                                /**
+                                 * Path: onboardingId [String] What the callback put into `continue_onboarding_oauth_imap_account`
+                                 *
+                                 * Responses:
+                                 *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such sign-in, it ran out, or it is not the current user's
+                                 */
+                                route("/onboardings/{onboardingId}") {
+                                    getOAuthOnboarding()
+
+                                    route("/folders/stream") {
+                                        streamOAuthOnboardingFolders()
+                                    }
+                                }
 
                                 /**
                                  * Path: provider [String] The provider, as the list names it

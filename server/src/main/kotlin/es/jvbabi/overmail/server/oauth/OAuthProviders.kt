@@ -25,7 +25,11 @@ class OAuthClient(
  * The one place that decides whether a provider is usable: the dialog lists [configured], and a
  * route resolves a provider through [byId], which knows nothing of one without an entry.
  */
-class OAuthProviders(clients: Map<String, OAuthClientConfig>, baseUrl: String) {
+class OAuthProviders(
+    clients: Map<String, OAuthClientConfig>,
+    /** Where the app is reached; the callback sends the browser back into it. */
+    val baseUrl: String,
+) {
 
     private val clients: Map<OAuthProvider, OAuthClient> = buildMap {
         clients.forEach { (id, config) ->

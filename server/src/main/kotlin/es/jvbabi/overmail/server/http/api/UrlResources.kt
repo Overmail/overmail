@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.oauth.OAuthClient
+import es.jvbabi.overmail.server.oauth.OAuthOnboardingStore
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
@@ -244,4 +245,14 @@ suspend fun ApplicationCall.requireOwnedSessionFromUrl(): Session {
 suspend fun ApplicationCall.requireOAuthClientFromUrl(): OAuthClient {
     val id = parameters["provider"] ?: error("this route has no {provider}, so its oauth provider cannot be resolved")
     return dependency<OAuthProviders>().byId(id) ?: notFound("oauth_provider", id)
+}
+
+/**
+ * `{onboardingId}` as a sign-in of the caller's that is waiting for "new inbox" to finish. One that
+ * ran out, one of somebody else's and a made-up id are the same miss: the id is a secret, and
+ * telling them apart would only say which ones exist.
+ */
+suspend fun ApplicationCall.requireOwnedOAuthOnboardingFromUrl(): OAuthOnboardingStore.Onboarding {
+    val id = parameters["onboardingId"] ?: error("this route has no {onboardingId}, so its onboarding cannot be resolved")
+    return dependency<OAuthOnboardingStore>().get(id, requireAuthenticatedUserId()) ?: notFound("oauth_onboarding")
 }

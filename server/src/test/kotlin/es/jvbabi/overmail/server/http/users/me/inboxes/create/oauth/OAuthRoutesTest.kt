@@ -5,6 +5,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.oauth.oauthCallback
+import es.jvbabi.overmail.server.oauth.OAuthOnboardingStore
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthStateStore
 import es.jvbabi.overmail.server.oauth.OAuthTokenClient
@@ -36,6 +37,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 import kotlinx.serialization.json.Json
@@ -43,10 +45,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
+import java.util.Base64
 
 private const val PROVIDERS = "/api/users/me/inboxes/create/oauth"
 private const val GOOD_CODE = "the-code"
 private const val ACCESS_TOKEN = "the-bearer"
+private const val MAILBOX = "julius@outlook.example"
 
 class OAuthRoutesTest {
 
@@ -130,7 +134,7 @@ class OAuthRoutesTest {
 
         // From the provider's page, so no session -- the state is what says who this is.
         signedIn = null
-        assertEquals(HttpStatusCode.OK, client.callback("microsoft", state).status)
+        assertEquals(HttpStatusCode.Found, client.callback("microsoft", state).status)
         assertEquals(HttpStatusCode.BadRequest, client.callback("microsoft", state).status)
     }
 
@@ -150,7 +154,7 @@ class OAuthRoutesTest {
         val client = createClient { followRedirects = false }
 
         val response = client.callback("microsoft", client.startSignIn())
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Found, response.status)
 
         val request = assertNotNull(tokenRequests.singleOrNull())
         assertEquals("authorization_code", request["grant_type"])
@@ -160,7 +164,58 @@ class OAuthRoutesTest {
         assertEquals("the-secret", request["client_secret"])
 
         // The bearer stays on the server.
+        assertFalse(response.headers[HttpHeaders.Location]!!.contains(ACCESS_TOKEN))
+    }
+
+    @Test
+    fun `the callback sends the browser back to the settings to continue with the mailbox`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val state = client.startSignIn()
+        signedIn = null
+        val target = Url(client.callback("microsoft", state).headers[HttpHeaders.Location]!!)
+        assertEquals("overmail.example", target.host)
+        assertEquals("email-accounts", target.parameters["settings"])
+        val onboardingId = assertNotNull(target.parameters["continue_onboarding_oauth_imap_account"])
+
+        signedIn = user
+        val response = client.get("$PROVIDERS/onboardings/$onboardingId")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val onboarding = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals("microsoft", onboarding["provider"]!!.jsonPrimitive.content)
+        assertEquals("outlook.office365.com", onboarding["host"]!!.jsonPrimitive.content)
+        assertEquals(MAILBOX, onboarding["username"]!!.jsonPrimitive.content)
         assertFalse(response.bodyAsText().contains(ACCESS_TOKEN))
+    }
+
+    @Test
+    fun `an onboarding is only there for the user who signed in`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val target = Url(client.callback("microsoft", client.startSignIn()).headers[HttpHeaders.Location]!!)
+        val onboardingId = target.parameters["continue_onboarding_oauth_imap_account"]!!
+
+        setUpUser()
+        assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/$onboardingId").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/made-up").status)
+    }
+
+    @Test
+    fun `the folder scan of an onboarding says the bearer login is not there yet`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val target = Url(client.callback("microsoft", client.startSignIn()).headers[HttpHeaders.Location]!!)
+        val onboardingId = target.parameters["continue_onboarding_oauth_imap_account"]!!
+
+        val response = client.get("$PROVIDERS/onboardings/$onboardingId/folders/stream")
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("oauth_login_unsupported"), response.bodyAsText())
     }
 
     @Test
@@ -182,8 +237,21 @@ class OAuthRoutesTest {
         val client = createClient { followRedirects = false }
 
         val response = client.get("/api/oauth/microsoft/callback?state=${client.startSignIn()}&error=access_denied")
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Found, response.status)
         assertTrue(tokenRequests.isEmpty())
+
+        // Back to the settings, with nothing to continue.
+        val target = Url(response.headers[HttpHeaders.Location]!!)
+        assertEquals("email-accounts", target.parameters["settings"])
+        assertNull(target.parameters["continue_onboarding_oauth_imap_account"])
+    }
+
+    /** An id token as the provider signs it; only the payload is read, so the signature is a stand-in. */
+    private fun idToken(email: String): String {
+        val encoder = Base64.getUrlEncoder().withoutPadding()
+        val header = encoder.encodeToString("""{"alg":"RS256"}""".toByteArray())
+        val payload = encoder.encodeToString("""{"email":"$email","sub":"someone"}""".toByteArray())
+        return "$header.$payload.signature"
     }
 
     private suspend fun io.ktor.client.HttpClient.startSignIn(): String =
@@ -217,7 +285,7 @@ class OAuthRoutesTest {
                         tokenRequests += form.entries().associate { it.key to it.value.single() }
                         if (form["code"] == GOOD_CODE) {
                             call.respondText(
-                                """{"access_token":"$ACCESS_TOKEN","token_type":"Bearer","expires_in":3599,"refresh_token":"refresh"}""",
+                                """{"access_token":"$ACCESS_TOKEN","token_type":"Bearer","expires_in":3599,"refresh_token":"refresh","id_token":"${idToken(MAILBOX)}"}""",
                                 ContentType.Application.Json,
                             )
                         } else {
@@ -240,6 +308,7 @@ class OAuthRoutesTest {
                 provide<OvermailDatabase> { database }
                 provide<OAuthProviders> { providers }
                 provide<OAuthStateStore> { OAuthStateStore() }
+                provide<OAuthOnboardingStore> { OAuthOnboardingStore() }
                 // The test client, which sends the token request to the fake endpoint below.
                 provide<OAuthTokenClient> { OAuthTokenClient(this@installRoutes.client) }
             }
@@ -247,6 +316,10 @@ class OAuthRoutesTest {
                 route(PROVIDERS) {
                     getOAuthProviders()
                     route("/{provider}") { startOAuth() }
+                    route("/onboardings/{onboardingId}") {
+                        getOAuthOnboarding()
+                        route("/folders/stream") { streamOAuthOnboardingFolders() }
+                    }
                 }
                 route("/api/oauth/{provider}/callback") { oauthCallback() }
             }

@@ -8,6 +8,7 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.ai.chat.ChatAgent
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
+import es.jvbabi.overmail.server.oauth.OAuthOnboardingStore
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthStateStore
 import es.jvbabi.overmail.server.oauth.OAuthTokenClient
@@ -97,6 +98,7 @@ private fun Application.configureDependencies() {
 
         provide<OAuthProviders> { resolve<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
         provide<OAuthStateStore> { OAuthStateStore() }
+        provide<OAuthOnboardingStore> { OAuthOnboardingStore() }
         provide<OAuthTokenClient> {
             OAuthTokenClient(HttpClient(CIO) { install(HttpTimeout) { requestTimeoutMillis = 10_000 } })
         }

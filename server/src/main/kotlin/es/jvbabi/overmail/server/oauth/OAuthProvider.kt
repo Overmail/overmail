@@ -13,6 +13,9 @@ enum class OAuthProvider(
     val authorizeUrl: String,
     val tokenUrl: String,
     val scopes: List<String>,
+    /** Where the mailbox behind a sign-in here is read from, over imap with tls. */
+    val imapHost: String,
+    val imapPort: Int = 993,
     /** What this provider needs on the authorize request beyond the standard parameters. */
     val authorizeParameters: Map<String, String> = emptyMap(),
 ) {
@@ -23,12 +26,14 @@ enum class OAuthProvider(
         // offline_access is what brings a refresh token -- the importer keeps logging in long after
         // the access token from this sign-in ran out. openid and email name the mailbox.
         scopes = listOf("https://outlook.office.com/IMAP.AccessAsUser.All", "offline_access", "openid", "email"),
+        imapHost = "outlook.office365.com",
     ),
     GOOGLE(
         id = "google",
         authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth",
         tokenUrl = "https://oauth2.googleapis.com/token",
         scopes = listOf("https://mail.google.com/", "openid", "email"),
+        imapHost = "imap.gmail.com",
         // Google hands out a refresh token only for offline access, and only on the first consent
         // unless it is asked for again -- a mailbox that was connected once before would get none.
         authorizeParameters = mapOf("access_type" to "offline", "prompt" to "consent"),

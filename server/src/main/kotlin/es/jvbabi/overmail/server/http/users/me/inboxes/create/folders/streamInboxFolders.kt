@@ -129,6 +129,19 @@ internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, userna
     }
 }
 
+/**
+ * [scanMailbox] for a mailbox signed in to at a provider, which imap logs in to with the bearer
+ * through `AUTHENTICATE XOAUTH2` rather than with a password.
+ *
+ * Kamel only speaks `LOGIN` so far, so for now this says the login is not possible yet. Once it
+ * can take a bearer, this opens the `ImapClient` with one and goes through [scanFolders] like the
+ * password scan does.
+ */
+@Suppress("UNUSED_PARAMETER")
+internal suspend fun scanMailboxWithBearer(writer: Writer, host: String, port: Int, username: String, accessToken: String) {
+    runCatching { writeEvent(writer, FolderStreamEvent.Failed("oauth_login_unsupported")) }
+}
+
 /** Lists the folders, then counts them one after another. */
 private suspend fun scanFolders(writer: Writer, client: ImapClient) {
     // Sorted by the full path, which keeps a parent ahead of its children and is the order the

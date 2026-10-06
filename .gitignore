@@ -14,11 +14,11 @@ local.properties
 !**/src/test/**/build/
 
 ### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/discord.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+# Machine-specific; only the settings that are the same for everybody stay shared.
+.idea/*
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+!.idea/icon.svg
 *.iws
 *.iml
 *.ipr

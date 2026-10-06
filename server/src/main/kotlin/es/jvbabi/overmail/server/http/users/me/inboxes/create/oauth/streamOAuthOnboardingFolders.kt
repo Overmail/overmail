@@ -1,7 +1,8 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.http.api.requireOwnedOAuthOnboardingFromUrl
-import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.scanMailboxWithBearer
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.scanMailbox
 import io.ktor.http.ContentType
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respondTextWriter
@@ -28,12 +29,13 @@ fun Route.streamOAuthOnboardingFolders() {
         get {
             val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
             call.respondTextWriter(ContentType.Text.EventStream) {
-                scanMailboxWithBearer(
+                scanMailbox(
                     writer = this,
                     host = onboarding.provider.imapHost,
                     port = onboarding.provider.imapPort,
-                    username = onboarding.address,
-                    accessToken = onboarding.tokens.accessToken,
+                    // The access token of the sign-in, which lasts an hour -- far longer than the
+                    // dialog it is scanned for stays open.
+                    auth = ImapClient.Auth.BearerAuth(onboarding.address, onboarding.tokens.accessToken),
                 )
             }
         }

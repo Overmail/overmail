@@ -205,20 +205,6 @@ class OAuthRoutesTest {
     }
 
     @Test
-    fun `the folder scan of an onboarding says the bearer login is not there yet`() = testApplication {
-        setUpUser()
-        installRoutes()
-        val client = createClient { followRedirects = false }
-
-        val target = Url(client.callback("microsoft", client.startSignIn()).headers[HttpHeaders.Location]!!)
-        val onboardingId = target.parameters["continue_onboarding_oauth_imap_account"]!!
-
-        val response = client.get("$PROVIDERS/onboardings/$onboardingId/folders/stream")
-        assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("oauth_login_unsupported"), response.bodyAsText())
-    }
-
-    @Test
     fun `a code the provider refuses is a bad request and uses up the state`() = testApplication {
         setUpUser()
         installRoutes()
@@ -318,7 +304,6 @@ class OAuthRoutesTest {
                     route("/{provider}") { startOAuth() }
                     route("/onboardings/{onboardingId}") {
                         getOAuthOnboarding()
-                        route("/folders/stream") { streamOAuthOnboardingFolders() }
                     }
                 }
                 route("/api/oauth/{provider}/callback") { oauthCallback() }

@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
@@ -168,7 +169,12 @@ fun Route.streamInboxFoldersForInbox() {
             )
 
             call.respondTextWriter(ContentType.Text.EventStream) {
-                scanMailbox(this, credentials.host, credentials.port, credentials.username, credentials.password)
+                scanMailbox(
+                    this,
+                    credentials.host,
+                    credentials.port,
+                    ImapClient.Auth.BasicAuth(credentials.username, credentials.password),
+                )
             }
         }
     }

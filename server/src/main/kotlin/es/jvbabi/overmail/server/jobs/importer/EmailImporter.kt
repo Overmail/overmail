@@ -184,8 +184,7 @@ class EmailImporter(
                     ImapClient(
                         host = account.host,
                         port = account.port,
-                        username = account.username,
-                        password = account.password,
+                        auth = ImapClient.Auth.BasicAuth(account.username, account.password),
                         debug = false,
                     ).use { client ->
                         val folders = client.getFolders()
@@ -270,8 +269,7 @@ class EmailImporter(
     private fun connect() = ImapClient(
         host = account.host,
         port = account.port,
-        username = account.username,
-        password = account.password,
+        auth = ImapClient.Auth.BasicAuth(account.username, account.password),
         debug = false,
     )
 

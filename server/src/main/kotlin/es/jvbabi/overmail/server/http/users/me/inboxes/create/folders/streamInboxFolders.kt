@@ -82,7 +82,7 @@ fun Route.streamInboxFolders() {
             // Errors after this point go into the stream, not into a status: the response has
             // already begun by the time the mailbox is opened.
             call.respondTextWriter(ContentType.Text.EventStream) {
-                scanMailbox(this, host, request.port, request.username, request.password)
+                scanMailbox(this, host, request.port, ImapClient.Auth.BasicAuth(request.username, request.password))
             }
         }
     }
@@ -91,13 +91,14 @@ fun Route.streamInboxFolders() {
 /**
  * Opens the mailbox and writes the whole scan into [writer].
  *
- * `internal` because the edit screen scans an existing mailbox through the same code -- the only
- * thing that differs there is where the password comes from.
+ * `internal` because the edit screen and a sign-in at a provider scan through the same code -- the
+ * only thing that differs is how [auth] logs in: the password typed here, the stored one, or the
+ * bearer of the sign-in.
  *
  * Never throws: once the stream is open the only way to report a failure is an `error` event in
  * it, and a client left without one would wait for a `done` that never comes.
  */
-internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, username: String, password: String) {
+internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, auth: ImapClient.Auth) {
     // Owned rather than the one `ImapClient` makes for itself: the scan opens a connection per
     // folder, and cancelling this is what closes down anything still running when the client hangs
     // up. The handler keeps an expected connection failure out of the thread's default one.
@@ -108,8 +109,7 @@ internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, userna
                 ImapClient(
                     host = host,
                     port = port,
-                    username = username,
-                    password = password,
+                    auth = auth,
                     coroutineScope = connections,
                     debug = false,
                 ).use { client -> scanFolders(writer, client) }
@@ -127,19 +127,6 @@ internal suspend fun scanMailbox(writer: Writer, host: String, port: Int, userna
     } finally {
         connections.cancel()
     }
-}
-
-/**
- * [scanMailbox] for a mailbox signed in to at a provider, which imap logs in to with the bearer
- * through `AUTHENTICATE XOAUTH2` rather than with a password.
- *
- * Kamel only speaks `LOGIN` so far, so for now this says the login is not possible yet. Once it
- * can take a bearer, this opens the `ImapClient` with one and goes through [scanFolders] like the
- * password scan does.
- */
-@Suppress("UNUSED_PARAMETER")
-internal suspend fun scanMailboxWithBearer(writer: Writer, host: String, port: Int, username: String, accessToken: String) {
-    runCatching { writeEvent(writer, FolderStreamEvent.Failed("oauth_login_unsupported")) }
 }
 
 /** Lists the folders, then counts them one after another. */

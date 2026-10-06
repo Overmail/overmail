@@ -94,8 +94,7 @@ internal suspend fun probeImapLogin(
             ImapClient(
                 host = host,
                 port = port,
-                username = username,
-                password = password,
+                auth = ImapClient.Auth.BasicAuth(username, password),
                 coroutineScope = connections,
                 debug = false,
             ).use { client ->

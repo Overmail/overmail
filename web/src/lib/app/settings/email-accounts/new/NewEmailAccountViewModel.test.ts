@@ -721,3 +721,45 @@ test("a mailbox the edit would collide with is reported, not thrown", async () =
     expect(await viewModel.submitInbox()).toBe(false);
     expect(viewModel.submitState).toEqual({type: "conflict"});
 });
+
+test("a sign-in at a provider continues at the folders, scanned through the onboarding", async () => {
+    const streamFolders = mock(async function* (..._args: unknown[]): AsyncGenerator<FolderStreamEvent> {
+        yield TREE;
+        yield {type: "done"};
+    });
+    const testImapHost = mock(async () => REACHABLE);
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "microsoft",
+            host: "outlook.office365.com",
+            port: 993,
+            username: "julius@outlook.example",
+        })),
+        testImapHost,
+        streamFolders,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(viewModel.step).toBe("folders");
+    expect(viewModel.username).toBe("julius@outlook.example");
+    expect(viewModel.folders.map((folder) => folder.fullName)).toContain("Archiv");
+    // The scan names the onboarding, which is what the server logs in with.
+    expect(streamFolders.mock.calls[0][6]).toBe("onb-1");
+    // The provider's sign-in stands in for both checks, so neither ran.
+    expect(testImapHost).not.toHaveBeenCalled();
+});
+
+test("a sign-in that ran out leaves the form at the start, saying so", async () => {
+    const repository = {oauthOnboarding: mock(async () => null)} as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("gone");
+
+    expect(viewModel.step).toBe("server");
+    expect(viewModel.oauthOnboarding).toBeNull();
+    expect(viewModel.oauthOnboardingExpired).toBe(true);
+});

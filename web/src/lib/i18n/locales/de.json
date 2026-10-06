@@ -391,7 +391,8 @@
           "port": "Port",
           "oauth": {
             "or": "Oder weiter mit",
-            "continueWith": "Weiter mit {provider}"
+            "continueWith": "Weiter mit {provider}",
+            "expired": "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an."
           },
           "test": {
             "testing": "Verbinde…",

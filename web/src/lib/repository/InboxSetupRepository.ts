@@ -47,6 +47,23 @@ export function oauthStartUrl(provider: OAuthProviderId): string {
     return `${OAUTH_ENDPOINT}/${encodeURIComponent(provider)}`;
 }
 
+/**
+ * A sign-in at a provider that came back, as "new inbox" continues it: the mailbox, without the
+ * tokens -- those stay on the server, and everything after this names the onboarding instead.
+ */
+export type OAuthOnboarding = {
+    id: string;
+    provider: OAuthProviderId;
+    host: string;
+    port: number;
+    /** The address that was signed in to. */
+    username: string;
+};
+
+function oauthOnboardingEndpoint(id: string): string {
+    return `${OAUTH_ENDPOINT}/onboardings/${encodeURIComponent(id)}`;
+}
+
 /** The connection an inbox is created for. */
 export type InboxConnection = {
     host: string;
@@ -194,6 +211,22 @@ export class InboxSetupRepository {
         return (body.providers as {id: string}[]).map((provider) => provider.id);
     }
 
+    /** The sign-in [id] names, or null once it ran out -- it is only kept for a while. */
+    async oauthOnboarding(id: string, signal?: AbortSignal): Promise<OAuthOnboarding | null> {
+        const response = await fetch(oauthOnboardingEndpoint(id), {credentials: "include", signal});
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error(`Could not read the oauth onboarding: ${response.status}`);
+
+        const body = await response.json();
+        return {
+            id,
+            provider: body.provider as OAuthProviderId,
+            host: body.host as string,
+            port: body.port as number,
+            username: body.username as string,
+        };
+    }
+
     /**
      * Whether these credentials open that mailbox. Answers for every outcome; only a request
      * that did not happen at all throws.
@@ -274,14 +307,21 @@ export class InboxSetupRepository {
         signal?: AbortSignal,
         /** An existing mailbox, when the form is editing one: see [inboxEndpoint]. */
         inboxId?: string,
+        /**
+         * A sign-in at a provider, when the form continues one. The server logs in with its bearer
+         * and has everything else as well, so nothing is sent -- the other arguments are ignored.
+         */
+        oauthOnboardingId?: string,
     ): AsyncGenerator<FolderStreamEvent> {
-        const response = await fetch(inboxEndpoint(inboxId, "folders/stream", FOLDER_STREAM_ENDPOINT), {
-            method: "POST",
-            credentials: "include",
-            headers: {"content-type": "application/json"},
-            body: JSON.stringify({host, port, username, password}),
-            signal,
-        });
+        const response = oauthOnboardingId
+            ? await fetch(`${oauthOnboardingEndpoint(oauthOnboardingId)}/folders/stream`, {credentials: "include", signal})
+            : await fetch(inboxEndpoint(inboxId, "folders/stream", FOLDER_STREAM_ENDPOINT), {
+                method: "POST",
+                credentials: "include",
+                headers: {"content-type": "application/json"},
+                body: JSON.stringify({host, port, username, password}),
+                signal,
+            });
         if (!response.ok || !response.body) {
             throw new Error(`Could not read the folders: ${response.status}`);
         }

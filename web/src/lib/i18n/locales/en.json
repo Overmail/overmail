@@ -391,7 +391,8 @@
           "port": "Port",
           "oauth": {
             "or": "Or continue with",
-            "continueWith": "Continue with {provider}"
+            "continueWith": "Continue with {provider}",
+            "expired": "The sign-in ran out. Please sign in again."
           },
           "test": {
             "testing": "Connecting…",

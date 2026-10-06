@@ -20,10 +20,32 @@
     import type {Inbox} from "$lib/repository/InboxRepository";
     import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
+    import {page} from "$app/state";
+    import {goto} from "$app/navigation";
+
+    /** What the oauth callback on the server puts into the url, see `oauthCallback.kt`. */
+    const CONTINUE_ONBOARDING_PARAMETER = "continue_onboarding_oauth_imap_account";
 
     const {inboxes: inboxRepository} = useRepositories();
 
     let showNewEmailAccountDialog = $state(false);
+
+    /**
+     * The sign-in at a provider "new inbox" continues with. The oauth callback on the server sends
+     * the browser back here with its id in the url, and the dialog opens on it at the folders.
+     */
+    let oauthOnboardingId: string | null = $state(null);
+    $effect(() => {
+        const id = page.url.searchParams.get(CONTINUE_ONBOARDING_PARAMETER);
+        if (!id) return;
+        oauthOnboardingId = id;
+        showNewEmailAccountDialog = true;
+
+        // Out of the url again, so a reload or the back button does not reopen a used-up sign-in.
+        const url = new URL(page.url);
+        url.searchParams.delete(CONTINUE_ONBOARDING_PARAMETER);
+        goto(url, {replaceState: true, noScroll: true});
+    });
     /** The mailbox the delete dialog is asking about; null while it is closed. */
     let inboxToDelete: Inbox | null = $state(null);
     /** The mailbox the edit dialog is open on; null while it is closed. */
@@ -331,6 +353,6 @@
 </div>
 
 <!-- Neither dialog knows about this list, so each says what it did and this re-reads. -->
-<NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} />
+<NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} {oauthOnboardingId} />
 <DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} onPaused={load} />
 <EditEmailAccountDialog bind:inbox={inboxToEdit} onSaved={load} />

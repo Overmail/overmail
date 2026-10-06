@@ -148,6 +148,13 @@
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
 
     {#if oauthProviders.length > 0}
+        {#if viewModel.oauthOnboardingExpired}
+            <SetupStatusLine
+                    icon={WarningCircleIcon}
+                    message={$_("settings.emailAccounts.new.server.oauth.expired")}
+                    tone="text-destructive"
+            />
+        {/if}
         <span class="self-center text-xs text-muted-foreground font-semibold">{$_("settings.emailAccounts.new.server.oauth.or")}</span>
         <hr />
         <div class="flex flex-row gap-2 items-center">

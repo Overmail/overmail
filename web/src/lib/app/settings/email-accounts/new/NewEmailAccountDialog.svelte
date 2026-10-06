@@ -9,14 +9,18 @@
     import AnimatedHeight from "./AnimatedHeight.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import {_} from "svelte-i18n";
+    import {untrack} from "svelte";
 
     let {
         open = $bindable(false),
         onCreated,
+        oauthOnboardingId = null,
     }: {
         open: boolean,
         /** Called once an inbox exists, so whoever lists them can re-read. */
         onCreated?: () => void,
+        /** A sign-in at a provider to continue at the folders, as the oauth callback named it. */
+        oauthOnboardingId?: string | null,
     } = $props();
 
     const {inboxSetup} = useRepositories();
@@ -30,6 +34,13 @@
     // from would still run -- and still connect to somebody's server.
     $effect(() => {
         if (!open) viewModel.dispose();
+    });
+
+    // Untracked: continuing resets the form, and everything that reads would otherwise become a
+    // reason to continue -- and reset -- all over again.
+    $effect(() => {
+        const id = oauthOnboardingId;
+        if (id) untrack(() => void viewModel.continueOAuthOnboarding(id));
     });
 
     const step = $derived(viewModel.step);

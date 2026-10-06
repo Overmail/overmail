@@ -23,10 +23,10 @@ import kotlin.uuid.Uuid
 
 /**
  * Mounted below the `/api` prefix Caddy forwards. The callback of each provider ends up at
- * `/api/oauth/authentikt/static/plugins/authentikt-builtin/oidc/<provider>/callback`, which is what
- * it has to be registered with there; authentikt logs it at startup.
+ * `/api/inbox-sign-in/authentikt/static/plugins/authentikt-builtin/oidc/<provider>/callback`, which
+ * is what it has to be registered with there; authentikt logs it at startup.
  */
-const val OAUTH_API_PREFIX = "/api/oauth"
+const val INBOX_SIGN_IN_API_PREFIX = "/api/inbox-sign-in"
 
 /** A mailbox somebody signed in to at a provider. */
 data class OAuthMailbox(
@@ -84,7 +84,7 @@ fun Application.installOAuthOnboardings() {
     val folders = FoldersStep()
 
     val instance = installAuthentikt {
-        apiPrefix = OAUTH_API_PREFIX
+        apiPrefix = INBOX_SIGN_IN_API_PREFIX
         baseUrl = providers.baseUrl
         // Where the provider's sign-in ends: the email account settings, which open "new inbox" on
         // the `_authentikt_session_id` authentikt adds.

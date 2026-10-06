@@ -57,7 +57,7 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 private const val PROVIDERS = "/api/users/me/inboxes/create/oauth"
-private const val CALLBACK = "/api/oauth/authentikt/static/plugins/authentikt-builtin/oidc/microsoft/callback"
+private const val CALLBACK = "/api/inbox-sign-in/authentikt/static/plugins/authentikt-builtin/oidc/microsoft/callback"
 private const val CLIENT_ID = "the-client"
 private const val CLIENT_SECRET = "the-secret"
 private const val GOOD_CODE = "the-code"

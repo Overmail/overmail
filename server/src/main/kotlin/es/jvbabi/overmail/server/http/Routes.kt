@@ -493,7 +493,7 @@ internal fun Application.configureRouting() {
 
                             // Connecting an inbox by signing in at its provider rather than with
                             // an imap password. The sign-in itself is an authentikt flow under
-                            // /api/oauth, see OAuthOnboardings.
+                            // /api/inbox-sign-in, see OAuthOnboardings.
                             route("/oauth") {
                                 getOAuthProviders()
 

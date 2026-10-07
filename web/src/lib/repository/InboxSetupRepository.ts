@@ -267,26 +267,23 @@ export class InboxSetupRepository {
         folders: SubmitInboxFolder[],
         signal?: AbortSignal,
     ): Promise<SubmitInboxResult> {
-        const response = await fetch(SUBMIT_ENDPOINT, {
-            method: "POST",
-            credentials: "include",
-            headers: {"content-type": "application/json"},
-            body: JSON.stringify({
-                imap,
-                folder_settings: folders.map((folder) => ({
-                    folder_name: folder.folderName,
-                    imap_push: folder.imapPush,
-                    ai_import: folder.aiImport,
-                })),
-            }),
+        return submit(SUBMIT_ENDPOINT, {imap, folder_settings: folders.map(toWireFolder)}, signal);
+    }
+
+    /**
+     * Creates the inbox a sign-in at a provider came back with. Only the folders are sent: the
+     * server has the connection, and the inbox logs in with the sign-in from here on.
+     */
+    async submitOAuthInbox(
+        onboardingId: string,
+        folders: SubmitInboxFolder[],
+        signal?: AbortSignal,
+    ): Promise<SubmitInboxResult> {
+        return submit(
+            `${oauthOnboardingEndpoint(onboardingId)}/submit`,
+            {folder_settings: folders.map(toWireFolder)},
             signal,
-        });
-
-        if (response.status === 409) return {type: "conflict"};
-        if (!response.ok) throw new Error(`Could not create the inbox: ${response.status}`);
-
-        const body = await response.json();
-        return {type: "created", id: body.id as string};
+        );
     }
 
     /**
@@ -350,6 +347,31 @@ export class InboxSetupRepository {
             await reader.cancel().catch(() => {});
         }
     }
+}
+
+/** Posts a new inbox to [endpoint]; see [InboxSetupRepository.submitInbox] for what it answers. */
+async function submit(endpoint: string, body: object, signal?: AbortSignal): Promise<SubmitInboxResult> {
+    const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(body),
+        signal,
+    });
+
+    if (response.status === 409) return {type: "conflict"};
+    if (!response.ok) throw new Error(`Could not create the inbox: ${response.status}`);
+
+    const created = await response.json();
+    return {type: "created", id: created.id as string};
+}
+
+function toWireFolder(folder: SubmitInboxFolder) {
+    return {
+        folder_name: folder.folderName,
+        imap_push: folder.imapPush,
+        ai_import: folder.aiImport,
+    };
 }
 
 /**

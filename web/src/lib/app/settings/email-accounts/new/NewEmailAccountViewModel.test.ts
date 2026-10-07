@@ -753,6 +753,35 @@ test("a sign-in at a provider continues at the folders, scanned through the onbo
     expect(testImapHost).not.toHaveBeenCalled();
 });
 
+test("a sign-in at a provider is submitted through its onboarding", async () => {
+    const submitInbox = mock(async () => ({type: "created", id: "inbox-1"}) as const);
+    const submitOAuthInbox = mock(async () => ({type: "created", id: "inbox-1"}) as const);
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "google",
+            host: "imap.gmail.com",
+            port: 993,
+            username: "julius@gmail.example",
+        })),
+        streamFolders: mock(async function* (): AsyncGenerator<FolderStreamEvent> {
+            yield TREE;
+            yield {type: "done"};
+        }),
+        submitInbox,
+        submitOAuthInbox,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    // No password to send: the server logs the inbox in with the sign-in.
+    expect(submitInbox).not.toHaveBeenCalled();
+    expect(submitOAuthInbox.mock.calls[0][0]).toBe("onb-1");
+});
+
 test("a sign-in that ran out leaves the form at the start, saying so", async () => {
     const repository = {oauthOnboarding: mock(async () => null)} as unknown as InboxSetupRepository;
 

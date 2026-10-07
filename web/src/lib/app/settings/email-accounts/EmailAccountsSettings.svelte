@@ -22,28 +22,42 @@
     import {_} from "svelte-i18n";
     import {page} from "$app/state";
     import {goto} from "$app/navigation";
+    import {untrack} from "svelte";
 
-    /** What the oauth callback on the server puts into the url, see `oauthCallback.kt`. */
-    const CONTINUE_ONBOARDING_PARAMETER = "continue_onboarding_oauth_imap_account";
+    /**
+     * What authentikt puts into the url when a sign-in at a provider is done, see
+     * `OAuthOnboardings.kt`: the flow is active, and this is its id.
+     */
+    const FLOW_ACTIVE_PARAMETER = "_authentikt_flow_active";
+    const FLOW_SESSION_PARAMETER = "_authentikt_session_id";
 
     const {inboxes: inboxRepository} = useRepositories();
 
     let showNewEmailAccountDialog = $state(false);
 
     /**
-     * The sign-in at a provider "new inbox" continues with. The oauth callback on the server sends
-     * the browser back here with its id in the url, and the dialog opens on it at the folders.
+     * The sign-in at a provider "new inbox" continues with. The provider's sign-in sends the browser
+     * back here with the id of its flow in the url, and the dialog opens on it at the folders.
+     *
+     * The id stays in the url while the dialog is open, so a reload opens it on the same sign-in
+     * again -- the server keeps it until the inbox is created. Closing the dialog takes it out, so
+     * the back button does not reopen one that is used up.
      */
     let oauthOnboardingId: string | null = $state(null);
     $effect(() => {
-        const id = page.url.searchParams.get(CONTINUE_ONBOARDING_PARAMETER);
-        if (!id) return;
+        const id = page.url.searchParams.get(FLOW_SESSION_PARAMETER);
+        // Untracked: clearing it below must not read the id that is still in the url back in.
+        if (!id || id === untrack(() => oauthOnboardingId)) return;
         oauthOnboardingId = id;
         showNewEmailAccountDialog = true;
+    });
+    $effect(() => {
+        if (showNewEmailAccountDialog || !oauthOnboardingId) return;
+        oauthOnboardingId = null;
 
-        // Out of the url again, so a reload or the back button does not reopen a used-up sign-in.
         const url = new URL(page.url);
-        url.searchParams.delete(CONTINUE_ONBOARDING_PARAMETER);
+        url.searchParams.delete(FLOW_ACTIVE_PARAMETER);
+        url.searchParams.delete(FLOW_SESSION_PARAMETER);
         goto(url, {replaceState: true, noScroll: true});
     });
     /** The mailbox the delete dialog is asking about; null while it is closed. */

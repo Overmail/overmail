@@ -398,7 +398,9 @@ export class NewEmailAccountViewModel {
             const folders = this.keptFolders.map(toSubmitFolder);
             const result = this.editing
                 ? await this.editing.save(imap, folders)
-                : await this.inboxSetup.submitInbox(imap, folders, running.signal);
+                : this.oauthOnboarding
+                  ? await this.inboxSetup.submitOAuthInbox(this.oauthOnboarding.id, folders, running.signal)
+                  : await this.inboxSetup.submitInbox(imap, folders, running.signal);
             if (running.signal.aborted) return false;
 
             if (result.type === "conflict") {

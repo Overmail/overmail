@@ -9,6 +9,7 @@
     import {NewEmailAccountViewModel} from "$lib/app/settings/email-accounts/new/NewEmailAccountViewModel.svelte.ts";
     import {useRepositories} from "$lib/repository/repositories";
     import {OAUTH_PROVIDER_LOOKS} from "$lib/app/settings/email-accounts/new/oauthProviderLooks";
+    import {oauthStartUrl} from "$lib/repository/InboxSetupRepository";
     import type {Inbox} from "$lib/repository/InboxRepository";
     import {_} from "svelte-i18n";
 
@@ -141,6 +142,28 @@
                                 })}
                             </span>
                         </div>
+                        {#if viewModel.requiresReauthentication}
+                            <div class="text-destructive flex flex-row items-start gap-2 text-sm">
+                                <WarningCircleIcon class="mt-0.5 size-4 shrink-0" />
+                                <span>
+                                    {$_("settings.emailAccounts.edit.requiresReauthentication", {
+                                        values: {provider: looks?.name ?? viewModel.signedInWith},
+                                    })}
+                                </span>
+                            </div>
+                            <!-- A full page load: the server redirects to the provider. -->
+                            <Button
+                                    variant="outline"
+                                    class="w-fit"
+                                    href={oauthStartUrl(viewModel.signedInWith)}
+                                    data-sveltekit-reload
+                            >
+                                {#if looks}
+                                    <img src={looks.logo} class="size-4" alt="" />
+                                {/if}
+                                {$_("settings.emailAccounts.list.actions.reauthenticate")}
+                            </Button>
+                        {/if}
                     </section>
                 {:else}
                     <section class="flex flex-col gap-2">
@@ -157,10 +180,13 @@
                     </section>
                 {/if}
 
-                <section class="flex flex-col gap-2">
-                    <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.folders")}</h3>
-                    <FolderStep viewModel={viewModel} />
-                </section>
+                <!-- No folders to show while the provider refuses the sign-in: nothing could read them. -->
+                {#if !viewModel.requiresReauthentication}
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.folders")}</h3>
+                        <FolderStep viewModel={viewModel} />
+                    </section>
+                {/if}
             </div>
         {/if}
 

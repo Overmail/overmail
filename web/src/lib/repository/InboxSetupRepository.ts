@@ -58,6 +58,11 @@ export type OAuthOnboarding = {
     port: number;
     /** The address that was signed in to. */
     username: string;
+    /**
+     * The inbox the sign-in signed in to again, where it was one whose sign-in the provider had
+     * refused. It has its tokens back then, and there is nothing left to set up.
+     */
+    reauthenticatedInboxId: string | null;
 };
 
 function oauthOnboardingEndpoint(id: string): string {
@@ -224,6 +229,7 @@ export class InboxSetupRepository {
             host: body.host as string,
             port: body.port as number,
             username: body.username as string,
+            reauthenticatedInboxId: (body.reauthenticated_inbox_id ?? null) as string | null,
         };
     }
 

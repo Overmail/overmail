@@ -638,6 +638,7 @@ const STORED = {
     username: "julius",
     isPaused: false,
     oauthProvider: null,
+    requiresReauthentication: false,
     folders: [
         {folderName: "Archiv.Newsletter", imapPush: true, aiImport: {type: "all_messages"}},
         {folderName: "Trash", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
@@ -728,6 +729,51 @@ test("a mailbox signed in to at a provider opens on its folders without checking
 
     expect(await viewModel.submitInbox()).toBe(true);
     expect(save.mock.calls[0][0]).toEqual({host: "imap.gmail.com", port: 993, username: "julius@gmail.example", password: ""});
+});
+
+test("a mailbox whose sign-in the provider refused offers no folders to edit", async () => {
+    const {viewModel, login, streamFolders} = editing();
+    viewModel.prefill({...STORED, oauthProvider: "google", requiresReauthentication: true} as never);
+    await tick(1100);
+
+    expect(viewModel.requiresReauthentication).toBe(true);
+    // Nothing could read them until the user signs in again.
+    expect(viewModel.canEnter("folders")).toBe(false);
+    viewModel.goTo("folders");
+    await tick(60);
+    expect(login).toHaveBeenCalledTimes(0);
+    expect(streamFolders).toHaveBeenCalledTimes(0);
+});
+
+test("a sign-in that renewed an existing inbox has nothing left to set up", async () => {
+    const streamFolders = mock(async function* (..._args: unknown[]): AsyncGenerator<FolderStreamEvent> {
+        yield {type: "done"};
+    });
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "google",
+            host: "imap.gmail.com",
+            port: 993,
+            username: "julius@gmail.example",
+            reauthenticatedInboxId: "inbox-1",
+        })),
+        streamFolders,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(viewModel.reauthenticated).toBe(true);
+    expect(viewModel.signedInWith).toBe("google");
+    expect(viewModel.oauthOnboarding).toBeNull();
+    expect(viewModel.step).toBe("server");
+    expect(streamFolders).toHaveBeenCalledTimes(0);
+
+    // The next opening is a new inbox again.
+    viewModel.reset();
+    expect(viewModel.reauthenticated).toBe(false);
 });
 
 test("a mailbox the edit would collide with is reported, not thrown", async () => {

@@ -19,6 +19,13 @@ export type Inbox = {
     folders: string[];
     /** How many mails were imported through it -- what disconnecting it would take with it. */
     emailCount: number;
+    /** The provider it was signed in to at, or null for one that logs in with a password. */
+    oauthProvider: OAuthProviderId | null;
+    /**
+     * Whether the provider refused its sign-in. Nothing is imported until the user signs in there
+     * again, which puts the new sign-in on this inbox.
+     */
+    requiresReauthentication: boolean;
 };
 
 const ENDPOINT = "/api/users/me/inboxes";
@@ -42,6 +49,8 @@ export type InboxDetail = {
      * inbox stays on the connection the sign-in named; only its folders can be changed.
      */
     oauthProvider: OAuthProviderId | null;
+    /** See [Inbox.requiresReauthentication]. */
+    requiresReauthentication: boolean;
     folders: InboxFolderSetting[];
 };
 
@@ -66,6 +75,8 @@ export class InboxRepository {
             isPaused: (inbox.is_paused ?? false) as boolean,
             folders: (inbox.folders ?? []) as string[],
             emailCount: (inbox.email_count ?? 0) as number,
+            oauthProvider: (inbox.oauth_provider ?? null) as OAuthProviderId | null,
+            requiresReauthentication: (inbox.requires_reauthentication ?? false) as boolean,
         }));
     }
 
@@ -86,6 +97,7 @@ export class InboxRepository {
             username: body.username as string,
             isPaused: (body.is_paused ?? false) as boolean,
             oauthProvider: (body.oauth_provider ?? null) as OAuthProviderId | null,
+            requiresReauthentication: (body.requires_reauthentication ?? false) as boolean,
             folders: ((body.folders ?? []) as any[]).map((folder) => ({
                 folderName: folder.folder_name as string,
                 imapPush: (folder.imap_push ?? false) as boolean,

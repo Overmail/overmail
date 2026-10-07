@@ -18,6 +18,7 @@
     import EditEmailAccountDialog from "$lib/app/settings/email-accounts/EditEmailAccountDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
+    import {oauthStartUrl} from "$lib/repository/InboxSetupRepository";
     import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
     import {page} from "$app/state";
@@ -225,6 +226,27 @@
                                             {/if}
                                             <span>{inbox.host}:{inbox.port}</span>
                                         </div>
+                                        <!--
+                                          Not behind the hover like the other actions: nothing is
+                                          imported until it is done, so it has to be seen.
+                                        -->
+                                        {#if inbox.requiresReauthentication && inbox.oauthProvider}
+                                            <div class="mt-1 flex flex-row items-center gap-2 whitespace-nowrap">
+                                                <span class="text-destructive flex flex-row items-center gap-1 text-xs font-normal">
+                                                    <WarningCircleIcon class="size-3" />
+                                                    {$_("settings.emailAccounts.list.requiresReauthentication")}
+                                                </span>
+                                                <!-- A full page load: the server redirects to the provider. -->
+                                                <Button
+                                                        variant="outline"
+                                                        size="xs"
+                                                        href={oauthStartUrl(inbox.oauthProvider)}
+                                                        data-sveltekit-reload
+                                                >
+                                                    {$_("settings.emailAccounts.list.actions.reauthenticate")}
+                                                </Button>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </Table.Cell>
                                 <Table.Cell>

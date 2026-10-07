@@ -360,7 +360,8 @@
           "delete": "Delete connection",
           "pause": "Pause import",
           "resume": "Resume import",
-          "paused": "Paused"
+          "paused": "Paused",
+          "reauthenticate": "Sign in again"
         },
         "delete": {
           "title": "Delete connection?",
@@ -373,7 +374,8 @@
           "failed": "The connection could not be deleted.",
           "pauseInstead": "Pause instead",
           "pauseHint": "Pausing stops the import and deletes nothing. You can resume it any time."
-        }
+        },
+        "requiresReauthentication": "Sign-in expired"
       },
       "new": {
         "title": "New inbox",
@@ -455,6 +457,11 @@
             "conflict": "This mailbox is already set up.",
             "failed": "The inbox could not be created."
           }
+        },
+        "close": "Close",
+        "reauthenticated": {
+          "description": "You signed in to a mailbox that is already connected.",
+          "message": "Signed in at {provider} again. {address} is being imported again."
         }
       },
       "edit": {
@@ -470,7 +477,8 @@
         "saving": "Saving…",
         "loadFailed": "This mailbox could not be read.",
         "conflict": "You already have a connection to that mailbox.",
-        "failed": "The changes could not be saved."
+        "failed": "The changes could not be saved.",
+        "requiresReauthentication": "{provider} no longer accepts this sign-in, so nothing is imported. Sign in there again to continue."
       }
     },
     "knowledge": {

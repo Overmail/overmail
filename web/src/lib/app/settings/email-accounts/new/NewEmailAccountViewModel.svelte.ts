@@ -167,6 +167,18 @@ export class NewEmailAccountViewModel {
      */
     signedInWith: OAuthProviderId | null = $state(null);
 
+    /**
+     * Whether the provider refused the sign-in of the mailbox being edited. Signing in there again
+     * is the only thing that helps, so the form says that instead of offering its folders.
+     */
+    requiresReauthentication = $state(false);
+
+    /**
+     * Whether the sign-in this form continued was the one an existing inbox was waiting for. The
+     * inbox has its tokens back then, and there is nothing to set up.
+     */
+    reauthenticated = $state(false);
+
     #hostDebounce: ReturnType<typeof setTimeout> | null = null;
     #hostRunning: AbortController | null = null;
     #loginDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -210,7 +222,10 @@ export class NewEmailAccountViewModel {
         this.password = "";
         this.step = "server";
         this.signedInWith = detail.oauthProvider;
+        this.requiresReauthentication = detail.requiresReauthentication;
         if (detail.oauthProvider) {
+            // Refused by the provider: there is no folder to read until the user signs in again.
+            if (detail.requiresReauthentication) return;
             this.imapServerTest = {type: "reachable", capabilities: []};
             this.imapLoginTest = {type: "authenticated"};
             return;
@@ -260,10 +275,16 @@ export class NewEmailAccountViewModel {
             return;
         }
 
-        this.oauthOnboarding = onboarding;
         this.host = onboarding.host;
         this.port = onboarding.port;
         this.username = onboarding.username;
+        if (onboarding.reauthenticatedInboxId) {
+            this.signedInWith = onboarding.provider;
+            this.reauthenticated = true;
+            return;
+        }
+
+        this.oauthOnboarding = onboarding;
         this.imapServerTest = {type: "reachable", capabilities: []};
         this.imapLoginTest = {type: "authenticated"};
         this.goTo("folders");
@@ -451,6 +472,8 @@ export class NewEmailAccountViewModel {
         this.oauthOnboarding = null;
         this.oauthOnboardingExpired = false;
         this.signedInWith = null;
+        this.requiresReauthentication = false;
+        this.reauthenticated = false;
     }
 
     /** Called when the dialog closes, so no check and no scan outlives it. */

@@ -360,7 +360,8 @@
           "delete": "Verbindung löschen",
           "pause": "Import pausieren",
           "resume": "Import fortsetzen",
-          "paused": "Pausiert"
+          "paused": "Pausiert",
+          "reauthenticate": "Erneut anmelden"
         },
         "delete": {
           "title": "Verbindung löschen?",
@@ -373,7 +374,8 @@
           "failed": "Die Verbindung konnte nicht gelöscht werden.",
           "pauseInstead": "Stattdessen pausieren",
           "pauseHint": "Pausieren stoppt den Import und löscht nichts. Du kannst jederzeit fortsetzen."
-        }
+        },
+        "requiresReauthentication": "Anmeldung abgelaufen"
       },
       "new": {
         "title": "Neues Postfach",
@@ -455,6 +457,11 @@
             "conflict": "Dieses Postfach ist bereits eingerichtet.",
             "failed": "Das Postfach konnte nicht angelegt werden."
           }
+        },
+        "close": "Schließen",
+        "reauthenticated": {
+          "description": "Du hast dich bei einem Postfach angemeldet, das schon verbunden ist.",
+          "message": "Wieder bei {provider} angemeldet. {address} wird wieder importiert."
         }
       },
       "edit": {
@@ -470,7 +477,8 @@
         "saving": "Wird gespeichert…",
         "loadFailed": "Dieses Postfach konnte nicht gelesen werden.",
         "conflict": "Zu diesem Postfach hast du bereits eine Verbindung.",
-        "failed": "Die Änderungen konnten nicht gespeichert werden."
+        "failed": "Die Änderungen konnten nicht gespeichert werden.",
+        "requiresReauthentication": "{provider} akzeptiert diese Anmeldung nicht mehr, deshalb wird nichts importiert. Melde dich dort erneut an, um fortzufahren."
       }
     },
     "knowledge": {

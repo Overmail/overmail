@@ -11,6 +11,10 @@ object ImapAccounts : UuidTable("imap_accounts") {
     val host = varchar("host", 255)
     val port = integer("port")
     val username = varchar("username", 255)
+    /**
+     * Empty for an inbox signed in to at a provider: that one logs in with the bearer of its
+     * `OAuthGrants` row instead.
+     */
     val password = varchar("password", 255)
 
     /**

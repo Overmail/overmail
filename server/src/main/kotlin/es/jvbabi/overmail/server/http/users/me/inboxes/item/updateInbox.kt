@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
@@ -114,8 +115,7 @@ fun Route.updateInbox() {
             val nthNewestDates = lookUpNthNewestDates(
                 host = credentials.host,
                 port = credentials.port,
-                username = credentials.username,
-                password = credentials.password,
+                auth = ImapClient.Auth.BasicAuth(credentials.username, credentials.password),
                 folders = request.folderSettings
                     .mapNotNull { settings ->
                         val count = settings.aiImport.count

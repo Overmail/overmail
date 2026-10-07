@@ -9,6 +9,7 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -79,6 +80,12 @@ data class ImapConnection(
     val port: Int,
     val username: String,
     val password: String,
+    /**
+     * The grant this account logs in with instead of [password], where it was signed in to at a
+     * provider. Its token changes every hour and is fetched for every connection, so it is not
+     * part of the [signature].
+     */
+    val oauthGrantId: Uuid? = null,
     /** The folders this account syncs, and how. Empty means nothing is imported for it. */
     val folders: List<FolderSync>,
     /** Whether the account is paused; a paused one has no importer at all. */
@@ -86,7 +93,7 @@ data class ImapConnection(
 ) {
     /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
     val signature: String
-        get() = "$host:$port:$username:$password:" +
+        get() = "$host:$port:$username:$password:$oauthGrantId:" +
             folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImport}/${it.createdAt}" }
 
     /** One folder's settings, as `ImapAccountFolderSyncs` holds them. */
@@ -120,6 +127,7 @@ class EmailImporter(
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
+    private val oauthTokens: OAuthTokens,
 ) {
 
     private val logger = LoggerFactory.getLogger(EmailImporter::class.java)
@@ -181,12 +189,7 @@ class EmailImporter(
                 // library cannot end an IDLE that is still being read, so the next IDLE waited on
                 // it forever. The timeout also covers a connect that never gets an answer.
                 val folderExists = withTimeoutOrNull(IDLE_RENEW_INTERVAL) {
-                    ImapClient(
-                        host = account.host,
-                        port = account.port,
-                        auth = ImapClient.Auth.BasicAuth(account.username, account.password),
-                        debug = false,
-                    ).use { client ->
+                    connect().use { client ->
                         val folders = client.getFolders()
                         // An account has at least an INBOX, so an empty listing is not an account
                         // without folders: it is a socket that answered nothing. Worth a retry,
@@ -266,12 +269,24 @@ class EmailImporter(
     }
 
     /** A client for this account. Connecting and logging in happens on the first command. */
-    private fun connect() = ImapClient(
+    private suspend fun connect() = ImapClient(
         host = account.host,
         port = account.port,
-        auth = ImapClient.Auth.BasicAuth(account.username, account.password),
+        auth = auth(),
         debug = false,
     )
+
+    /**
+     * What this account logs in with right now. For a grant that is its current access token,
+     * fetched anew for every connection: one connection outlives no token, but an importer
+     * outlives many.
+     */
+    private suspend fun auth(): ImapClient.Auth {
+        val grantId = account.oauthGrantId ?: return ImapClient.Auth.BasicAuth(account.username, account.password)
+        val bearer = oauthTokens.accessToken(grantId)
+            ?: throw ConnectionLostException("the oauth grant of ${account.username} is gone")
+        return ImapClient.Auth.BearerAuth(account.username, bearer)
+    }
 
     /**
      * Selects [sync] and imports every mail in it.

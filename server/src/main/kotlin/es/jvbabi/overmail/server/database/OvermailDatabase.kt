@@ -40,6 +40,7 @@ class OvermailDatabase(private val database: Database) {
             exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_active BOOLEAN DEFAULT TRUE NOT NULL")
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
             SchemaUtils.create(ImapAccounts)
+            SchemaUtils.create(OAuthGrants)
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails, Attachments)

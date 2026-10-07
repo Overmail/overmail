@@ -49,6 +49,7 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthProv
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.startOAuth
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.streamOAuthOnboardingFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
 import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
@@ -509,6 +510,10 @@ internal fun Application.configureRouting() {
 
                                     route("/folders/stream") {
                                         streamOAuthOnboardingFolders()
+                                    }
+
+                                    route("/submit") {
+                                        oauthInboxSubmitRoute()
                                     }
                                 }
 

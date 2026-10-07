@@ -1,5 +1,7 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.submit
 
+import es.jvbabi.overmail.server.oauth.OAuthProviders
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
@@ -314,6 +316,7 @@ class SubmitInboxTest {
                             database = database,
                         ),
                         mailNotifier = MailNotifier(),
+                        oauthTokens = OAuthTokens(database, OAuthProviders(emptyMap(), "https://overmail.example")),
                     )
                 }
             }

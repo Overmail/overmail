@@ -26,13 +26,13 @@ fun Route.getOAuthOnboarding() {
          *   - 200 [OAuthOnboardingResponse] The mailbox
          */
         get {
-            val mailbox = call.requireOwnedOAuthOnboardingFromUrl()
+            val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
             call.respond(
                 OAuthOnboardingResponse(
-                    provider = mailbox.provider.id,
-                    host = mailbox.provider.imapHost,
-                    port = mailbox.provider.imapPort,
-                    username = mailbox.address,
+                    provider = onboarding.provider.id,
+                    host = onboarding.provider.imapHost,
+                    port = onboarding.provider.imapPort,
+                    username = onboarding.address,
                 )
             )
         }

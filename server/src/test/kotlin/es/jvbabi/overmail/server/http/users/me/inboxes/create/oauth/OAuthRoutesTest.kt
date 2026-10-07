@@ -1,21 +1,42 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth
 
+import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.llm.LLMProvider
+import ai.koog.prompt.llm.LLModel
 import es.jvbabi.authentikt.core.session.sessions
+import es.jvbabi.overmail.server.ai.classification.EmailClassification
+import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
+import es.jvbabi.overmail.server.config.ApplicationConfig
+import es.jvbabi.overmail.server.config.EmailConfig
+import es.jvbabi.overmail.server.config.SmtpConfig
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
+import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.config.OAuthClientConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.ImapAccount
+import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.OAuthGrant
+import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.oauth.OAuthEndpoints
 import es.jvbabi.overmail.server.oauth.OAuthProviders
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import es.jvbabi.overmail.server.oauth.installOAuthOnboardings
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -36,11 +57,15 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import java.util.Base64
 import javax.crypto.Mac
@@ -87,6 +112,27 @@ class OAuthRoutesTest {
      */
     private lateinit var provider: EmbeddedServer<*, *>
     private lateinit var providers: OAuthProviders
+    private val tokens by lazy { OAuthTokens(database, providers) }
+
+    private val testModel = LLModel(
+        provider = LLMProvider.OpenAI,
+        id = "test-model",
+        capabilities = listOf(LLMCapability.Completion),
+    )
+
+    /** Nothing in here is reached: the importer this feeds runs on a scope that is already over. */
+    private val testConfig = ApplicationConfig(
+        baseUrl = "http://localhost",
+        database = DatabaseConfig(host = "localhost", database = "none", user = "none", password = "none"),
+        email = EmailConfig(
+            smtp = SmtpConfig(
+                host = "localhost",
+                port = 25,
+                auth = SmtpConfig.Auth(username = "none", password = "none"),
+            )
+        ),
+        ai = ApplicationConfig.AiConfig(apiKey = "none", model = "test-model", baseUrl = "http://localhost:1"),
+    )
 
     @BeforeTest
     fun startProvider() {
@@ -321,6 +367,88 @@ class OAuthRoutesTest {
         assertTrue(tokenRequests.isEmpty())
     }
 
+    @Test
+    fun `a sign-in that came back is kept with its tokens`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val onboardingId = client.signInToMailbox()
+
+        val grant = database.query {
+            OAuthGrant.find { OAuthGrants.onboardingId eq onboardingId }.single().let {
+                listOf(it.user.id.value, it.provider, it.address, it.accessToken, it.refreshToken, it.imapAccount)
+            }
+        }
+        assertEquals(listOf(user.id.value, "microsoft", MAILBOX, ACCESS_TOKEN, "refresh", null), grant)
+    }
+
+    @Test
+    fun `a sign-in that came back outlives its flow`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val onboardingId = client.signInToMailbox()
+        // What a restart leaves of authentikt's flows, which live in memory only.
+        sessions.clear()
+
+        signedIn = user
+        assertEquals(HttpStatusCode.OK, client.get("$PROVIDERS/onboardings/$onboardingId").status)
+    }
+
+    @Test
+    fun `submitting a sign-in creates an inbox that logs in with its grant`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val onboardingId = client.signInToMailbox()
+        signedIn = user
+
+        val response = client.submit(onboardingId)
+        assertEquals(HttpStatusCode.Created, response.status)
+        val inboxId = Uuid.parse(Json.parseToJsonElement(response.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content)
+
+        val (account, grant) = database.query {
+            val account = ImapAccount[inboxId].let { listOf(it.user.id.value, it.host, it.port, it.username, it.password) }
+            val grant = OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single().let { it.onboardingId to it.accessToken }
+            account to grant
+        }
+        assertEquals(listOf(user.id.value, "outlook.office365.com", 993, MAILBOX, ""), account)
+        assertEquals(null to ACCESS_TOKEN, grant)
+
+        // Used up: neither the dialog nor a second submit finds it again.
+        assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/$onboardingId").status)
+        assertEquals(HttpStatusCode.NotFound, client.submit(onboardingId).status)
+    }
+
+    @Test
+    fun `a sign-in is only submitted by the user who signed in`() = testApplication {
+        val owner = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val onboardingId = client.signInToMailbox()
+
+        setUpUser()
+        assertEquals(HttpStatusCode.NotFound, client.submit(onboardingId).status)
+        assertEquals(0L, database.query { ImapAccount.find { ImapAccounts.user eq owner.id }.count() })
+    }
+
+    @Test
+    fun `a sign-in submitted without folders is refused`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val onboardingId = client.signInToMailbox()
+        signedIn = user
+
+        assertEquals(HttpStatusCode.BadRequest, client.submit(onboardingId, folders = "").status)
+        assertEquals(HttpStatusCode.OK, client.get("$PROVIDERS/onboardings/$onboardingId").status)
+    }
+
     /** An id token as the provider signs it, for the mailbox and the last sign-in's nonce. */
     private fun idToken(): String {
         val encoder = Base64.getUrlEncoder().withoutPadding()
@@ -338,6 +466,24 @@ class OAuthRoutesTest {
         val target = Url(get("$PROVIDERS/microsoft").headers[HttpHeaders.Location]!!)
         nonce = target.parameters["nonce"]
         return target.parameters["state"]!!
+    }
+
+    /** Signs in at the provider and answers the onboarding the browser is sent back with. */
+    private suspend fun HttpClient.signInToMailbox(): String {
+        val user = signedIn
+        val state = startSignIn()
+        signedIn = null
+        val target = Url(callback(state).headers[HttpHeaders.Location]!!)
+        signedIn = user
+        return target.parameters["_authentikt_session_id"]!!
+    }
+
+    private suspend fun HttpClient.submit(
+        onboardingId: String,
+        folders: String = """{"folder_name":"INBOX","imap_push":true,"ai_import":{"type":"only_new_messages"}}""",
+    ): HttpResponse = post("$PROVIDERS/onboardings/$onboardingId/submit") {
+        contentType(ContentType.Application.Json)
+        setBody("""{"folder_settings":[$folders]}""")
     }
 
     private suspend fun HttpClient.callback(state: String, code: String = GOOD_CODE): HttpResponse =
@@ -363,6 +509,27 @@ class OAuthRoutesTest {
             dependencies {
                 provide<OvermailDatabase> { database }
                 provide<OAuthProviders> { providers }
+                provide<OAuthTokens> { tokens }
+                // A manager on a scope that is already over: the submit reboots the importer after
+                // answering, and a test has no mailbox for it to connect to.
+                provide<ImporterManager> {
+                    ImporterManager(
+                        database = database,
+                        coroutineScope = CoroutineScope(Job()).also { it.cancel() },
+                        emailClassificationQueue = EmailClassificationQueue(
+                            emailClassification = EmailClassification(
+                                config = testConfig,
+                                model = testModel,
+                                overmailDatabase = database,
+                                mailNotifier = MailNotifier(),
+                                knowledgeStore = KnowledgeStore(database),
+                            ),
+                            database = database,
+                        ),
+                        mailNotifier = MailNotifier(),
+                        oauthTokens = tokens,
+                    )
+                }
             }
             installOAuthOnboardings()
             routing {
@@ -371,6 +538,7 @@ class OAuthRoutesTest {
                     route("/{provider}") { startOAuth() }
                     route("/onboardings/{onboardingId}") {
                         getOAuthOnboarding()
+                        route("/submit") { oauthInboxSubmitRoute() }
                     }
                 }
             }

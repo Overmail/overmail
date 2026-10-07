@@ -22,6 +22,8 @@
     // Usually there already: the dialog asks as soon as it is mounted. Read synchronously then, so
     // the buttons are part of the first frame instead of growing the dialog a moment later.
     let oauthProviders: OAuthProviderId[] = $state(known(inboxSetup.cachedOAuthProviders ?? []));
+    /** What the buttons are drawn for: nothing while editing, whatever is already known. */
+    const offeredProviders = $derived(viewModel.isEditing ? [] : oauthProviders);
     $effect(() => {
         if (viewModel.isEditing || inboxSetup.cachedOAuthProviders) return;
         let cancelled = false;
@@ -140,7 +142,7 @@
     -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
 
-    {#if oauthProviders.length > 0}
+    {#if offeredProviders.length > 0}
         {#if viewModel.oauthOnboardingExpired}
             <SetupStatusLine
                     icon={WarningCircleIcon}
@@ -151,7 +153,7 @@
         <span class="self-center text-xs text-muted-foreground font-semibold">{$_("settings.emailAccounts.new.server.oauth.or")}</span>
         <hr />
         <div class="flex flex-row gap-2 items-center">
-            {#each oauthProviders as provider (provider)}
+            {#each offeredProviders as provider (provider)}
                 <!-- A full page load: the server redirects to the provider, which SvelteKit's router cannot follow. -->
                 <Button
                         variant="outline"

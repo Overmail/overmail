@@ -31,9 +31,16 @@
     inboxSetup.oauthProviders().catch(() => {});
 
     // The dialog outlives one opening of it, so a check scheduled for a host the user walked away
-    // from would still run -- and still connect to somebody's server.
+    // from would still run -- and still connect to somebody's server. Every opening starts on an
+    // empty form, except one that continues a sign-in: that one resets itself, see below.
     $effect(() => {
-        if (!open) viewModel.dispose();
+        if (!open) {
+            viewModel.dispose();
+            return;
+        }
+        untrack(() => {
+            if (!oauthOnboardingId) viewModel.reset();
+        });
     });
 
     // Untracked: continuing resets the form, and everything that reads would otherwise become a

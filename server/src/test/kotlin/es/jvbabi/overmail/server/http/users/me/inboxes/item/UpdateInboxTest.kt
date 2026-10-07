@@ -1,5 +1,11 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
+import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.server.database.models.OAuthGrant
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonNull
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthTokens
 import ai.koog.prompt.llm.LLMCapability
@@ -64,6 +70,8 @@ class UpdateInboxTest {
     )
 
     private var signedIn: User? = null
+
+    private val tokens = OAuthTokens(database, OAuthProviders(emptyMap(), "https://overmail.example"))
 
     /** Nothing listens here, so the imap lookup for a count fails fast instead of reaching anyone. */
     private val deadPort = ServerSocket(0).use { it.localPort }
@@ -232,6 +240,94 @@ class UpdateInboxTest {
         assertEquals("imap.stranger.example", database.query { ImapAccount.findById(strangers)!!.host })
     }
 
+    @Test
+    fun `the detail names the provider an inbox was signed in to at`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val password = setUpAccount(user)
+        val signedIn = setUpOAuthAccount(user)
+
+        val provider = { id: Uuid ->
+            runBlocking { client.get("/api/users/me/inboxes/$id").bodyAsText() }
+                .let { Json.parseToJsonElement(it).jsonObject["oauth_provider"]!! }
+        }
+        assertEquals(JsonNull, provider(password))
+        assertEquals("google", provider(signedIn).jsonPrimitive.content)
+    }
+
+    @Test
+    fun `an inbox signed in to at a provider keeps its connection and changes its folders`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val account = setUpOAuthAccount(user)
+
+        val response = client.put("/api/users/me/inboxes/$account") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {"imap":{"host":"imap.moved.example","port":$deadPort,"username":"moved@example.com","password":"typed"},
+                 "folder_settings":[{"folder_name":"[Gmail]/Sent","imap_push":false,"ai_import":{"type":"all_messages"}}]}
+                """.trimIndent()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val (connection, folders) = database.query {
+            val row = ImapAccount.findById(account)!!
+            listOf(row.host, row.port, row.username, row.password) to
+                row.folderSyncs.map { it.folder }
+        }
+        assertEquals(listOf<Any>("imap.gmail.com", 993, "julius@gmail.example", ""), connection)
+        assertEquals(listOf("[Gmail]/Sent"), folders)
+    }
+
+    @Test
+    fun `an inbox signed in to at a provider logs in with its access token`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val account = setUpOAuthAccount(user)
+
+        val credentials = resolveInboxCredentials(
+            database = database,
+            tokens = tokens,
+            userId = user.id.value,
+            inboxId = account,
+            host = "imap.moved.example",
+            port = 143,
+            username = "moved@example.com",
+            password = "typed",
+        )
+
+        assertEquals("imap.gmail.com" to 993, credentials.host to credentials.port)
+        assertEquals(ImapClient.Auth.BearerAuth("julius@gmail.example", "the-access-token"), credentials.auth)
+    }
+
+    private suspend fun setUpOAuthAccount(user: User): Uuid = database.query {
+        val account = ImapAccount.new {
+            this.user = user
+            host = "imap.gmail.com"
+            port = 993
+            username = "julius@gmail.example"
+            password = ""
+        }
+        ImapAccountFolderSync.new {
+            imapAccount = account
+            folder = "INBOX"
+            imapPush = true
+            aiImport = ImapAccountFolderSync.AiImportSettings.OnlyNewMessages
+        }
+        OAuthGrant.new {
+            this.user = user
+            imapAccount = account
+            provider = "google"
+            address = "julius@gmail.example"
+            accessToken = "the-access-token"
+            accessTokenExpiresAt = Clock.System.now() + 1.hours
+            refreshToken = "the-refresh-token"
+        }
+        account.id.value
+    }
+
     private suspend fun setUpAccount(user: User): Uuid = database.query {
         val account = ImapAccount.new {
             this.user = user
@@ -289,6 +385,7 @@ class UpdateInboxTest {
             install(Authentication) { session() }
             dependencies {
                 provide<OvermailDatabase> { database }
+                provide<OAuthTokens> { tokens }
                 provide<ImporterManager> {
                     ImporterManager(
                         database = database,
@@ -304,7 +401,7 @@ class UpdateInboxTest {
                             database = database,
                         ),
                         mailNotifier = MailNotifier(),
-                        oauthTokens = OAuthTokens(database, OAuthProviders(emptyMap(), "https://overmail.example")),
+                        oauthTokens = tokens,
                     )
                 }
             }

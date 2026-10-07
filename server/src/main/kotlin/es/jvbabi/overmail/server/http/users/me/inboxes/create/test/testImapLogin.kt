@@ -65,7 +65,7 @@ fun Route.testImapLogin() {
             if (request.port !in 1..65535) invalidRequest("port", "is not a port", request.port.toString())
             if (request.username.isEmpty()) invalidRequest("username", "a login needs a username")
 
-            call.respond(HttpStatusCode.OK, probeImapLogin(host, request.port, request.username, request.password))
+            call.respond(HttpStatusCode.OK, probeImapLogin(host, request.port, ImapClient.Auth.BasicAuth(request.username, request.password)))
         }
     }
 }
@@ -74,15 +74,14 @@ fun Route.testImapLogin() {
  * Connects and logs in, then hangs up again.
  *
  * `ImapClient` is what does the work here, unlike in the host probe: its pool factory connects,
- * hand shakes and sends `LOGIN` in one go, which at this point is exactly the question being
+ * hand shakes and logs in in one go, which at this point is exactly the question being
  * asked. A `NO`/`BAD` on that login surfaces as [ImapCommandException] -- the server having read
  * the credentials and refused them, which is the one outcome worth telling apart.
  */
 internal suspend fun probeImapLogin(
     host: String,
     port: Int,
-    username: String,
-    password: String,
+    auth: ImapClient.Auth,
 ): ImapLoginTestResponse = withContext(Dispatchers.IO) {
     val connections = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, _ -> })
     try {
@@ -94,7 +93,7 @@ internal suspend fun probeImapLogin(
             ImapClient(
                 host = host,
                 port = port,
-                auth = ImapClient.Auth.BasicAuth(username, password),
+                auth = auth,
                 coroutineScope = connections,
                 debug = false,
             ).use { client ->

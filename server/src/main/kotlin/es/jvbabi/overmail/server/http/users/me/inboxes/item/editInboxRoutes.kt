@@ -1,13 +1,15 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
-import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.scanMailbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.probeImapLogin
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
@@ -22,6 +24,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -55,7 +58,8 @@ fun Route.getInbox() {
 
             val inbox = call.database().query {
                 val account = ImapAccounts
-                    .select(ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused)
+                    .join(OAuthGrants, JoinType.LEFT, ImapAccounts.id, OAuthGrants.imapAccount)
+                    .select(ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused, OAuthGrants.provider)
                     .where { (ImapAccounts.id eq inboxId) and (ImapAccounts.user eq userId) }
                     .firstOrNull() ?: return@query null
 
@@ -77,6 +81,7 @@ fun Route.getInbox() {
                     port = account[ImapAccounts.port],
                     username = account[ImapAccounts.username],
                     isPaused = account[ImapAccounts.isPaused],
+                    oauthProvider = account.getOrNull(OAuthGrants.provider),
                     folders = folders,
                 )
             } ?: notFound("inbox", inboxId.toString())
@@ -98,7 +103,7 @@ fun Route.testInboxLogin() {
         /**
          * Check a login for an existing inbox.
          *
-         * Description: The login check of the setup dialog; an empty password checks the stored one. A rejected login is an `outcome`, not an error status.
+         * Description: The login check of the setup dialog; an empty password checks the stored one, and one signed in to at a provider checks its sign-in. A rejected login is an `outcome`, not an error status.
          *
          * Tag: Inboxes
          *
@@ -115,6 +120,7 @@ fun Route.testInboxLogin() {
 
             val credentials = resolveInboxCredentials(
                 database = call.database(),
+                tokens = call.dependency<OAuthTokens>(),
                 userId = userId,
                 inboxId = inboxId,
                 host = request.host,
@@ -125,7 +131,7 @@ fun Route.testInboxLogin() {
 
             call.respond(
                 HttpStatusCode.OK,
-                probeImapLogin(credentials.host, credentials.port, credentials.username, credentials.password),
+                probeImapLogin(credentials.host, credentials.port, credentials.auth),
             )
         }
     }
@@ -160,6 +166,7 @@ fun Route.streamInboxFoldersForInbox() {
 
             val credentials = resolveInboxCredentials(
                 database = call.database(),
+                tokens = call.dependency<OAuthTokens>(),
                 userId = userId,
                 inboxId = inboxId,
                 host = request.host,
@@ -169,12 +176,7 @@ fun Route.streamInboxFoldersForInbox() {
             )
 
             call.respondTextWriter(ContentType.Text.EventStream) {
-                scanMailbox(
-                    this,
-                    credentials.host,
-                    credentials.port,
-                    ImapClient.Auth.BasicAuth(credentials.username, credentials.password),
-                )
+                scanMailbox(this, credentials.host, credentials.port, credentials.auth)
             }
         }
     }
@@ -202,6 +204,8 @@ internal data class InboxDetailResponse(
     @SerialName("port") val port: Int,
     @SerialName("username") val username: String,
     @SerialName("is_paused") val isPaused: Boolean,
+    @JsonSchema.Description("The provider it was signed in to at, `google` or `microsoft`; null for one that logs in with a password. Its host, port and username cannot be changed")
+    @SerialName("oauth_provider") val oauthProvider: String? = null,
     @SerialName("folders") val folders: List<FolderSetting>,
 ) {
     @Serializable

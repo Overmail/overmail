@@ -120,6 +120,8 @@ fun Route.oauthInboxSubmitRoute() {
          */
         post {
             val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
+            // It re-authenticated an inbox that exists; there is nothing to create.
+            if (onboarding.reauthenticatedInboxId != null) notFound("oauth_onboarding")
             val request = call.receive<SubmitOAuthInboxRequest>()
             val bearer = call.dependency<OAuthTokens>().accessToken(onboarding.grantId) ?: notFound("oauth_onboarding")
 

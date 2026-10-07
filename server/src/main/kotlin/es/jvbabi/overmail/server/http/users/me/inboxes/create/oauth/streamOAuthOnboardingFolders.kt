@@ -31,6 +31,8 @@ fun Route.streamOAuthOnboardingFolders() {
          */
         get {
             val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
+            // One that re-authenticated an inbox has no folders left to pick.
+            if (onboarding.reauthenticatedInboxId != null) notFound("oauth_onboarding")
             // Renewed first where the dialog was left open longer than the token lasts.
             val bearer = call.dependency<OAuthTokens>().accessToken(onboarding.grantId) ?: notFound("oauth_onboarding")
             call.respondTextWriter(ContentType.Text.EventStream) {

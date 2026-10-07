@@ -90,7 +90,12 @@ data class ImapConnection(
     val folders: List<FolderSync>,
     /** Whether the account is paused; a paused one has no importer at all. */
     val isPaused: Boolean = false,
+    /** Whether the provider refused [oauthGrantId]; such an account has no importer until a new sign-in. */
+    val requiresReauthentication: Boolean = false,
 ) {
+    /** Whether an importer runs for the account at all. */
+    val canRun: Boolean get() = !isPaused && !requiresReauthentication
+
     /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
     val signature: String
         get() = "$host:$port:$username:$password:$oauthGrantId:" +

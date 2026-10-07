@@ -4,10 +4,11 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
-import es.jvbabi.overmail.server.database.models.OAuthGrant
 import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.oauth.OAuthTokens
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.jdbc.select
 import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
@@ -31,7 +32,10 @@ class ImporterManager(
      */
     suspend fun start() {
         while (coroutineScope.isActive) {
-            reconcile(database.query { ImapAccount.all().map { it.toConnection() } })
+            reconcile(database.query {
+                val grants = oauthGrantStates()
+                ImapAccount.all().map { it.toConnection(grants[it.id.value]) }
+            })
             delay(RELOAD_INTERVAL)
         }
     }
@@ -49,10 +53,13 @@ class ImporterManager(
     suspend fun reboot(accountId: Uuid) {
         importer.remove(accountId)?.stop()
 
-        val account = database.query { ImapAccount.findById(accountId)?.toConnection() } ?: return
+        val account = database.query {
+            ImapAccount.findById(accountId)?.let { it.toConnection(oauthGrantStates(accountId)[accountId]) }
+        } ?: return
         // Rebooting a paused account means leaving it stopped; the row is what decides, not the
-        // caller, so a resume and a pause can go through the same door.
-        if (account.isPaused) return
+        // caller, so a resume and a pause can go through the same door. Same for one whose sign-in
+        // was refused: it is started by the new sign-in, not before.
+        if (!account.canRun) return
         importer[accountId] = startImporter(account)
     }
 
@@ -70,8 +77,9 @@ class ImporterManager(
     private suspend fun reconcile(allAccounts: List<ImapConnection>) {
         // A paused account is treated as one that is not there at all: whatever importer it has is
         // stopped below and none is started for it. That also makes a pause set straight in the
-        // database take hold, within RELOAD_INTERVAL.
-        val accounts = allAccounts.filterNot { it.isPaused }
+        // database take hold, within RELOAD_INTERVAL -- and a grant the provider refused, which
+        // would only fail every login until the user signs in again.
+        val accounts = allAccounts.filter { it.canRun }
         val currentIds = accounts.map { it.id }.toSet()
         importer.keys.filterNot { it in currentIds }.toList().forEach { removedId ->
             importer.remove(removedId)?.stop()
@@ -98,15 +106,34 @@ class ImporterManager(
     ).also { it.start() }
 }
 
-/** Reads the row into the snapshot the job runs on; only valid inside the transaction. */
-internal fun ImapAccount.toConnection() = ImapConnection(
+/** The grant an account logs in with, as far as the importer cares. */
+internal data class OAuthGrantState(val id: Uuid, val requiresReauthentication: Boolean)
+
+/**
+ * The grants of [accountId], or of every account when null, by account. One query for all of them,
+ * so a sweep does not cost a query per account.
+ */
+internal fun oauthGrantStates(accountId: Uuid? = null): Map<Uuid, OAuthGrantState> = OAuthGrants
+    .select(OAuthGrants.id, OAuthGrants.imapAccount, OAuthGrants.requiresReauthentication)
+    .where { if (accountId == null) OAuthGrants.imapAccount.isNotNull() else OAuthGrants.imapAccount eq accountId }
+    .associate { row ->
+        row[OAuthGrants.imapAccount]!!.value to
+            OAuthGrantState(row[OAuthGrants.id].value, row[OAuthGrants.requiresReauthentication])
+    }
+
+/**
+ * Reads the row into the snapshot the job runs on; only valid inside the transaction. [grant] is
+ * the account's, see [oauthGrantStates].
+ */
+internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = ImapConnection(
     id = id.value,
     userId = user.id.value,
     host = host,
     port = port,
     username = username,
     password = password,
-    oauthGrantId = OAuthGrant.find { OAuthGrants.imapAccount eq id }.firstOrNull()?.id?.value,
+    oauthGrantId = grant?.id,
+    requiresReauthentication = grant?.requiresReauthentication ?: false,
     isPaused = isPaused,
     // Read here, with the account: the importer outlives this transaction and could not follow
     // the reference afterwards.

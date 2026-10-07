@@ -4,6 +4,8 @@ import es.jvbabi.overmail.server.config.OAuthClientConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.OAuthGrant
+import es.jvbabi.overmail.server.database.models.OAuthGrants
+import es.jvbabi.authentikt.core.step.plugins.builtin.OIDCTokens
 import es.jvbabi.overmail.server.database.models.User
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -15,6 +17,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -53,6 +56,9 @@ class OAuthTokensTest {
     /** Whether the fake provider refuses every renewal, as for a grant the user revoked. */
     private var refuse = false
 
+    /** Whether the fake provider is down and answers every renewal with a 503. */
+    private var down = false
+
     private lateinit var provider: EmbeddedServer<*, *>
     private lateinit var tokens: OAuthTokens
 
@@ -63,7 +69,9 @@ class OAuthTokensTest {
                 post("/token") {
                     val form = call.receiveParameters()
                     tokenRequests += form.entries().associate { it.key to it.value.single() }
-                    if (refuse) {
+                    if (down) {
+                        call.respondText("unavailable", ContentType.Text.Plain, HttpStatusCode.ServiceUnavailable)
+                    } else if (refuse) {
                         call.respondText(
                             """{"error":"invalid_grant","error_description":"The grant was revoked"}""",
                             ContentType.Application.Json,
@@ -154,24 +162,75 @@ class OAuthTokensTest {
     }
 
     @Test
-    fun `a refused renewal is not retried straight away`() = runBlocking {
+    fun `a renewal that failed is not retried straight away`() = runBlocking {
         val grantId = grant(lifetime = 1.hours)
+        down = true
+
+        // About to run out, so the connection asking for it tries to renew it.
+        now += 59.minutes
+        assertEquals("access-0", tokens.accessToken(grantId))
+        assertEquals(1, tokenRequests.size)
+        assertNotNull(database.query { OAuthGrant[grantId].renewalFailedAt })
+
+        // Neither the next connection nor the job asks again within the backoff.
+        now += 1.minutes
+        assertEquals("access-0", tokens.accessToken(grantId))
+        tokens.renewDue()
+        assertEquals(1, tokenRequests.size)
+
+        // A provider that was down is no reason for a new sign-in.
+        assertEquals(false, database.query { OAuthGrant[grantId].requiresReauthentication })
+
+        down = false
+        now += 15.minutes
+        tokens.renewDue()
+        assertEquals(2, tokenRequests.size)
+        assertNull(database.query { OAuthGrant[grantId].renewalFailedAt })
+    }
+
+    @Test
+    fun `a grant the provider refuses is locked until a new sign-in`() = runBlocking {
+        val grantId = grant(lifetime = 1.hours, withInbox = true)
         refuse = true
 
         now += 31.minutes
         tokens.renewDue()
-        assertEquals(1, tokenRequests.size)
-        assertNotNull(database.query { OAuthGrant[grantId].renewalFailedAt })
-
-        now += 5.minutes
-        tokens.renewDue()
-        assertEquals(1, tokenRequests.size)
+        assertEquals(true, database.query { OAuthGrant[grantId].requiresReauthentication })
 
         refuse = false
-        now += 11.minutes
+        now += 1.days
         tokens.renewDue()
-        assertEquals(2, tokenRequests.size)
-        assertNull(database.query { OAuthGrant[grantId].renewalFailedAt })
+        assertEquals("access-0", tokens.accessToken(grantId))
+        assertEquals(1, tokenRequests.size)
+    }
+
+    @Test
+    fun `signing in again to a locked inbox puts the new tokens on its grant`() = runBlocking {
+        val grantId = grant(lifetime = 1.hours, withInbox = true)
+        val (userId, inboxId) = database.query {
+            OAuthGrant[grantId].apply { requiresReauthentication = true }
+                .let { it.readValues[OAuthGrants.user].value to it.readValues[OAuthGrants.imapAccount]!!.value }
+        }
+
+        val reauthenticated = tokens.storeOnboarding("flow-again", userId, mailbox("fresh-access", "fresh-refresh"))
+
+        assertEquals(inboxId, reauthenticated)
+        val grant = database.query {
+            OAuthGrant[grantId].let { listOf(it.accessToken, it.refreshToken, it.requiresReauthentication, it.onboardingId) }
+        }
+        assertEquals(listOf("fresh-access", "fresh-refresh", false, "flow-again"), grant)
+        assertEquals(1, database.query { OAuthGrant.all().count() })
+    }
+
+    @Test
+    fun `signing in again to an inbox that is fine starts a new onboarding`() = runBlocking {
+        val grantId = grant(lifetime = 1.hours, withInbox = true)
+        val userId = database.query { OAuthGrant[grantId].readValues[OAuthGrants.user].value }
+
+        // Submitting it is the conflict it always was; nothing is taken over here.
+        assertNull(tokens.storeOnboarding("flow-again", userId, mailbox("fresh-access", "fresh-refresh")))
+        assertEquals("access-0", database.query { OAuthGrant[grantId].accessToken })
+        assertEquals(2, database.query { OAuthGrant.all().count() })
     }
 
     @Test
@@ -197,6 +256,21 @@ class OAuthTokensTest {
         val left = database.query { listOf(abandoned, submitted, fresh).map { OAuthGrant.findById(it) != null } }
         assertEquals(listOf(false, true, true), left)
     }
+
+    private fun mailbox(accessToken: String, refreshToken: String) = OAuthMailbox(
+        provider = OAuthProvider.MICROSOFT,
+        address = "julius@outlook.example",
+        tokens = OIDCTokens(
+            accessToken = accessToken,
+            tokenType = "Bearer",
+            refreshToken = refreshToken,
+            idToken = null,
+            expiresIn = 1.hours,
+            scopes = null,
+            receivedAt = now,
+            raw = JsonObject(emptyMap()),
+        ),
+    )
 
     private suspend fun grant(lifetime: Duration, refreshToken: String? = "refresh-0", withInbox: Boolean = false): Uuid {
         database.init()

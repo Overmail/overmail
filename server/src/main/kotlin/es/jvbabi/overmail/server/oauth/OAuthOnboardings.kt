@@ -16,8 +16,9 @@ import es.jvbabi.overmail.server.database.models.OAuthGrants
 import io.ktor.http.URLBuilder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.isNull
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.server.application.Application
+import kotlinx.coroutines.launch
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.util.AttributeKey
@@ -48,6 +49,11 @@ data class OAuthOnboarding(
     val provider: OAuthProvider,
     /** The address that was signed in to; what imap logs in as. */
     val address: String,
+    /**
+     * The inbox the sign-in re-authenticated, if it was one whose grant was locked: there is
+     * nothing left to submit then, the inbox has its tokens back.
+     */
+    val reauthenticatedInboxId: Uuid? = null,
 )
 
 private val OWNER = AttributeKey<Uuid>("overmail.oauth-onboarding.owner")
@@ -86,13 +92,20 @@ class OAuthOnboardings internal constructor(
      *
      * Read from the database rather than the flow, which only lives in this process's memory: the
      * dialog has to survive a reload of the page and the server a restart.
+     *
+     * A sign-in that re-authenticated an inbox is found too, on that inbox's grant, and says so.
      */
     suspend fun get(id: String, userId: Uuid): OAuthOnboarding? = database.query {
         OAuthGrant.find {
-            (OAuthGrants.onboardingId eq id) and (OAuthGrants.user eq userId) and OAuthGrants.imapAccount.isNull()
+            (OAuthGrants.onboardingId eq id) and (OAuthGrants.user eq userId)
         }.firstOrNull()?.let { grant ->
             val provider = OAuthProvider.byId(grant.provider) ?: return@let null
-            OAuthOnboarding(grantId = grant.id.value, provider = provider, address = grant.address)
+            OAuthOnboarding(
+                grantId = grant.id.value,
+                provider = provider,
+                address = grant.address,
+                reauthenticatedInboxId = grant.readValues[OAuthGrants.imapAccount]?.value,
+            )
         }
     }
 }
@@ -108,7 +121,9 @@ fun Application.installOAuthOnboardings() {
 
     val signIns = providers.clients.associate { client -> client.provider to signInStep(client) }
     val folders = FoldersStep(store = { session, mailbox ->
-        tokens.storeOnboarding(session.sessionId, session.attributes[OWNER]!!, mailbox)
+        val reauthenticated = tokens.storeOnboarding(session.sessionId, session.attributes[OWNER]!!, mailbox)
+        // Its importer was stopped while the grant was locked; it can log in again now.
+        if (reauthenticated != null) launch { dependencies.resolve<ImporterManager>().reboot(reauthenticated) }
     })
 
     val instance = installAuthentikt {
@@ -168,7 +183,8 @@ private class MailboxUser(mailbox: OAuthMailbox) : AuthentiktUser<OAuthMailbox>(
 
 /**
  * Where a flow ends once the provider named the mailbox: it is stored as an onboarding the moment
- * the flow gets here, and the flow is done with. Never completes -- the folders are picked through
+ * the flow gets here -- or re-authenticates the inbox it already is, see [OAuthTokens.storeOnboarding]
+ * -- and the flow is done with. Never completes -- the folders are picked through
  * the dialog's own routes, which find the onboarding through [OAuthOnboardings.get].
  */
 private class FoldersStep(

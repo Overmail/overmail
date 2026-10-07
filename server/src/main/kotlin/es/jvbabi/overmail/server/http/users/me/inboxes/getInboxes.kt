@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.http.users.me.inboxes
 import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import io.ktor.openapi.JsonSchema
@@ -62,6 +63,8 @@ fun Route.getInboxes() {
                             isPaused = row[ImapAccounts.isPaused],
                             folders = emptyList(),
                             emailCount = 0L,
+                            oauthProvider = null,
+                            requiresReauthentication = false,
                         )
                     }
 
@@ -83,10 +86,19 @@ fun Route.getInboxes() {
                     .orderBy(ImapAccountFolderSyncs.folder to SortOrder.ASC)
                     .groupBy({ it[ImapAccountFolderSyncs.imapAccount].value }, { it[ImapAccountFolderSyncs.folder] })
 
+                // The same for the sign-ins the ones connected through a provider log in with.
+                val grantsByAccount = if (accounts.isEmpty()) emptyMap() else OAuthGrants
+                    .select(OAuthGrants.imapAccount, OAuthGrants.provider, OAuthGrants.requiresReauthentication)
+                    .where { OAuthGrants.imapAccount inList accounts.map { it.id } }
+                    .associateBy { it[OAuthGrants.imapAccount]!!.value }
+
                 accounts.map { inbox ->
+                    val grant = grantsByAccount[inbox.id]
                     inbox.copy(
                         folders = foldersByAccount[inbox.id].orEmpty(),
                         emailCount = mailsByAccount[inbox.id] ?: 0L,
+                        oauthProvider = grant?.get(OAuthGrants.provider),
+                        requiresReauthentication = grant?.get(OAuthGrants.requiresReauthentication) ?: false,
                     )
                 }
             }
@@ -113,5 +125,9 @@ private data class InboxesResponse(
         @SerialName("folders") val folders: List<String>,
         @JsonSchema.Description("How many mails were imported through it, which deleting it deletes")
         @SerialName("email_count") val emailCount: Long,
+        @JsonSchema.Description("The provider it was signed in to at, `google` or `microsoft`; null for one that logs in with a password")
+        @SerialName("oauth_provider") val oauthProvider: String?,
+        @JsonSchema.Description("Whether the provider refused its sign-in; it is not imported until the user signs in there again")
+        @SerialName("requires_reauthentication") val requiresReauthentication: Boolean,
     )
 }

@@ -22,6 +22,7 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.oauthGrantStates
 import es.jvbabi.overmail.server.jobs.importer.toConnection
 import es.jvbabi.overmail.server.oauth.OAuthEndpoints
 import es.jvbabi.overmail.server.oauth.OAuthProviders
@@ -63,6 +64,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -414,7 +416,7 @@ class OAuthRoutesTest {
         val (account, grant, importer) = database.query {
             val account = ImapAccount[inboxId].let { listOf(it.user.id.value, it.host, it.port, it.username, it.password) }
             val grant = OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single()
-            Triple(account, grant.onboardingId to grant.accessToken, grant.id.value to ImapAccount[inboxId].toConnection().oauthGrantId)
+            Triple(account, grant.onboardingId to grant.accessToken, grant.id.value to ImapAccount[inboxId].toConnection(oauthGrantStates(inboxId)[inboxId]).oauthGrantId)
         }
         assertEquals(listOf(user.id.value, "outlook.office365.com", 993, MAILBOX, ""), account)
         assertEquals(null to ACCESS_TOKEN, grant)
@@ -424,6 +426,49 @@ class OAuthRoutesTest {
         // Used up: neither the dialog nor a second submit finds it again.
         assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/$onboardingId").status)
         assertEquals(HttpStatusCode.NotFound, client.submit(onboardingId).status)
+    }
+
+    @Test
+    fun `signing in again to an inbox whose sign-in was refused renews it instead of adding a second`() = testApplication {
+        val user = setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        val inboxId = client.submit(client.signInToMailbox()).bodyAsText()
+            .let { Uuid.parse(Json.parseToJsonElement(it).jsonObject["id"]!!.jsonPrimitive.content) }
+        database.query {
+            OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single().apply {
+                requiresReauthentication = true
+                accessToken = "the-revoked-one"
+            }
+        }
+
+        val again = client.signInToMailbox()
+        signedIn = user
+
+        val onboarding = Json.parseToJsonElement(client.get("$PROVIDERS/onboardings/$again").bodyAsText()).jsonObject
+        assertEquals(inboxId.toString(), onboarding["reauthenticated_inbox_id"]!!.jsonPrimitive.content)
+        // Nothing to submit: the inbox has its tokens back, and there is still only the one.
+        assertEquals(HttpStatusCode.NotFound, client.submit(again).status)
+        val grant = database.query {
+            OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single().let { it.accessToken to it.requiresReauthentication }
+        }
+        assertEquals(ACCESS_TOKEN to false, grant)
+        assertEquals(1L, database.query { ImapAccount.find { ImapAccounts.user eq user.id }.count() })
+    }
+
+    @Test
+    fun `signing in again to an inbox that is fine is the conflict it always was`() = testApplication {
+        setUpUser()
+        installRoutes()
+        val client = createClient { followRedirects = false }
+
+        assertEquals(HttpStatusCode.Created, client.submit(client.signInToMailbox()).status)
+
+        val again = client.signInToMailbox()
+        val onboarding = Json.parseToJsonElement(client.get("$PROVIDERS/onboardings/$again").bodyAsText()).jsonObject
+        assertEquals(JsonNull, onboarding["reauthenticated_inbox_id"])
+        assertEquals(HttpStatusCode.Conflict, client.submit(again).status)
     }
 
     @Test

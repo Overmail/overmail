@@ -59,7 +59,7 @@ fun Route.getInbox() {
             val inbox = call.database().query {
                 val account = ImapAccounts
                     .join(OAuthGrants, JoinType.LEFT, ImapAccounts.id, OAuthGrants.imapAccount)
-                    .select(ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused, OAuthGrants.provider)
+                    .select(ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused, OAuthGrants.provider, OAuthGrants.requiresReauthentication)
                     .where { (ImapAccounts.id eq inboxId) and (ImapAccounts.user eq userId) }
                     .firstOrNull() ?: return@query null
 
@@ -82,6 +82,7 @@ fun Route.getInbox() {
                     username = account[ImapAccounts.username],
                     isPaused = account[ImapAccounts.isPaused],
                     oauthProvider = account.getOrNull(OAuthGrants.provider),
+                    requiresReauthentication = account.getOrNull(OAuthGrants.requiresReauthentication) ?: false,
                     folders = folders,
                 )
             } ?: notFound("inbox", inboxId.toString())
@@ -206,6 +207,8 @@ internal data class InboxDetailResponse(
     @SerialName("is_paused") val isPaused: Boolean,
     @JsonSchema.Description("The provider it was signed in to at, `google` or `microsoft`; null for one that logs in with a password. Its host, port and username cannot be changed")
     @SerialName("oauth_provider") val oauthProvider: String? = null,
+    @JsonSchema.Description("Whether the provider refused its sign-in; it is not imported until the user signs in there again")
+    @SerialName("requires_reauthentication") val requiresReauthentication: Boolean = false,
     @SerialName("folders") val folders: List<FolderSetting>,
 ) {
     @Serializable

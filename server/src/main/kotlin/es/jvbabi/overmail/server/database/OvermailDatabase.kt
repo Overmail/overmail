@@ -41,6 +41,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
             SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(OAuthGrants)
+            exec("ALTER TABLE oauth_grants ADD COLUMN IF NOT EXISTS requires_reauthentication BOOLEAN DEFAULT FALSE NOT NULL")
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails, Attachments)

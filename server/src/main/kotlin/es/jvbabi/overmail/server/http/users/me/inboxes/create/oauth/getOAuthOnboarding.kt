@@ -18,7 +18,7 @@ fun Route.getOAuthOnboarding() {
         /**
          * Read the mailbox a sign-in at a provider came back with.
          *
-         * Description: What the settings open "new inbox" on when the url carries `_authentikt_session_id`.
+         * Description: What the settings open "new inbox" on when the url carries `_authentikt_session_id`, or a sign-in that re-authenticated an inbox.
          *
          * Tag: Setup
          *
@@ -33,6 +33,7 @@ fun Route.getOAuthOnboarding() {
                     host = onboarding.provider.imapHost,
                     port = onboarding.provider.imapPort,
                     username = onboarding.address,
+                    reauthenticatedInboxId = onboarding.reauthenticatedInboxId,
                 )
             )
         }
@@ -47,4 +48,6 @@ internal data class OAuthOnboardingResponse(
     @SerialName("port") val port: Int,
     @JsonSchema.Description("The address that was signed in to, which is what imap logs in as")
     @SerialName("username") val username: String,
+    @JsonSchema.Description("The inbox the sign-in signed in to again, where it was one waiting for that; there is nothing left to submit then")
+    @SerialName("reauthenticated_inbox_id") val reauthenticatedInboxId: kotlin.uuid.Uuid? = null,
 )

@@ -1,5 +1,6 @@
 import type {
     InboxConnection,
+    OAuthProviderId,
     SubmitInboxFolder,
     SubmitInboxResult,
     WireAiScope,
@@ -36,6 +37,11 @@ export type InboxDetail = {
     port: number;
     username: string;
     isPaused: boolean;
+    /**
+     * The provider it was signed in to at, or null for one that logs in with a password. Such an
+     * inbox stays on the connection the sign-in named; only its folders can be changed.
+     */
+    oauthProvider: OAuthProviderId | null;
     folders: InboxFolderSetting[];
 };
 
@@ -79,6 +85,7 @@ export class InboxRepository {
             port: body.port as number,
             username: body.username as string,
             isPaused: (body.is_paused ?? false) as boolean,
+            oauthProvider: (body.oauth_provider ?? null) as OAuthProviderId | null,
             folders: ((body.folders ?? []) as any[]).map((folder) => ({
                 folderName: folder.folder_name as string,
                 imapPush: (folder.imap_push ?? false) as boolean,

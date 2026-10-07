@@ -8,6 +8,7 @@
     import FolderStep from "$lib/app/settings/email-accounts/new/FolderStep.svelte";
     import {NewEmailAccountViewModel} from "$lib/app/settings/email-accounts/new/NewEmailAccountViewModel.svelte.ts";
     import {useRepositories} from "$lib/repository/repositories";
+    import {OAUTH_PROVIDER_LOOKS} from "$lib/app/settings/email-accounts/new/oauthProviderLooks";
     import type {Inbox} from "$lib/repository/InboxRepository";
     import {_} from "svelte-i18n";
 
@@ -103,7 +104,9 @@
     <Dialog.Content class="sm:max-w-4xl">
         <Dialog.Header>
             <Dialog.Title>{$_("settings.emailAccounts.edit.title")}</Dialog.Title>
-            <Dialog.Description>{$_("settings.emailAccounts.edit.description")}</Dialog.Description>
+            <Dialog.Description>
+                {$_(viewModel?.signedInWith ? "settings.emailAccounts.edit.oauthDescription" : "settings.emailAccounts.edit.description")}
+            </Dialog.Description>
         </Dialog.Header>
 
         {#if loading.type === "loading"}
@@ -123,18 +126,36 @@
               ceremony. Each section still checks itself as it is changed.
             -->
             <div class="flex flex-col gap-6">
-                <section class="flex flex-col gap-2">
-                    <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.server")}</h3>
-                    <ServerStep viewModel={viewModel} />
-                </section>
+                {#if viewModel.signedInWith}
+                    <!-- The sign-in decides server and login, so there is nothing to type or check. -->
+                    {@const looks = OAUTH_PROVIDER_LOOKS[viewModel.signedInWith]}
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.credentials")}</h3>
+                        <div class="text-muted-foreground flex flex-row items-start gap-2 text-sm">
+                            {#if looks}
+                                <img src={looks.logo} class="mt-0.5 size-4 shrink-0" alt="" />
+                            {/if}
+                            <span>
+                                {$_("settings.emailAccounts.edit.signedIn", {
+                                    values: {provider: looks?.name ?? viewModel.signedInWith, address: viewModel.username},
+                                })}
+                            </span>
+                        </div>
+                    </section>
+                {:else}
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.server")}</h3>
+                        <ServerStep viewModel={viewModel} />
+                    </section>
 
-                <section class="flex flex-col gap-2">
-                    <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.credentials")}</h3>
-                    <CredentialsStep
-                            viewModel={viewModel}
-                            passwordPlaceholder={$_("settings.emailAccounts.edit.passwordPlaceholder")}
-                    />
-                </section>
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.credentials")}</h3>
+                        <CredentialsStep
+                                viewModel={viewModel}
+                                passwordPlaceholder={$_("settings.emailAccounts.edit.passwordPlaceholder")}
+                        />
+                    </section>
+                {/if}
 
                 <section class="flex flex-col gap-2">
                     <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.folders")}</h3>

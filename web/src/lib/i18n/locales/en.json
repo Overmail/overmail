@@ -460,8 +460,10 @@
       "edit": {
         "title": "Edit connection",
         "description": "Everything is checked as you change it. Leave the password blank to keep the current one.",
+        "oauthDescription": "Everything is checked as you change it.",
         "server": "Mail server",
         "credentials": "Sign-in",
+        "signedIn": "Signed in at {provider} as {address}. Sign-in and server come from there; only the folders can be changed.",
         "folders": "Folders",
         "passwordPlaceholder": "Unchanged",
         "save": "Save",

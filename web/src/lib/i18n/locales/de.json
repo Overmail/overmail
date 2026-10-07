@@ -460,8 +460,10 @@
       "edit": {
         "title": "Verbindung bearbeiten",
         "description": "Alles wird beim Ändern geprüft. Passwort leer lassen, um das bisherige zu behalten.",
+        "oauthDescription": "Alles wird beim Ändern geprüft.",
         "server": "Mailserver",
         "credentials": "Anmeldung",
+        "signedIn": "Bei {provider} angemeldet als {address}. Anmeldung und Server kommen von dort, nur die Ordner lassen sich ändern.",
         "folders": "Ordner",
         "passwordPlaceholder": "Unverändert",
         "save": "Speichern",

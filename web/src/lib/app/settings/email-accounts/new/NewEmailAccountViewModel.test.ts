@@ -637,6 +637,7 @@ const STORED = {
     port: 993,
     username: "julius",
     isPaused: false,
+    oauthProvider: null,
     folders: [
         {folderName: "Archiv.Newsletter", imapPush: true, aiImport: {type: "all_messages"}},
         {folderName: "Trash", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
@@ -711,6 +712,24 @@ test("saving an edit writes to the mailbox instead of creating a second one", as
     expect(folders.map((f) => f.folderName).sort()).toEqual(["Archiv.Newsletter", "Trash"]);
 });
 
+test("a mailbox signed in to at a provider opens on its folders without checking anything", async () => {
+    const {viewModel, login, streamFolders, save} = editing();
+    viewModel.prefill({...STORED, host: "imap.gmail.com", username: "julius@gmail.example", oauthProvider: "google"} as never);
+    expect(viewModel.signedInWith).toBe("google");
+
+    // The server logs in with the sign-in; there is no login to check and no password to ask for.
+    expect(viewModel.canEnter("folders")).toBe(true);
+    await tick(1100);
+    expect(login).toHaveBeenCalledTimes(0);
+
+    viewModel.goTo("folders");
+    await tick(60);
+    expect(streamFolders.mock.calls[0][5]).toBe("acc-1");
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    expect(save.mock.calls[0][0]).toEqual({host: "imap.gmail.com", port: 993, username: "julius@gmail.example", password: ""});
+});
+
 test("a mailbox the edit would collide with is reported, not thrown", async () => {
     const {viewModel} = editing({save: async () => ({type: "conflict"}) as const});
     viewModel.prefill(STORED as never);
@@ -755,7 +774,7 @@ test("a sign-in at a provider continues at the folders, scanned through the onbo
 
 test("a sign-in at a provider is submitted through its onboarding", async () => {
     const submitInbox = mock(async () => ({type: "created", id: "inbox-1"}) as const);
-    const submitOAuthInbox = mock(async () => ({type: "created", id: "inbox-1"}) as const);
+    const submitOAuthInbox = mock(async (_onboardingId: string, _folders: SubmitInboxFolder[]) => ({type: "created", id: "inbox-1"}) as const);
     const repository = {
         oauthOnboarding: mock(async (id: string) => ({
             id,

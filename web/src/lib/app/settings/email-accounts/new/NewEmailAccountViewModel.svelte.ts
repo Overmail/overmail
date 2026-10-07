@@ -6,6 +6,7 @@ import type {
     InboxSetupRepository,
     InboxConnection,
     OAuthOnboarding,
+    OAuthProviderId,
     SubmitInboxFolder,
     SubmitInboxResult,
     WireAiScope,
@@ -160,6 +161,12 @@ export class NewEmailAccountViewModel {
     /** The settings were opened on a sign-in the server no longer has -- it is only kept for a while. */
     oauthOnboardingExpired = $state(false);
 
+    /**
+     * The provider the mailbox being edited was signed in to at, or null. Its connection is the
+     * sign-in's and has nothing to check or change; only its folders are edited.
+     */
+    signedInWith: OAuthProviderId | null = $state(null);
+
     #hostDebounce: ReturnType<typeof setTimeout> | null = null;
     #hostRunning: AbortController | null = null;
     #loginDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -191,6 +198,9 @@ export class NewEmailAccountViewModel {
      * The password stays empty on purpose: the server never hands one out, and an empty one means
      * "unchanged" everywhere it is sent. The folder settings are kept aside rather than applied
      * now -- the rows they belong to do not exist until the scan has read the mailbox.
+     *
+     * A mailbox signed in to at a provider has nothing to check: the server logs in with the
+     * sign-in, so the form starts out as if both checks had passed.
      */
     prefill(detail: InboxDetail) {
         this.#storedSettings = new Map(detail.folders.map((folder) => [folder.folderName, folder]));
@@ -199,6 +209,12 @@ export class NewEmailAccountViewModel {
         this.username = detail.username;
         this.password = "";
         this.step = "server";
+        this.signedInWith = detail.oauthProvider;
+        if (detail.oauthProvider) {
+            this.imapServerTest = {type: "reachable", capabilities: []};
+            this.imapLoginTest = {type: "authenticated"};
+            return;
+        }
         this.#scheduleHostTest();
         this.#scheduleLoginTest();
     }
@@ -434,6 +450,7 @@ export class NewEmailAccountViewModel {
         this.submitState = {type: "idle"};
         this.oauthOnboarding = null;
         this.oauthOnboardingExpired = false;
+        this.signedInWith = null;
     }
 
     /** Called when the dialog closes, so no check and no scan outlives it. */

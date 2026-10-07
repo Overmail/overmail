@@ -7,25 +7,18 @@
     import {CheckCircleIcon, WarningCircleIcon, WarningIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import {Button} from "$lib/components/ui/button";
-    import outlookLogo from "$lib/assets/microsoft-outlook.svg";
-    import gmailLogo from "$lib/assets/gmail.svg";
+    import {OAUTH_PROVIDER_LOOKS} from "./oauthProviderLooks";
     import {oauthStartUrl, type OAuthProviderId} from "$lib/repository/InboxSetupRepository";
     import {useRepositories} from "$lib/repository/repositories";
 
     let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
-
-    /** How each provider the server may offer looks here. One it lists that is missing is skipped. */
-    const OAUTH_PROVIDERS: Record<string, {name: string; logo: string}> = {
-        microsoft: {name: "Microsoft", logo: outlookLogo},
-        google: {name: "Google", logo: gmailLogo},
-    };
 
     /**
      * The providers the server has a client for -- the only ones a button would lead anywhere.
      * Not while editing: signing in creates a mailbox, it does not change the one being edited.
      */
     const {inboxSetup} = useRepositories();
-    const known = (providers: OAuthProviderId[]) => providers.filter((id) => id in OAUTH_PROVIDERS);
+    const known = (providers: OAuthProviderId[]) => providers.filter((id) => id in OAUTH_PROVIDER_LOOKS);
     // Usually there already: the dialog asks as soon as it is mounted. Read synchronously then, so
     // the buttons are part of the first frame instead of growing the dialog a moment later.
     let oauthProviders: OAuthProviderId[] = $state(known(inboxSetup.cachedOAuthProviders ?? []));
@@ -165,9 +158,9 @@
                         class="flex-1"
                         href={oauthStartUrl(provider)}
                         data-sveltekit-reload
-                        aria-label={$_("settings.emailAccounts.new.server.oauth.continueWith", {values: {provider: OAUTH_PROVIDERS[provider].name}})}
+                        aria-label={$_("settings.emailAccounts.new.server.oauth.continueWith", {values: {provider: OAUTH_PROVIDER_LOOKS[provider].name}})}
                 >
-                    <img src={OAUTH_PROVIDERS[provider].logo} class="size-4" alt="">
+                    <img src={OAUTH_PROVIDER_LOOKS[provider].logo} class="size-4" alt="">
                 </Button>
             {/each}
         </div>

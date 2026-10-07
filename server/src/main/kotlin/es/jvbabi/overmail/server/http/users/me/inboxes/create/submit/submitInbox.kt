@@ -66,7 +66,7 @@ fun Route.inboxSubmitRoute() {
          *
          * Responses:
          *   - 201 [SubmitInboxResponse] The new inbox
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, or no folders or one listed twice
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host, username or password, an invalid port, or no folders or one listed twice
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user has an inbox with the same host, port and username
          */
         post {
@@ -77,6 +77,9 @@ fun Route.inboxSubmitRoute() {
             if (host.isEmpty()) invalidRequest("host", "an imap server needs a host")
             if (request.imap.port !in 1..65535) invalidRequest("port", "is not a port", request.imap.port.toString())
             if (request.imap.username.isEmpty()) invalidRequest("username", "a login needs a username")
+            // An empty one is what an inbox signed in to at a provider stores, and it logs in with
+            // its grant instead -- one created here would log in with nothing.
+            if (request.imap.password.isEmpty()) invalidRequest("password", "a login needs a password")
 
             call.createInbox(
                 userId = user.id.value,

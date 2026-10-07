@@ -22,6 +22,7 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.toConnection
 import es.jvbabi.overmail.server.oauth.OAuthEndpoints
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthTokens
@@ -410,13 +411,15 @@ class OAuthRoutesTest {
         assertEquals(HttpStatusCode.Created, response.status)
         val inboxId = Uuid.parse(Json.parseToJsonElement(response.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content)
 
-        val (account, grant) = database.query {
+        val (account, grant, importer) = database.query {
             val account = ImapAccount[inboxId].let { listOf(it.user.id.value, it.host, it.port, it.username, it.password) }
-            val grant = OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single().let { it.onboardingId to it.accessToken }
-            account to grant
+            val grant = OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single()
+            Triple(account, grant.onboardingId to grant.accessToken, grant.id.value to ImapAccount[inboxId].toConnection().oauthGrantId)
         }
         assertEquals(listOf(user.id.value, "outlook.office365.com", 993, MAILBOX, ""), account)
         assertEquals(null to ACCESS_TOKEN, grant)
+        // What the importer logs in with.
+        assertEquals(importer.first, importer.second)
 
         // Used up: neither the dialog nor a second submit finds it again.
         assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/$onboardingId").status)

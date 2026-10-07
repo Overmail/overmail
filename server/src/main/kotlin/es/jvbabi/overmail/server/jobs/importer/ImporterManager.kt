@@ -99,7 +99,7 @@ class ImporterManager(
 }
 
 /** Reads the row into the snapshot the job runs on; only valid inside the transaction. */
-private fun ImapAccount.toConnection() = ImapConnection(
+internal fun ImapAccount.toConnection() = ImapConnection(
     id = id.value,
     userId = user.id.value,
     host = host,

@@ -4,12 +4,14 @@ import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
 import es.jvbabi.overmail.data.database.entity.DbEmail
+import es.jvbabi.overmail.data.database.entity.DbEmailAttachment
 import es.jvbabi.overmail.data.database.entity.DbEmailLabels
 import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbImapAccount
 import es.jvbabi.overmail.data.database.entity.DbLabels
 import es.jvbabi.overmail.data.database.entity.DbOvermailAccount
 import es.jvbabi.overmail.data.database.entity.DbParticipant
+import es.jvbabi.overmail.domain.model.Attachment
 import es.jvbabi.overmail.domain.model.Email
 
 data class EmbeddedEmail(
@@ -44,6 +46,11 @@ data class EmbeddedEmail(
         parentColumn = "id",
         entityColumn = "email_id",
     ) val recipients: List<EmbeddedEmailRecipient>,
+    @Relation(
+        entity = DbEmailAttachment::class,
+        parentColumn = "id",
+        entityColumn = "email_id"
+    ) val attachments: List<DbEmailAttachment>,
 ) {
     fun toModel() = Email(
         id = dbEmail.id,
@@ -59,5 +66,6 @@ data class EmbeddedEmail(
         archivedState = dbEmail.archivedState,
         labels = labels.map { it.toModel() },
         recipients = recipients.map { it.toModel() },
+        attachments = attachments.map { it.toModel() }
     )
 }

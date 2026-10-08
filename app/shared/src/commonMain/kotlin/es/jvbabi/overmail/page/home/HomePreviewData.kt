@@ -253,6 +253,7 @@ private fun previewEmail(index: Long, sentAt: Instant, random: Random): Email {
         labels = PREVIEW_LABELS.shuffled(random).take(random.nextInt(0, 3)),
         recipients = listOf(EmailRecipient(PREVIEW_SELF, EmailRecipientType.Recipient)) +
             cc.map { EmailRecipient(it, EmailRecipientType.Cc) },
+        attachments = emptyList(),
     )
 }
 

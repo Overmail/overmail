@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.database.dao.ParticipantFromEmail
 import es.jvbabi.overmail.data.database.entity.DbEmail
+import es.jvbabi.overmail.data.database.entity.DbEmailAttachment
 import es.jvbabi.overmail.data.database.entity.DbEmailLabels
 import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbLabels
@@ -187,6 +188,7 @@ class EmailSync(
                     email.cc.map { DbEmailRecipients(email.id, it.id, EmailRecipientType.Cc) } +
                     email.bcc.map { DbEmailRecipients(email.id, it.id, EmailRecipientType.Bcc) }
             },
+            attachments = storable.flatMap { email -> email.attachments.map { it.toDb(email.id) } },
         )
     }
 }
@@ -232,6 +234,14 @@ private fun ApiEmailMeta.Label.toDb(account: OvermailAccount) = DbLabels(
     overmailAccountId = account.id,
 )
 
+private fun ApiEmailMeta.Attachment.toDb(emailId: Uuid) = DbEmailAttachment(
+    id = id,
+    emailId = emailId,
+    filename = name,
+    contentType = contentType,
+    size = size,
+)
+
 /** `QUERY /api/emails/meta`, `http/email/meta/emailsMeta.kt`. */
 @Serializable
 private data class ApiIdsRequest(@SerialName("ids") val ids: List<Uuid>)
@@ -256,6 +266,8 @@ private data class ApiEmailMeta(
     @SerialName("cc") val cc: List<Participant>,
     @SerialName("bcc") val bcc: List<Participant>,
     @SerialName("labels") val labels: List<Label>,
+    /** Empty from a server that does not send them yet. */
+    @SerialName("attachments") val attachments: List<Attachment> = emptyList(),
 ) {
     @Serializable
     data class Participant(
@@ -273,6 +285,14 @@ private data class ApiEmailMeta(
         @SerialName("color") val color: String,
         @SerialName("description") val description: String?,
         @SerialName("created_by_agent") val createdByAgent: Boolean,
+    )
+
+    @Serializable
+    data class Attachment(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String,
+        @SerialName("size") val size: Long,
+        @SerialName("content_type") val contentType: String,
     )
 }
 

@@ -23,12 +23,20 @@ data class Email(
     val archivedState: ArchivedState,
     val labels: List<Label>,
     val recipients: List<EmailRecipient>,
+    val attachments: List<Attachment>,
 )
 
 /** Somebody a mail was addressed to, and in which header field. */
 data class EmailRecipient(
     val participant: Participant,
     val type: EmailRecipientType,
+)
+
+data class Attachment(
+    val id: Uuid,
+    val filename: String,
+    val contentType: String,
+    val size: Long,
 )
 
 /** The header field a recipient is in, the server's `EmailRecipientType`. */

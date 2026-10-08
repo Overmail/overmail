@@ -284,7 +284,8 @@ private fun AgentContent(
             exit = fadeOut() + scaleOut(targetScale = 0.8f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bottomHeight - BOTTOM_FADE_HEIGHT + PROMPT_GAP),
+                // Zero until the area below is measured, and a negative padding throws.
+                .padding(bottom = (bottomHeight - BOTTOM_FADE_HEIGHT + PROMPT_GAP).coerceAtLeast(0.dp)),
         ) {
             Box(
                 modifier = Modifier

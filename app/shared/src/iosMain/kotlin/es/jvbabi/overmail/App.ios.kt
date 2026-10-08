@@ -37,6 +37,10 @@ import platform.SafariServices.SFSafariViewController
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
 import platform.UIKit.UIDevice
+import platform.UIKit.UIDocumentInteractionController
+import platform.UIKit.UIDocumentInteractionControllerDelegateProtocol
+import platform.UIKit.UIViewController
+import platform.darwin.NSObject
 import platform.UIKit.UIPasteboard
 import platform.UIKit.UIPopoverArrowDirectionAny
 import platform.UIKit.UIScreen
@@ -58,6 +62,50 @@ actual fun emailBodyCacheDirectory(): Path {
 actual fun emailPictureCacheDirectory(): Path {
     val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
     return "$caches/email-pictures".toPath()
+}
+
+actual fun attachmentCacheDirectory(): Path {
+    val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
+    return "$caches/attachments".toPath()
+}
+
+/** Asked for the screen to show the preview over; UIKit does not keep the delegate itself alive. */
+private class DocumentDelegate : NSObject(), UIDocumentInteractionControllerDelegateProtocol {
+    override fun documentInteractionControllerViewControllerForPreview(
+        controller: UIDocumentInteractionController,
+    ): UIViewController = checkNotNull(topViewController())
+
+    override fun documentInteractionControllerDidEndPreview(controller: UIDocumentInteractionController) {
+        openDocument = null
+    }
+
+    override fun documentInteractionControllerDidDismissOpenInMenu(controller: UIDocumentInteractionController) {
+        openDocument = null
+    }
+}
+
+/** The document on screen and its delegate, held until it is closed: both go away when let go of. */
+private var openDocument: Pair<UIDocumentInteractionController, DocumentDelegate>? = null
+
+/** What is on top, so a preview is not presented under a sheet that is already up. */
+private fun topViewController(): UIViewController? {
+    var controller = UIApplication.sharedApplication.keyWindow?.rootViewController
+    while (controller?.presentedViewController != null) controller = controller.presentedViewController
+    return controller
+}
+
+actual fun openFile(file: Path, contentType: String): Boolean {
+    val view = topViewController()?.view ?: return false
+    val controller = UIDocumentInteractionController.interactionControllerWithURL(NSURL.fileURLWithPath(file.toString()))
+    val delegate = DocumentDelegate()
+    controller.delegate = delegate
+    openDocument = controller to delegate
+
+    // Quick Look shows most of what a mail brings; for the rest, the apps that can open it.
+    val shown = controller.presentPreviewAnimated(true) ||
+        controller.presentOpenInMenuFromRect(view.bounds, inView = view, animated = true)
+    if (!shown) openDocument = null
+    return shown
 }
 
 actual fun openUrl(url: String) {

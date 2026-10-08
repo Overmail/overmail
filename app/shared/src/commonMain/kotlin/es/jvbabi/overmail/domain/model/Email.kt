@@ -32,8 +32,11 @@ data class EmailRecipient(
     val type: EmailRecipientType,
 )
 
+/** A file attached to a mail. Only its description; the file itself is downloaded on demand. */
 data class Attachment(
     val id: Uuid,
+    /** The mail it is attached to, which is what the server finds it under. */
+    val emailId: Uuid,
     val filename: String,
     val contentType: String,
     val size: Long,

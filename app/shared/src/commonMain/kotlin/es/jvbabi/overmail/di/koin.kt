@@ -14,12 +14,14 @@ import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
 import es.jvbabi.overmail.data.repository.EmailsRepositoryImpl
+import es.jvbabi.overmail.data.repository.FileRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
+import es.jvbabi.overmail.domain.repository.FileRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
@@ -152,6 +154,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
         single { EmailPictures(renderer = get(), cache = EmailPictureCache(emailPictureCacheDirectory())) }
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
+        single<FileRepository> { FileRepositoryImpl() }
 
         singleOf(::GetCurrentAccountUseCase)
         singleOf(::SetCurrentAccountUseCase)

@@ -8,6 +8,8 @@ import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.ViewState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.LocalDate
+import es.jvbabi.overmail.domain.model.Attachment
+import okio.BufferedSink
 import kotlin.uuid.Uuid
 
 interface EmailsRepository {
@@ -36,6 +38,17 @@ interface EmailsRepository {
      * fetched while there is no copy: a stored mail never changes.
      */
     suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody>
+
+    /**
+     * Streams the file of [attachment] into [sink], telling [onProgress] how far it got, from 0 to
+     * 1. Not cached here: where the file is kept is the [FileRepository]'s.
+     */
+    suspend fun downloadAttachment(
+        attachment: Attachment,
+        user: OvermailAccount,
+        sink: BufferedSink,
+        onProgress: (Float) -> Unit,
+    ): Result<Unit>
 
     /** What [getBody] last answered for the mail of [emailId], if it was lately; without waiting, like [peekEmail]. */
     fun peekBody(emailId: Uuid): EmailBody?

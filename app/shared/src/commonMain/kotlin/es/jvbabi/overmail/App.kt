@@ -143,6 +143,20 @@ expect fun emailBodyCacheDirectory(): Path
 expect fun emailPictureCacheDirectory(): Path
 
 /**
+ * Where downloaded attachments are kept, see `FileRepositoryImpl`: in the platform's cache as well,
+ * so the system may clear it. On Android it is also what the FileProvider may hand out.
+ */
+expect fun attachmentCacheDirectory(): Path
+
+/**
+ * Shows [file] in whatever the platform opens a [contentType] with: an app of the user's choice on
+ * Android, the system's preview on iOS.
+ *
+ * @return false when nothing on the device can open it.
+ */
+expect fun openFile(file: Path, contentType: String): Boolean
+
+/**
  * The color scheme the system suggests -- Material You on Android 12 and up, the app's own scheme
  * everywhere else. Only consulted when [AppTheme] is asked for a dynamic theme.
  */

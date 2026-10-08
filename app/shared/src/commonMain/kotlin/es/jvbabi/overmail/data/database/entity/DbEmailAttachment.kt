@@ -36,6 +36,7 @@ data class DbEmailAttachment(
 ) {
     fun toModel() = Attachment(
         id = id,
+        emailId = emailId,
         filename = filename,
         contentType = contentType,
         size = size,

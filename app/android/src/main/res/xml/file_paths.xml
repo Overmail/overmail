@@ -2,11 +2,17 @@
 <!--
   What the app's FileProvider is allowed to hand out.
 
-  Only the folder the updater downloads its APKs into — nothing else in the cache has any business
-  leaving the app. The path has to match UPDATE_CACHE_DIRECTORY in UpdateRepositoryImpl.
+  Only the folders of what the app downloads to give away — nothing else in the cache has any
+  business leaving the app:
+
+  - the updater's APKs, has to match UPDATE_CACHE_DIRECTORY in UpdateRepositoryImpl
+  - the attachments opened in another app, has to match ATTACHMENT_CACHE_DIRECTORY in App.android.kt
 -->
 <paths>
     <cache-path
         name="updates"
         path="updates/" />
+    <cache-path
+        name="attachments"
+        path="attachments/" />
 </paths>

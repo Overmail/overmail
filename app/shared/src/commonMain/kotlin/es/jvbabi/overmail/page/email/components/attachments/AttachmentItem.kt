@@ -195,15 +195,18 @@ private fun ProgressRing(progress: Float) {
     }
 }
 
+private val previewEmailId = Uuid.random()
+
 internal val previewAttachments = listOf(
-    Attachment(Uuid.random(), "Rechnung_2026-09.pdf", "application/pdf", 184_320),
-    Attachment(Uuid.random(), "Urlaubsfotos.zip", "application/zip", 48_234_496),
-    Attachment(Uuid.random(), "IMG_4021.HEIC", "image/heic", 2_734_080),
-    Attachment(Uuid.random(), "Termin.ics", "text/calendar", 1_204),
-    Attachment(Uuid.random(), "signature.asc", "application/pgp-signature", 833),
-    Attachment(Uuid.random(), "unbenannt", "application/octet-stream", 12_000),
+    Attachment(Uuid.random(), previewEmailId, "Rechnung_2026-09.pdf", "application/pdf", 184_320),
+    Attachment(Uuid.random(), previewEmailId, "Urlaubsfotos.zip", "application/zip", 48_234_496),
+    Attachment(Uuid.random(), previewEmailId, "IMG_4021.HEIC", "image/heic", 2_734_080),
+    Attachment(Uuid.random(), previewEmailId, "Termin.ics", "text/calendar", 1_204),
+    Attachment(Uuid.random(), previewEmailId, "signature.asc", "application/pgp-signature", 833),
+    Attachment(Uuid.random(), previewEmailId, "unbenannt", "application/octet-stream", 12_000),
     Attachment(
         Uuid.random(),
+        previewEmailId,
         "Protokoll der Mitgliederversammlung vom 14. September 2026 (endgültige Fassung).docx",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         96_512,

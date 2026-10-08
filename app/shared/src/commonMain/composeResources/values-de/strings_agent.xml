@@ -3,7 +3,6 @@
     <string name="agent_title_unnamed">Unbenannter Chat</string>
     <string name="agent_new_chat">Neuer Chat</string>
     <string name="agent_chats">Chats</string>
-    <string name="agent_empty">Stell eine Frage oder gib eine Aufgabe</string>
     <string name="agent_input_placeholder">Overmail AI fragen</string>
     <string name="agent_send">Senden</string>
     <string name="agent_tool_read_email">Lese E-Mail</string>
@@ -34,4 +33,9 @@
     <string name="agent_link_description">Dieser Link führt aus Overmail heraus, und den Text eines Links schreibt der Assistent.</string>
     <string name="agent_link_cancel">Abbrechen</string>
     <string name="agent_link_open">Öffnen</string>
+    <string name="agent_empty_title">Wobei kann ich helfen?</string>
+    <string name="agent_suggestion_today">Was ist heute wichtig?</string>
+    <string name="agent_suggestion_summary">Fasse meine ungelesenen Mails zusammen</string>
+    <string name="agent_suggestion_waiting">Wer wartet auf eine Antwort von mir?</string>
+    <string name="agent_scroll_to_end">Zum Ende scrollen</string>
 </resources>

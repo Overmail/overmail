@@ -8,6 +8,7 @@ import org.intellij.markdown.ast.getTextInNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
+import org.intellij.markdown.parser.CancellationToken
 import org.intellij.markdown.parser.MarkdownParser
 import kotlin.uuid.Uuid
 
@@ -46,7 +47,7 @@ sealed interface MdInline {
 
 enum class EntityKind(val tag: String) { Email("email"), Label("label"), Person("person") }
 
-private val parser = MarkdownParser(GFMFlavourDescriptor())
+private val parser = MarkdownParser(GFMFlavourDescriptor(), cancellationToken = CancellationToken.NonCancellable)
 
 private val ENTITY_OPEN = Regex("""^<(email|label|person)\s+id\s*=\s*"([^"]*)"\s*(/?)>$""", RegexOption.IGNORE_CASE)
 private val ENTITY_ELEMENT = Regex("""<(email|label|person)\s+id\s*=\s*"([^"]*)"\s*(?:/>|>[\s\S]*?</\1\s*>)""", RegexOption.IGNORE_CASE)
@@ -58,7 +59,7 @@ private val UNFINISHED_TAG = Regex("""<[a-zA-Z/][^>\n]*$""")
 /** [streaming]: the answer is still being written, and its end may be half a tag. */
 fun parseMarkdown(source: String, streaming: Boolean = false): List<MdBlock> {
     val text = if (streaming) source.replace(UNFINISHED_TAG, "") else source
-    return MarkdownSource(text).blocks(parser.buildMarkdownTreeFromString(text).children)
+    return MarkdownSource(text).blocks(parser.buildMarkdownTreeFromString(text as CharSequence).children)
 }
 
 private class MarkdownSource(val text: String) {

@@ -1,35 +1,31 @@
 package es.jvbabi.overmail.page.agent
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,44 +33,51 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phosphor.icons.PhIcons
-import com.phosphor.icons.regular.ArrowClockwise
-import com.phosphor.icons.regular.CaretDown
-import com.phosphor.icons.regular.PaperPlaneTilt
-import com.phosphor.icons.regular.Plus
+import com.phosphor.icons.regular.ArrowDown
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import es.jvbabi.overmail.domain.model.AiChatMessage
-import es.jvbabi.overmail.page.LocalBottomNavBarHeight
 import es.jvbabi.overmail.openUrl
-import es.jvbabi.overmail.page.agent.components.ToolCallGroup
+import es.jvbabi.overmail.page.LocalBottomNavBarHeight
+import es.jvbabi.overmail.page.agent.components.AssistantMessage
+import es.jvbabi.overmail.page.agent.components.ChatListSheet
+import es.jvbabi.overmail.page.agent.components.ChatTopBar
+import es.jvbabi.overmail.page.agent.components.Composer
+import es.jvbabi.overmail.page.agent.components.EmptyChat
+import es.jvbabi.overmail.page.agent.components.UserMessage
 import es.jvbabi.overmail.page.agent.markdown.MarkdownActions
-import es.jvbabi.overmail.page.agent.markdown.MarkdownContent
-import es.jvbabi.overmail.page.agent.markdown.parseMarkdown
-import es.jvbabi.overmail.ui.components.orb.OrbState
-import es.jvbabi.overmail.ui.components.orb.ThinkingOrb
+import es.jvbabi.overmail.utils.ProgressiveDirection
+import es.jvbabi.overmail.utils.progressiveBackground
+import es.jvbabi.overmail.utils.progressiveBackgroundBlur
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
-import overmail.app.shared.generated.resources.agent_empty
 import overmail.app.shared.generated.resources.agent_error_load
 import overmail.app.shared.generated.resources.agent_error_retry
 import overmail.app.shared.generated.resources.agent_error_send
-import overmail.app.shared.generated.resources.agent_retry
-import overmail.app.shared.generated.resources.agent_input_placeholder
 import overmail.app.shared.generated.resources.agent_link_cancel
 import overmail.app.shared.generated.resources.agent_link_description
 import overmail.app.shared.generated.resources.agent_link_open
 import overmail.app.shared.generated.resources.agent_link_title
-import overmail.app.shared.generated.resources.agent_new_chat
-import overmail.app.shared.generated.resources.agent_send
-import overmail.app.shared.generated.resources.agent_title_new
-import overmail.app.shared.generated.resources.agent_title_unnamed
+import overmail.app.shared.generated.resources.agent_scroll_to_end
 import kotlin.uuid.Uuid
 
 /**
@@ -127,212 +130,172 @@ fun AgentScreen(
     }
 }
 
+
+/** How much of the area under the conversation fades in, from its top; the rest is solid. */
+private const val BOTTOM_FADE = 0.22f
+
 @Composable
 private fun AgentContent(
     state: AgentState,
     actions: MarkdownActions,
     onEvent: (AgentEvent) -> Unit,
 ) {
-    val bottomNavBarHeight = LocalBottomNavBarHeight.current
+    val density = LocalDensity.current
+    val colors = MaterialTheme.colorScheme
+    val hazeState = rememberHazeState()
     val listState = rememberLazyListState()
-
-    // Follows the end of the conversation as it grows, a new message and a longer answer alike.
-    val lastLength = (state.messages.lastOrNull() as? AiChatMessage.Assistant)?.content?.length
-    LaunchedEffect(state.messages.size, lastLength) {
-        if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .imePadding(),
-    ) {
-        ChatHeader(state = state, onEvent = onEvent)
-
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (state.messages.isEmpty() && state.currentChatId == null) Text(
-                text = stringResource(Res.string.agent_empty),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.Center).padding(32.dp),
-            )
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(state.messages, key = { it.id.toString() }) { message ->
-                    when (message) {
-                        is AiChatMessage.User -> UserMessage(message)
-                        is AiChatMessage.Assistant -> AssistantMessage(
-                            message = message,
-                            references = state.references,
-                            actions = actions,
-                            canRetry = !state.isAnswering,
-                            onRetry = { onEvent(AgentEvent.Retry(message.id)) },
-                        )
-                    }
-                }
-            }
-        }
-
-        state.error?.let { error ->
-            Text(
-                text = stringResource(
-                    when (error) {
-                        AgentError.Load -> Res.string.agent_error_load
-                        AgentError.Send -> Res.string.agent_error_send
-                        AgentError.Retry -> Res.string.agent_error_retry
-                    }
-                ),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // The nav bar lies over the bottom of the screen; the prompt sits above it.
-                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = bottomNavBarHeight + 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = state.input,
-                onValueChange = { onEvent(AgentEvent.SetInput(it)) },
-                placeholder = { Text(stringResource(Res.string.agent_input_placeholder)) },
-                maxLines = 5,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = { onEvent(AgentEvent.Send) },
-                enabled = !state.isAnswering && state.input.isNotBlank(),
-            ) {
-                Icon(PhIcons.Regular.PaperPlaneTilt, contentDescription = stringResource(Res.string.agent_send))
-            }
-        }
-    }
-}
-
-/** What chat is open, the others to switch to, and a new one. */
-@Composable
-private fun ChatHeader(state: AgentState, onEvent: (AgentEvent) -> Unit) {
+    val scope = rememberCoroutineScope()
     var showChats by remember { mutableStateOf(false) }
+    var topBarHeight by remember { mutableStateOf(0.dp) }
+    var bottomHeight by remember { mutableStateOf(0.dp) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.weight(1f)) {
-            TextButton(onClick = { showChats = true }) {
-                Text(
-                    text = when {
-                        state.currentChatId == null -> stringResource(Res.string.agent_title_new)
-                        else -> state.currentChat?.name ?: stringResource(Res.string.agent_title_unnamed)
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Icon(PhIcons.Regular.CaretDown, contentDescription = null, modifier = Modifier.padding(start = 4.dp))
+    // Above the nav bar, or above the keyboard while it is out -- it covers the nav bar then.
+    val keyboard = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val bottomOffset = maxOf(keyboard, LocalBottomNavBarHeight.current)
+
+    // Following the end is the reader's choice: scrolling up stops it, coming back to the end --
+    // or the button -- starts it again. That way an answer being written pushes the view along
+    // for whoever reads its end, and leaves alone whoever went back to something further up.
+    var followsEnd by remember { mutableStateOf(true) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress to listState.canScrollForward }
+            .distinctUntilChanged()
+            .collect { (scrolling, canScrollForward) ->
+                if (!canScrollForward) followsEnd = true
+                else if (scrolling && listState.lastScrolledBackward) followsEnd = false
             }
-            DropdownMenu(expanded = showChats, onDismissRequest = { showChats = false }) {
-                state.chats.forEach { chat ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = chat.name ?: stringResource(Res.string.agent_title_unnamed),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        onClick = {
-                            showChats = false
-                            onEvent(AgentEvent.SelectChat(chat.id))
-                        },
+    }
+    // Another chat, or a question just sent: back to the end, whatever was scrolled before.
+    val lastUserMessage = state.messages.lastOrNull { it is AiChatMessage.User }?.id
+    LaunchedEffect(state.currentChatId, lastUserMessage) { followsEnd = true }
+
+    // Whatever makes the content longer -- a new message, an answer growing, a chip resolved into
+    // its name, a tool call group opened -- shows up as room to scroll further.
+    val lastIndex by rememberUpdatedState(state.messages.lastIndex)
+    LaunchedEffect(listState, followsEnd) {
+        if (!followsEnd) return@LaunchedEffect
+        snapshotFlow { listState.canScrollForward }.collect { canScrollForward ->
+            if (canScrollForward && lastIndex >= 0) listState.scrollToItem(lastIndex, Int.MAX_VALUE)
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(colors.background)) {
+        if (state.messages.isEmpty() && state.currentChatId == null) {
+            EmptyChat(
+                onAsk = { onEvent(AgentEvent.Ask(it)) },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(top = topBarHeight, bottom = bottomHeight),
+            )
+        } else LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().hazeSource(hazeState),
+            // The list runs under the bar and the prompt, and pads itself clear of both.
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                end = 20.dp,
+                top = topBarHeight + 8.dp,
+                bottom = bottomHeight,
+            ),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            items(state.messages, key = { it.id.toString() }) { message ->
+                when (message) {
+                    is AiChatMessage.User -> UserMessage(message)
+                    is AiChatMessage.Assistant -> AssistantMessage(
+                        message = message,
+                        references = state.references,
+                        actions = actions,
+                        canRetry = !state.isAnswering,
+                        onRetry = { onEvent(AgentEvent.Retry(message.id)) },
                     )
                 }
             }
         }
-        IconButton(onClick = { onEvent(AgentEvent.NewChat) }) {
-            Icon(PhIcons.Regular.Plus, contentDescription = stringResource(Res.string.agent_new_chat))
-        }
-    }
-}
 
-@Composable
-private fun UserMessage(message: AiChatMessage.User) {
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Text(
-            text = message.text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        ChatTopBar(
+            title = state.currentChat?.name,
+            isNewChat = state.currentChatId == null,
+            onShowChats = { showChats = true },
+            onNewChat = { onEvent(AgentEvent.NewChat) },
             modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .align(Alignment.TopCenter)
+                .progressiveBackgroundBlur(hazeState, ProgressiveDirection.TopToBottom, colors.background, startRadius = 24.dp)
+                .progressiveBackground(colors.background, ProgressiveDirection.TopToBottom)
+                // Before the paddings: the list has to clear the status bar and the fade as well.
+                .onSizeChanged { topBarHeight = with(density) { it.height.toDp() } }
+                .statusBarsPadding()
+                .padding(bottom = 20.dp),
         )
-    }
-}
 
-/** The answer's markdown, and the tool calls between it as their collapsible groups. */
-@Composable
-private fun AssistantMessage(
-    message: AiChatMessage.Assistant,
-    references: AgentReferences,
-    actions: MarkdownActions,
-    /** False while an answer runs in this chat: a retry now would collide with it. */
-    canRetry: Boolean,
-    onRetry: () -> Unit,
-) {
-    val blocks = remember(message.content) { agentBlocks(message.content) }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        blocks.forEachIndexed { index, block ->
-            when (block) {
-                is AgentBlock.Text -> {
-                    // Only the end of an answer being written can be half a tag.
-                    val streaming = message.isPending && index == blocks.lastIndex
-                    val markdown = remember(block.content, streaming) { parseMarkdown(block.content, streaming) }
-                    MarkdownContent(markdown, references, actions)
-                }
-                // The last block of an answer that is still being written is what runs right now.
-                is AgentBlock.Tools -> ToolCallGroup(
-                    calls = block.calls,
-                    references = references,
-                    isRunning = message.isPending && index == blocks.lastIndex,
-                )
-            }
-        }
-        // Before the first block the agent is working on something it has not named yet.
-        if (message.isPending && blocks.lastOrNull() !is AgentBlock.Tools) ThinkingOrb(OrbState.Working)
-
-        // Only a finished answer with something in it can be acted on. It comes in after the
-        // answer, so it reads as a consequence of it rather than as part of it.
-        val hasActions = !message.isPending && message.content.isNotBlank()
-        AnimatedVisibility(
-            visible = hasActions,
-            enter = fadeIn(tween(150)) + slideInVertically(tween(150)) { it / 4 },
-            exit = fadeOut(tween(100)),
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                // Solid from the prompt down, so nothing shows between it and the nav bar; above
+                // it the conversation fades out instead of being cut off.
+                .background(Brush.verticalGradient(0f to Color.Transparent, BOTTOM_FADE to colors.background))
+                // Before the padding, which holds the nav bar or the keyboard the list has to clear too.
+                .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } }
+                .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = bottomOffset + 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            IconButton(
-                onClick = onRetry,
-                enabled = canRetry,
-                colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                modifier = Modifier.size(32.dp),
+            AnimatedVisibility(
+                visible = !followsEnd && state.messages.isNotEmpty(),
+                enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                exit = fadeOut() + scaleOut(targetScale = 0.8f),
             ) {
-                Icon(
-                    imageVector = PhIcons.Regular.ArrowClockwise,
-                    contentDescription = stringResource(Res.string.agent_retry),
-                    modifier = Modifier.size(16.dp),
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .shadow(6.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(colors.surfaceContainerLow)
+                        .clickable(role = Role.Button, onClickLabel = stringResource(Res.string.agent_scroll_to_end)) {
+                            followsEnd = true
+                            scope.launch { listState.animateScrollToItem(state.messages.lastIndex, Int.MAX_VALUE) }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(PhIcons.Regular.ArrowDown, contentDescription = stringResource(Res.string.agent_scroll_to_end), modifier = Modifier.size(18.dp))
+                }
+            }
+
+            state.error?.let { error ->
+                Text(
+                    text = stringResource(
+                        when (error) {
+                            AgentError.Load -> Res.string.agent_error_load
+                            AgentError.Send -> Res.string.agent_error_send
+                            AgentError.Retry -> Res.string.agent_error_retry
+                        }
+                    ),
+                    color = colors.error,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
+
+            Composer(
+                value = state.input,
+                onValueChange = { onEvent(AgentEvent.SetInput(it)) },
+                isAnswering = state.isAnswering,
+                onSend = { onEvent(AgentEvent.Send) },
+            )
         }
     }
+
+    if (showChats) ChatListSheet(
+        chats = state.chats,
+        currentChatId = state.currentChatId,
+        onSelect = {
+            showChats = false
+            onEvent(AgentEvent.SelectChat(it))
+        },
+        onNewChat = {
+            showChats = false
+            onEvent(AgentEvent.NewChat)
+        },
+        onDismiss = { showChats = false },
+    )
 }

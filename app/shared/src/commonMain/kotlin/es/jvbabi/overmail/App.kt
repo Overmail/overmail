@@ -124,6 +124,13 @@ expect fun getClipboardText(): String?
  */
 expect fun hapticFirework()
 
+/**
+ * The faintest tap the device can give, [intensity] from 0 to 1: what text arriving feels like
+ * while an answer is written. Nothing on a device that can only buzz -- a buzz per word would be
+ * the opposite of the point.
+ */
+expect fun hapticTick(intensity: Float)
+
 expect fun deviceInfo(): DeviceInfo
 
 /**

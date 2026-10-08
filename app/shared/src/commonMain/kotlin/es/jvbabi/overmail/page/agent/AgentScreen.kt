@@ -140,6 +140,9 @@ private const val BOTTOM_FADE = 0.22f
  */
 internal val SCREEN_PADDING = 16.dp
 
+/** The fade above the prompt, where the conversation runs out. */
+private val BOTTOM_FADE_HEIGHT = 24.dp
+
 /** Between the prompt and what is below it, the nav bar or the keyboard. */
 private val PROMPT_GAP = 12.dp
 
@@ -246,31 +249,10 @@ private fun AgentContent(
                 .background(Brush.verticalGradient(0f to Color.Transparent, BOTTOM_FADE to colors.background))
                 // Before the padding, which holds the nav bar or the keyboard the list has to clear too.
                 .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } }
-                .padding(start = SCREEN_PADDING, end = SCREEN_PADDING, top = 24.dp, bottom = bottomOffset + PROMPT_GAP),
+                .padding(start = SCREEN_PADDING, end = SCREEN_PADDING, top = BOTTOM_FADE_HEIGHT, bottom = bottomOffset + PROMPT_GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AnimatedVisibility(
-                visible = !followsEnd && state.shownMessages.isNotEmpty(),
-                enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                exit = fadeOut() + scaleOut(targetScale = 0.8f),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .shadow(6.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(colors.surfaceContainerLow)
-                        .clickable(role = Role.Button, onClickLabel = stringResource(Res.string.agent_scroll_to_end)) {
-                            followsEnd = true
-                            scope.launch { listState.animateScrollToItem(state.shownMessages.lastIndex, Int.MAX_VALUE) }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(PhIcons.Regular.ArrowDown, contentDescription = stringResource(Res.string.agent_scroll_to_end), modifier = Modifier.size(18.dp))
-                }
-            }
-
             state.error?.let { error ->
                 Text(
                     text = stringResource(
@@ -291,6 +273,33 @@ private fun AgentContent(
                 isAnswering = state.isAnswering,
                 onSend = { onEvent(AgentEvent.Send) },
             )
+        }
+
+        // A layer of its own over the fade above the prompt: in the column below it would make
+        // that taller when it comes and goes -- the list's padding with it -- and the prompt,
+        // drawn after it, would cut off its shadow.
+        AnimatedVisibility(
+            visible = !followsEnd && state.shownMessages.isNotEmpty(),
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = bottomHeight - BOTTOM_FADE_HEIGHT + PROMPT_GAP),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .shadow(6.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(colors.surfaceContainerLow)
+                    .clickable(role = Role.Button, onClickLabel = stringResource(Res.string.agent_scroll_to_end)) {
+                        followsEnd = true
+                        scope.launch { listState.animateScrollToItem(state.shownMessages.lastIndex, Int.MAX_VALUE) }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(PhIcons.Regular.ArrowDown, contentDescription = stringResource(Res.string.agent_scroll_to_end), modifier = Modifier.size(18.dp))
+            }
         }
     }
 

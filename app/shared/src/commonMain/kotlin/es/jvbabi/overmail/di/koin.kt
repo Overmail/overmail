@@ -31,6 +31,7 @@ import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
 import es.jvbabi.overmail.page.email.EmailViewModel
+import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
@@ -173,6 +174,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         viewModelOf(::OnboardingSuccessViewModel)
         // Takes the id of the mail as a parameter.
         viewModelOf(::EmailViewModel)
+        viewModelOf(::AttachmentsViewModel)
         viewModelOf(::SearchViewModel)
     })
 

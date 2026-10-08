@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -20,27 +22,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.Paperclip
 import es.jvbabi.overmail.domain.model.Attachment
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.email_attachments_title
 import kotlin.uuid.Uuid
 
 /**
- * The attachments of a mail under a heading, the web app's `AttachmentList`. Only the row: which
- * downloads run and how far they are is the caller's, and so is what a tap does.
- *
- * @param downloadProgress the running downloads, by attachment id, from 0 to 1.
- * @param onClick an attachment was tapped: start its download, or cancel the one that is running.
+ * The attachments of a mail under a heading, the web app's `AttachmentList`. A tap downloads one
+ * into the app's cache and opens it, see [AttachmentsViewModel].
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AttachmentList(
     attachments: List<Attachment>,
-    downloadProgress: Map<Uuid, Float>,
+    modifier: Modifier = Modifier,
+) {
+    val viewModel = koinViewModel<AttachmentsViewModel>()
+    val states by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(attachments) { viewModel.onAttachmentsShown(attachments) }
+
+    AttachmentList(
+        attachments = attachments,
+        states = states,
+        onClick = viewModel::onClick,
+        modifier = modifier,
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AttachmentList(
+    attachments: List<Attachment>,
+    states: Map<Uuid, AttachmentState>,
     onClick: (Attachment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -72,7 +91,7 @@ fun AttachmentList(
             attachments.forEach { attachment ->
                 AttachmentItem(
                     attachment = attachment,
-                    downloadProgress = downloadProgress[attachment.id],
+                    state = states[attachment.id] ?: AttachmentState.Remote,
                     onClick = { onClick(attachment) },
                 )
             }
@@ -85,7 +104,11 @@ private fun AttachmentListContent() {
     Surface {
         AttachmentList(
             attachments = previewAttachments,
-            downloadProgress = mapOf(previewAttachments[1].id to 0.65f),
+            states = mapOf(
+                previewAttachments[0].id to AttachmentState.Cached,
+                previewAttachments[1].id to AttachmentState.Downloading(0.65f),
+                previewAttachments[3].id to AttachmentState.Failed(AttachmentFailure.Download),
+            ),
             onClick = {},
             modifier = Modifier.padding(16.dp),
         )

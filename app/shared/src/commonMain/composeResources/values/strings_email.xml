@@ -23,4 +23,7 @@
     <string name="email_attachments_cancel">Cancel downloading %1$s</string>
     <!-- While downloading: the file's size, then how far along it is. -->
     <string name="email_attachments_progress">%1$s • %2$d%</string>
+    <string name="email_attachments_open">Open %1$s</string>
+    <string name="email_attachments_failed">Download failed</string>
+    <string name="email_attachments_no_app">No app can open this</string>
 </resources>

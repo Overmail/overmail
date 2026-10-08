@@ -46,6 +46,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.phosphor.icons.PhIcons
+import com.phosphor.icons.regular.ArrowSquareOut
 import com.phosphor.icons.regular.Download
 import com.phosphor.icons.regular.X
 import es.jvbabi.overmail.domain.model.Attachment
@@ -55,6 +56,9 @@ import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.email_attachments_cancel
 import overmail.app.shared.generated.resources.email_attachments_download
+import overmail.app.shared.generated.resources.email_attachments_failed
+import overmail.app.shared.generated.resources.email_attachments_no_app
+import overmail.app.shared.generated.resources.email_attachments_open
 import overmail.app.shared.generated.resources.email_attachments_progress
 import kotlin.math.roundToInt
 import kotlin.uuid.Uuid
@@ -62,19 +66,17 @@ import kotlin.uuid.Uuid
 private val ItemShape = RoundedCornerShape(8.dp)
 
 /**
- * One attachment, the web app's `Attachment`: its type, name and size, and a tap that downloads it
- * or cancels the download that is running.
+ * One attachment, the web app's `Attachment`: its type, name and size, and a tap that does what
+ * [state] says -- download, open, or cancel the download that is running.
  *
- * While downloading the type gives way to a ring of [downloadProgress]. Unlike the web, the ring
- * holds the cancel icon the whole time rather than only on hover: a phone has no hover, and the
- * tap cancels either way.
- *
- * @param downloadProgress how far the download is, from 0 to 1; null while none is running.
+ * While downloading the type gives way to a ring of the progress. Unlike the web, the ring holds
+ * the cancel icon the whole time rather than only on hover: a phone has no hover, and the tap
+ * cancels either way.
  */
 @Composable
 fun AttachmentItem(
     attachment: Attachment,
-    downloadProgress: Float?,
+    state: AttachmentState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -83,12 +85,19 @@ fun AttachmentItem(
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.95f else 1f)
 
+    val downloadProgress = (state as? AttachmentState.Downloading)?.progress
     val downloading = downloadProgress != null
     val showFiletypeIcon = !downloading && !hovered
+    // Whether a tap opens what is here rather than fetching it first.
+    val opens = state == AttachmentState.Cached || state == AttachmentState.Failed(AttachmentFailure.NoApp)
 
     val size = HumanReadable.fileSize(attachment.size)
     val label = stringResource(
-        if (downloading) Res.string.email_attachments_cancel else Res.string.email_attachments_download,
+        when {
+            downloading -> Res.string.email_attachments_cancel
+            opens -> Res.string.email_attachments_open
+            else -> Res.string.email_attachments_download
+        },
         attachment.filename,
     )
 
@@ -134,7 +143,11 @@ fun AttachmentItem(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (downloading) PhIcons.Regular.X else PhIcons.Regular.Download,
+                    imageVector = when {
+                        downloading -> PhIcons.Regular.X
+                        opens -> PhIcons.Regular.ArrowSquareOut
+                        else -> PhIcons.Regular.Download
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(16.dp),
@@ -152,17 +165,27 @@ fun AttachmentItem(
                 overflow = TextOverflow.MiddleEllipsis,
             )
             Text(
-                text = if (downloadProgress != null) stringResource(
-                    Res.string.email_attachments_progress,
-                    size,
-                    (downloadProgress.coerceIn(0f, 1f) * 100).roundToInt(),
-                ) else size,
+                text = when (state) {
+                    is AttachmentState.Downloading -> stringResource(
+                        Res.string.email_attachments_progress,
+                        size,
+                        (state.progress.coerceIn(0f, 1f) * 100).roundToInt(),
+                    )
+                    is AttachmentState.Failed -> stringResource(
+                        when (state.reason) {
+                            AttachmentFailure.Download -> Res.string.email_attachments_failed
+                            AttachmentFailure.NoApp -> Res.string.email_attachments_no_app
+                        }
+                    )
+                    AttachmentState.Remote, AttachmentState.Cached -> size
+                },
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     fontFeatureSettings = "tnum",
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state is AttachmentState.Failed) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
@@ -217,11 +240,14 @@ internal val previewAttachments = listOf(
 private fun AttachmentItemStates() {
     Surface {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            AttachmentItem(previewAttachments[0], downloadProgress = null, onClick = {})
-            AttachmentItem(previewAttachments[1], downloadProgress = 0f, onClick = {})
-            AttachmentItem(previewAttachments[1], downloadProgress = 0.42f, onClick = {})
-            AttachmentItem(previewAttachments[1], downloadProgress = 1f, onClick = {})
-            AttachmentItem(previewAttachments.last(), downloadProgress = null, onClick = {})
+            AttachmentItem(previewAttachments[0], AttachmentState.Remote, onClick = {})
+            AttachmentItem(previewAttachments[0], AttachmentState.Cached, onClick = {})
+            AttachmentItem(previewAttachments[1], AttachmentState.Downloading(0f), onClick = {})
+            AttachmentItem(previewAttachments[1], AttachmentState.Downloading(0.42f), onClick = {})
+            AttachmentItem(previewAttachments[1], AttachmentState.Downloading(1f), onClick = {})
+            AttachmentItem(previewAttachments[2], AttachmentState.Failed(AttachmentFailure.Download), onClick = {})
+            AttachmentItem(previewAttachments[5], AttachmentState.Failed(AttachmentFailure.NoApp), onClick = {})
+            AttachmentItem(previewAttachments.last(), AttachmentState.Remote, onClick = {})
         }
     }
 }

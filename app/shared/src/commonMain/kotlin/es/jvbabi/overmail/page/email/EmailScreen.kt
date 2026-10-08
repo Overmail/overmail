@@ -46,6 +46,7 @@ import com.phosphor.icons.regular.TrayArrowDown
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.page.email.components.EmailParticipants
+import es.jvbabi.overmail.page.email.components.attachments.AttachmentList
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import es.jvbabi.overmail.shareUrl
@@ -155,6 +156,11 @@ private fun EmailContent(
                         small = true,
                     ) }
                 }
+
+                if (email.attachments.isNotEmpty()) AttachmentList(
+                    attachments = email.attachments,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
 
                 EmailBody(body = state.body)
 

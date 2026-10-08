@@ -17,4 +17,12 @@
     <string name="email_body_empty">Diese Mail hat keinen lesbaren Inhalt.</string>
     <string name="email_body_failed">Der Inhalt konnte nicht geladen werden.</string>
     <string name="email_action_failed">Das hat den Server nicht erreicht und wurde zurückgenommen.</string>
+    <!-- Die Anhänge einer Mail, unter ihrem Inhalt. -->
+    <string name="email_attachments_title">Anhänge</string>
+    <string name="email_attachments_download">%1$s herunterladen</string>
+    <string name="email_attachments_cancel">Download von %1$s abbrechen</string>
+    <string name="email_attachments_progress">%1$s • %2$d&#160;%</string>
+    <string name="email_attachments_open">%1$s öffnen</string>
+    <string name="email_attachments_failed">Download fehlgeschlagen</string>
+    <string name="email_attachments_no_app">Keine App kann das öffnen</string>
 </resources>

@@ -4,7 +4,10 @@ import android.content.Context
 import coil3.PlatformContext
 import okio.Path
 import okio.Path.Companion.toPath
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
@@ -68,6 +71,35 @@ actual fun emailBodyCacheDirectory(): Path =
 
 actual fun emailPictureCacheDirectory(): Path =
     KoinPlatformTools.defaultContext().get().get<Context>().cacheDir.resolve("email-pictures").absolutePath.toPath()
+
+/** Has to match the `cache-path` of the attachments in `res/xml/file_paths.xml` of `:app:android`. */
+private const val ATTACHMENT_CACHE_DIRECTORY = "attachments"
+
+/** Completes the authority the FileProvider is declared under in the app manifest. */
+private const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".fileprovider"
+
+actual fun attachmentCacheDirectory(): Path =
+    KoinPlatformTools.defaultContext().get().get<Context>().cacheDir.resolve(ATTACHMENT_CACHE_DIRECTORY).absolutePath.toPath()
+
+actual fun openFile(file: Path, contentType: String): Boolean {
+    val context = activityContext()
+    // A content URI with a read grant: a file:// URI would be a FileUriExposedException.
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}$FILE_PROVIDER_AUTHORITY_SUFFIX", file.toFile())
+    // What the sender declared is often just bytes; the name tells an app more then.
+    val type = contentType.takeUnless { it.equals("application/octet-stream", ignoreCase = true) }
+        ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.name.substringAfterLast('.', "").lowercase())
+        ?: contentType
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, type)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    return try {
+        context.startActivity(intent)
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    }
+}
 
 actual fun openUrl(url: String) {
     val customTabsIntent = CustomTabsIntent.Builder()

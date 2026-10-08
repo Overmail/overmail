@@ -14,12 +14,14 @@ import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
 import es.jvbabi.overmail.data.repository.EmailsRepositoryImpl
+import es.jvbabi.overmail.data.repository.FileRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
+import es.jvbabi.overmail.domain.repository.FileRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
@@ -29,6 +31,7 @@ import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
 import es.jvbabi.overmail.page.email.EmailViewModel
+import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
@@ -152,6 +155,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
         single { EmailPictures(renderer = get(), cache = EmailPictureCache(emailPictureCacheDirectory())) }
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
+        single<FileRepository> { FileRepositoryImpl() }
 
         singleOf(::GetCurrentAccountUseCase)
         singleOf(::SetCurrentAccountUseCase)
@@ -170,6 +174,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         viewModelOf(::OnboardingSuccessViewModel)
         // Takes the id of the mail as a parameter.
         viewModelOf(::EmailViewModel)
+        viewModelOf(::AttachmentsViewModel)
         viewModelOf(::SearchViewModel)
     })
 

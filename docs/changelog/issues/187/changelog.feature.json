@@ -1,0 +1,10 @@
+{
+  "title": "Attachments in the app",
+  "description": "A mail shows its attachments under its labels. Tap one to download it and open it in an app of your choice; a second tap on a running download cancels it. What you downloaded stays on the device and opens right away the next time.",
+  "localized": {
+    "de": {
+      "title": "Anhänge in der App",
+      "description": "Eine Mail zeigt ihre Anhänge unter ihren Labels. Tippe auf einen, um ihn herunterzuladen und in einer App deiner Wahl zu öffnen; ein zweites Tippen auf einen laufenden Download bricht ihn ab. Was du heruntergeladen hast, bleibt auf dem Gerät und öffnet sich beim nächsten Mal sofort."
+    }
+  }
+}

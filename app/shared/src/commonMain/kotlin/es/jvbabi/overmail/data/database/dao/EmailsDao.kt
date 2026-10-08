@@ -10,6 +10,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import androidx.compose.ui.graphics.Color
 import es.jvbabi.overmail.data.database.entity.DbEmail
+import es.jvbabi.overmail.data.database.entity.DbEmailAttachment
 import es.jvbabi.overmail.data.database.entity.DbEmailLabels
 import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbLabels
@@ -49,7 +50,7 @@ interface EmailsDao {
     /**
      * Stores what the server said about [emails], replacing what was here of them.
      *
-     * A mail's labels and recipients are the whole list every time, so they are replaced rather
+     * A mail's labels, recipients and attachments are the whole list every time, so they are replaced rather
      * than merged. Participants and labels are shared with the searches, which know more of them
      * than a mail does -- how much mail they hold, when a label was made -- so a row that exists
      * keeps that and only takes over what a mail says of it.
@@ -61,6 +62,7 @@ interface EmailsDao {
         labels: List<DbLabels>,
         emailLabels: List<DbEmailLabels>,
         recipients: List<DbEmailRecipients>,
+        attachments: List<DbEmailAttachment>,
     ) {
         insertParticipantsIfMissing(participants)
         updateParticipantsFromEmails(participants.map { ParticipantFromEmail(it.id, it.email, it.avatarUrl, it.avatarPadding) })
@@ -73,6 +75,8 @@ interface EmailsDao {
         insertEmailLabels(emailLabels)
         deleteRecipientsOf(ids)
         insertRecipients(recipients)
+        deleteAttachmentsOf(ids)
+        insertAttachments(attachments)
     }
 
     /** A correspondent's picture changed. Only touches the ones that are here. */
@@ -102,6 +106,12 @@ interface EmailsDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertRecipients(recipients: List<DbEmailRecipients>)
+
+    @Query("DELETE FROM email_attachments WHERE email_id IN (:emailIds)")
+    suspend fun deleteAttachmentsOf(emailIds: List<Uuid>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAttachments(attachments: List<DbEmailAttachment>)
 }
 
 /** What a mail says of a participant; the name is left alone, a mail only has its own header's. */

@@ -11,6 +11,7 @@ import es.jvbabi.overmail.data.database.dao.LabelsDao
 import es.jvbabi.overmail.data.database.dao.ParticipantsDao
 import es.jvbabi.overmail.data.database.dao.OvermailAccountDao
 import es.jvbabi.overmail.data.database.entity.DbEmail
+import es.jvbabi.overmail.data.database.entity.DbEmailAttachment
 import es.jvbabi.overmail.data.database.entity.DbEmailLabels
 import es.jvbabi.overmail.data.database.entity.DbEmailRecipients
 import es.jvbabi.overmail.data.database.entity.DbKeyValue
@@ -29,9 +30,13 @@ import es.jvbabi.overmail.data.database.entity.DbParticipant
         DbEmail::class,
         DbEmailLabels::class,
         DbEmailRecipients::class,
+        DbEmailAttachment::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
+    autoMigrations = [
+        AutoMigration(from = 2, to = 3)
+    ]
 )
 @TypeConverters(
     value = [

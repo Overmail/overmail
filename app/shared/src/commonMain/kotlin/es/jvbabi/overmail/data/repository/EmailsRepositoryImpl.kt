@@ -56,6 +56,14 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import es.jvbabi.overmail.domain.model.Attachment
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.contentLength
+import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
+import okio.BufferedSink
 import kotlin.uuid.Uuid
 
 private val logger = Logger.withTag("EmailsRepository")
@@ -158,6 +166,36 @@ class EmailsRepositoryImpl(
 
     override fun peekBody(emailId: Uuid): EmailBody? = recentBodies[emailId]
 
+    override suspend fun downloadAttachment(
+        attachment: Attachment,
+        user: OvermailAccount,
+        sink: BufferedSink,
+        onProgress: (Float) -> Unit,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        safeRequest {
+            val url = URLBuilder(urlString = user.homeserver).apply {
+                appendPathSegments("api", "emails", attachment.emailId.toString(), "attachments", attachment.id.toString())
+            }.build()
+
+            httpClient.prepareGet(url) { bearerAuth(user.token) }.execute { response ->
+                if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+
+                // The server sends the length; the size the mail described is the fallback.
+                val total = response.contentLength() ?: attachment.size
+                val channel = response.bodyAsChannel()
+                val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
+                var received = 0L
+                while (true) {
+                    val read = channel.readAvailable(buffer, 0, buffer.size)
+                    if (read == -1) break
+                    sink.write(buffer, 0, read)
+                    received += read
+                    if (total > 0) onProgress((received.toFloat() / total).coerceAtMost(1f))
+                }
+            }
+        }
+    }
+
     override fun peekPicture(emailId: Uuid): ImageBitmap? = emailPictures.peek(emailId)
 
     override suspend fun getPicture(emailId: Uuid, html: String, order: () -> Int): ImageBitmap? =
@@ -230,6 +268,9 @@ class EmailsRepositoryImpl(
 }
 
 private val streamJson = Json { ignoreUnknownKeys = true }
+
+/** How much of an attachment is read before it is written on. */
+private const val DOWNLOAD_BUFFER_BYTES = 64 * 1024
 
 /** How many bodies [EmailsRepositoryImpl.peekBody] remembers; the pile reads a few ahead. */
 private const val RECENT_BODIES = 16

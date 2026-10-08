@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 private val logger = Logger.withTag("AgentViewModel")
@@ -150,40 +151,59 @@ class AgentViewModel(
             AgentEvent.Send -> {
                 val text = state.value.input.trim()
                 if (text.isEmpty()) return
-                send(state.value.currentChatId, text)
+                send(state.value.currentChatId, text, fromInput = true)
             }
             is AgentEvent.Retry -> retry(event.messageId)
             // Asked from somewhere else, the search for instance: a question of its own.
             is AgentEvent.Ask -> {
                 if (event.text.isBlank()) return
                 openChat(null)
-                send(null, event.text.trim())
+                send(null, event.text.trim(), fromInput = false)
             }
         }
     }
 
     private fun openChat(chatId: Uuid?) {
         chatJob?.cancel()
-        state.update { it.copy(currentChatId = chatId, messages = emptyList(), error = null) }
+        state.update { it.copy(currentChatId = chatId, messages = emptyList(), pendingQuestion = null, error = null) }
         if (chatId != null) chatJob = viewModelScope.launch { load(chatId) }
     }
 
-    private fun send(chatId: Uuid?, text: String) {
+    /**
+     * Sends [text] into [chatId]. It shows up as asked right away, see [AgentState.pendingQuestion],
+     * and the prompt is emptied with it; a question that did not get through goes back into the
+     * prompt it came from, [fromInput].
+     */
+    private fun send(chatId: Uuid?, text: String, fromInput: Boolean) {
         val account = state.value.account ?: return
         if (state.value.isAnswering) return
 
-        state.update { it.copy(isSending = true, error = null) }
+        state.update {
+            it.copy(
+                isSending = true,
+                pendingQuestion = text,
+                input = if (fromInput) "" else it.input,
+                error = null,
+            )
+        }
         viewModelScope.launch {
             aiChatRepository.send(chatId, text, account)
                 .onSuccess { sent ->
-                    state.update { it.copy(input = "", isSending = false) }
                     chatJob?.cancel()
-                    state.update { it.copy(currentChatId = sent.chatId) }
+                    state.update { it.copy(currentChatId = sent.chatId, isSending = false) }
+                    // The question stays shown as pending until the chat is loaded with it in it.
                     chatJob = viewModelScope.launch { load(sent.chatId) }
                 }
                 .onFailure { e ->
                     logger.e(e) { "Could not send the question" }
-                    state.update { it.copy(isSending = false, error = AgentError.Send) }
+                    state.update {
+                        it.copy(
+                            isSending = false,
+                            pendingQuestion = null,
+                            input = if (fromInput && it.input.isEmpty()) text else it.input,
+                            error = AgentError.Send,
+                        )
+                    }
                 }
         }
     }
@@ -217,10 +237,10 @@ class AgentViewModel(
         val account = state.value.account ?: return
         val messages = aiChatRepository.getMessages(chatId, account).getOrElse { e ->
             logger.e(e) { "Could not load chat $chatId" }
-            state.update { it.copy(error = AgentError.Load) }
+            state.update { it.copy(error = AgentError.Load, pendingQuestion = null) }
             return
         }
-        state.update { it.copy(messages = messages) }
+        state.update { it.copy(messages = messages, pendingQuestion = null) }
 
         // Children of the chat's job, so opening another chat stops following this one's answers.
         coroutineScope {
@@ -259,12 +279,27 @@ data class AgentState(
     /** The question is on its way; the answer does not exist yet. */
     val isSending: Boolean = false,
     val error: AgentError? = null,
+    /**
+     * A question on its way to the server: shown as asked before the server has the chat, so
+     * whatever was on screen -- the welcome, the chat before -- gives way to it at once.
+     */
+    val pendingQuestion: String? = null,
     val references: AgentReferences = AgentReferences(),
 ) {
     val currentChat: AiChat? = chats.firstOrNull { it.id == currentChatId }
 
     /** From sending until the answer is written; the prompt waits that long. */
-    val isAnswering: Boolean = isSending || messages.any { it is AiChatMessage.Assistant && it.isPending }
+    val isAnswering: Boolean = isSending || pendingQuestion != null ||
+        messages.any { it is AiChatMessage.Assistant && it.isPending }
+
+    /** [messages], and the [pendingQuestion] with an answer that has not begun yet. */
+    val shownMessages: List<AiChatMessage> = if (pendingQuestion == null) messages else messages + listOf(
+        AiChatMessage.User(id = PENDING_QUESTION_ID, createdAt = Clock.System.now(), text = pendingQuestion),
+        AiChatMessage.Assistant(id = PENDING_ANSWER_ID, createdAt = Clock.System.now(), content = "", isPending = true),
+    )
+
+    /** Nothing asked in this chat yet, and nothing on its way: the welcome is shown. */
+    val isEmpty: Boolean = currentChatId == null && messages.isEmpty() && pendingQuestion == null
 }
 
 /** The labels and mails the tool calls of the open chat name, by id; one not found is left out. */
@@ -273,6 +308,9 @@ data class AgentReferences(
     val emails: Map<Uuid, Email> = emptyMap(),
     val persons: Map<Uuid, Participant> = emptyMap(),
 )
+
+private val PENDING_QUESTION_ID = Uuid.fromLongs(0, 1)
+private val PENDING_ANSWER_ID = Uuid.fromLongs(0, 2)
 
 enum class AgentError { Load, Send, Retry }
 

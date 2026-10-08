@@ -134,6 +134,15 @@ fun AgentScreen(
 /** How much of the area under the conversation fades in, from its top; the rest is solid. */
 private const val BOTTOM_FADE = 0.22f
 
+/**
+ * The one margin of the screen: the text of the conversation, the edges of the questions and of
+ * the prompt, and the icons of the bar all line up on it.
+ */
+internal val SCREEN_PADDING = 16.dp
+
+/** Between the prompt and what is below it, the nav bar or the keyboard. */
+private val PROMPT_GAP = 12.dp
+
 @Composable
 private fun AgentContent(
     state: AgentState,
@@ -166,12 +175,12 @@ private fun AgentContent(
             }
     }
     // Another chat, or a question just sent: back to the end, whatever was scrolled before.
-    val lastUserMessage = state.messages.lastOrNull { it is AiChatMessage.User }?.id
+    val lastUserMessage = state.shownMessages.lastOrNull { it is AiChatMessage.User }?.id
     LaunchedEffect(state.currentChatId, lastUserMessage) { followsEnd = true }
 
     // Whatever makes the content longer -- a new message, an answer growing, a chip resolved into
     // its name, a tool call group opened -- shows up as room to scroll further.
-    val lastIndex by rememberUpdatedState(state.messages.lastIndex)
+    val lastIndex by rememberUpdatedState(state.shownMessages.lastIndex)
     LaunchedEffect(listState, followsEnd) {
         if (!followsEnd) return@LaunchedEffect
         snapshotFlow { listState.canScrollForward }.collect { canScrollForward ->
@@ -180,7 +189,7 @@ private fun AgentContent(
     }
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
-        if (state.messages.isEmpty() && state.currentChatId == null) {
+        if (state.isEmpty) {
             EmptyChat(
                 onAsk = { onEvent(AgentEvent.Ask(it)) },
                 modifier = Modifier
@@ -192,14 +201,14 @@ private fun AgentContent(
             modifier = Modifier.fillMaxSize().hazeSource(hazeState),
             // The list runs under the bar and the prompt, and pads itself clear of both.
             contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
+                start = SCREEN_PADDING,
+                end = SCREEN_PADDING,
                 top = topBarHeight + 8.dp,
                 bottom = bottomHeight,
             ),
             verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
-            items(state.messages, key = { it.id.toString() }) { message ->
+            items(state.shownMessages, key = { it.id.toString() }) { message ->
                 when (message) {
                     is AiChatMessage.User -> UserMessage(message)
                     is AiChatMessage.Assistant -> AssistantMessage(
@@ -237,12 +246,12 @@ private fun AgentContent(
                 .background(Brush.verticalGradient(0f to Color.Transparent, BOTTOM_FADE to colors.background))
                 // Before the padding, which holds the nav bar or the keyboard the list has to clear too.
                 .onSizeChanged { bottomHeight = with(density) { it.height.toDp() } }
-                .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = bottomOffset + 8.dp),
+                .padding(start = SCREEN_PADDING, end = SCREEN_PADDING, top = 24.dp, bottom = bottomOffset + PROMPT_GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             AnimatedVisibility(
-                visible = !followsEnd && state.messages.isNotEmpty(),
+                visible = !followsEnd && state.shownMessages.isNotEmpty(),
                 enter = fadeIn() + scaleIn(initialScale = 0.8f),
                 exit = fadeOut() + scaleOut(targetScale = 0.8f),
             ) {
@@ -254,7 +263,7 @@ private fun AgentContent(
                         .background(colors.surfaceContainerLow)
                         .clickable(role = Role.Button, onClickLabel = stringResource(Res.string.agent_scroll_to_end)) {
                             followsEnd = true
-                            scope.launch { listState.animateScrollToItem(state.messages.lastIndex, Int.MAX_VALUE) }
+                            scope.launch { listState.animateScrollToItem(state.shownMessages.lastIndex, Int.MAX_VALUE) }
                         },
                     contentAlignment = Alignment.Center,
                 ) {

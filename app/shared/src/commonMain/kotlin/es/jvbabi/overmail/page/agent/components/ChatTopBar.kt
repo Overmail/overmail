@@ -41,6 +41,7 @@ import com.phosphor.icons.PhIcons
 import com.phosphor.icons.regular.List
 import com.phosphor.icons.regular.NotePencil
 import es.jvbabi.overmail.domain.model.AiChat
+import es.jvbabi.overmail.page.agent.SCREEN_PADDING
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
@@ -60,7 +61,9 @@ fun ChatTopBar(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        // The icons are smaller than the buttons around them: the button sits off the margin by the
+        // difference, so the icon itself is on it.
+        modifier = modifier.fillMaxWidth().padding(horizontal = SCREEN_PADDING - (BUTTON_SIZE - ICON_SIZE) / 2, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BarButton(PhIcons.Regular.List, Res.string.agent_chats, onShowChats)
@@ -92,7 +95,7 @@ private fun BarButton(icon: ImageVector, label: StringResource, onClick: () -> U
     val color = MaterialTheme.colorScheme.onSurface
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(BUTTON_SIZE)
             .clip(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(label), onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -101,10 +104,13 @@ private fun BarButton(icon: ImageVector, label: StringResource, onClick: () -> U
             imageVector = icon,
             contentDescription = stringResource(label),
             tint = if (enabled) color else color.copy(alpha = 0.3f),
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(ICON_SIZE),
         )
     }
 }
+
+private val BUTTON_SIZE = 44.dp
+private val ICON_SIZE = 22.dp
 
 /** Every chat, newest first, the open one marked; and a new one at the top. */
 @OptIn(ExperimentalMaterial3Api::class)

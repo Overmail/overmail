@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -66,6 +67,9 @@ private val TICK_INTERVAL = 70.milliseconds
 private const val TICK_INTENSITY = 0.18f
 /** A tool call landing, or the answer being done: a little more than a word. */
 private const val STEP_INTENSITY = 0.45f
+
+private val ACTION_SIZE = 32.dp
+private val ACTION_ICON_SIZE = 16.dp
 
 /** A question: a quiet bubble on the right, as wide as it needs and no wider than most of the line. */
 @Composable
@@ -141,12 +145,13 @@ fun AssistantMessage(
             enter = fadeIn(tween(200, delayMillis = 100)) + slideInVertically(tween(200, delayMillis = 100)) { it / 3 },
             exit = fadeOut(tween(100)),
         ) {
-            Row(Modifier.padding(top = 2.dp)) {
+            // The icon on the text's edge, its touch target reaching past it.
+            Row(Modifier.padding(top = 2.dp).offset(x = -(ACTION_SIZE - ACTION_ICON_SIZE) / 2)) {
                 MessageAction(
                     label = Res.string.agent_retry,
                     enabled = canRetry,
                     onClick = onRetry,
-                ) { Icon(PhIcons.Regular.ArrowClockwise, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                ) { Icon(PhIcons.Regular.ArrowClockwise, contentDescription = null, modifier = Modifier.size(ACTION_ICON_SIZE)) }
             }
         }
     }
@@ -157,7 +162,7 @@ private fun MessageAction(label: StringResource, enabled: Boolean, onClick: () -
     val colors = MaterialTheme.colorScheme
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(ACTION_SIZE)
             .clip(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(label), onClick = onClick),
         contentAlignment = Alignment.Center,

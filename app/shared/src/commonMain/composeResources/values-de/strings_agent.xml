@@ -1,0 +1,37 @@
+<resources>
+    <string name="agent_title_new">Neuer Chat</string>
+    <string name="agent_title_unnamed">Unbenannter Chat</string>
+    <string name="agent_new_chat">Neuer Chat</string>
+    <string name="agent_chats">Chats</string>
+    <string name="agent_empty">Stell eine Frage oder gib eine Aufgabe</string>
+    <string name="agent_input_placeholder">Overmail AI fragen</string>
+    <string name="agent_send">Senden</string>
+    <string name="agent_tool_read_email">Lese E-Mail</string>
+    <string name="agent_tool_create_label">Neues Label</string>
+    <string name="agent_tool_label_email">Label vergeben</string>
+    <string name="agent_tool_unlabel_email">Label entfernt</string>
+    <string name="agent_tool_search_knowledge">Durchsucht mein Wissen</string>
+    <string name="agent_tool_read_knowledge">Wissen gelesen zu</string>
+    <string name="agent_tool_write_knowledge">Gemerkt</string>
+    <string name="agent_tool_update_knowledge">Wissen aktualisiert zu</string>
+    <string name="agent_tool_rename_chat">Chat umbenannt</string>
+    <string name="agent_tool_search_emails">Suche Mails</string>
+    <string name="agent_tool_search_subject">Betreff: %1$s</string>
+    <string name="agent_tool_search_sender">Von: %1$s</string>
+    <string name="agent_tool_thinking">Denkt nach</string>
+    <string name="agent_tool_working">Arbeitet</string>
+    <string name="agent_tool_deleted">Gelöscht</string>
+    <string name="agent_tool_expand">Toolcalls anzeigen</string>
+    <plurals name="agent_tool_calls">
+        <item quantity="one">%1$d Toolcall</item>
+        <item quantity="other">%1$d Toolcalls</item>
+    </plurals>
+    <string name="agent_error_load">Der Chat konnte nicht geladen werden.</string>
+    <string name="agent_error_send">Die Frage konnte nicht gesendet werden.</string>
+    <string name="agent_retry">Erneut versuchen</string>
+    <string name="agent_error_retry">Die Antwort konnte nicht neu geschrieben werden.</string>
+    <string name="agent_link_title">Link öffnen?</string>
+    <string name="agent_link_description">Dieser Link führt aus Overmail heraus, und den Text eines Links schreibt der Assistent.</string>
+    <string name="agent_link_cancel">Abbrechen</string>
+    <string name="agent_link_open">Öffnen</string>
+</resources>

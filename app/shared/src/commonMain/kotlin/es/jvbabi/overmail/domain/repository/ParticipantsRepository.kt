@@ -22,4 +22,11 @@ interface ParticipantsRepository {
 
     /** The cached correspondents behind [ids], for naming what a filter holds. Local only. */
     fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Participant>>
+
+    /**
+     * The correspondents behind [ids] as the server has them now, for one that is not in the
+     * cache. Unknown and foreign ids are left out. The server does not say how much they wrote,
+     * so [Participant.emailCount] is 0: this is for showing who they are, not for ranking them.
+     */
+    suspend fun lookUp(ids: List<Uuid>, overmailAccount: OvermailAccount): Result<List<Participant>>
 }

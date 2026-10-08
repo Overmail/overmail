@@ -48,6 +48,7 @@ import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.page.Screen
+import es.jvbabi.overmail.page.agent.AgentScreen
 import es.jvbabi.overmail.page.home.ListScreen
 import es.jvbabi.overmail.page.home.StackScreen
 import es.jvbabi.overmail.page.onboarding.OnboardingRoot
@@ -227,6 +228,8 @@ fun App() {
             var focusListSearch by remember { mutableStateOf(false) }
             // A stack worked through leads on to the archive, in the list.
             var openListArchive by remember { mutableStateOf(false) }
+            // Asked from the search: sent as a new chat once the agent's tab is there.
+            var agentQuestion by remember { mutableStateOf<String?>(null) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             // Around the bottom bar as well: a card lifted off a page lies over it too.
@@ -274,6 +277,21 @@ fun App() {
                                                 onSearchFocused = { focusListSearch = false },
                                                 openArchive = openListArchive,
                                                 onArchiveOpened = { openListArchive = false },
+                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
+                                                onAskAgent = { question ->
+                                                    agentQuestion = question
+                                                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                                                    backstack.add(Screen.Agent)
+                                                },
+                                            )
+                                        }
+                                    }
+
+                                    is Screen.Agent -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                        ScreenEntry(appViewModelStoreOwner) {
+                                            AgentScreen(
+                                                ask = agentQuestion,
+                                                onAsked = { agentQuestion = null },
                                                 onOpenEmail = { backstack.add(Screen.Email(it)) },
                                             )
                                         }

@@ -51,6 +51,7 @@ mlkit-barcode-scanning = "17.3.0"
 coil = "3.6.3"
 google-services = "4.5.0"
 firebase-messaging = "26.0.0"
+jetbrains-markdown = "0.7.16"
 
 [libraries]
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
@@ -154,6 +155,7 @@ app-kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 app-haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 app-haze-blur-materials = { module = "dev.chrisbanes.haze:haze-blur-materials", version.ref = "haze" }
 app-coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+app-jetbrains-markdown = { module = "org.jetbrains:markdown", version.ref = "jetbrains-markdown" }
 app-coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 app-phosphor-regular = { module = "io.github.dev778g-me:phosphoricon-compose", version.ref = "phosphor" }
 app-confettikit = { module = "io.github.vinceglb:confettikit", version.ref = "confettikit" }

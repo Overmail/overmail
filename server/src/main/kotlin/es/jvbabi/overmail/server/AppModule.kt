@@ -7,6 +7,8 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassification
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.ai.chat.ChatAgent
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
+import es.jvbabi.overmail.server.ai.chat.ChatResponder
+import es.jvbabi.overmail.server.ai.chat.FakeChatAgent
 import es.jvbabi.overmail.server.auth.JwtService
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthTokens
@@ -33,6 +35,7 @@ import es.jvbabi.overmail.server.database.DatabaseConfig
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.api.installBackendHeaders
+import es.jvbabi.overmail.server.http.ServerConfig
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
@@ -77,8 +80,8 @@ import kotlin.time.Duration.Companion.seconds
  * The Ktor application is the composition root: it owns the object graph and the coroutine scope
  * the importers run in, so stopping the server tears them down.
  */
-fun Application.overmail() {
-    configureDependencies()
+fun Application.overmail(serverConfig: ServerConfig = ServerConfig()) {
+    configureDependencies(serverConfig)
     // First of the plugins, so a request's span is there for everything that handles it.
     install(KtorServerTelemetry) { setOpenTelemetry(get<OpenTelemetry>()) }
     installBackendHeaders()
@@ -105,10 +108,10 @@ fun Application.overmail() {
     startJobs()
 }
 
-private fun Application.configureDependencies() {
+private fun Application.configureDependencies(serverConfig: ServerConfig) {
     install(Koin) {
         slf4jLogger()
-        modules(overmailModule(this@configureDependencies))
+        modules(overmailModule(this@configureDependencies, serverConfig))
     }
 }
 
@@ -118,7 +121,7 @@ private fun Application.configureDependencies() {
  * Every definition is a `single`, built on first use -- except the database, which is built
  * when the application starts so a server that cannot reach it does not come up at all.
  */
-internal fun overmailModule(application: CoroutineScope) = module {
+internal fun overmailModule(application: CoroutineScope, serverConfig: ServerConfig = ServerConfig()) = module {
     single<ApplicationConfig> { ApplicationConfig.load() }
     single<DatabaseConfig> { get<ApplicationConfig>().database }
     single<SmtpConfig> { get<ApplicationConfig>().email.smtp }
@@ -200,7 +203,19 @@ internal fun overmailModule(application: CoroutineScope) = module {
         )
     }
 
-    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
+    // `--fake-ai` swaps the model for a replay, everything around it stays as it is.
+    single<ChatResponder> {
+        val fakeAi = serverConfig.fakeAi
+        if (fakeAi == null) get<ChatAgent>()
+        else FakeChatAgent(
+            sourceChatId = fakeAi.sourceChatId,
+            database = get(),
+            streamNotifier = get(),
+            chatNotifier = get(),
+        )
+    }
+
+    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get<ChatResponder>(), streamNotifier = get()) }
 
     // Owns an http client, so one instance rather than one per lookup.
     single<AvatarLookup> { AvatarLookup() }
@@ -297,6 +312,8 @@ private fun Application.startJobs() {
     }
 
     launch {
+        // Before the first question: the replay reads what it replays while it is still intact.
+        (get<ChatResponder>() as? FakeChatAgent)?.load()
         get<ChatAgentQueue>().consume()
     }
 

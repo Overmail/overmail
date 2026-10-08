@@ -10,5 +10,5 @@ import io.ktor.server.netty.Netty
  */
 fun createHttpServer(config: ServerConfig = ServerConfig()) =
     embeddedServer(Netty, port = config.port, host = config.host) {
-        overmail()
+        overmail(config)
     }

@@ -507,6 +507,8 @@ it for free.
 ./gradlew :server:compileKotlin
 ./gradlew :server:test          # session auth against an in-memory H2, no Postgres needed
 ./gradlew :server:runServer     # creates the schema, talks to the shared dev DB
+./gradlew :server:runServer --args="--fake-ai"   # the assistant replays the newest recorded answer
+                                                # to every question; --fake-ai=<chat id> picks one
 curl localhost:8080/api/health
 curl localhost:8080/api/swagger/documentation.json
 ```

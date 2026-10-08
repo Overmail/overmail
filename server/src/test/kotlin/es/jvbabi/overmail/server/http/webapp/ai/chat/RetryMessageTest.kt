@@ -125,7 +125,7 @@ class RetryMessageTest {
                         )
                     }
                     // No consumer in the test: the run is queued and stays there.
-                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
+                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get<ChatAgent>(), streamNotifier = get()) }
                 })
             }
             routing {

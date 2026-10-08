@@ -85,7 +85,7 @@ class ChatAgent(
         apiKey = config.apiKey,
         settings = OpenAIClientSettings(baseUrl = config.baseUrl),
     ),
-) {
+) : ChatResponder {
 
     private val promptExecutor = MultiLLMPromptExecutor(llmClient)
 
@@ -138,7 +138,7 @@ class ChatAgent(
      * Cancelling the coroutine this runs in is how an answer is stopped, see [ChatAgentQueue.stop]:
      * what was written until then is kept and the message is marked as stopped.
      */
-    suspend fun run(messageId: AiChatMessage.Id) {
+    override suspend fun run(messageId: AiChatMessage.Id) {
         // Before anything can go wrong: every exit from here has to end the stream, or a client
         // waits for an answer that nobody is writing. The queue opened it when the message was
         // enqueued, and opening is idempotent.
@@ -194,32 +194,8 @@ class ChatAgent(
         }
     }
 
-    /**
-     * Marks an answer nobody is writing as stopped: one that was still waiting in the queue, or
-     * one a restart left behind. Does nothing to a finished answer, so it is safe to call for a
-     * run that ended on its own in the meantime.
-     */
-    suspend fun finishStopped(messageId: AiChatMessage.Id) {
-        // Nothing was written into it, but a client can be following it already.
-        val stream = streamNotifier.of(messageId)
-        var stopped = false
-
-        try {
-            stopped = database.query {
-                val message = AiChatMessage.findById(messageId) ?: return@query false
-                if (message.finishedAt != null) return@query false
-                val content = message.content as? AiChatMessage.MessageContent.AgentMessageContent
-                    ?: return@query false
-
-                message.content = content.copy(stopped = true)
-                message.finishedAt = Clock.System.now()
-                true
-            }
-        } finally {
-            stream?.complete(stopped = stopped)
-            streamNotifier.close(messageId)
-        }
-    }
+    override suspend fun finishStopped(messageId: AiChatMessage.Id) =
+        finishStoppedAnswer(messageId, database, streamNotifier)
 
     private suspend fun answer(turn: ChatTurn, stream: AiChatMessageStream, recorder: ChatToolCallRecorder) {
         val agentConfig = AIAgentConfig(

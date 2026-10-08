@@ -172,7 +172,7 @@ class MessageTest {
                         )
                     }
                     // No consumer in the test: the runs are queued and stay there.
-                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
+                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get<ChatAgent>(), streamNotifier = get()) }
                 })
             }
             routing {

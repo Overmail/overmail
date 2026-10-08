@@ -90,7 +90,7 @@ const wirePath = (group: string) => (group === "" ? [] : group.split(","));
  */
 export class MailListViewModel {
     /**
-     * What was read, per view -- see [viewKey] for what makes two of them the same.
+     * What was read, per listing -- see [key] for what makes two of them the same.
      *
      * A map rather than an object, and the listings in it are replaced rather than written to: a
      * reader asks for a view nobody has read yet, and what it has to hear about is exactly that
@@ -99,8 +99,23 @@ export class MailListViewModel {
      */
     private readonly listings = new SvelteMap<string, Listing>();
 
-    /** What the listing is: what it leaves out, how it is cut up, what orders it. */
-    private view: ViewSettings = $state(mailboxView());
+    /**
+     * What the listing is: what it leaves out, how it is cut up, what orders it.
+     *
+     * A copy of what [setView] was handed, never the object itself. The caller's view is state it
+     * edits in place, and holding that would move [key] the moment a filter is clicked -- before
+     * [setView] ran, which then finds nothing changed and never watches the new listing.
+     */
+    private view: ViewSettings = $state.raw(mailboxView());
+
+    /**
+     * What identifies the listing being shown: everything held is keyed by it.
+     *
+     * The query the socket watches, not [viewKey]: the direction of a grouping is in a view but
+     * not in what the server is asked, because it only flips the headers -- and a key the socket
+     * would not watch again is a listing that never gets an answer.
+     */
+    private readonly key: string = $derived(this.query().toString());
 
     failed = $state(false);
 
@@ -158,12 +173,7 @@ export class MailListViewModel {
         // existence -- see [listing].
         this.watched = this.key;
         this.update(this.key, {});
-        this.socket.watch(this.query().toString());
-    }
-
-    /** What identifies the listing being shown: everything held is keyed by it. */
-    private get key(): string {
-        return viewKey(this.view);
+        this.socket.watch(this.key);
     }
 
     /**
@@ -361,15 +371,20 @@ export class MailListViewModel {
      * otherwise be a listing watched again from the top.
      */
     setView(view: ViewSettings) {
-        if (viewKey(view) === this.key) return;
+        if (viewKey(view) === viewKey(this.view)) return;
 
-        this.view = view;
-        // Started here rather than left to whoever reads it: a listing nobody has read yet is
-        // empty, and an empty one has no rows, so the table would sit at a length of zero waiting
-        // for a scroll that never comes.
-        this.watched = this.key;
-        this.update(this.key, {});
-        this.socket.watch(this.query().toString());
+        this.view = $state.snapshot(view) as ViewSettings;
+
+        // A grouping turned round is the same listing laid out the other way: the mails stay, only
+        // which of them the window covers moves.
+        if (this.key !== this.watched) {
+            // Started here rather than left to whoever reads it: a listing nobody has read yet is
+            // empty, and an empty one has no rows, so the table would sit at a length of zero
+            // waiting for a scroll that never comes.
+            this.watched = this.key;
+            this.update(this.key, {});
+            this.socket.watch(this.key);
+        }
 
         const last = this.lastWindow;
         if (last !== null) this.window(last.fromRow, last.toRow);

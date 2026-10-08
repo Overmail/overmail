@@ -3,6 +3,7 @@ import {MailListViewModel, everyMail} from "./MailListViewModel.svelte";
 import type {EmailRepository} from "$lib/repository/EmailRepository.svelte";
 import type {SocketLike} from "$lib/repository/ReconnectingSocket";
 import type {ViewSettings} from "$lib/app/views/viewSettings";
+import {deepState} from "./stateFixture.svelte";
 
 /** What was asked of the `/ids` endpoint, which is the one thing still fetched. */
 let requests: string[] = [];
@@ -263,6 +264,47 @@ test("changing the view watches the other listing, and keeps what this one read"
     expect(watches.length).toBe(2);
     // Each watch is its own, so an answer to the first is not filed under the second.
     expect(watches[0].token).not.toBe(watches[1].token);
+});
+
+test("a filter changed on the view that was handed in watches the new listing", async () => {
+    const levels: ViewSettings["groupings"] = [{kind: "date_smart", reversed: false}];
+    const box = mailbox({"1": ["a", "b"]}, levels);
+    const list = new MailListViewModel(repository().repository, {open: box.open, reconnectDelays: [1]});
+
+    // The table's view is the page's state, and a chip writes into it rather than handing over
+    // another one -- the view model is told about it only after the change happened.
+    const current = deepState(view(levels));
+    list.setView(current);
+    await settle();
+    list.window(0, 20);
+    await settle();
+
+    current.filter = {...current.filter, archivedState: ["Archive", "Unarchive"]};
+    list.setView(current);
+    await settle();
+
+    const watches = box.latest().sent.filter((message) => message.type === "watch.listing");
+    expect(watches.at(-1)?.query).toContain("archived_state=");
+    expect(list.initialized).toBe(true);
+    expect(list.total).toBe(2);
+});
+
+test("turning a grouping round keeps the listing it already has", async () => {
+    const box = mailbox({"1": ["a", "b"], "2": ["c"]});
+    const list = listing(box);
+
+    await settle();
+    list.window(0, 20);
+    await settle();
+
+    // The server is not asked about the direction of a group, so it has nothing new to answer.
+    list.setView(view([{kind: "date_smart", reversed: true}]));
+    await settle();
+
+    const watches = box.latest().sent.filter((message) => message.type === "watch.listing");
+    expect(watches.length).toBe(1);
+    expect(list.initialized).toBe(true);
+    expect(list.total).toBe(3);
 });
 
 test("an answer to a watch that has been left behind is dropped", async () => {

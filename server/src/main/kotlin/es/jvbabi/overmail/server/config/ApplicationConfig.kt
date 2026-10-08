@@ -21,6 +21,9 @@ data class ApplicationConfig(
     @SerialName("database") val database: DatabaseConfig,
     @SerialName("email") val email: EmailConfig,
     @SerialName("ai") val ai: AiConfig,
+
+    /** The mail providers an inbox can be connected through by signing in there, see [OAuthClientConfig]. */
+    @SerialName("oauth") val oauth: Map<String, OAuthClientConfig> = emptyMap(),
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }

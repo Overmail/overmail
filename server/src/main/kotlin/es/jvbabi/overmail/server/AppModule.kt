@@ -8,6 +8,9 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.ai.chat.ChatAgent
 import es.jvbabi.overmail.server.ai.chat.ChatAgentQueue
 import es.jvbabi.overmail.server.auth.JwtService
+import es.jvbabi.overmail.server.oauth.OAuthProviders
+import es.jvbabi.overmail.server.oauth.OAuthTokens
+import es.jvbabi.overmail.server.oauth.installOAuthOnboardings
 import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
@@ -66,6 +69,7 @@ fun Application.overmail() {
         })
     }
     installOvermailAuthentikt()
+    installOAuthOnboardings()
     configureRouting()
     startJobs()
 }
@@ -88,6 +92,9 @@ private fun Application.configureDependencies() {
         provide<OvermailDatabase> { OvermailDatabase(resolve<DatabaseConfig>()).also { it.init() } }
 
         provide<JwtService> { JwtService() }
+
+        provide<OAuthProviders> { resolve<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
+        provide<OAuthTokens> { OAuthTokens(resolve<OvermailDatabase>(), resolve<OAuthProviders>()) }
 
         provide {
             val config = resolve<ApplicationConfig>()
@@ -168,12 +175,21 @@ private fun Application.configureDependencies() {
                 coroutineScope = this@configureDependencies,
                 emailClassificationQueue = resolve(),
                 mailNotifier = resolve(),
+                oauthTokens = resolve(),
             )
         }
     }
 }
 
 private fun Application.startJobs() {
+    launch {
+        dependencies.resolve<OAuthProviders>().logConfigured()
+    }
+
+    launch {
+        dependencies.resolve<OAuthTokens>().run()
+    }
+
     launch {
         dependencies.resolve<ImporterManager>().start()
     }

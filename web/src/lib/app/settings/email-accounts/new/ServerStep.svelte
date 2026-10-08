@@ -6,8 +6,35 @@
     import {DEFAULT_IMAP_PORT, type NewEmailAccountViewModel} from "./NewEmailAccountViewModel.svelte.ts";
     import {CheckCircleIcon, WarningCircleIcon, WarningIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
+    import {Button} from "$lib/components/ui/button";
+    import {OAUTH_PROVIDER_LOOKS} from "./oauthProviderLooks";
+    import {oauthStartUrl, type OAuthProviderId} from "$lib/repository/InboxSetupRepository";
+    import {useRepositories} from "$lib/repository/repositories";
 
     let {viewModel}: {viewModel: NewEmailAccountViewModel} = $props();
+
+    /**
+     * The providers the server has a client for -- the only ones a button would lead anywhere.
+     * Not while editing: signing in creates a mailbox, it does not change the one being edited.
+     */
+    const {inboxSetup} = useRepositories();
+    const known = (providers: OAuthProviderId[]) => providers.filter((id) => id in OAUTH_PROVIDER_LOOKS);
+    // Usually there already: the dialog asks as soon as it is mounted. Read synchronously then, so
+    // the buttons are part of the first frame instead of growing the dialog a moment later.
+    let oauthProviders: OAuthProviderId[] = $state(known(inboxSetup.cachedOAuthProviders ?? []));
+    /** What the buttons are drawn for: nothing while editing, whatever is already known. */
+    const offeredProviders = $derived(viewModel.isEditing ? [] : oauthProviders);
+    $effect(() => {
+        if (viewModel.isEditing || inboxSetup.cachedOAuthProviders) return;
+        let cancelled = false;
+        inboxSetup.oauthProviders()
+            .then((providers) => {
+                if (!cancelled) oauthProviders = known(providers);
+            })
+            // Without the list the form still works with a password, which is all that is lost.
+            .catch(() => {});
+        return () => (cancelled = true);
+    });
 
     const id = $props.id();
     const test = $derived(viewModel.imapServerTest);
@@ -114,4 +141,30 @@
       not checked out -- which is when Enter still has something to do, see `submit`.
     -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true"></button>
+
+    {#if offeredProviders.length > 0}
+        {#if viewModel.oauthOnboardingExpired}
+            <SetupStatusLine
+                    icon={WarningCircleIcon}
+                    message={$_("settings.emailAccounts.new.server.oauth.expired")}
+                    tone="text-destructive"
+            />
+        {/if}
+        <span class="self-center text-xs text-muted-foreground font-semibold">{$_("settings.emailAccounts.new.server.oauth.or")}</span>
+        <hr />
+        <div class="flex flex-row gap-2 items-center">
+            {#each offeredProviders as provider (provider)}
+                <!-- A full page load: the server redirects to the provider, which SvelteKit's router cannot follow. -->
+                <Button
+                        variant="outline"
+                        class="flex-1"
+                        href={oauthStartUrl(provider)}
+                        data-sveltekit-reload
+                        aria-label={$_("settings.emailAccounts.new.server.oauth.continueWith", {values: {provider: OAUTH_PROVIDER_LOOKS[provider].name}})}
+                >
+                    <img src={OAUTH_PROVIDER_LOOKS[provider].logo} class="size-4" alt="">
+                </Button>
+            {/each}
+        </div>
+    {/if}
 </form>

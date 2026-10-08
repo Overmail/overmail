@@ -1,5 +1,7 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.submit
 
+import es.jvbabi.overmail.server.oauth.OAuthProviders
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
@@ -86,8 +88,8 @@ class SubmitInboxTest {
         ai = ApplicationConfig.AiConfig(apiKey = "none", model = "test-model", baseUrl = "http://localhost:1"),
     )
 
-    private fun body(folders: String, host: String = "127.0.0.1") = """
-        {"imap":{"host":"$host","port":$deadPort,"username":"julius","password":"secret"},
+    private fun body(folders: String, host: String = "127.0.0.1", password: String = "secret") = """
+        {"imap":{"host":"$host","port":$deadPort,"username":"julius","password":"$password"},
          "folder_settings":[$folders]}
     """.trimIndent()
 
@@ -107,6 +109,22 @@ class SubmitInboxTest {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         val error = Json.parseToJsonElement(response.bodyAsText()).jsonObject["error"]!!.jsonObject
         assertEquals("folder_settings", error["details"]!!.jsonObject["parameter"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `an inbox without a password is refused`() = testApplication {
+        setUpUser()
+        installRoute()
+
+        val response = client.post(ROUTE) {
+            contentType(ContentType.Application.Json)
+            setBody(body(folders = folder("INBOX", true, """{"type":"all_messages"}"""), password = ""))
+        }
+
+        // It would log in with nothing; one signed in to at a provider is submitted through its sign-in.
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val error = Json.parseToJsonElement(response.bodyAsText()).jsonObject["error"]!!.jsonObject
+        assertEquals("password", error["details"]!!.jsonObject["parameter"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -314,6 +332,7 @@ class SubmitInboxTest {
                             database = database,
                         ),
                         mailNotifier = MailNotifier(),
+                        oauthTokens = OAuthTokens(database, OAuthProviders(emptyMap(), "https://overmail.example")),
                     )
                 }
             }

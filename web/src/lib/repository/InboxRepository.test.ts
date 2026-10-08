@@ -18,6 +18,8 @@ test("reads the mailboxes and their folders", async () => {
                 folders: ["Archiv/Newsletter", "INBOX"],
                 email_count: 2649,
                 is_paused: true,
+                oauth_provider: "google",
+                requires_reauthentication: true,
             },
         ],
     });
@@ -31,6 +33,8 @@ test("reads the mailboxes and their folders", async () => {
             isPaused: true,
             folders: ["Archiv/Newsletter", "INBOX"],
             emailCount: 2649,
+            oauthProvider: "google",
+            requiresReauthentication: true,
         },
     ]);
     expect((fetcher as any).mock.calls[0][0]).toBe("/api/users/me/inboxes");

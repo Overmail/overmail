@@ -44,7 +44,12 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthOnboarding
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthProviders
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.startOAuth
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.streamOAuthOnboardingFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.inboxSubmitRoute
+import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapHost
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.test.testImapLogin
 import es.jvbabi.overmail.server.http.users.me.knowledge.createKnowledgeEntry
@@ -484,6 +489,39 @@ internal fun Application.configureRouting() {
                             route("/folders") {
                                 route("/stream") {
                                     streamInboxFolders()
+                                }
+                            }
+
+                            // Connecting an inbox by signing in at its provider rather than with
+                            // an imap password. The sign-in itself is an authentikt flow under
+                            // /api/inbox-sign-in, see OAuthOnboardings.
+                            route("/oauth") {
+                                getOAuthProviders()
+
+                                // A sign-in that came back, as the dialog continues it.
+                                /**
+                                 * Path: onboardingId [String] The sign-in flow, as the provider's sign-in put it into `_authentikt_session_id`
+                                 *
+                                 * Responses:
+                                 *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such sign-in, it ran out, or it is not the current user's
+                                 */
+                                route("/onboardings/{onboardingId}") {
+                                    getOAuthOnboarding()
+
+                                    route("/folders/stream") {
+                                        streamOAuthOnboardingFolders()
+                                    }
+
+                                    route("/submit") {
+                                        oauthInboxSubmitRoute()
+                                    }
+                                }
+
+                                /**
+                                 * Path: provider [String] The provider, as the list names it
+                                 */
+                                route("/{provider}") {
+                                    startOAuth()
                                 }
                             }
 

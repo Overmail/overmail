@@ -5,6 +5,8 @@ import type {
     ImapLoginOutcome,
     InboxSetupRepository,
     InboxConnection,
+    OAuthOnboarding,
+    OAuthProviderId,
     SubmitInboxFolder,
     SubmitInboxResult,
     WireAiScope,
@@ -154,6 +156,29 @@ export class NewEmailAccountViewModel {
 
     submitState: SubmitState = $state({type: "idle"});
 
+    /** The sign-in at a provider this form continues, if it does. See [continueOAuthOnboarding]. */
+    oauthOnboarding: OAuthOnboarding | null = $state(null);
+    /** The settings were opened on a sign-in the server no longer has -- it is only kept for a while. */
+    oauthOnboardingExpired = $state(false);
+
+    /**
+     * The provider the mailbox being edited was signed in to at, or null. Its connection is the
+     * sign-in's and has nothing to check or change; only its folders are edited.
+     */
+    signedInWith: OAuthProviderId | null = $state(null);
+
+    /**
+     * Whether the provider refused the sign-in of the mailbox being edited. Signing in there again
+     * is the only thing that helps, so the form says that instead of offering its folders.
+     */
+    requiresReauthentication = $state(false);
+
+    /**
+     * Whether the sign-in this form continued was the one an existing inbox was waiting for. The
+     * inbox has its tokens back then, and there is nothing to set up.
+     */
+    reauthenticated = $state(false);
+
     #hostDebounce: ReturnType<typeof setTimeout> | null = null;
     #hostRunning: AbortController | null = null;
     #loginDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -185,6 +210,9 @@ export class NewEmailAccountViewModel {
      * The password stays empty on purpose: the server never hands one out, and an empty one means
      * "unchanged" everywhere it is sent. The folder settings are kept aside rather than applied
      * now -- the rows they belong to do not exist until the scan has read the mailbox.
+     *
+     * A mailbox signed in to at a provider has nothing to check: the server logs in with the
+     * sign-in, so the form starts out as if both checks had passed.
      */
     prefill(detail: InboxDetail) {
         this.#storedSettings = new Map(detail.folders.map((folder) => [folder.folderName, folder]));
@@ -193,6 +221,15 @@ export class NewEmailAccountViewModel {
         this.username = detail.username;
         this.password = "";
         this.step = "server";
+        this.signedInWith = detail.oauthProvider;
+        this.requiresReauthentication = detail.requiresReauthentication;
+        if (detail.oauthProvider) {
+            // Refused by the provider: there is no folder to read until the user signs in again.
+            if (detail.requiresReauthentication) return;
+            this.imapServerTest = {type: "reachable", capabilities: []};
+            this.imapLoginTest = {type: "authenticated"};
+            return;
+        }
         this.#scheduleHostTest();
         this.#scheduleLoginTest();
     }
@@ -222,25 +259,60 @@ export class NewEmailAccountViewModel {
         }),
     );
 
+    /**
+     * Picks up a sign-in at a provider that came back, at the folders.
+     *
+     * The first two steps are skipped, not filled in: the provider named the server and the
+     * address, and the sign-in there is what their checks would have found out. Typing into
+     * either of them afterwards leaves the sign-in behind and makes this an ordinary form again.
+     */
+    async continueOAuthOnboarding(id: string) {
+        this.reset();
+
+        const onboarding = await this.inboxSetup.oauthOnboarding(id).catch(() => null);
+        if (!onboarding) {
+            this.oauthOnboardingExpired = true;
+            return;
+        }
+
+        this.host = onboarding.host;
+        this.port = onboarding.port;
+        this.username = onboarding.username;
+        if (onboarding.reauthenticatedInboxId) {
+            this.signedInWith = onboarding.provider;
+            this.reauthenticated = true;
+            return;
+        }
+
+        this.oauthOnboarding = onboarding;
+        this.imapServerTest = {type: "reachable", capabilities: []};
+        this.imapLoginTest = {type: "authenticated"};
+        this.goTo("folders");
+    }
+
     setHost(value: string) {
+        this.oauthOnboarding = null;
         this.host = value;
         this.#invalidateLogin();
         this.#scheduleHostTest();
     }
 
     setPort(value: number) {
+        this.oauthOnboarding = null;
         this.port = value;
         this.#invalidateLogin();
         this.#scheduleHostTest();
     }
 
     setUsername(value: string) {
+        this.oauthOnboarding = null;
         this.username = value;
         this.#invalidateFolders();
         this.#scheduleLoginTest();
     }
 
     setPassword(value: string) {
+        this.oauthOnboarding = null;
         this.password = value;
         this.#invalidateFolders();
         this.#scheduleLoginTest();
@@ -363,7 +435,9 @@ export class NewEmailAccountViewModel {
             const folders = this.keptFolders.map(toSubmitFolder);
             const result = this.editing
                 ? await this.editing.save(imap, folders)
-                : await this.inboxSetup.submitInbox(imap, folders, running.signal);
+                : this.oauthOnboarding
+                  ? await this.inboxSetup.submitOAuthInbox(this.oauthOnboarding.id, folders, running.signal)
+                  : await this.inboxSetup.submitInbox(imap, folders, running.signal);
             if (running.signal.aborted) return false;
 
             if (result.type === "conflict") {
@@ -395,6 +469,11 @@ export class NewEmailAccountViewModel {
         this.collapsed = [];
         this.folderScan = {type: "idle"};
         this.submitState = {type: "idle"};
+        this.oauthOnboarding = null;
+        this.oauthOnboardingExpired = false;
+        this.signedInWith = null;
+        this.requiresReauthentication = false;
+        this.reauthenticated = false;
     }
 
     /** Called when the dialog closes, so no check and no scan outlives it. */
@@ -541,6 +620,7 @@ export class NewEmailAccountViewModel {
                 this.password,
                 running.signal,
                 this.editing?.inboxId,
+                this.oauthOnboarding?.id,
             )) {
                 if (running.signal.aborted) return;
 

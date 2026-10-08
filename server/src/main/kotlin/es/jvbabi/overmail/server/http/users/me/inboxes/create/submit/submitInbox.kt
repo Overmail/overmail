@@ -1,15 +1,24 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.submit
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccounts
+import es.jvbabi.overmail.server.database.models.OAuthGrants
+import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.ApiErrorCode
 import es.jvbabi.overmail.server.http.api.ApiException
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
+import es.jvbabi.overmail.server.http.api.notFound
+import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import es.jvbabi.overmail.server.http.api.requireOwnedOAuthOnboardingFromUrl
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.api.requireThat
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.oauth.OAuthTokens
+import io.ktor.server.application.ApplicationCall
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
@@ -24,9 +33,12 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.update
 
 /**
  * Creates the inbox the "new inbox" dialog was filling in:
@@ -54,13 +66,10 @@ fun Route.inboxSubmitRoute() {
          *
          * Responses:
          *   - 201 [SubmitInboxResponse] The new inbox
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, or no folders or one listed twice
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host, username or password, an invalid port, or no folders or one listed twice
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user has an inbox with the same host, port and username
          */
         post {
-            val database = call.database()
-            val importerManager = call.application.dependencies.resolve<ImporterManager>()
-
             val user = call.requireAuthenticatedUser()
             val request = call.receive<SubmitInboxRequest>()
 
@@ -68,80 +77,168 @@ fun Route.inboxSubmitRoute() {
             if (host.isEmpty()) invalidRequest("host", "an imap server needs a host")
             if (request.imap.port !in 1..65535) invalidRequest("port", "is not a port", request.imap.port.toString())
             if (request.imap.username.isEmpty()) invalidRequest("username", "a login needs a username")
-            if (request.folderSettings.isEmpty()) invalidRequest("folder_settings", "an inbox needs a folder")
+            // An empty one is what an inbox signed in to at a provider stores, and it logs in with
+            // its grant instead -- one created here would log in with nothing.
+            if (request.imap.password.isEmpty()) invalidRequest("password", "a login needs a password")
 
-            val duplicateFolder = request.folderSettings
-                .groupingBy { it.folderName }
-                .eachCount()
-                .entries
-                .firstOrNull { it.value > 1 }
-            if (duplicateFolder != null) invalidRequest("folder_settings", "is listed twice", duplicateFolder.key)
-
-            requireThat(database.query {
-                ImapAccounts
-                    .select(ImapAccounts.id)
-                    .where { ImapAccounts.user eq user.id }
-                    .andWhere { ImapAccounts.host eq host }
-                    .andWhere { ImapAccounts.port eq request.imap.port }
-                    .andWhere { ImapAccounts.username eq request.imap.username }
-                    .count() == 0L
-            }) {
-                throw ApiException(
-                    status = HttpStatusCode.Conflict,
-                    code = ApiErrorCode.CONFLICT,
-                    message = "An IMAP account with the same host, port and username already exists for this user."
-                )
-            }
-
-            // Over imap, and therefore before the transaction: holding one open across a network
-            // round trip to somebody else's server is what turns a slow mailbox into a locked
-            // table. Folders that do not ask for a count cost nothing here.
-            val nthNewestDates = lookUpNthNewestDates(
+            call.createInbox(
+                userId = user.id.value,
                 host = host,
                 port = request.imap.port,
                 username = request.imap.username,
                 password = request.imap.password,
-                folders = request.folderSettings
-                    .mapNotNull { settings ->
-                        val scope = settings.aiImport
-                        if (scope is SubmitInboxRequest.FolderSettings.AiImportSettings.NewestMessages) {
-                            settings.folderName to scope.count
-                        } else {
-                            null
-                        }
-                    }
-                    .toMap(),
+                auth = ImapClient.Auth.BasicAuth(request.imap.username, request.imap.password),
+                oauthGrantId = null,
+                folderSettings = request.folderSettings,
             )
+        }
+    }
+}
 
-            val accountId = database.query {
-                val imapAccount = ImapAccount.new {
-                    this.host = host
-                    this.port = request.imap.port
-                    this.username = request.imap.username
-                    this.password = request.imap.password
-                    this.user = user
+/**
+ * The same last step for a mailbox signed in to at a provider:
+ * `POST /api/users/me/inboxes/create/oauth/onboardings/{onboardingId}/submit`.
+ *
+ * Only the folders are sent. Host, address and login all come with the sign-in, whose grant the
+ * new inbox then logs in with -- it stops being an onboarding here.
+ */
+fun Route.oauthInboxSubmitRoute() {
+    authenticate {
+        /**
+         * Create an inbox signed in to at a provider.
+         *
+         * Description: The last step of the setup dialog after a sign-in at a provider. Like `POST /api/users/me/inboxes/create/submit`, with the connection taken from the sign-in.
+         *
+         * Tag: Setup
+         *
+         * Body: [SubmitOAuthInboxRequest] The folders
+         *
+         * Responses:
+         *   - 201 [SubmitInboxResponse] The new inbox
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No folders, or one listed twice
+         *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user already has an inbox for this mailbox
+         */
+        post {
+            val onboarding = call.requireOwnedOAuthOnboardingFromUrl()
+            // It re-authenticated an inbox that exists; there is nothing to create.
+            if (onboarding.reauthenticatedInboxId != null) notFound("oauth_onboarding")
+            val request = call.receive<SubmitOAuthInboxRequest>()
+            val bearer = call.dependency<OAuthTokens>().accessToken(onboarding.grantId) ?: notFound("oauth_onboarding")
+
+            call.createInbox(
+                userId = call.requireAuthenticatedUserId(),
+                host = onboarding.provider.imapHost,
+                port = onboarding.provider.imapPort,
+                username = onboarding.address,
+                // Never asked for: the importer logs in with the grant, see ImapAccounts.password.
+                password = "",
+                auth = ImapClient.Auth.BearerAuth(onboarding.address, bearer),
+                oauthGrantId = onboarding.grantId,
+                folderSettings = request.folderSettings,
+            )
+        }
+    }
+}
+
+/**
+ * Creates the inbox, answers with it and starts its importer -- what both submits share once they
+ * know what to connect to. [auth] is what the "newest n" lookup logs in with; [oauthGrantId] the
+ * grant the inbox logs in with from here on, if it was signed in to at a provider.
+ */
+private suspend fun ApplicationCall.createInbox(
+    userId: Uuid,
+    host: String,
+    port: Int,
+    username: String,
+    password: String,
+    auth: ImapClient.Auth,
+    oauthGrantId: Uuid?,
+    folderSettings: List<SubmitInboxRequest.FolderSettings>,
+) {
+    val database = database()
+    val importerManager = application.dependencies.resolve<ImporterManager>()
+
+    if (folderSettings.isEmpty()) invalidRequest("folder_settings", "an inbox needs a folder")
+
+    val duplicateFolder = folderSettings
+        .groupingBy { it.folderName }
+        .eachCount()
+        .entries
+        .firstOrNull { it.value > 1 }
+    if (duplicateFolder != null) invalidRequest("folder_settings", "is listed twice", duplicateFolder.key)
+
+    requireThat(database.query {
+        ImapAccounts
+            .select(ImapAccounts.id)
+            .where { ImapAccounts.user eq userId }
+            .andWhere { ImapAccounts.host eq host }
+            .andWhere { ImapAccounts.port eq port }
+            .andWhere { ImapAccounts.username eq username }
+            .count() == 0L
+    }) {
+        throw ApiException(
+            status = HttpStatusCode.Conflict,
+            code = ApiErrorCode.CONFLICT,
+            message = "An IMAP account with the same host, port and username already exists for this user."
+        )
+    }
+
+    // Over imap, and therefore before the transaction: holding one open across a network
+    // round trip to somebody else's server is what turns a slow mailbox into a locked
+    // table. Folders that do not ask for a count cost nothing here.
+    val nthNewestDates = lookUpNthNewestDates(
+        host = host,
+        port = port,
+        auth = auth,
+        folders = folderSettings
+            .mapNotNull { settings ->
+                val scope = settings.aiImport
+                if (scope is SubmitInboxRequest.FolderSettings.AiImportSettings.NewestMessages) {
+                    settings.folderName to scope.count
+                } else {
+                    null
                 }
-
-                request.folderSettings.forEach { folderSettings ->
-                    ImapAccountFolderSync.new {
-                        this.imapAccount = imapAccount
-                        this.folder = folderSettings.folderName
-                        this.imapPush = folderSettings.imapPush
-                        this.aiImport = folderSettings.aiImport.stored(nthNewestDates[folderSettings.folderName])
-                    }
-                }
-
-                imapAccount.id.value
             }
+            .toMap(),
+    )
 
-            call.respond(HttpStatusCode.Created, SubmitInboxResponse(id = accountId))
+    val accountId = database.query {
+        val imapAccount = ImapAccount.new {
+            this.host = host
+            this.port = port
+            this.username = username
+            this.password = password
+            this.user = User[userId]
+        }
 
-            // After the answer, and on the application's scope rather than the call's: the call
-            // scope ends with the response, and this outlives it by design.
-            call.application.launch {
-                importerManager.reboot(accountId)
+        if (oauthGrantId != null) {
+            // Only while it is still an onboarding: two submits of one sign-in get one inbox, and
+            // the second rolls back with a 404.
+            val claimed = OAuthGrants.update({ (OAuthGrants.id eq oauthGrantId) and OAuthGrants.imapAccount.isNull() }) {
+                it[OAuthGrants.imapAccount] = imapAccount.id
+                it[OAuthGrants.onboardingId] = null
+            }
+            if (claimed == 0) notFound("oauth_onboarding")
+        }
+
+        folderSettings.forEach { settings ->
+            ImapAccountFolderSync.new {
+                this.imapAccount = imapAccount
+                this.folder = settings.folderName
+                this.imapPush = settings.imapPush
+                this.aiImport = settings.aiImport.stored(nthNewestDates[settings.folderName])
             }
         }
+
+        imapAccount.id.value
+    }
+
+    respond(HttpStatusCode.Created, SubmitInboxResponse(id = accountId))
+
+    // After the answer, and on the application's scope rather than the call's: the call
+    // scope ends with the response, and this outlives it by design.
+    application.launch {
+        importerManager.reboot(accountId)
     }
 }
 
@@ -218,6 +315,12 @@ private data class SubmitInboxRequest(
         }
     }
 }
+
+@Serializable
+private data class SubmitOAuthInboxRequest(
+    @JsonSchema.Description("Every folder to sync")
+    @SerialName("folder_settings") val folderSettings: List<SubmitInboxRequest.FolderSettings>,
+)
 
 @Serializable
 private data class SubmitInboxResponse(

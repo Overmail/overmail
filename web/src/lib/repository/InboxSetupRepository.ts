@@ -31,6 +31,43 @@ const TEST_IMAP_HOST_ENDPOINT = "/api/users/me/inboxes/create/test/imap-host";
 const TEST_IMAP_LOGIN_ENDPOINT = "/api/users/me/inboxes/create/test/imap-login";
 const FOLDER_STREAM_ENDPOINT = "/api/users/me/inboxes/create/folders/stream";
 const SUBMIT_ENDPOINT = "/api/users/me/inboxes/create/submit";
+const OAUTH_ENDPOINT = "/api/users/me/inboxes/create/oauth";
+
+/**
+ * A provider an inbox can be connected through by signing in there. Mirrors `OAuthProvider` on
+ * the server; open like the outcomes above, so a provider added there is skipped here, not fatal.
+ */
+export type OAuthProviderId = "microsoft" | "google" | (string & {});
+
+/**
+ * Where the browser goes to sign in at [provider]. A link, not a request: the server answers with
+ * a redirect to the provider's page, which the browser has to follow itself.
+ */
+export function oauthStartUrl(provider: OAuthProviderId): string {
+    return `${OAUTH_ENDPOINT}/${encodeURIComponent(provider)}`;
+}
+
+/**
+ * A sign-in at a provider that came back, as "new inbox" continues it: the mailbox, without the
+ * tokens -- those stay on the server, and everything after this names the onboarding instead.
+ */
+export type OAuthOnboarding = {
+    id: string;
+    provider: OAuthProviderId;
+    host: string;
+    port: number;
+    /** The address that was signed in to. */
+    username: string;
+    /**
+     * The inbox the sign-in signed in to again, where it was one whose sign-in the provider had
+     * refused. It has its tokens back then, and there is nothing left to set up.
+     */
+    reauthenticatedInboxId: string | null;
+};
+
+function oauthOnboardingEndpoint(id: string): string {
+    return `${OAUTH_ENDPOINT}/onboardings/${encodeURIComponent(id)}`;
+}
 
 /** The connection an inbox is created for. */
 export type InboxConnection = {
@@ -146,6 +183,57 @@ export class InboxSetupRepository {
     }
 
     /**
+     * The providers the server has a client for. Only these can be offered.
+     *
+     * The one answer here that is kept: it is the server's configuration, not something the user
+     * is typing, and the dialog wants it on its first frame. So it is fetched once, shared by
+     * everybody who asks in the meantime, and only a failure is asked again.
+     */
+    oauthProviders(): Promise<OAuthProviderId[]> {
+        this.oauthProvidersRequest ??= this.fetchOAuthProviders().then(
+            (providers) => (this.loadedOAuthProviders = providers),
+            (error) => {
+                this.oauthProvidersRequest = null;
+                throw error;
+            },
+        );
+        return this.oauthProvidersRequest;
+    }
+
+    /** What [oauthProviders] came to, or null while it has not answered yet. */
+    get cachedOAuthProviders(): OAuthProviderId[] | null {
+        return this.loadedOAuthProviders;
+    }
+
+    private oauthProvidersRequest: Promise<OAuthProviderId[]> | null = null;
+    private loadedOAuthProviders: OAuthProviderId[] | null = null;
+
+    private async fetchOAuthProviders(): Promise<OAuthProviderId[]> {
+        const response = await fetch(OAUTH_ENDPOINT, {credentials: "include"});
+        if (!response.ok) throw new Error(`Could not list the oauth providers: ${response.status}`);
+
+        const body = await response.json();
+        return (body.providers as {id: string}[]).map((provider) => provider.id);
+    }
+
+    /** The sign-in [id] names, or null once it ran out -- it is only kept for a while. */
+    async oauthOnboarding(id: string, signal?: AbortSignal): Promise<OAuthOnboarding | null> {
+        const response = await fetch(oauthOnboardingEndpoint(id), {credentials: "include", signal});
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error(`Could not read the oauth onboarding: ${response.status}`);
+
+        const body = await response.json();
+        return {
+            id,
+            provider: body.provider as OAuthProviderId,
+            host: body.host as string,
+            port: body.port as number,
+            username: body.username as string,
+            reauthenticatedInboxId: (body.reauthenticated_inbox_id ?? null) as string | null,
+        };
+    }
+
+    /**
      * Whether these credentials open that mailbox. Answers for every outcome; only a request
      * that did not happen at all throws.
      */
@@ -185,26 +273,23 @@ export class InboxSetupRepository {
         folders: SubmitInboxFolder[],
         signal?: AbortSignal,
     ): Promise<SubmitInboxResult> {
-        const response = await fetch(SUBMIT_ENDPOINT, {
-            method: "POST",
-            credentials: "include",
-            headers: {"content-type": "application/json"},
-            body: JSON.stringify({
-                imap,
-                folder_settings: folders.map((folder) => ({
-                    folder_name: folder.folderName,
-                    imap_push: folder.imapPush,
-                    ai_import: folder.aiImport,
-                })),
-            }),
+        return submit(SUBMIT_ENDPOINT, {imap, folder_settings: folders.map(toWireFolder)}, signal);
+    }
+
+    /**
+     * Creates the inbox a sign-in at a provider came back with. Only the folders are sent: the
+     * server has the connection, and the inbox logs in with the sign-in from here on.
+     */
+    async submitOAuthInbox(
+        onboardingId: string,
+        folders: SubmitInboxFolder[],
+        signal?: AbortSignal,
+    ): Promise<SubmitInboxResult> {
+        return submit(
+            `${oauthOnboardingEndpoint(onboardingId)}/submit`,
+            {folder_settings: folders.map(toWireFolder)},
             signal,
-        });
-
-        if (response.status === 409) return {type: "conflict"};
-        if (!response.ok) throw new Error(`Could not create the inbox: ${response.status}`);
-
-        const body = await response.json();
-        return {type: "created", id: body.id as string};
+        );
     }
 
     /**
@@ -225,14 +310,21 @@ export class InboxSetupRepository {
         signal?: AbortSignal,
         /** An existing mailbox, when the form is editing one: see [inboxEndpoint]. */
         inboxId?: string,
+        /**
+         * A sign-in at a provider, when the form continues one. The server logs in with its bearer
+         * and has everything else as well, so nothing is sent -- the other arguments are ignored.
+         */
+        oauthOnboardingId?: string,
     ): AsyncGenerator<FolderStreamEvent> {
-        const response = await fetch(inboxEndpoint(inboxId, "folders/stream", FOLDER_STREAM_ENDPOINT), {
-            method: "POST",
-            credentials: "include",
-            headers: {"content-type": "application/json"},
-            body: JSON.stringify({host, port, username, password}),
-            signal,
-        });
+        const response = oauthOnboardingId
+            ? await fetch(`${oauthOnboardingEndpoint(oauthOnboardingId)}/folders/stream`, {credentials: "include", signal})
+            : await fetch(inboxEndpoint(inboxId, "folders/stream", FOLDER_STREAM_ENDPOINT), {
+                method: "POST",
+                credentials: "include",
+                headers: {"content-type": "application/json"},
+                body: JSON.stringify({host, port, username, password}),
+                signal,
+            });
         if (!response.ok || !response.body) {
             throw new Error(`Could not read the folders: ${response.status}`);
         }
@@ -261,6 +353,31 @@ export class InboxSetupRepository {
             await reader.cancel().catch(() => {});
         }
     }
+}
+
+/** Posts a new inbox to [endpoint]; see [InboxSetupRepository.submitInbox] for what it answers. */
+async function submit(endpoint: string, body: object, signal?: AbortSignal): Promise<SubmitInboxResult> {
+    const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(body),
+        signal,
+    });
+
+    if (response.status === 409) return {type: "conflict"};
+    if (!response.ok) throw new Error(`Could not create the inbox: ${response.status}`);
+
+    const created = await response.json();
+    return {type: "created", id: created.id as string};
+}
+
+function toWireFolder(folder: SubmitInboxFolder) {
+    return {
+        folder_name: folder.folderName,
+        imap_push: folder.imapPush,
+        ai_import: folder.aiImport,
+    };
 }
 
 /**

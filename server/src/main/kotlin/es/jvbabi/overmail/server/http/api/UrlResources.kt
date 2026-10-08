@@ -13,6 +13,10 @@ import es.jvbabi.overmail.server.database.models.Labels
 import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.oauth.OAuthClient
+import es.jvbabi.overmail.server.oauth.OAuthOnboarding
+import es.jvbabi.overmail.server.oauth.OAuthOnboardings
+import es.jvbabi.overmail.server.oauth.OAuthProviders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
 import kotlin.uuid.Uuid
@@ -233,4 +237,23 @@ suspend fun ApplicationCall.requireOwnedSessionFromUrl(): Session {
 
     rememberOwned("session")
     return session
+}
+
+/**
+ * `{provider}` as a provider this server has an oauth client for. One without a client is a miss
+ * like an unknown one: it cannot be used, so as far as the api is concerned it does not exist.
+ */
+suspend fun ApplicationCall.requireOAuthClientFromUrl(): OAuthClient {
+    val id = parameters["provider"] ?: error("this route has no {provider}, so its oauth provider cannot be resolved")
+    return dependency<OAuthProviders>().byId(id) ?: notFound("oauth_provider", id)
+}
+
+/**
+ * `{onboardingId}` as the mailbox of a sign-in of the caller's that is waiting for "new inbox" to
+ * finish. One that ran out, one of somebody else's and a made-up id are the same miss: the id is a
+ * secret, and telling them apart would only say which ones exist.
+ */
+suspend fun ApplicationCall.requireOwnedOAuthOnboardingFromUrl(): OAuthOnboarding {
+    val id = parameters["onboardingId"] ?: error("this route has no {onboardingId}, so its onboarding cannot be resolved")
+    return dependency<OAuthOnboardings>().get(id, requireAuthenticatedUserId()) ?: notFound("oauth_onboarding")
 }

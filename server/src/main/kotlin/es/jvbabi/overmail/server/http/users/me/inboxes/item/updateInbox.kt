@@ -7,10 +7,12 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.ApiErrorCode
 import es.jvbabi.overmail.server.http.api.ApiException
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.lookUpNthNewestDates
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.oauth.OAuthTokens
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
@@ -40,7 +42,8 @@ import org.jetbrains.exposed.v1.jdbc.update
  * took out, and a diff would only be a slower way of arriving at the same table.
  *
  * A blank password means the stored one stays; see [resolveInboxCredentials] for why an edit
- * screen cannot do anything else.
+ * screen cannot do anything else. An inbox signed in to at a provider keeps its connection, and only
+ * its folders change.
  *
  * The importer is restarted afterwards, off the response, for the same reason the submit route
  * does it: stopping waits for the mail in flight and starting opens connections.
@@ -50,7 +53,7 @@ fun Route.updateInbox() {
         /**
          * Save an inbox.
          *
-         * Description: The connection and the complete folder settings; a folder left out stops syncing. An empty password keeps the stored one. The importer restarts afterwards.
+         * Description: The connection and the complete folder settings; a folder left out stops syncing. An empty password keeps the stored one; one signed in to at a provider keeps its connection. The importer restarts afterwards.
          *
          * Tag: Inboxes
          *
@@ -80,6 +83,7 @@ fun Route.updateInbox() {
             // Resolves the password and refuses a mailbox that is not this user's, in one step.
             val credentials = resolveInboxCredentials(
                 database = database,
+                tokens = call.dependency<OAuthTokens>(),
                 userId = userId,
                 inboxId = inboxId,
                 host = request.imap.host,
@@ -114,8 +118,7 @@ fun Route.updateInbox() {
             val nthNewestDates = lookUpNthNewestDates(
                 host = credentials.host,
                 port = credentials.port,
-                username = credentials.username,
-                password = credentials.password,
+                auth = credentials.auth,
                 folders = request.folderSettings
                     .mapNotNull { settings ->
                         val count = settings.aiImport.count

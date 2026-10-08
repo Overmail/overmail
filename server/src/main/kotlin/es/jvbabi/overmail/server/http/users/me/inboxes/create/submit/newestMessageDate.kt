@@ -35,8 +35,7 @@ private val LOOKUP_TIMEOUT = 60.seconds
 internal suspend fun lookUpNthNewestDates(
     host: String,
     port: Int,
-    username: String,
-    password: String,
+    auth: ImapClient.Auth,
     folders: Map<String, Int>,
 ): Map<String, Instant?> {
     if (folders.isEmpty()) return emptyMap()
@@ -50,8 +49,7 @@ internal suspend fun lookUpNthNewestDates(
                 ImapClient(
                     host = host,
                     port = port,
-                    username = username,
-                    password = password,
+                    auth = auth,
                     coroutineScope = connections,
                     debug = false,
                 ).use { client ->

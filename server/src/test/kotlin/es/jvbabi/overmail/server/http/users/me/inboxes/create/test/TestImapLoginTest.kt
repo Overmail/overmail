@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.test
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
@@ -78,7 +79,7 @@ class TestImapLoginTest {
         // outcome, and the dialog sends the user back rather than blaming the credentials.
         val port = ServerSocket(0).use { it.localPort }
 
-        val result = probeImapLogin("127.0.0.1", port, "user", "secret")
+        val result = probeImapLogin("127.0.0.1", port, ImapClient.Auth.BasicAuth("user", "secret"))
 
         assertFalse(result.authenticated)
         assertEquals(ImapLoginTestOutcome.CONNECTION_FAILED.wire, result.outcome)

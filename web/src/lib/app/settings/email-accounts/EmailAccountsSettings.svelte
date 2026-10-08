@@ -18,12 +18,49 @@
     import EditEmailAccountDialog from "$lib/app/settings/email-accounts/EditEmailAccountDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
+    import {oauthStartUrl} from "$lib/repository/InboxSetupRepository";
     import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
+    import {page} from "$app/state";
+    import {goto} from "$app/navigation";
+    import {untrack} from "svelte";
+
+    /**
+     * What authentikt puts into the url when a sign-in at a provider is done, see
+     * `OAuthOnboardings.kt`: the flow is active, and this is its id.
+     */
+    const FLOW_ACTIVE_PARAMETER = "_authentikt_flow_active";
+    const FLOW_SESSION_PARAMETER = "_authentikt_session_id";
 
     const {inboxes: inboxRepository} = useRepositories();
 
     let showNewEmailAccountDialog = $state(false);
+
+    /**
+     * The sign-in at a provider "new inbox" continues with. The provider's sign-in sends the browser
+     * back here with the id of its flow in the url, and the dialog opens on it at the folders.
+     *
+     * The id stays in the url while the dialog is open, so a reload opens it on the same sign-in
+     * again -- the server keeps it until the inbox is created. Closing the dialog takes it out, so
+     * the back button does not reopen one that is used up.
+     */
+    let oauthOnboardingId: string | null = $state(null);
+    $effect(() => {
+        const id = page.url.searchParams.get(FLOW_SESSION_PARAMETER);
+        // Untracked: clearing it below must not read the id that is still in the url back in.
+        if (!id || id === untrack(() => oauthOnboardingId)) return;
+        oauthOnboardingId = id;
+        showNewEmailAccountDialog = true;
+    });
+    $effect(() => {
+        if (showNewEmailAccountDialog || !oauthOnboardingId) return;
+        oauthOnboardingId = null;
+
+        const url = new URL(page.url);
+        url.searchParams.delete(FLOW_ACTIVE_PARAMETER);
+        url.searchParams.delete(FLOW_SESSION_PARAMETER);
+        goto(url, {replaceState: true, noScroll: true});
+    });
     /** The mailbox the delete dialog is asking about; null while it is closed. */
     let inboxToDelete: Inbox | null = $state(null);
     /** The mailbox the edit dialog is open on; null while it is closed. */
@@ -189,6 +226,27 @@
                                             {/if}
                                             <span>{inbox.host}:{inbox.port}</span>
                                         </div>
+                                        <!--
+                                          Not behind the hover like the other actions: nothing is
+                                          imported until it is done, so it has to be seen.
+                                        -->
+                                        {#if inbox.requiresReauthentication && inbox.oauthProvider}
+                                            <div class="mt-1 flex flex-row items-center gap-2 whitespace-nowrap">
+                                                <span class="text-destructive flex flex-row items-center gap-1 text-xs font-normal">
+                                                    <WarningCircleIcon class="size-3" />
+                                                    {$_("settings.emailAccounts.list.requiresReauthentication")}
+                                                </span>
+                                                <!-- A full page load: the server redirects to the provider. -->
+                                                <Button
+                                                        variant="outline"
+                                                        size="xs"
+                                                        href={oauthStartUrl(inbox.oauthProvider)}
+                                                        data-sveltekit-reload
+                                                >
+                                                    {$_("settings.emailAccounts.list.actions.reauthenticate")}
+                                                </Button>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </Table.Cell>
                                 <Table.Cell>
@@ -331,6 +389,6 @@
 </div>
 
 <!-- Neither dialog knows about this list, so each says what it did and this re-reads. -->
-<NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} />
+<NewEmailAccountDialog bind:open={showNewEmailAccountDialog} onCreated={load} {oauthOnboardingId} />
 <DeleteInboxDialog bind:inbox={inboxToDelete} onDeleted={load} onPaused={load} />
 <EditEmailAccountDialog bind:inbox={inboxToEdit} onSaved={load} />

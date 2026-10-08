@@ -637,6 +637,8 @@ const STORED = {
     port: 993,
     username: "julius",
     isPaused: false,
+    oauthProvider: null,
+    requiresReauthentication: false,
     folders: [
         {folderName: "Archiv.Newsletter", imapPush: true, aiImport: {type: "all_messages"}},
         {folderName: "Trash", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
@@ -711,6 +713,69 @@ test("saving an edit writes to the mailbox instead of creating a second one", as
     expect(folders.map((f) => f.folderName).sort()).toEqual(["Archiv.Newsletter", "Trash"]);
 });
 
+test("a mailbox signed in to at a provider opens on its folders without checking anything", async () => {
+    const {viewModel, login, streamFolders, save} = editing();
+    viewModel.prefill({...STORED, host: "imap.gmail.com", username: "julius@gmail.example", oauthProvider: "google"} as never);
+    expect(viewModel.signedInWith).toBe("google");
+
+    // The server logs in with the sign-in; there is no login to check and no password to ask for.
+    expect(viewModel.canEnter("folders")).toBe(true);
+    await tick(1100);
+    expect(login).toHaveBeenCalledTimes(0);
+
+    viewModel.goTo("folders");
+    await tick(60);
+    expect(streamFolders.mock.calls[0][5]).toBe("acc-1");
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    expect(save.mock.calls[0][0]).toEqual({host: "imap.gmail.com", port: 993, username: "julius@gmail.example", password: ""});
+});
+
+test("a mailbox whose sign-in the provider refused offers no folders to edit", async () => {
+    const {viewModel, login, streamFolders} = editing();
+    viewModel.prefill({...STORED, oauthProvider: "google", requiresReauthentication: true} as never);
+    await tick(1100);
+
+    expect(viewModel.requiresReauthentication).toBe(true);
+    // Nothing could read them until the user signs in again.
+    expect(viewModel.canEnter("folders")).toBe(false);
+    viewModel.goTo("folders");
+    await tick(60);
+    expect(login).toHaveBeenCalledTimes(0);
+    expect(streamFolders).toHaveBeenCalledTimes(0);
+});
+
+test("a sign-in that renewed an existing inbox has nothing left to set up", async () => {
+    const streamFolders = mock(async function* (..._args: unknown[]): AsyncGenerator<FolderStreamEvent> {
+        yield {type: "done"};
+    });
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "google",
+            host: "imap.gmail.com",
+            port: 993,
+            username: "julius@gmail.example",
+            reauthenticatedInboxId: "inbox-1",
+        })),
+        streamFolders,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(viewModel.reauthenticated).toBe(true);
+    expect(viewModel.signedInWith).toBe("google");
+    expect(viewModel.oauthOnboarding).toBeNull();
+    expect(viewModel.step).toBe("server");
+    expect(streamFolders).toHaveBeenCalledTimes(0);
+
+    // The next opening is a new inbox again.
+    viewModel.reset();
+    expect(viewModel.reauthenticated).toBe(false);
+});
+
 test("a mailbox the edit would collide with is reported, not thrown", async () => {
     const {viewModel} = editing({save: async () => ({type: "conflict"}) as const});
     viewModel.prefill(STORED as never);
@@ -720,4 +785,75 @@ test("a mailbox the edit would collide with is reported, not thrown", async () =
 
     expect(await viewModel.submitInbox()).toBe(false);
     expect(viewModel.submitState).toEqual({type: "conflict"});
+});
+
+test("a sign-in at a provider continues at the folders, scanned through the onboarding", async () => {
+    const streamFolders = mock(async function* (..._args: unknown[]): AsyncGenerator<FolderStreamEvent> {
+        yield TREE;
+        yield {type: "done"};
+    });
+    const testImapHost = mock(async () => REACHABLE);
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "microsoft",
+            host: "outlook.office365.com",
+            port: 993,
+            username: "julius@outlook.example",
+        })),
+        testImapHost,
+        streamFolders,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(viewModel.step).toBe("folders");
+    expect(viewModel.username).toBe("julius@outlook.example");
+    expect(viewModel.folders.map((folder) => folder.fullName)).toContain("Archiv");
+    // The scan names the onboarding, which is what the server logs in with.
+    expect(streamFolders.mock.calls[0][6]).toBe("onb-1");
+    // The provider's sign-in stands in for both checks, so neither ran.
+    expect(testImapHost).not.toHaveBeenCalled();
+});
+
+test("a sign-in at a provider is submitted through its onboarding", async () => {
+    const submitInbox = mock(async () => ({type: "created", id: "inbox-1"}) as const);
+    const submitOAuthInbox = mock(async (_onboardingId: string, _folders: SubmitInboxFolder[]) => ({type: "created", id: "inbox-1"}) as const);
+    const repository = {
+        oauthOnboarding: mock(async (id: string) => ({
+            id,
+            provider: "google",
+            host: "imap.gmail.com",
+            port: 993,
+            username: "julius@gmail.example",
+        })),
+        streamFolders: mock(async function* (): AsyncGenerator<FolderStreamEvent> {
+            yield TREE;
+            yield {type: "done"};
+        }),
+        submitInbox,
+        submitOAuthInbox,
+    } as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("onb-1");
+    await tick(50);
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    // No password to send: the server logs the inbox in with the sign-in.
+    expect(submitInbox).not.toHaveBeenCalled();
+    expect(submitOAuthInbox.mock.calls[0][0]).toBe("onb-1");
+});
+
+test("a sign-in that ran out leaves the form at the start, saying so", async () => {
+    const repository = {oauthOnboarding: mock(async () => null)} as unknown as InboxSetupRepository;
+
+    const viewModel = new NewEmailAccountViewModel(repository);
+    await viewModel.continueOAuthOnboarding("gone");
+
+    expect(viewModel.step).toBe("server");
+    expect(viewModel.oauthOnboarding).toBeNull();
+    expect(viewModel.oauthOnboardingExpired).toBe(true);
 });

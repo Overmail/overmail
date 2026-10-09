@@ -391,10 +391,15 @@ class ChatAgent(
                 "up by keyword and `${ReadKnowledgeTool.NAME}` reads an entry in full. Look " +
                 "before you answer anything about how this user works, who writes to them, or a " +
                 "date they mentioned before -- it is cheaper than asking them again. Write with " +
-                "`${WriteKnowledgeTool.NAME}` when something will still be worth knowing next " +
-                "week, and give it the words you would search for; the content of one email is " +
-                "not worth an entry, a decision the user made is. Do not write down what you " +
-                "were only asked to do once, and never write what the user has not told you. " +
+                "`${WriteKnowledgeTool.NAME}` sparingly, only for what is significant and will " +
+                "still matter in months: a decision or preference of the user, who a " +
+                "correspondent is to them, a contract or account they have, a date with real " +
+                "consequences. The content of one email is not worth an entry, and neither is " +
+                "routine mail such as a login notification, a code, a delivery update or a " +
+                "receipt. Do not write down what you were only asked to do once, and never write " +
+                "what the user has not told you. Before writing, search for an entry on the same " +
+                "topic and extend it -- read it, then write it back under its name with your " +
+                "addition -- rather than starting a new one beside it. " +
                 "`${DeleteKnowledgeTool.NAME}` removes an entry you wrote yourself once it is " +
                 "wrong or no longer holds, or when the user asks you to forget it; the entries " +
                 "the user wrote are not yours to delete.\n" +

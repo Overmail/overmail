@@ -162,7 +162,8 @@ class EmailClassification(
                 // by an earlier run or in a chat, never by the mail in front of us.
                 if (knowledge.isNotEmpty()) {
                     system(
-                        "What you already know about this user:\n" +
+                        "What you already know about this user. To add to one of these, write it " +
+                                "again under exactly its name rather than starting a new entry:\n" +
                                 knowledge.joinToString("\n\n") { entry ->
                                     "- ${entry.name}" +
                                             (entry.relevantOn?.let { " (relevant on $it)" } ?: "") +
@@ -565,9 +566,13 @@ data class EmailClassificationFinalized(
         """
             What you learned about the USER from this email and want to keep -- not what this email says.
 
-            Write an entry only when it will still be worth knowing next week and when it would change how a later email is handled: how this user wants a kind of mail treated, who writes to them and in what role, a contract or subscription they have, a date they will be asked about again (a deadline, a move, an appointment). Most emails teach nothing of the sort; then leave this out entirely. Never write down what the email itself contains -- the email is stored anyway -- and never anything about other people that the user did not say themselves.
+            Leave this out unless you are sure. Almost every email teaches nothing worth keeping, and a memory full of trivia buries what matters. An empty knowledge list is the normal answer.
 
-            Writing a name that already exists replaces that entry. Use it when this email adds to something you already know from the context above, and repeat the part that still holds.
+            Keep only what is significant and lasting: something that still matters in months and that would change how you handle a later email or answer the user. For example: a contract, an insurance, a subscription or an account the user actually has; who a correspondent is to the user (their landlord, their employer, their doctor); a decision or habit of the user; a date with real consequences, such as a contract deadline, a move or an exam.
+
+            Never keep routine or transient mail, and never record that such a mail arrived: login and sign-in notifications, security codes, password resets, verification links, shipping and delivery updates, order and payment confirmations, receipts, invoices that are simply paid, newsletters, advertising, social media notifications, calendar reminders, automatic status reports. Never write down what the email itself contains -- the email is stored anyway -- and never anything about other people that the user did not say themselves. If the only thing you could write is "the user received X on day Y", write nothing.
+
+            Prefer extending what you already know over starting something new. An entry is about a topic -- a provider, a contract, a person, a project -- not about one email. When this email adds something significant to an entry in the context above, write that entry again under exactly the same name, with the whole text that still holds plus the addition, and add the new keywords to the old ones. Only start a new entry for a topic that has none yet, and name it after the topic ("Stromvertrag Stadtwerke"), not after the email.
         """
     )
     val knowledge: List<EmailClassificationFinalized.Knowledge>? = null,
@@ -606,8 +611,9 @@ data class EmailClassificationFinalized(
     data class Knowledge(
         @SerialName("name")
         @property:LLMDescription(
-            "What the entry is about, in a few words, in the user's language. This is also its " +
-                "handle: writing the same name again replaces that entry."
+            "The topic the entry is about, in a few words, in the user's language -- a provider, a " +
+                "contract, a person, not one email. This is also its handle: writing the same name " +
+                "again replaces that entry, which is how an entry is extended."
         )
         val name: String,
 
@@ -620,8 +626,10 @@ data class EmailClassificationFinalized(
 
         @SerialName("keywords")
         @property:LLMDescription(
-            "The words to find this entry by: names, addresses, order numbers, the subject it " +
-                "comes up under. Without them the entry is hard to find again."
+            "The words to find this entry by: names, sender addresses and domains, contract or " +
+                "customer numbers, the subject it comes up under. A later email finds the entry " +
+                "through its sender and subject, so include those. Without them the entry is hard " +
+                "to find again."
         )
         val keywords: List<String> = emptyList(),
 

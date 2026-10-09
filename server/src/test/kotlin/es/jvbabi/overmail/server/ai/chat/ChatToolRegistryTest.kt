@@ -263,7 +263,7 @@ class ChatToolRegistryTest {
         // Who wrote an entry is part of what the agent sees, so it knows before it tries.
         val hits = registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
             .execute(SearchKnowledgeTool.Args(query = "")).entries
-        assertEquals(mapOf("Alter Vertrag" to true, "Umzug" to false), hits.associate { it.name to it.writtenByYou })
+        assertEquals(mapOf("Alter Vertrag" to "assistant", "Umzug" to "user"), hits.associate { it.name to it.createdBy })
 
         assertEquals(
             DeleteKnowledgeTool.Result.Deleted(name = "Alter Vertrag"),
@@ -271,7 +271,7 @@ class ChatToolRegistryTest {
         )
         assertTrue(
             delete.execute(DeleteKnowledgeTool.Args(knowledgeId = users.entry.id.toString()))
-                is DeleteKnowledgeTool.Result.NotWrittenByYou
+                is DeleteKnowledgeTool.Result.CreatedByUser
         )
         assertTrue(
             delete.execute(DeleteKnowledgeTool.Args(knowledgeId = "not-an-id"))

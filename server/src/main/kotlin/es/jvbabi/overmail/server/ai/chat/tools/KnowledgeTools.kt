@@ -14,6 +14,19 @@ import kotlin.uuid.Uuid
 private const val MAX_HITS = 8
 
 /**
+ * Who created an entry, as the tools tell the model. Not a boolean "by you": the assistant that
+ * created it may have been the classification rather than this chat, and an entry the user
+ * edited afterwards was still created by the assistant.
+ */
+private const val CREATED_BY_ASSISTANT = "assistant"
+private const val CREATED_BY_USER = "user"
+private const val CREATED_BY_DESCRIPTION = "`$CREATED_BY_ASSISTANT` for you, in a chat or while " +
+    "sorting mail, `$CREATED_BY_USER` for the user, in the settings."
+
+private fun createdBy(entry: KnowledgeStore.Entry): String =
+    if (entry.createdByAgent) CREATED_BY_ASSISTANT else CREATED_BY_USER
+
+/**
  * The assistant's own memory: looking something up, reading it in full, writing it down, and
  * deleting what it wrote itself.
  *
@@ -41,7 +54,8 @@ class SearchKnowledgeTool(
         "decisions they made, dates that matter to them. Give the words you would look for " +
         "yourself, not a sentence. Answers with the beginning of each entry; read the ones you " +
         "need in full with `${ReadKnowledgeTool.NAME}`. An empty query answers with the most " +
-        "recently written entries.",
+        "recently written entries. Each entry says who created it in `created_by`: " +
+        CREATED_BY_DESCRIPTION,
 ) {
 
     @Serializable
@@ -64,8 +78,8 @@ class SearchKnowledgeTool(
         @SerialName("relevant_on") val relevantOn: String?,
         /** The beginning of the entry; ask for it by id to read the rest. */
         @SerialName("excerpt") val excerpt: String,
-        /** False for an entry the user wrote; only the agent's own can be deleted. */
-        @SerialName("written_by_you") val writtenByYou: Boolean,
+        /** Who created the entry, see [CREATED_BY_DESCRIPTION]; only the assistant's own can be deleted. */
+        @SerialName("created_by") val createdBy: String,
     )
 
     override suspend fun execute(args: Args): Result {
@@ -81,7 +95,7 @@ class SearchKnowledgeTool(
                     keywords = entry.keywords,
                     relevantOn = entry.relevantOn?.toString(),
                     excerpt = entry.excerpt,
-                    writtenByYou = entry.createdByAgent,
+                    createdBy = createdBy(entry),
                 )
             }
         )
@@ -125,7 +139,7 @@ class ReadKnowledgeTool(
             @SerialName("keywords") val keywords: List<String>,
             @SerialName("relevant_on") val relevantOn: String?,
             @SerialName("description") val description: String,
-            @SerialName("written_by_you") val writtenByYou: Boolean,
+            @SerialName("created_by") val createdBy: String,
         ) : Result()
 
         @Serializable
@@ -147,7 +161,7 @@ class ReadKnowledgeTool(
             keywords = entry.keywords,
             relevantOn = entry.relevantOn?.toString(),
             description = entry.description,
-            writtenByYou = entry.createdByAgent,
+            createdBy = createdBy(entry),
         )
     }
 
@@ -267,10 +281,11 @@ class DeleteKnowledgeTool(
     argsType = typeToken<Args>(),
     resultType = typeToken<Result>(),
     name = NAME,
-    description = "Delete an entry you wrote yourself, when it is wrong, no longer holds, or the " +
-        "user asks you to forget it. Only entries with `written_by_you` can be deleted; the " +
-        "user's own entries stay. To correct an entry rather than drop it, rewrite it with " +
-        "`${WriteKnowledgeTool.NAME}` instead. The id comes from `${SearchKnowledgeTool.NAME}`.",
+    description = "Delete an entry you created, when it is wrong, no longer holds, or the user " +
+        "asks you to forget it. Only entries with `created_by` `$CREATED_BY_ASSISTANT` can be " +
+        "deleted; the ones the user created stay. To correct an entry rather than drop it, " +
+        "rewrite it with `${WriteKnowledgeTool.NAME}` instead. The id comes from " +
+        "`${SearchKnowledgeTool.NAME}`.",
 ) {
 
     @Serializable
@@ -295,8 +310,8 @@ class DeleteKnowledgeTool(
         ) : Result()
 
         @Serializable
-        @SerialName("not_written_by_you")
-        data class NotWrittenByYou(
+        @SerialName("created_by_user")
+        data class CreatedByUser(
             @SerialName("name") val name: String,
             @SerialName("message") val message: String = "The user wrote this entry themselves, so " +
                 "it was not deleted. They can remove it in the settings.",
@@ -312,7 +327,7 @@ class DeleteKnowledgeTool(
                 Result.Deleted(name = deleted.name)
             }
             KnowledgeStore.Deleted.NotFound -> Result.NotFound()
-            is KnowledgeStore.Deleted.NotCreatedByAgent -> Result.NotWrittenByYou(name = deleted.name)
+            is KnowledgeStore.Deleted.NotCreatedByAgent -> Result.CreatedByUser(name = deleted.name)
         }
     }
 

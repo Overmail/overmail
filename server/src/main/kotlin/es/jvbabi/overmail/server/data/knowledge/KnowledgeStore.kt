@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.lowerCase
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.update
@@ -40,6 +41,8 @@ class KnowledgeStore(private val database: OvermailDatabase) {
         val keywords: List<String>,
         val relevantOn: LocalDate?,
         val updatedAt: Instant,
+        /** False for an entry the user wrote themselves, which the agent may read but not delete. */
+        val createdByAgent: Boolean,
     ) {
         val excerpt: String
             get() = if (description.length <= EXCERPT_CHARS) description
@@ -48,6 +51,15 @@ class KnowledgeStore(private val database: OvermailDatabase) {
 
     /** The entry as it stands after a write, and whether there was one of that name before. */
     data class Written(val entry: Entry, val existed: Boolean)
+
+    /** What became of a delete the agent asked for. */
+    sealed interface Deleted {
+        data class Removed(val name: String) : Deleted
+        data object NotFound : Deleted
+
+        /** The user wrote this entry themselves; it stays, see [deleteByAgent]. */
+        data class NotCreatedByAgent(val name: String) : Deleted
+    }
 
     /**
      * The entries whose keywords or name account for [query], most of it first and the freshest
@@ -73,6 +85,7 @@ class KnowledgeStore(private val database: OvermailDatabase) {
                     Knowledges.keywords,
                     Knowledges.relevantOn,
                     Knowledges.updatedAt,
+                    Knowledges.createdByAgent,
                 )
                 .where { Knowledges.owner eq userId }
                 .orderBy(Knowledges.updatedAt, SortOrder.DESC)
@@ -101,6 +114,7 @@ class KnowledgeStore(private val database: OvermailDatabase) {
                 Knowledges.keywords,
                 Knowledges.relevantOn,
                 Knowledges.updatedAt,
+                Knowledges.createdByAgent,
             )
             // The ownership is part of the lookup: there is no moment where a foreign entry has
             // been read.
@@ -168,6 +182,7 @@ class KnowledgeStore(private val database: OvermailDatabase) {
                     Knowledges.keywords,
                     Knowledges.relevantOn,
                     Knowledges.updatedAt,
+                    Knowledges.createdByAgent,
                 )
                 .where { Knowledges.id eq id }
                 .single()
@@ -175,6 +190,30 @@ class KnowledgeStore(private val database: OvermailDatabase) {
 
             Written(entry = entry, existed = existing != null)
         }
+    }
+
+    /**
+     * Deletes an entry the agent wrote, and only that.
+     *
+     * What the user wrote down themselves is theirs to remove: the agent may outgrow its own
+     * notes, but a model deciding that one of the user's is obsolete would be losing something
+     * the user asked to keep. The condition is part of the delete itself, so there is no moment
+     * between checking an entry and removing it in which it could have changed hands.
+     */
+    suspend fun deleteByAgent(userId: User.Id, id: Knowledge.Id): Deleted = database.query {
+        val entry = Knowledges
+            .select(Knowledges.name, Knowledges.createdByAgent)
+            .where { (Knowledges.id eq id) and (Knowledges.owner eq userId) }
+            .singleOrNull()
+            ?: return@query Deleted.NotFound
+
+        val name = entry[Knowledges.name]
+        if (!entry[Knowledges.createdByAgent]) return@query Deleted.NotCreatedByAgent(name)
+
+        val removed = Knowledges.deleteWhere {
+            (Knowledges.id eq id) and (Knowledges.owner eq userId) and (Knowledges.createdByAgent eq true)
+        }
+        if (removed == 0) Deleted.NotFound else Deleted.Removed(name)
     }
 }
 
@@ -201,4 +240,5 @@ private fun org.jetbrains.exposed.v1.core.ResultRow.toEntry() = KnowledgeStore.E
     keywords = Knowledge.splitKeywords(this[Knowledges.keywords]),
     relevantOn = this[Knowledges.relevantOn],
     updatedAt = this[Knowledges.updatedAt],
+    createdByAgent = this[Knowledges.createdByAgent],
 )

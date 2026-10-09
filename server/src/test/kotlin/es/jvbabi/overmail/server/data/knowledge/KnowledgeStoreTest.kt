@@ -109,6 +109,26 @@ class KnowledgeStoreTest {
     }
 
     @Test
+    fun `the agent deletes what it wrote, and nothing else`() = runTest {
+        val (user, stranger) = setUp()
+
+        val own = store.write(user, "Alter Vertrag", "Gekündigt.", listOf("vertrag"), null, byAgent = true)
+        val users = store.write(user, "Umzug", "Nach Potsdam.", listOf("umzug"), null, byAgent = false)
+        val theirs = store.write(stranger, "Fremd", "Nicht deins.", listOf("fremd"), null, byAgent = true)
+
+        assertEquals(KnowledgeStore.Deleted.Removed("Alter Vertrag"), store.deleteByAgent(user, own.entry.id))
+        assertNull(store.read(user, own.entry.id))
+
+        // The user's own entry is refused by name, somebody else's is not even there.
+        assertEquals(KnowledgeStore.Deleted.NotCreatedByAgent("Umzug"), store.deleteByAgent(user, users.entry.id))
+        assertEquals(KnowledgeStore.Deleted.NotFound, store.deleteByAgent(user, theirs.entry.id))
+        assertEquals(KnowledgeStore.Deleted.NotFound, store.deleteByAgent(user, own.entry.id))
+
+        assertEquals("Nach Potsdam.", store.read(user, users.entry.id)?.description)
+        assertEquals("Nicht deins.", store.read(stranger, theirs.entry.id)?.description)
+    }
+
+    @Test
     fun `an excerpt is the beginning of a long entry`() = runTest {
         val (user, _) = setUp()
 

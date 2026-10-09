@@ -14,9 +14,10 @@ import kotlin.uuid.Uuid
 private const val MAX_HITS = 8
 
 /**
- * The assistant's own memory: looking something up, reading it in full, and writing it down.
+ * The assistant's own memory: looking something up, reading it in full, writing it down, and
+ * deleting what it wrote itself.
  *
- * All three go through [KnowledgeStore], which is also what the classification uses -- what the
+ * All of them go through [KnowledgeStore], which is also what the classification uses -- what the
  * agent learns while sorting a mail is the same knowledge it reads in a chat. Bound to one user
  * like every tool here.
  */
@@ -63,6 +64,8 @@ class SearchKnowledgeTool(
         @SerialName("relevant_on") val relevantOn: String?,
         /** The beginning of the entry; ask for it by id to read the rest. */
         @SerialName("excerpt") val excerpt: String,
+        /** False for an entry the user wrote; only the agent's own can be deleted. */
+        @SerialName("written_by_you") val writtenByYou: Boolean,
     )
 
     override suspend fun execute(args: Args): Result {
@@ -78,6 +81,7 @@ class SearchKnowledgeTool(
                     keywords = entry.keywords,
                     relevantOn = entry.relevantOn?.toString(),
                     excerpt = entry.excerpt,
+                    writtenByYou = entry.createdByAgent,
                 )
             }
         )
@@ -121,6 +125,7 @@ class ReadKnowledgeTool(
             @SerialName("keywords") val keywords: List<String>,
             @SerialName("relevant_on") val relevantOn: String?,
             @SerialName("description") val description: String,
+            @SerialName("written_by_you") val writtenByYou: Boolean,
         ) : Result()
 
         @Serializable
@@ -142,6 +147,7 @@ class ReadKnowledgeTool(
             keywords = entry.keywords,
             relevantOn = entry.relevantOn?.toString(),
             description = entry.description,
+            writtenByYou = entry.createdByAgent,
         )
     }
 
@@ -244,5 +250,76 @@ class WriteKnowledgeTool(
 
         fun markup(name: String, replaced: Boolean): String =
             """<toolcall-write-knowledge name="${escapeAttribute(name)}" replaced="$replaced"></toolcall-write-knowledge>"""
+    }
+}
+
+/**
+ * Deletes an entry the agent wrote itself, when it turned out wrong or no longer holds.
+ *
+ * What the user wrote stays: the store refuses it, and the answer says so, so the agent can tell
+ * the user to remove it in the settings rather than claim it is gone.
+ */
+class DeleteKnowledgeTool(
+    private val userId: User.Id,
+    private val store: KnowledgeStore,
+    private val onDelete: (String) -> Unit = {},
+) : Tool<DeleteKnowledgeTool.Args, DeleteKnowledgeTool.Result>(
+    argsType = typeToken<Args>(),
+    resultType = typeToken<Result>(),
+    name = NAME,
+    description = "Delete an entry you wrote yourself, when it is wrong, no longer holds, or the " +
+        "user asks you to forget it. Only entries with `written_by_you` can be deleted; the " +
+        "user's own entries stay. To correct an entry rather than drop it, rewrite it with " +
+        "`${WriteKnowledgeTool.NAME}` instead. The id comes from `${SearchKnowledgeTool.NAME}`.",
+) {
+
+    @Serializable
+    data class Args(
+        @property:LLMDescription("The id of the entry, as the search gave it.")
+        @SerialName("knowledge_id") val knowledgeId: String,
+    )
+
+    @Serializable
+    sealed class Result {
+
+        @Serializable
+        @SerialName("deleted")
+        data class Deleted(
+            @SerialName("name") val name: String,
+        ) : Result()
+
+        @Serializable
+        @SerialName("not_found")
+        data class NotFound(
+            @SerialName("message") val message: String = "No knowledge with this id belongs to the user.",
+        ) : Result()
+
+        @Serializable
+        @SerialName("not_written_by_you")
+        data class NotWrittenByYou(
+            @SerialName("name") val name: String,
+            @SerialName("message") val message: String = "The user wrote this entry themselves, so " +
+                "it was not deleted. They can remove it in the settings.",
+        ) : Result()
+    }
+
+    override suspend fun execute(args: Args): Result {
+        val id = Uuid.parseOrNull(args.knowledgeId.trim()) ?: return Result.NotFound()
+
+        return when (val deleted = store.deleteByAgent(userId = userId, id = id)) {
+            is KnowledgeStore.Deleted.Removed -> {
+                onDelete(markup(deleted.name))
+                Result.Deleted(name = deleted.name)
+            }
+            KnowledgeStore.Deleted.NotFound -> Result.NotFound()
+            is KnowledgeStore.Deleted.NotCreatedByAgent -> Result.NotWrittenByYou(name = deleted.name)
+        }
+    }
+
+    companion object {
+        const val NAME = "delete_knowledge"
+
+        fun markup(name: String): String =
+            """<toolcall-delete-knowledge name="${escapeAttribute(name)}"></toolcall-delete-knowledge>"""
     }
 }

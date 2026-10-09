@@ -24,6 +24,7 @@ import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
+import es.jvbabi.overmail.server.ai.chat.tools.DeleteKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
@@ -393,7 +394,10 @@ class ChatAgent(
                 "`${WriteKnowledgeTool.NAME}` when something will still be worth knowing next " +
                 "week, and give it the words you would search for; the content of one email is " +
                 "not worth an entry, a decision the user made is. Do not write down what you " +
-                "were only asked to do once, and never write what the user has not told you.\n" +
+                "were only asked to do once, and never write what the user has not told you. " +
+                "`${DeleteKnowledgeTool.NAME}` removes an entry you wrote yourself once it is " +
+                "wrong or no longer holds, or when the user asks you to forget it; the entries " +
+                "the user wrote are not yours to delete.\n" +
                 "Labels are the user's own vocabulary for their mailbox, and the tools that write " +
                 "them change what the user sees right away. Only use them when the user asked for " +
                 "it. `${CreateLabelTool.NAME}` makes one -- and answers with the existing label " +
@@ -524,6 +528,7 @@ internal fun chatToolRegistry(
         .tool(SearchKnowledgeTool(userId = userId, store = knowledgeStore, onSearch = ::writeBlock))
         .tool(ReadKnowledgeTool(userId = userId, store = knowledgeStore, onRead = ::writeBlock))
         .tool(WriteKnowledgeTool(userId = userId, store = knowledgeStore, onWrite = ::writeBlock))
+        .tool(DeleteKnowledgeTool(userId = userId, store = knowledgeStore, onDelete = ::writeBlock))
         .tool(
             RenameChatTool(
                 userId = userId,

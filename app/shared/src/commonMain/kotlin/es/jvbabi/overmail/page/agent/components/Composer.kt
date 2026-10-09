@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -57,6 +59,8 @@ fun Composer(
     isAnswering: Boolean,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Puts the cursor into the text field; the pill around it cannot take focus itself. */
+    focusRequester: FocusRequester? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val canSend = !isAnswering && value.isNotBlank()
@@ -93,7 +97,9 @@ fun Composer(
                 cursorBrush = SolidColor(colors.primary),
                 maxLines = 6,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
             )
         }
 

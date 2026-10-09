@@ -237,6 +237,8 @@ fun App() {
             var openListArchive by remember { mutableStateOf(false) }
             // Asked from the search: sent as a new chat once the agent's tab is there.
             var agentQuestion by remember { mutableStateOf<String?>(null) }
+            // The agent tab tapped again while it is open: a new question is what is wanted next.
+            var newAgentChat by remember { mutableStateOf(false) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             // Around the bottom bar as well: a card lifted off a page lies over it too.
@@ -299,6 +301,8 @@ fun App() {
                                             AgentScreen(
                                                 ask = agentQuestion,
                                                 onAsked = { agentQuestion = null },
+                                                newChat = newAgentChat,
+                                                onNewChatOpened = { newAgentChat = false },
                                                 onOpenEmail = { backstack.add(Screen.Email(it)) },
                                             )
                                         }
@@ -337,6 +341,7 @@ fun App() {
                         onSelect = { tab ->
                             if (tab == currentTab) {
                                 if (tab == Screen.List) focusListSearch = true
+                                if (tab == Screen.Agent) newAgentChat = true
                                 return@BottomNavBar
                             }
                             // The stack is the root and every other tab lies on top of it, so back from

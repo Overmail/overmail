@@ -41,10 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,17 +84,31 @@ import kotlin.uuid.Uuid
 
 /**
  * The assistant. [ask] is a question asked from elsewhere -- the search -- and is sent as a new
- * chat once; [onAsked] says it is done, and the request is taken back. [onOpenEmail] opens a mail
- * an answer names.
+ * chat once; [onAsked] says it is done, and the request is taken back. [newChat] opens a new chat
+ * with the cursor in the prompt the same way, see [onNewChatOpened]. [onOpenEmail] opens a mail an
+ * answer names.
  */
 @Composable
 fun AgentScreen(
     ask: String? = null,
     onAsked: () -> Unit = {},
+    newChat: Boolean = false,
+    onNewChatOpened: () -> Unit = {},
     onOpenEmail: (Uuid) -> Unit = {},
 ) {
     val viewModel = koinViewModel<AgentViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    val promptFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(newChat) {
+        if (!newChat) return@LaunchedEffect
+        viewModel.onEvent(AgentEvent.NewChat)
+        promptFocus.requestFocus()
+        // Focus alone leaves the keyboard down when the field had it already.
+        keyboard?.show()
+        onNewChatOpened()
+    }
 
     // Waits for the account: a question sent before it is known would go nowhere.
     LaunchedEffect(ask, state.account) {
@@ -105,7 +121,7 @@ fun AgentScreen(
     var pendingLink by remember { mutableStateOf<String?>(null) }
     val actions = remember(onOpenEmail) { MarkdownActions(onOpenEmail = onOpenEmail, onOpenLink = { pendingLink = it }) }
 
-    AgentContent(state = state, actions = actions, onEvent = viewModel::onEvent)
+    AgentContent(state = state, actions = actions, promptFocus = promptFocus, onEvent = viewModel::onEvent)
 
     pendingLink?.let { url ->
         AlertDialog(
@@ -150,6 +166,7 @@ private val PROMPT_GAP = 12.dp
 private fun AgentContent(
     state: AgentState,
     actions: MarkdownActions,
+    promptFocus: FocusRequester,
     onEvent: (AgentEvent) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -272,6 +289,7 @@ private fun AgentContent(
                 onValueChange = { onEvent(AgentEvent.SetInput(it)) },
                 isAnswering = state.isAnswering,
                 onSend = { onEvent(AgentEvent.Send) },
+                focusRequester = promptFocus,
             )
         }
 

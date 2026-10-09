@@ -712,6 +712,7 @@
         "readKnowledge": "Wissen gelesen zu",
         "writeKnowledge": "Gemerkt",
         "updateKnowledge": "Wissen aktualisiert zu",
+        "deleteKnowledge": "Wissen gelöscht zu",
         "renameChat": "Chat umbenannt",
         "tokensOutput": "{count, plural, one {# Token Ausgabe} other {# Tokens Ausgabe}}",
         "searchEmails": "Suche Mails",

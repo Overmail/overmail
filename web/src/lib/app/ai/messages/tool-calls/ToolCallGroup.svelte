@@ -40,6 +40,7 @@
         "search-knowledge": "searching",
         "read-knowledge": "working",
         "write-knowledge": "working",
+        "delete-knowledge": "working",
         "rename-chat": "working",
         thinking: "breathing",
     };
@@ -53,6 +54,7 @@
         "search-knowledge": "ai.chat.messages.searchKnowledge",
         "read-knowledge": "ai.chat.messages.readKnowledge",
         "write-knowledge": "ai.chat.messages.writeKnowledge",
+        "delete-knowledge": "ai.chat.messages.deleteKnowledge",
         "rename-chat": "ai.chat.messages.renameChat",
         thinking: "ai.chat.messages.thinking",
     };
@@ -124,6 +126,8 @@
                         <ToolCallKnowledge kind="read" attributes={call.attributes}/>
                     {:else if call.kind === "write-knowledge"}
                         <ToolCallKnowledge kind="write" attributes={call.attributes}/>
+                    {:else if call.kind === "delete-knowledge"}
+                        <ToolCallKnowledge kind="delete" attributes={call.attributes}/>
                     {:else if call.kind === "rename-chat"}
                         <ToolCallRenameChat attributes={call.attributes}/>
                     {/if}

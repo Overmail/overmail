@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
 import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.RenameChatTool
+import es.jvbabi.overmail.server.ai.chat.tools.DeleteKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
@@ -30,6 +31,7 @@ import kotlinx.coroutines.test.runTest
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -244,6 +246,48 @@ class ChatToolRegistryTest {
         assertTrue(registry.tools.filterIsInstance<ReadKnowledgeTool>().single()
             .execute(ReadKnowledgeTool.Args(knowledgeId = theirs.entry.id.toString()))
                 is ReadKnowledgeTool.Result.NotFound)
+    }
+
+    @Test
+    fun `the agent deletes only knowledge it wrote itself`() = runTest {
+        val fixture = setUp()
+        val stream = AiChatMessageStream()
+        val store = KnowledgeStore(database)
+
+        val own = store.write(fixture.userId, "Alter Vertrag", "Gekündigt.", listOf("vertrag"), null, byAgent = true)
+        val users = store.write(fixture.userId, "Umzug", "Nach Potsdam.", listOf("umzug"), null, byAgent = false)
+
+        val registry = registry(fixture, stream)
+        val delete = registry.tools.filterIsInstance<DeleteKnowledgeTool>().single()
+
+        // Who wrote an entry is part of what the agent sees, so it knows before it tries.
+        val hits = registry.tools.filterIsInstance<SearchKnowledgeTool>().single()
+            .execute(SearchKnowledgeTool.Args(query = "")).entries
+        assertEquals(mapOf("Alter Vertrag" to "assistant", "Umzug" to "user"), hits.associate { it.name to it.createdBy })
+
+        assertEquals(
+            DeleteKnowledgeTool.Result.Deleted(name = "Alter Vertrag"),
+            delete.execute(DeleteKnowledgeTool.Args(knowledgeId = own.entry.id.toString())),
+        )
+        assertTrue(
+            delete.execute(DeleteKnowledgeTool.Args(knowledgeId = users.entry.id.toString()))
+                is DeleteKnowledgeTool.Result.CreatedByUser
+        )
+        assertTrue(
+            delete.execute(DeleteKnowledgeTool.Args(knowledgeId = "not-an-id"))
+                is DeleteKnowledgeTool.Result.NotFound
+        )
+
+        assertNull(store.read(fixture.userId, own.entry.id))
+        assertEquals("Nach Potsdam.", store.read(fixture.userId, users.entry.id)?.description)
+        // Only the delete that happened left a line in the answer.
+        assertEquals(
+            listOf(
+                """<toolcall-search-knowledge query=""></toolcall-search-knowledge>""",
+                """<toolcall-delete-knowledge name="Alter Vertrag"></toolcall-delete-knowledge>""",
+            ),
+            stream.snapshot().content.split("\n\n"),
+        )
     }
 
     @Test

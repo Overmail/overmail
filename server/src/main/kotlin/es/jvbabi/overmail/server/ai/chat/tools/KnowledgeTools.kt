@@ -14,9 +14,23 @@ import kotlin.uuid.Uuid
 private const val MAX_HITS = 8
 
 /**
- * The assistant's own memory: looking something up, reading it in full, and writing it down.
+ * Who created an entry, as the tools tell the model. Not a boolean "by you": the assistant that
+ * created it may have been the classification rather than this chat, and an entry the user
+ * edited afterwards was still created by the assistant.
+ */
+private const val CREATED_BY_ASSISTANT = "assistant"
+private const val CREATED_BY_USER = "user"
+private const val CREATED_BY_DESCRIPTION = "`$CREATED_BY_ASSISTANT` for you, in a chat or while " +
+    "sorting mail, `$CREATED_BY_USER` for the user, in the settings."
+
+private fun createdBy(entry: KnowledgeStore.Entry): String =
+    if (entry.createdByAgent) CREATED_BY_ASSISTANT else CREATED_BY_USER
+
+/**
+ * The assistant's own memory: looking something up, reading it in full, writing it down, and
+ * deleting what it wrote itself.
  *
- * All three go through [KnowledgeStore], which is also what the classification uses -- what the
+ * All of them go through [KnowledgeStore], which is also what the classification uses -- what the
  * agent learns while sorting a mail is the same knowledge it reads in a chat. Bound to one user
  * like every tool here.
  */
@@ -40,7 +54,8 @@ class SearchKnowledgeTool(
         "decisions they made, dates that matter to them. Give the words you would look for " +
         "yourself, not a sentence. Answers with the beginning of each entry; read the ones you " +
         "need in full with `${ReadKnowledgeTool.NAME}`. An empty query answers with the most " +
-        "recently written entries.",
+        "recently written entries. Each entry says who created it in `created_by`: " +
+        CREATED_BY_DESCRIPTION,
 ) {
 
     @Serializable
@@ -63,6 +78,8 @@ class SearchKnowledgeTool(
         @SerialName("relevant_on") val relevantOn: String?,
         /** The beginning of the entry; ask for it by id to read the rest. */
         @SerialName("excerpt") val excerpt: String,
+        /** Who created the entry, see [CREATED_BY_DESCRIPTION]; only the assistant's own can be deleted. */
+        @SerialName("created_by") val createdBy: String,
     )
 
     override suspend fun execute(args: Args): Result {
@@ -78,6 +95,7 @@ class SearchKnowledgeTool(
                     keywords = entry.keywords,
                     relevantOn = entry.relevantOn?.toString(),
                     excerpt = entry.excerpt,
+                    createdBy = createdBy(entry),
                 )
             }
         )
@@ -121,6 +139,7 @@ class ReadKnowledgeTool(
             @SerialName("keywords") val keywords: List<String>,
             @SerialName("relevant_on") val relevantOn: String?,
             @SerialName("description") val description: String,
+            @SerialName("created_by") val createdBy: String,
         ) : Result()
 
         @Serializable
@@ -142,6 +161,7 @@ class ReadKnowledgeTool(
             keywords = entry.keywords,
             relevantOn = entry.relevantOn?.toString(),
             description = entry.description,
+            createdBy = createdBy(entry),
         )
     }
 
@@ -244,5 +264,77 @@ class WriteKnowledgeTool(
 
         fun markup(name: String, replaced: Boolean): String =
             """<toolcall-write-knowledge name="${escapeAttribute(name)}" replaced="$replaced"></toolcall-write-knowledge>"""
+    }
+}
+
+/**
+ * Deletes an entry the agent wrote itself, when it turned out wrong or no longer holds.
+ *
+ * What the user wrote stays: the store refuses it, and the answer says so, so the agent can tell
+ * the user to remove it in the settings rather than claim it is gone.
+ */
+class DeleteKnowledgeTool(
+    private val userId: User.Id,
+    private val store: KnowledgeStore,
+    private val onDelete: (String) -> Unit = {},
+) : Tool<DeleteKnowledgeTool.Args, DeleteKnowledgeTool.Result>(
+    argsType = typeToken<Args>(),
+    resultType = typeToken<Result>(),
+    name = NAME,
+    description = "Delete an entry you created, when it is wrong, no longer holds, or the user " +
+        "asks you to forget it. Only entries with `created_by` `$CREATED_BY_ASSISTANT` can be " +
+        "deleted; the ones the user created stay. To correct an entry rather than drop it, " +
+        "rewrite it with `${WriteKnowledgeTool.NAME}` instead. The id comes from " +
+        "`${SearchKnowledgeTool.NAME}`.",
+) {
+
+    @Serializable
+    data class Args(
+        @property:LLMDescription("The id of the entry, as the search gave it.")
+        @SerialName("knowledge_id") val knowledgeId: String,
+    )
+
+    @Serializable
+    sealed class Result {
+
+        @Serializable
+        @SerialName("deleted")
+        data class Deleted(
+            @SerialName("name") val name: String,
+        ) : Result()
+
+        @Serializable
+        @SerialName("not_found")
+        data class NotFound(
+            @SerialName("message") val message: String = "No knowledge with this id belongs to the user.",
+        ) : Result()
+
+        @Serializable
+        @SerialName("created_by_user")
+        data class CreatedByUser(
+            @SerialName("name") val name: String,
+            @SerialName("message") val message: String = "The user wrote this entry themselves, so " +
+                "it was not deleted. They can remove it in the settings.",
+        ) : Result()
+    }
+
+    override suspend fun execute(args: Args): Result {
+        val id = Uuid.parseOrNull(args.knowledgeId.trim()) ?: return Result.NotFound()
+
+        return when (val deleted = store.deleteByAgent(userId = userId, id = id)) {
+            is KnowledgeStore.Deleted.Removed -> {
+                onDelete(markup(deleted.name))
+                Result.Deleted(name = deleted.name)
+            }
+            KnowledgeStore.Deleted.NotFound -> Result.NotFound()
+            is KnowledgeStore.Deleted.NotCreatedByAgent -> Result.CreatedByUser(name = deleted.name)
+        }
+    }
+
+    companion object {
+        const val NAME = "delete_knowledge"
+
+        fun markup(name: String): String =
+            """<toolcall-delete-knowledge name="${escapeAttribute(name)}"></toolcall-delete-knowledge>"""
     }
 }

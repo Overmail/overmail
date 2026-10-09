@@ -712,6 +712,7 @@
         "readKnowledge": "Read what I know about",
         "writeKnowledge": "Noted",
         "updateKnowledge": "Updated what I know about",
+        "deleteKnowledge": "Forgot what I knew about",
         "renameChat": "Chat renamed",
         "tokensOutput": "{count, plural, one {# output token} other {# output tokens}}",
         "searchEmails": "Searching emails",

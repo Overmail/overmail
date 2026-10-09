@@ -187,16 +187,22 @@ class WriteKnowledgeTool(
     argsType = typeToken<Args>(),
     resultType = typeToken<Result>(),
     name = NAME,
-    description = "Write down something about this user that will still be worth knowing next " +
-        "week: how they want their mail handled, who writes to them and why, a date they will " +
-        "be asked about again. Not the content of a single email, and not what the user can see " +
-        "for themselves. Writing a name that already exists replaces that entry, so read it " +
-        "first with `${ReadKnowledgeTool.NAME}` and send the whole text back with your addition.",
+    description = "Write down something significant about this user that will still matter in " +
+        "months: how they want their mail handled, who writes to them and why, a contract or " +
+        "account they have, a date with real consequences. Not the content of a single email, " +
+        "not routine mail like login notifications, codes, delivery updates or receipts, and " +
+        "not what the user can see for themselves. An entry is about a topic, not one email: " +
+        "search for an existing entry on the topic first and extend it instead of starting a " +
+        "new one. Writing a name that already exists replaces that entry, so read it first " +
+        "with `${ReadKnowledgeTool.NAME}` and send the whole text back with your addition.",
 ) {
 
     @Serializable
     data class Args(
-        @property:LLMDescription("What the entry is about, in a few words. This is also its handle.")
+        @property:LLMDescription(
+            "The topic the entry is about, in a few words -- a provider, a contract, a person. " +
+                "This is also its handle: the name of an existing entry extends that entry."
+        )
         @SerialName("name") val name: String,
         @property:LLMDescription("What you learned, in full sentences. Write it for your future self.")
         @SerialName("description") val description: String,

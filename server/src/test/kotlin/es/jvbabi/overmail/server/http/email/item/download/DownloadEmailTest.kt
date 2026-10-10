@@ -85,6 +85,17 @@ class DownloadEmailTest {
     }
 
     @Test
+    fun `a mail without a subject still names a file`() = testApplication {
+        val mail = setUp(null)
+        installRoute()
+
+        val disposition = client.get("/api/emails/$mail/download")
+            .headers[HttpHeaders.ContentDisposition]!!
+
+        assertTrue(disposition.contains("""filename="${day}_email.eml""""), disposition)
+    }
+
+    @Test
     fun `a mail of somebody else is not handed out`() = testApplication {
         setUp("Mine")
         installRoute()
@@ -116,7 +127,7 @@ class DownloadEmailTest {
     }
 
     /** A signed-in user with one mail, plus somebody else to be refused. */
-    private suspend fun setUp(subject: String): Uuid {
+    private suspend fun setUp(subject: String?): Uuid {
         database.init()
         return database.query {
             signedIn = User.new {

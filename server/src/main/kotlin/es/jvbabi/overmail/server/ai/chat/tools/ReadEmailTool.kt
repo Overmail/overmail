@@ -175,8 +175,11 @@ class ReadEmailTool(
             subject: String?,
             avatarUrl: String?,
             avatarPadding: Double?,
-        ): String =
-            """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" """ +
-                    """avatarPadding="${avatarPadding ?: ""}" subject="${escapeAttribute(subject.orEmpty())}"></toolcall-read-email>"""
+        ): String {
+            // Left out rather than empty for a mail without one, so the chat can tell the two apart.
+            val subjectAttribute = subject?.let { """ subject="${escapeAttribute(it)}"""" }.orEmpty()
+            return """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" """ +
+                    """avatarPadding="${avatarPadding ?: ""}"$subjectAttribute></toolcall-read-email>"""
+        }
     }
 }

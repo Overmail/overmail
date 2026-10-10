@@ -120,6 +120,14 @@ class ReadEmailToolTest {
     }
 
     @Test
+    fun `leaves the subject out of the markup of a mail without one`() {
+        val id = Uuid.random()
+        val markup = ReadEmailTool.markup(id, subject = null, avatarUrl = null, avatarPadding = null)
+
+        assertEquals("""<toolcall-read-email emailId="$id" avatarUrl="" avatarPadding=""></toolcall-read-email>""", markup)
+    }
+
+    @Test
     fun `does not read a mail of another user`() = runTest {
         val fixture = setUp()
         val tool = ReadEmailTool(userId = fixture.strangerId, database = database)

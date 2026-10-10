@@ -179,7 +179,7 @@ class SearchEmailsTool(
                 .limit(MAX_CANDIDATES)
                 .filter { row ->
                     val subjectMatches = args.subject.isNullOrBlank()
-                        || (row[Emails.subject] != null && (row[Emails.subject]!! fuzzyContains args.subject))
+                        || row[Emails.subject]?.let { it fuzzyContains args.subject } == true
                     // Name and address are one field to the model: it cannot know which of the
                     // two carries what it is looking for.
                     val senderMatches = args.sender.isNullOrBlank()

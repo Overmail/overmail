@@ -102,7 +102,7 @@ private fun Candidate.matchAgainst(query: String): MatchedCandidate? {
     var score = 0.0
 
     for (token in query.split(Regex("\\s+")).filter { it.isNotBlank() }) {
-        val subjectResult = if (subject != null) subject detailedFuzzyContains token else FuzzyMatchResult.NO_MATCH
+        val subjectResult = subject?.detailedFuzzyContains(token) ?: FuzzyMatchResult.NO_MATCH
         val nameResult = senderName?.detailedFuzzyContains(token) ?: FuzzyMatchResult.NO_MATCH
         val addressResult = senderAddress detailedFuzzyContains token
         if (!subjectResult.matches && !nameResult.matches && !addressResult.matches) return null
@@ -110,13 +110,11 @@ private fun Candidate.matchAgainst(query: String): MatchedCandidate? {
         nameRanges += nameResult.ranges
         addressRanges += addressResult.ranges
 
-        score += listOfNotNull(
-            if (subject != null) fieldScore(subject, subjectResult) * SUBJECT_WEIGHT else null,
+        score += maxOf(
+            fieldScore(subject.orEmpty(), subjectResult) * SUBJECT_WEIGHT,
             fieldScore(senderName.orEmpty(), nameResult) * NAME_WEIGHT,
             fieldScore(senderAddress, addressResult) * ADDRESS_WEIGHT,
         )
-            .ifEmpty { listOf(0.0) }
-            .max()
     }
 
     return MatchedCandidate(
@@ -218,7 +216,7 @@ fun Route.emailSearch() {
                 matched.map { (candidate, subjectRanges, nameRanges, addressRanges, _) ->
                     EmailSearchResponse.Email(
                         id = candidate.id,
-                        subject = if (candidate.subject != null) matchable(candidate.subject, subjectRanges) else null,
+                        subject = candidate.subject?.let { matchable(it, subjectRanges) },
                         from = EmailSearchResponse.Email.From(
                             name = candidate.senderName?.let { matchable(it, nameRanges) },
                             address = matchable(candidate.senderAddress, addressRanges),

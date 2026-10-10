@@ -45,6 +45,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(EmailAvatars)
             SchemaUtils.create(EmailUsers)
             SchemaUtils.create(Emails, Attachments)
+            exec("ALTER TABLE emails ALTER COLUMN subject DROP NOT NULL")
             SchemaUtils.create(EmailPreviews)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)

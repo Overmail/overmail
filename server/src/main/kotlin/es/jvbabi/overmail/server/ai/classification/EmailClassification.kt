@@ -151,7 +151,7 @@ class EmailClassification(
                 system(
                     """
                     From: ${email.sender.address} (${if (email.senderName != null) email.senderName else "no name provided"})
-                    Subject: ${email.subject}
+                    Subject: ${email.subject ?: "(no subject)"}
                     Sent: ${email.sent}
                     
                     Text content: $textContent

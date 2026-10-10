@@ -576,7 +576,6 @@ class OAuthRoutesTest {
                             database = database,
                         ),
                         mailNotifier = MailNotifier(),
-                        oauthTokens = tokens,
                     )
                 }
             }

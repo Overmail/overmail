@@ -175,7 +175,6 @@ private fun Application.configureDependencies() {
                 coroutineScope = this@configureDependencies,
                 emailClassificationQueue = resolve(),
                 mailNotifier = resolve(),
-                oauthTokens = resolve(),
             )
         }
     }

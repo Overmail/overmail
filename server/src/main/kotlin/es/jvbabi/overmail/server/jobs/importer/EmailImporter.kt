@@ -9,7 +9,6 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
-import es.jvbabi.overmail.server.oauth.OAuthTokens
 import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -136,7 +135,6 @@ class EmailImporter(
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
-    private val oauthTokens: OAuthTokens,
 ) {
 
     private val logger = LoggerFactory.getLogger(EmailImporter::class.java)

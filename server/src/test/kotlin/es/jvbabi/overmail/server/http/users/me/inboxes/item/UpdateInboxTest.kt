@@ -401,7 +401,6 @@ class UpdateInboxTest {
                             database = database,
                         ),
                         mailNotifier = MailNotifier(),
-                        oauthTokens = tokens,
                     )
                 }
             }

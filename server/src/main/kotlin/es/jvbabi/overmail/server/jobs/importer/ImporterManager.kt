@@ -6,7 +6,6 @@ import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.OAuthGrants
-import es.jvbabi.overmail.server.oauth.OAuthTokens
 import kotlinx.coroutines.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNotNull
@@ -22,7 +21,6 @@ class ImporterManager(
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
-    private val oauthTokens: OAuthTokens,
 ) {
 
     private val importer = mutableMapOf<Uuid, EmailImporter>()
@@ -103,7 +101,6 @@ class ImporterManager(
         coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
         emailClassificationQueue = this.emailClassificationQueue,
         mailNotifier = this.mailNotifier,
-        oauthTokens = this.oauthTokens,
     ).also { it.start() }
 }
 

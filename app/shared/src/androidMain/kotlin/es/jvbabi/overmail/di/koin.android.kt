@@ -8,6 +8,7 @@ import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.picture.AndroidEmailPictureRenderer
 import es.jvbabi.overmail.data.picture.EmailPictureRenderer
 import es.jvbabi.overmail.data.push.FirebasePushTokenRepository
+import es.jvbabi.overmail.data.push.PushNotifier
 import es.jvbabi.overmail.data.repository.NotificationChannelRepositoryImpl
 import es.jvbabi.overmail.data.repository.OvermailAppRepositoryImpl
 import es.jvbabi.overmail.data.repository.UpdateRepositoryImpl
@@ -54,6 +55,7 @@ actual fun platformModule(): Module = module {
     // One instance under both types: the service reports a new token to what the shared code reads.
     singleOf(::FirebasePushTokenRepository) bind PushTokenRepository::class
 
+    single { PushNotifier(context = get(), notificationChannelRepository = get()) }
     single<NotificationChannelRepository> { NotificationChannelRepositoryImpl(context = get()) }
 
     singleOf(::CheckAppIsLatestVersionUseCase)

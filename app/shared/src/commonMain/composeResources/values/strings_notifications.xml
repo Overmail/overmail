@@ -4,4 +4,7 @@
     <string name="notifications_group_account_description">Mailboxes of the Overmail account “%1$s” on “%2$s”</string>
     <string name="notifications_channel_mailbox_name">New mail for %1$s</string>
     <string name="notifications_channel_mailbox_description">Mail that arrives in the mailbox “%1$s” on “%2$s”</string>
+
+    <string name="notifications_ping_title">Test notification</string>
+    <string name="notifications_ping_text">Your server reached this device. Push works.</string>
 </resources>

@@ -3,6 +3,8 @@ package es.jvbabi.overmail.data.push
 import co.touchlab.kermit.Logger
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import es.jvbabi.overmail.domain.model.ReceivedPush
+import kotlinx.coroutines.runBlocking
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -17,6 +19,7 @@ private val logger = Logger.withTag("PushMessagingService")
 class PushMessagingService : FirebaseMessagingService(), KoinComponent {
 
     private val pushTokens: FirebasePushTokenRepository by inject()
+    private val pushNotifier: PushNotifier by inject()
 
     /** Firebase replaces the token whenever it likes: on first start, a restore, cleared app data. */
     override fun onNewToken(token: String) {
@@ -25,7 +28,18 @@ class PushMessagingService : FirebaseMessagingService(), KoinComponent {
         pushTokens.onNewToken(token)
     }
 
+    /**
+     * Called on a thread of Firebase's own, which may be kept for about ten seconds -- so the
+     * work is done right here rather than handed to a scope the process could die under.
+     */
     override fun onMessageReceived(message: RemoteMessage) {
-        logger.i { "Push received: ${message.data.keys}" }
+        val push = ReceivedPush.fromData(message.data)
+        if (push == null) {
+            logger.w { "Ignoring a push this version cannot read" }
+            return
+        }
+
+        logger.i { "Push received: ${push.message}" }
+        runBlocking { pushNotifier.handle(push) }
     }
 }

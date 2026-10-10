@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import io.ktor.client.request.delete
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -204,21 +205,7 @@ class DeleteInboxTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<ImporterManager> {
-                        ImporterManager(
-                            database = database,
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

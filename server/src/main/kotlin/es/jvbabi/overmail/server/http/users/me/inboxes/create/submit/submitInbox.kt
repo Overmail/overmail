@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.submit
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccounts

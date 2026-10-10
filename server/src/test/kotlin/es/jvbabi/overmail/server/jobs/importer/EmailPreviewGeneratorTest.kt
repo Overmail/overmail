@@ -1,11 +1,13 @@
-package es.jvbabi.overmail.server.util
+package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator.Companion.MAIL_PREVIEW_LENGTH
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator.Companion.mailPreview
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The first line of a mail, as a listing shows it. */
-class MailPreviewTest {
+class EmailPreviewGeneratorTest {
 
     @Test
     fun `the text part becomes one line`() {

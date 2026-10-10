@@ -11,6 +11,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthTokens

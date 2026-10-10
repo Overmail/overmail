@@ -39,6 +39,7 @@ class OvermailDatabase(private val database: Database) {
             exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64)")
             exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_active BOOLEAN DEFAULT TRUE NOT NULL")
             SchemaUtils.create(ImapAccounts, ImapAccountFolderSyncs)
+            SchemaUtils.create(ImapFolderCursors)
             SchemaUtils.create(ImapAccounts)
             SchemaUtils.create(OAuthGrants)
             exec("ALTER TABLE oauth_grants ADD COLUMN IF NOT EXISTS requires_reauthentication BOOLEAN DEFAULT FALSE NOT NULL")

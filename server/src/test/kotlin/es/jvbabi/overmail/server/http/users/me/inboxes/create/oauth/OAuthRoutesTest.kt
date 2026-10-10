@@ -4,7 +4,7 @@ import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.authentikt.core.session.sessions
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassification
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.config.ApplicationConfig
@@ -23,6 +23,7 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import es.jvbabi.overmail.server.jobs.importer.oauthGrantStates
 import es.jvbabi.overmail.server.jobs.importer.toConnection
 import es.jvbabi.overmail.server.oauth.OAuthEndpoints
@@ -564,21 +565,7 @@ class OAuthRoutesTest {
                     // A manager on a scope that is already over: the submit reboots the importer after
                     // answering, and a test has no mailbox for it to connect to.
                     single<ImporterManager> {
-                        ImporterManager(
-                            database = database,
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.test
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling

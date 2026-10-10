@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.jobs.importer
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import kotlin.test.Test
 import kotlin.test.assertFalse

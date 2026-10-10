@@ -1,7 +1,7 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.folders
 
-import es.jvbabi.overmail.core.ImapClient
-import es.jvbabi.overmail.core.ImapFolder
+import es.jvbabi.overmail.kamel.ImapClient
+import es.jvbabi.overmail.kamel.ImapFolder
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.ContentType
@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull

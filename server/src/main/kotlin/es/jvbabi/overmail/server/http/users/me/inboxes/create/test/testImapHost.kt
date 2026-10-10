@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.test
 
-import es.jvbabi.overmail.core.SocketInstance
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode
@@ -10,6 +9,10 @@ import io.ktor.network.sockets.aSocket
 import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.network.tls.tls
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.writeStringUtf8
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -26,7 +29,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
@@ -87,9 +89,8 @@ fun Route.testImapHost() {
  * Kamel's `ImapClient` cannot do this: every connection it hands out is logged in by its pool
  * factory, and there are no credentials yet at this point of the dialog. Guessing some would also
  * mean a failed login attempt against a stranger's server on every keystroke pause, which is what
- * gets an address rate-limited. So the connection is opened with [SocketInstance] directly, which
- * is the piece of kamel below the login: it completes `isReady` on the `* OK` the server opens
- * with, and that greeting is the whole test.
+ * gets an address rate-limited. So the socket is opened and read here: the `* OK` the server
+ * opens with is the whole test.
  *
  * Answers rather than throws -- every outcome here is a normal answer to "is this a mail server".
  */
@@ -165,18 +166,16 @@ private suspend fun openAndGreet(
     }
 
     phase.reached = ImapProbePhase.GREETING
-    return SocketInstance(
-        socket = socket,
-        input = socket.openReadChannel(),
-        output = socket.openWriteChannel(autoFlush = true),
-        isDebug = false,
-    ).use { connection ->
+    return socket.use {
+        val input = socket.openReadChannel()
+        val output = socket.openWriteChannel(autoFlush = true)
         try {
-            connection.isReady.await()
+            val greeting = input.readUTF8Line()
+            check(greeting != null && greeting.startsWith("* OK", ignoreCase = true)) { "No IMAP greeting" }
             ImapHostTestResponse(
                 reachable = true,
                 outcome = ImapHostTestOutcome.REACHABLE.wire,
-                capabilities = readImapCapabilities(connection),
+                capabilities = readImapCapabilities(input, output),
             )
         } catch (e: CancellationException) {
             throw e
@@ -208,6 +207,9 @@ private class ImapProbePhase {
     }
 }
 
+/** The tag of the one command the probe sends. */
+private const val CAPABILITY_TAG = "A001"
+
 /**
  * What the server lists on `CAPABILITY`, e.g. `IMAP4rev1`, `AUTH=PLAIN`, `LOGINDISABLED`.
  *
@@ -216,11 +218,13 @@ private class ImapProbePhase {
  * take it. Empty rather than fatal when the command fails: the greeting already answered the
  * question this route was asked.
  */
-private suspend fun readImapCapabilities(connection: SocketInstance): List<String> = try {
-    val response = connection.execute("CAPABILITY")
+private suspend fun readImapCapabilities(input: ByteReadChannel, output: ByteWriteChannel): List<String> = try {
+    output.writeStringUtf8("$CAPABILITY_TAG CAPABILITY\r\n")
     val capabilities = mutableListOf<String>()
-    response.response.consumeEach { line ->
-        if (!line.startsWith("* CAPABILITY", ignoreCase = true)) return@consumeEach
+    while (true) {
+        val line = input.readUTF8Line() ?: break
+        if (line.startsWith(CAPABILITY_TAG)) break
+        if (!line.startsWith("* CAPABILITY", ignoreCase = true)) continue
         capabilities += line.split(" ").drop(2).filter { it.isNotBlank() }
     }
     capabilities.distinct()

@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.database.models.OAuthGrant
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonNull
@@ -26,6 +26,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -389,21 +390,7 @@ class UpdateInboxTest {
                     single<OvermailDatabase> { database }
                     single<OAuthTokens> { tokens }
                     single<ImporterManager> {
-                        ImporterManager(
-                            database = database,
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

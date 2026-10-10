@@ -32,7 +32,7 @@ import org.koin.ktor.ext.get
  * answer for "I want this to stop" that deleting is usually mistaken for.
  *
  * The row is written before the answer goes out, and the importer is dealt with after it: stopping
- * waits for the mail currently being written (see `EmailImporter.stop`) and starting opens
+ * waits for the mail currently being written (see `ImporterManager.stop`) and starting opens
  * connections, and neither is something a caller should be held on.
  */
 fun Route.setInboxPaused(paused: Boolean) {

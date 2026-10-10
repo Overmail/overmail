@@ -31,6 +31,13 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    // Kamel snapshots, for the time the importer is built against an unreleased version.
+    maven("https://central.sonatype.com/repository/maven-snapshots/") {
+        mavenContent {
+            snapshotsOnly()
+            includeModule("es.jvbabi.overmail", "kamel")
+        }
+    }
 }
 
 dependencies {

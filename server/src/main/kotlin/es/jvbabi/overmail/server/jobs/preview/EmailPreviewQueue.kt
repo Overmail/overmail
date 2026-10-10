@@ -4,23 +4,19 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailPreviews
 import es.jvbabi.overmail.server.database.models.Emails
-import es.jvbabi.overmail.server.util.mailPreview
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.JoinType
-import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.select
-import org.jetbrains.exposed.v1.jdbc.upsert
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * How many mails wait in the queue at most.
  *
- * Bounded on purpose: [backfill] fills it and suspends once it is full, so a mailbox with a
+ * Bounded on purpose: [EmailPreviewQueue.backfill] fills it and suspends once it is full, so a mailbox with a
  * hundred thousand mails in it is worked through a thousand at a time instead of being read into
  * memory as one list of ids.
  */
@@ -32,15 +28,19 @@ private const val BATCH_SIZE = 500
 /**
  * Queue of mails whose preview has to be worked out, and the backfill that finds them.
  *
- * A mail that is imported gets its preview where it is written -- the body is parsed at that
- * moment anyway, see `EmailImporter`. This is for the ones that were stored before there was a
+ * A mail that is imported gets its preview right there. This is for the ones that were stored
+ * before there was a
  * preview at all, and for anything that has to be redone later: [enqueue] takes a single mail,
  * [backfill] takes every mail that has no preview row yet.
  *
- * One consumer, one body at a time: a preview is a whole mail body read out of the database and
- * an HTML parse on top, and there is no reason to hold more than one of those at once.
+ * The preview itself is [EmailPreviewGenerator]'s; this only decides which mail is next. One
+ * consumer, one body at a time: a preview is a whole mail body read out of the database and an
+ * HTML parse on top, and there is no reason to hold more than one of those at once.
  */
-class EmailPreviewQueue(private val database: OvermailDatabase) {
+class EmailPreviewQueue(
+    private val database: OvermailDatabase,
+    private val emailPreviewGenerator: EmailPreviewGenerator,
+) {
 
     private val logger = LoggerFactory.getLogger(EmailPreviewQueue::class.java)
 
@@ -102,34 +102,16 @@ class EmailPreviewQueue(private val database: OvermailDatabase) {
     suspend fun consume() {
         for (emailId in channel) {
             try {
-                write(emailId)
+                // The generator takes the mail, so this reads all of it, source included. A mail
+                // that was deleted while it waited has nothing left to preview.
+                val email = database.query { Email.findById(emailId) } ?: continue
+                emailPreviewGenerator.generatePreview(email)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (cause: Exception) {
                 logger.warn("Could not work out the preview of $emailId: ${cause.message}")
             } finally {
                 pending.remove(emailId)
-            }
-        }
-    }
-
-    private suspend fun write(emailId: Email.Id) {
-        // Two columns of one row rather than the entity, which would read the raw source with it.
-        val body = database.query {
-            Emails
-                .select(Emails.textContent, Emails.htmlContent)
-                .where { Emails.id eq emailId }
-                .firstOrNull()
-                ?.let { row -> row[Emails.textContent] to row[Emails.htmlContent] }
-        } ?: return
-
-        // Parsing HTML is processor work, so it happens off the dispatcher the queries run on.
-        val preview = withContext(Dispatchers.Default) { mailPreview(body.first, body.second) }
-
-        database.query {
-            EmailPreviews.upsert {
-                it[email] = emailId
-                it[EmailPreviews.preview] = preview
             }
         }
     }

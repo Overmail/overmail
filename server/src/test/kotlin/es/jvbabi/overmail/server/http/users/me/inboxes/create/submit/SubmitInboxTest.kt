@@ -18,6 +18,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -40,7 +41,6 @@ import io.ktor.server.testing.testApplication
 import java.net.ServerSocket
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -318,21 +318,7 @@ class SubmitInboxTest {
                     // A manager on a scope that is already over: the route reboots the importer after
                     // answering, and a test has no mailbox for it to connect to.
                     single<ImporterManager> {
-                        ImporterManager(
-                            database = database,
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

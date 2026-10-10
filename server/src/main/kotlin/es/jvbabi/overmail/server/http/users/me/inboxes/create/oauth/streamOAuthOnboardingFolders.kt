@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireOwnedOAuthOnboardingFromUrl

@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
@@ -19,7 +20,10 @@ import es.jvbabi.overmail.kamel.ImapClient
 @OptIn(ExperimentalCoroutinesApi::class)
 class MailboxImporterTest {
 
-    private val timings = MailboxImporter.Timings(pollInterval = 5.minutes, idleRenewInterval = 25.minutes, retryDelay = 30.seconds)
+    private val timings = MailboxImporter.Timings(pollInterval = 5.minutes, idleRenewInterval = 10.minutes, retryDelay = 30.seconds)
+
+    /** A poll so rare that whatever happens within an hour is the watch's doing. */
+    private val watchOnly = timings.copy(pollInterval = 24.hours)
 
     /** The folders that were synchronized, in order. */
     private val passes = mutableListOf<String>()
@@ -55,12 +59,51 @@ class MailboxImporterTest {
 
         backgroundScope.launch { importer.run() }
         runCurrent()
-        assertEquals(1, passes.size)
+        val before = passes.size
 
         inbox.idleEvents.emit(IdleEvent.NewMessage(1))
         runCurrent()
 
-        assertEquals(2, passes.size)
+        assertEquals(before + 1, passes.size)
+    }
+
+    @Test
+    fun `a watch is renewed on time, and the folder read with it`() = runTest {
+        val inbox = FakeFolder("INBOX")
+        val importer = MailboxImporter(connection(folderSync("INBOX", imapPush = true)), synchronizer, { FakeClient(inbox) }, watchOnly)
+
+        backgroundScope.launch { importer.run() }
+        runCurrent()
+        val before = passes.size
+        assertEquals(1, inbox.watches)
+
+        advanceTimeBy(10.minutes + 1.seconds)
+
+        assertEquals(2, inbox.watches)
+        // Nothing reported what changed between the two, so the folder is looked at.
+        assertEquals(before + 1, passes.size)
+    }
+
+    @Test
+    fun `a watch that fails is taken up again, and the folder read with it`() = runTest {
+        val inbox = FakeFolder("INBOX").apply { failingWatches = 2 }
+        val importer = MailboxImporter(connection(folderSync("INBOX", imapPush = true)), synchronizer, { FakeClient(inbox) }, watchOnly)
+
+        backgroundScope.launch { importer.run() }
+        runCurrent()
+        val before = passes.size
+        assertEquals(1, inbox.watches)
+
+        advanceTimeBy(30.seconds + 1.seconds)
+        assertEquals(2, inbox.watches)
+        advanceTimeBy(30.seconds)
+        assertEquals(3, inbox.watches)
+        assertEquals(before + 2, passes.size)
+
+        // The third one holds, and reports as any other.
+        inbox.idleEvents.emit(IdleEvent.NewMessage(1))
+        runCurrent()
+        assertEquals(before + 3, passes.size)
     }
 
     @Test

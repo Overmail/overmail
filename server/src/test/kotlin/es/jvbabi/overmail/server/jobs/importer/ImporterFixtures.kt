@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.time.Instant
@@ -115,6 +116,12 @@ internal class FakeFolder(
 
     val idleEvents = MutableSharedFlow<IdleEvent>(extraBufferCapacity = 16)
 
+    /** How often an `IDLE` was issued. */
+    var watches = 0
+
+    /** How many of the next watches fail instead of watching. */
+    var failingWatches = 0
+
     override suspend fun state() = FolderState(
         uidValidity = uidValidity,
         uidNext = (mails.maxOfOrNull { it.uidValue() } ?: 0) + 1,
@@ -128,7 +135,11 @@ internal class FakeFolder(
     }
 
     override fun getIdleFolder() = object : IdleFolder {
-        override fun events(): Flow<IdleEvent> = idleEvents
+        override fun events(): Flow<IdleEvent> = flow {
+            watches++
+            if (failingWatches-- > 0) throw java.io.IOException("the watch lost its connection")
+            emitAll(idleEvents)
+        }
     }
 
     private fun KamelEmail.uidValue() = (uidValue as es.jvbabi.overmail.kamel.util.Optional.Set).value

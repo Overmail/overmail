@@ -9,15 +9,18 @@ import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
 import org.jetbrains.compose.resources.getString
 import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.notifications_channel_mailbox_description
+import overmail.app.shared.generated.resources.notifications_channel_mailbox_name
 import overmail.app.shared.generated.resources.notifications_channel_system_description
 import overmail.app.shared.generated.resources.notifications_channel_system_name
+import overmail.app.shared.generated.resources.notifications_group_account_description
 import kotlin.uuid.Uuid
 
 /**
  * Notification channels, with an account as a channel group and each of its mailboxes as a channel
  * in it.
  *
- * Creating one that exists changes its name and nothing else, so everything here can be repeated:
+ * Creating one that exists changes its name and description and nothing else, so everything here can be repeated:
  * importance, sound and the rest belong to the user from the first time on. Before Android 8 there
  * are no channels, and the compat classes make all of this a no-op.
  */
@@ -37,12 +40,16 @@ class NotificationChannelRepositoryImpl(context: Context) : NotificationChannelR
     override suspend fun createAccountChannels(account: OvermailAccount, imapAccounts: List<ImapAccount>, removeOthers: Boolean) {
         val groupId = accountGroupId(account.id)
         notificationManager.createNotificationChannelGroup(
-            NotificationChannelGroupCompat.Builder(groupId).setName(account.email).build()
+            NotificationChannelGroupCompat.Builder(groupId)
+                .setName(account.email)
+                .setDescription(getString(Res.string.notifications_group_account_description, account.email, account.homeserver))
+                .build()
         )
 
         notificationManager.createNotificationChannelsCompat(imapAccounts.map { imapAccount ->
             NotificationChannelCompat.Builder(imapAccountChannelId(imapAccount.id), NotificationManagerCompat.IMPORTANCE_DEFAULT)
-                .setName(imapAccount.username)
+                .setName(getString(Res.string.notifications_channel_mailbox_name, imapAccount.username))
+                .setDescription(getString(Res.string.notifications_channel_mailbox_description, imapAccount.username, imapAccount.host))
                 .setGroup(groupId)
                 .build()
         })

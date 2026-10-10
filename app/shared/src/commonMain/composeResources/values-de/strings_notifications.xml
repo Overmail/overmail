@@ -1,4 +1,7 @@
 <resources>
-    <string name="notifications_channel_system_name">System</string>
-    <string name="notifications_channel_system_description">Updates und alles, was die App selbst zu melden hat</string>
+    <string name="notifications_channel_system_name">App-Hinweise und Updates</string>
+    <string name="notifications_channel_system_description">Neue Versionen von Overmail und alles, was die App selbst zu melden hat und keine E-Mail ist</string>
+    <string name="notifications_group_account_description">Postfächer des Overmail-Kontos %1$s auf %2$s</string>
+    <string name="notifications_channel_mailbox_name">Neue E-Mails an %1$s</string>
+    <string name="notifications_channel_mailbox_description">E-Mails, die im Postfach %1$s auf %2$s eingehen</string>
 </resources>

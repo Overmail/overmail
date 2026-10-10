@@ -39,6 +39,12 @@ class AiChatMessage(id: EntityID<Id>): UuidEntity(id) {
              * existed still read.
              */
             @SerialName("tool_calls") val toolCalls: List<ToolCall> = emptyList(),
+            /**
+             * The user stopped this answer while it was being written: [text] and [toolCalls] are
+             * what there was at that point, not a complete answer. Defaulted, so rows written
+             * before this existed still read.
+             */
+            @SerialName("stopped") val stopped: Boolean = false,
         ) : MessageContent() {
 
             @Serializable

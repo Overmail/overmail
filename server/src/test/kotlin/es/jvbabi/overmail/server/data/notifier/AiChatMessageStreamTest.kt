@@ -29,7 +29,7 @@ class AiChatMessageStreamTest {
         val stream = AiChatMessageStream()
         stream.append("before ")
 
-        var snapshot = AiChatMessageStream.Snapshot("", 0, false, 0)
+        var snapshot = AiChatMessageStream.Snapshot("", 0, false, false, 0)
         val reader = async {
             stream.events
                 .onSubscription { snapshot = stream.snapshot() }

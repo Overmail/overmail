@@ -82,6 +82,7 @@ fun Route.chatHistory() {
                             pending = message.finishedAt == null,
                             content = content.text,
                             tokensOutput = content.tokensOutput,
+                            stopped = content.stopped,
                         )
                     }
                 }
@@ -209,6 +210,8 @@ private sealed class ChatHistoryMessage {
         @SerialName("content") val content: String,
         @JsonSchema.Description("Tokens the model reported for the answer; still growing while it is pending")
         @SerialName("tokens_output") val tokensOutput: Int,
+        @JsonSchema.Description("Whether the answer was stopped while it was being written, so `content` is not a complete answer")
+        @SerialName("stopped") val stopped: Boolean,
     ) : ChatHistoryMessage()
 }
 

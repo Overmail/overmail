@@ -12,7 +12,13 @@ import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
 import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
 import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
 import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
+import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
+import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
+import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChatMessage
+import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -145,22 +151,39 @@ class ChatPromptTest {
         val emailId = Uuid.random()
         val labelId = Uuid.random()
 
-        // Every tool of the registry. They are told apart from what the model wrote by their
-        // prefix alone, so one that is added without it would show up here.
-        val markup = listOf(
-            ReadEmailTool.markup(emailId, subject = """Re: "5 < 6" & more""", avatarUrl = null, avatarPadding = null),
-            SearchEmailsTool.markup(subject = "Rechnung > 100 €", sender = null),
-            CreateLabelTool.markup(labelId),
-            LabelEmailTool.markup(emailId, labelId),
-            UnlabelEmailTool.markup(emailId, labelId),
-            SearchKnowledgeTool.markup("Umzug"),
-            ReadKnowledgeTool.markup("Umzug"),
-            WriteKnowledgeTool.markup("Umzug", replaced = true),
-            DeleteKnowledgeTool.markup("Umzug"),
-            RenameChatTool.markup("Wissen aufräumen"),
+        // By tool name, so the list can be held against the registry below.
+        val markup = mapOf(
+            ReadEmailTool.NAME to
+                ReadEmailTool.markup(emailId, subject = """Re: "5 < 6" & more""", avatarUrl = null, avatarPadding = null),
+            SearchEmailsTool.NAME to SearchEmailsTool.markup(subject = "Rechnung > 100 €", sender = null),
+            CreateLabelTool.NAME to CreateLabelTool.markup(labelId),
+            LabelEmailTool.NAME to LabelEmailTool.markup(emailId, labelId),
+            UnlabelEmailTool.NAME to UnlabelEmailTool.markup(emailId, labelId),
+            SearchKnowledgeTool.NAME to SearchKnowledgeTool.markup("Umzug"),
+            ReadKnowledgeTool.NAME to ReadKnowledgeTool.markup("Umzug"),
+            WriteKnowledgeTool.NAME to WriteKnowledgeTool.markup("Umzug", replaced = true),
+            DeleteKnowledgeTool.NAME to DeleteKnowledgeTool.markup("Umzug"),
+            RenameChatTool.NAME to RenameChatTool.markup("Wissen aufräumen"),
         )
 
-        markup.forEach { element ->
+        // The registry is the list of what the agent can call: a tool that is added to it has to
+        // be added here as well, or this fails -- which is what keeps a markup that does not
+        // carry the prefix from going unnoticed.
+        val database = OvermailDatabase(
+            Database.connect("jdbc:h2:mem:chat-prompt-registry;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+        )
+        val registered = chatToolRegistry(
+            userId = Uuid.random(),
+            chatId = Uuid.random(),
+            database = database,
+            mailNotifier = MailNotifier(),
+            chatNotifier = AiChatNotifier(),
+            knowledgeStore = KnowledgeStore(database),
+            stream = AiChatMessageStream(),
+        ).tools.map { it.name }.toSet()
+        assertEquals(registered, markup.keys)
+
+        markup.values.forEach { element ->
             assertTrue(element.startsWith("<toolcall-"), "Not recognisable as a tool call: $element")
             assertEquals("", stripReplayMarkup(element), "Left behind by $element")
         }

@@ -426,8 +426,10 @@ class ChatAgent(
                 "do not repeat the subject, name or address next to the element. Use an id only " +
                 "where it came from; never invent one, and write the plain name when you have " +
                 "no id.\n" +
-                "Your tools are everything you can do: search the mailbox and read one email. " +
-                "You cannot label, archive, move, delete or send mail, you cannot change the " +
+                "Your tools are everything you can do: search the mailbox and read an email, " +
+                "look up, write and delete what you know about the user, create a label and put " +
+                "it on or take it off an email, and rename this chat. You cannot archive, move, " +
+                "delete or send mail, you cannot rename or delete a label, you cannot change the " +
                 "user's settings, and you cannot set up anything that acts on future emails. " +
                 "When the user asks for something you have no tool for, say in one sentence that " +
                 "you cannot do it, and stop there: never promise it, never ask what to set up, " +

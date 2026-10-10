@@ -16,6 +16,18 @@ import kotlin.uuid.Uuid
 @Serializable
 sealed class PushMessage {
 
+    /**
+     * A mail arrived that nobody has read yet. [imapAccountId] is the mailbox it arrived in, which
+     * is what the app picks the notification channel by; everything it shows of the mail it
+     * fetches itself.
+     */
+    @Serializable
+    @SerialName("new_email")
+    data class NewEmail(
+        @SerialName("email_id") val emailId: Uuid,
+        @SerialName("imap_account_id") val imapAccountId: Uuid,
+    ) : PushMessage()
+
     /** Nothing happened: the app shows a test notification, which proves the whole way works. */
     @Serializable
     @SerialName("ping")
@@ -27,7 +39,7 @@ sealed class PushMessage {
      */
     val isUrgent: Boolean
         get() = when (this) {
-            Ping -> true
+            is NewEmail, Ping -> true
         }
 
     /**

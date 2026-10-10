@@ -21,7 +21,7 @@ import es.jvbabi.overmail.server.jobs.push.FcmPushSender
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import es.jvbabi.overmail.server.jobs.push.PushQueue
 import es.jvbabi.overmail.server.jobs.push.PushSender
-import es.jvbabi.overmail.server.jobs.push.PushTarget
+import es.jvbabi.overmail.server.jobs.push.pushNewestEmails
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
@@ -49,6 +49,7 @@ import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
 import es.jvbabi.overmail.server.jobs.importer.GeneratePreviewStep
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
+import es.jvbabi.overmail.server.jobs.importer.PushStep
 import es.jvbabi.overmail.server.jobs.importer.NotifyStep
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -231,6 +232,7 @@ internal fun overmailModule(application: CoroutineScope) = module {
                 GeneratePreviewStep(generator = get()),
                 ClassifyStep(enqueue = get<EmailClassificationQueue>()::enqueue),
                 NotifyStep(mailNotifier = get()),
+                PushStep(push = get<PushNotifications>()::newEmail),
             ),
         )
     }
@@ -288,7 +290,8 @@ private fun Application.startJobs() {
         get<PushQueue>().consume()
     }
 
-    // For now, while push is being built: every device shows a test notification when the server
-    // comes up, which is the quickest way to see that one gets through.
-    get<PushNotifications>().ping(PushTarget.Everyone)
+    // For now, while push is being built, see pushNewestEmails.
+    launch {
+        pushNewestEmails(database = get(), pushNotifications = get())
+    }
 }

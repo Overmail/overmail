@@ -1,12 +1,17 @@
 package es.jvbabi.overmail.data.repository
 
+import android.content.ContentResolver
 import android.content.Context
+import android.media.AudioAttributes
+import android.net.Uri
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationChannelGroupCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
+import es.jvbabi.overmail.shared.compose.R
 import org.jetbrains.compose.resources.getString
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.notifications_channel_mailbox_description
@@ -24,7 +29,7 @@ import kotlin.uuid.Uuid
  * importance, sound and the rest belong to the user from the first time on. Before Android 8 there
  * are no channels, and the compat classes make all of this a no-op.
  */
-class NotificationChannelRepositoryImpl(context: Context) : NotificationChannelRepository {
+class NotificationChannelRepositoryImpl(private val context: Context) : NotificationChannelRepository {
 
     private val notificationManager = NotificationManagerCompat.from(context)
 
@@ -51,6 +56,7 @@ class NotificationChannelRepositoryImpl(context: Context) : NotificationChannelR
                 .setName(getString(Res.string.notifications_channel_mailbox_name, imapAccount.username))
                 .setDescription(getString(Res.string.notifications_channel_mailbox_description, imapAccount.username, imapAccount.host))
                 .setGroup(groupId)
+                .setSound(newEmailSound(context), NEW_EMAIL_SOUND_ATTRIBUTES)
                 .build()
         })
 
@@ -78,7 +84,22 @@ class NotificationChannelRepositoryImpl(context: Context) : NotificationChannelR
         /** The group of an Overmail account. */
         fun accountGroupId(overmailAccountId: Uuid) = "$ACCOUNT_GROUP_PREFIX$overmailAccountId"
 
-        /** The channel new mail of a mailbox is posted to. */
-        fun imapAccountChannelId(imapAccountId: Uuid) = "inbox:$imapAccountId"
+        /**
+         * The channel new mail of a mailbox is posted to.
+         *
+         * A channel keeps the sound it was created with, and one that is deleted comes back with
+         * its old settings under the same id. So a new default for the sound is a new prefix here;
+         * the channels under the old one go the next time the server confirms the mailboxes.
+         */
+        fun imapAccountChannelId(imapAccountId: Uuid) = "mailbox:$imapAccountId"
+
+        /** The app's own sound for a new mail, `res/raw/notification_new_email`. */
+        fun newEmailSound(context: Context): Uri =
+            "${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.notification_new_email}".toUri()
+
+        private val NEW_EMAIL_SOUND_ATTRIBUTES: AudioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
     }
 }

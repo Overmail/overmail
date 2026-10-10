@@ -138,6 +138,8 @@ class PushNotifier(
             // Which mailbox, for whoever has several.
             .setSubText(email.imapAccount.username)
             .setLargeIcon(avatarOf(email.sentBy))
+            // Before Android 8 there is no channel to carry it.
+            .setSound(NotificationChannelRepositoryImpl.newEmailSound(context))
             .setWhen(email.sentAt.toEpochMilliseconds())
             .setShowWhen(true)
             .setStyle(

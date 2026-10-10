@@ -21,7 +21,6 @@ import es.jvbabi.overmail.server.jobs.push.FcmPushSender
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import es.jvbabi.overmail.server.jobs.push.PushQueue
 import es.jvbabi.overmail.server.jobs.push.PushSender
-import es.jvbabi.overmail.server.jobs.push.pushNewestEmails
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
@@ -288,10 +287,5 @@ private fun Application.startJobs() {
 
     launch {
         get<PushQueue>().consume()
-    }
-
-    // For now, while push is being built, see pushNewestEmails.
-    launch {
-        pushNewestEmails(database = get(), pushNotifications = get())
     }
 }

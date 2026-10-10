@@ -88,10 +88,10 @@ export class ChatHistoryRepository {
                                 message.id,
                                 (assistant) => ({...assistant, content: assistant.content + content}),
                             ),
-                            onComplete: () => this.updateAssistantMessage(
+                            onComplete: (stopped) => this.updateAssistantMessage(
                                 chatId,
                                 message.id,
-                                (assistant) => ({...assistant, pending: false}),
+                                (assistant) => ({...assistant, pending: false, stopped}),
                             ),
                         })
                     }
@@ -101,6 +101,7 @@ export class ChatHistoryRepository {
                         pending: message.pending,
                         content: message.content,
                         tokensOutput: message.tokens_output,
+                        stopped: message.stopped === true,
                     };
                 }
                 return [];
@@ -146,7 +147,8 @@ class ChatResponseStreamingHandler {
         onNewContent: (content: string) => void,
         /** Running total, not a delta: a missed update is corrected by the next one. */
         onUsage: (tokensOutput: number) => void,
-        onComplete: () => void,
+        /** The answer ended; `stopped` when that was the user's doing rather than the model's. */
+        onComplete: (stopped: boolean) => void,
     }) {
         const existingSource = this.sources.get(config.messageId);
         if (existingSource) {
@@ -157,7 +159,7 @@ class ChatResponseStreamingHandler {
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === "done") {
-                config.onComplete();
+                config.onComplete(data.stopped === true);
                 eventSource.close();
                 this.sources.delete(config.messageId);
             } else if (data.type === "content") {
@@ -218,7 +220,9 @@ export type AiChatMessage = {
         pending: boolean,
         content: string,
         /** Tokens the model reported for this answer; still growing while it is pending. */
-        tokensOutput: number
+        tokensOutput: number,
+        /** Stopped by the user while it was being written, so `content` is not all of an answer. */
+        stopped: boolean
     }
 )
 

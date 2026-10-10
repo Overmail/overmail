@@ -699,11 +699,13 @@
         "askBeforeChanges": "Ask before changes"
       },
       "send": "Send",
+      "stop": "Stop answer",
       "scrollToEnd": "Scroll to the end",
       "hint": "Mention #labels, @emails or :people",
       "messages": {
         "deletedReference": "Deleted",
         "retry": "Try again",
+        "stopped": "Stopped",
         "readEmail": "Reading email",
         "createLabel": "New label",
         "labelEmail": "Label added",

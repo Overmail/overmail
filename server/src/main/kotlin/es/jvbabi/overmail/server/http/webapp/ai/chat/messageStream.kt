@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.http.api.ApiException
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireOwnedChatMessageFromUrl
+import io.ktor.openapi.JsonSchema
 import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.ServerSSESession
@@ -33,7 +34,7 @@ fun Route.chatMessageStream() {
         /**
          * Follow an answer as it is written.
          *
-         * Description: Server-sent events. A `snapshot` of the text so far first, then `content` chunks and `usage`, and `done` at the end. A finished answer is a snapshot and `done`.
+         * Description: Server-sent events. A `snapshot` of the text so far first, then `content` chunks and `usage`, and `done` at the end. A finished answer is a snapshot and `done`, which says whether the answer was stopped.
          *
          * Tag: Assistant
          *
@@ -47,7 +48,7 @@ fun Route.chatMessageStream() {
             val message = try {
                 call.requireOwnedChatMessageFromUrl()
             } catch (_: ApiException) {
-                send(StreamEvent.Done)
+                send(StreamEvent.Done())
                 return@sse
             }
 
@@ -58,7 +59,7 @@ fun Route.chatMessageStream() {
             val stream = call.dependency<AiChatStreamNotifier>().of(message.id.value)
             if (stream == null) {
                 send(StreamEvent.Snapshot(written?.text.orEmpty(), written?.tokensOutput ?: 0))
-                send(StreamEvent.Done)
+                send(StreamEvent.Done(stopped = written?.stopped == true))
                 return@sse
             }
 
@@ -87,7 +88,7 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
                     val snapshot = stream.snapshot()
                     emit(StreamEvent.Snapshot(snapshot.content, snapshot.tokensOutput))
                     nextChunk = snapshot.nextChunk
-                    if (snapshot.completed) emit(StreamEvent.Done)
+                    if (snapshot.completed) emit(StreamEvent.Done(stopped = snapshot.stopped))
                     !snapshot.completed
                 }
 
@@ -118,7 +119,7 @@ private suspend fun ServerSSESession.follow(stream: AiChatMessageStream) {
                     // otherwise stay missing in what it renders.
                     val snapshot = stream.snapshot()
                     emit(StreamEvent.Snapshot(snapshot.content, snapshot.tokensOutput))
-                    emit(StreamEvent.Done)
+                    emit(StreamEvent.Done(stopped = snapshot.stopped))
                     false
                 }
             }
@@ -153,5 +154,8 @@ private sealed class StreamEvent {
     /** The answer is complete; the client closes the stream on this. */
     @Serializable
     @SerialName("done")
-    data object Done : StreamEvent()
+    data class Done(
+        @JsonSchema.Description("Whether the answer ended because it was stopped, so the text is not a complete answer")
+        @SerialName("stopped") val stopped: Boolean = false,
+    ) : StreamEvent()
 }

@@ -1,7 +1,8 @@
-<!-- The prompt: editor, mode, model and the send button. -->
+<!-- The prompt: editor, mode, model and the send button -- or, while an answer is being
+     written, the button that stops it. -->
 <script lang="ts">
     import {Separator} from "$lib/components/ui/separator";
-    import {ArrowUpIcon, LightbulbIcon} from "phosphor-svelte";
+    import {ArrowUpIcon, LightbulbIcon, StopIcon} from "phosphor-svelte";
     import * as InputGroup from "$lib/components/ui/input-group";
     import * as Select from "$lib/components/ui/select";
     import {onMount} from "svelte";
@@ -125,22 +126,43 @@
                 {/if}
             </InputGroup.Text>
             <Separator orientation="vertical" class="h-4!"/>
-            <InputGroup.Button
-                    variant="default"
-                    class="rounded-full"
-                    size="icon-xs"
-                    onclick={submitPrompt}
-                    disabled={promptViewModel.isEmpty
-                        || promptViewModel.currentModel.type === "loading"
-                        || viewModel.isAnswering}
-            >
-                {#if viewModel.isAnswering}
-                    <Spinner/>
-                {:else}
-                    <ArrowUpIcon/>
-                {/if}
-                <span class="sr-only">{$_('ai.chat.send')}</span>
-            </InputGroup.Button>
+            {#if viewModel.stoppableMessageId !== null}
+                <!-- In the place of the send button, which has nothing to do while an answer is
+                     being written. Not there yet while the prompt is on its way: the spinner
+                     below covers that moment. -->
+                <InputGroup.Button
+                        variant="default"
+                        class="rounded-full"
+                        size="icon-xs"
+                        title={$_('ai.chat.stop')}
+                        onclick={() => viewModel.stopAnswer()}
+                        disabled={viewModel.isStopping}
+                >
+                    {#if viewModel.isStopping}
+                        <Spinner/>
+                    {:else}
+                        <StopIcon weight="fill"/>
+                    {/if}
+                    <span class="sr-only">{$_('ai.chat.stop')}</span>
+                </InputGroup.Button>
+            {:else}
+                <InputGroup.Button
+                        variant="default"
+                        class="rounded-full"
+                        size="icon-xs"
+                        onclick={submitPrompt}
+                        disabled={promptViewModel.isEmpty
+                            || promptViewModel.currentModel.type === "loading"
+                            || viewModel.isAnswering}
+                >
+                    {#if viewModel.isAnswering}
+                        <Spinner/>
+                    {:else}
+                        <ArrowUpIcon/>
+                    {/if}
+                    <span class="sr-only">{$_('ai.chat.send')}</span>
+                </InputGroup.Button>
+            {/if}
         </InputGroup.Addon>
     </InputGroup.Root>
     <span class="block text-muted-foreground text-sm pt-1 pl-4 font-medium tracking-tight">

@@ -74,6 +74,7 @@ import es.jvbabi.overmail.server.http.webapp.ai.chat.chatHistory
 import es.jvbabi.overmail.server.http.webapp.ai.chat.chatMessageStream
 import es.jvbabi.overmail.server.http.webapp.ai.chat.message
 import es.jvbabi.overmail.server.http.webapp.ai.chat.retryMessage
+import es.jvbabi.overmail.server.http.webapp.ai.chat.stopMessage
 import es.jvbabi.overmail.server.http.webapp.ai.currentAiConfig
 import es.jvbabi.overmail.server.http.webapp.auth.logout.logout
 import es.jvbabi.overmail.server.http.webapp.content.contentSocket
@@ -149,7 +150,7 @@ internal fun Application.configureRouting() {
                 tag("Inboxes", "Connected IMAP mailboxes: reading, editing, pausing and disconnecting them.")
                 tag("Setup", "The \"new inbox\" dialog: probing a server and a login, scanning folders, creating the inbox.")
                 tag("Knowledge", "What the assistant knows about the current user.")
-                tag("Assistant", "Chatting with the assistant: asking, following an answer, reading a chat back.")
+                tag("Assistant", "Chatting with the assistant: asking, following an answer, stopping it, reading a chat back.")
             }
 
             /**
@@ -635,6 +636,10 @@ internal fun Application.configureRouting() {
 
                                 route("/retry") {
                                     retryMessage()
+                                }
+
+                                route("/stop") {
+                                    stopMessage()
                                 }
                             }
                         }

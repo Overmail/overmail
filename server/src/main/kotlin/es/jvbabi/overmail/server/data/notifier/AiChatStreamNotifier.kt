@@ -53,6 +53,7 @@ class AiChatMessageStream {
     private val content = StringBuilder()
     private var nextChunk = 0
     private var completed = false
+    private var stopped = false
     private var tokensOutput = 0
 
     /** The text so far, plus where in the chunk sequence it ends. */
@@ -61,6 +62,7 @@ class AiChatMessageStream {
         content = content.toString(),
         nextChunk = nextChunk,
         completed = completed,
+        stopped = stopped,
         tokensOutput = tokensOutput,
     )
 
@@ -85,10 +87,12 @@ class AiChatMessageStream {
         mutableEvents.tryEmit(AiChatStreamEvent.Usage(tokensOutput))
     }
 
+    /** Ends the answer. [stopped] says the user ended it, so what is there is not all of it. */
     @Synchronized
-    fun complete() {
+    fun complete(stopped: Boolean = false) {
         if (completed) return
         completed = true
+        this.stopped = stopped
         mutableEvents.tryEmit(AiChatStreamEvent.Completed)
     }
 
@@ -97,6 +101,8 @@ class AiChatMessageStream {
         /** Index the next chunk will carry; a reader ignores everything below it. */
         val nextChunk: Int,
         val completed: Boolean,
+        /** The answer ended because the user stopped it. Only ever true once [completed] is. */
+        val stopped: Boolean,
         /** Tokens the model has reported for this answer so far. */
         val tokensOutput: Int,
     )

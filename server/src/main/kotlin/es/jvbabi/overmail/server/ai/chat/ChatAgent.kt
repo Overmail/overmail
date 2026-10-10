@@ -19,6 +19,7 @@ import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponse
+import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
@@ -45,8 +46,13 @@ import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessages
 import es.jvbabi.overmail.server.database.models.User
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -74,14 +80,14 @@ class ChatAgent(
     private val mailNotifier: MailNotifier,
     /** What the assistant knows about this user, shared with the classification. */
     private val knowledgeStore: KnowledgeStore,
+    /** The provider the model is asked through. A parameter so a test can answer in its place. */
+    llmClient: LLMClient = OpenAILLMClient(
+        apiKey = config.apiKey,
+        settings = OpenAIClientSettings(baseUrl = config.baseUrl),
+    ),
 ) {
 
-    private val promptExecutor = MultiLLMPromptExecutor(
-        OpenAILLMClient(
-            apiKey = config.apiKey,
-            settings = OpenAIClientSettings(baseUrl = config.baseUrl),
-        )
-    )
+    private val promptExecutor = MultiLLMPromptExecutor(llmClient)
 
     /**
      * The graph, built per run: its nodes write the answer into [stream] while the model produces
@@ -128,30 +134,44 @@ class ChatAgent(
      *
      * The row exists before this is called (the endpoint creates it, so the client can render the
      * message as pending right away); this only fills it in.
+     *
+     * Cancelling the coroutine this runs in is how an answer is stopped, see [ChatAgentQueue.stop]:
+     * what was written until then is kept and the message is marked as stopped.
      */
     suspend fun run(messageId: AiChatMessage.Id) {
         // Before anything can go wrong: every exit from here has to end the stream, or a client
         // waits for an answer that nobody is writing. The queue opened it when the message was
         // enqueued, and opening is idempotent.
         val stream = streamNotifier.open(messageId)
+        var stopped = false
 
         try {
-            val turn = loadTurn(messageId) ?: return
-
             val recorder = ChatToolCallRecorder()
 
-            try {
-                answer(turn, stream, recorder)
+            // Loading the turn sits inside as well: a run stopped this early still has to leave
+            // its message finished.
+            val turn = try {
+                (loadTurn(messageId) ?: return).also { turn -> answer(turn, stream, recorder) }
             } catch (exception: Exception) {
+                // A cancellation is only a stop when it is this coroutine that was cancelled; one
+                // that surfaces while it is still active came out of the run itself -- a timeout
+                // further down, say -- and is a failure like any other.
+                stopped = exception is CancellationException && !currentCoroutineContext().isActive
+
                 // Whatever the model managed to write is kept and the message is marked finished:
                 // the client stops waiting for an answer that is not coming. The queue logs it.
+                // Non-cancellable, because the write suspends and a stopped run is cancelled
+                // already -- without it the row would stay pending for good.
                 val partial = stream.snapshot()
-                finish(
-                    messageId,
-                    content = partial.content,
-                    tokensOutput = partial.tokensOutput,
-                    toolCalls = recorder.recorded(),
-                )
+                withContext(NonCancellable) {
+                    finish(
+                        messageId,
+                        content = partial.content,
+                        tokensOutput = partial.tokensOutput,
+                        toolCalls = recorder.recorded(),
+                        stopped = stopped,
+                    )
+                }
                 throw exception
             }
 
@@ -162,11 +182,41 @@ class ChatAgent(
                 tokensOutput = answer.tokensOutput,
                 toolCalls = recorder.recorded(),
             )
+            // Only reached by an answer that ran to its end. A stopped one names nothing: the
+            // user just asked for the model to stop working, and half an answer is a poor source
+            // for a title. The chat stays nameless until its next answer, which names it then.
             nameChat(turn, answer.content)
         } finally {
             // After the row is written, so a client that reloads on `done` sees the same text it
             // was just streamed.
-            stream.complete()
+            stream.complete(stopped = stopped)
+            streamNotifier.close(messageId)
+        }
+    }
+
+    /**
+     * Marks an answer nobody is writing as stopped: one that was still waiting in the queue, or
+     * one a restart left behind. Does nothing to a finished answer, so it is safe to call for a
+     * run that ended on its own in the meantime.
+     */
+    suspend fun finishStopped(messageId: AiChatMessage.Id) {
+        // Nothing was written into it, but a client can be following it already.
+        val stream = streamNotifier.of(messageId)
+        var stopped = false
+
+        try {
+            stopped = database.query {
+                val message = AiChatMessage.findById(messageId) ?: return@query false
+                if (message.finishedAt != null) return@query false
+                val content = message.content as? AiChatMessage.MessageContent.AgentMessageContent
+                    ?: return@query false
+
+                message.content = content.copy(stopped = true)
+                message.finishedAt = Clock.System.now()
+                true
+            }
+        } finally {
+            stream?.complete(stopped = stopped)
             streamNotifier.close(messageId)
         }
     }
@@ -338,6 +388,7 @@ class ChatAgent(
         content: String,
         tokensOutput: Int,
         toolCalls: List<AiChatMessage.MessageContent.AgentMessageContent.ToolCall>,
+        stopped: Boolean = false,
     ) = database.query {
         val message = AiChatMessage.findById(messageId) ?: return@query
         // The model is written with the answer, not taken from the placeholder row: the config
@@ -349,6 +400,7 @@ class ChatAgent(
             // what the user asked for.
             tokensOutput = tokensOutput,
             toolCalls = toolCalls,
+            stopped = stopped,
         )
         message.finishedAt = Clock.System.now()
     }

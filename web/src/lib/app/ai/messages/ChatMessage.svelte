@@ -22,8 +22,11 @@
     const isUser = $derived(message.type === "user");
 
     // Only a finished answer with something in it can be acted on: there is nothing to retry
-    // while the tokens are still coming in.
-    const hasActions = $derived(message.type === "assistant" && !message.pending && message.content !== "");
+    // while the tokens are still coming in. A stopped one counts even when it is empty -- asking
+    // again is the one thing left to do with an answer that was stopped before it began.
+    const hasActions = $derived(
+        message.type === "assistant" && !message.pending && (message.content !== "" || message.stopped)
+    );
 </script>
 
 <li class="flex min-w-0 flex-col gap-0.5" class:items-end={isUser}>
@@ -38,7 +41,7 @@
             <ChatUserContent segments={message.content}/>
         {:else if message.content !== ""}
             <ChatAgentContent content={message.content} streaming={message.pending}/>
-        {:else}
+        {:else if message.pending}
             <!-- Nothing streamed yet: the answer is queued or just starting. -->
             <Spinner class="size-4"/>
         {/if}
@@ -54,6 +57,12 @@
 
             <div class="flex items-center gap-1.5">
                 <RelativeTime date={message.created_at}/>
+                {#if message.type === "assistant" && message.stopped}
+                    <!-- Next to the time rather than in the text: it is a fact about the answer,
+                         not something the assistant said. -->
+                    <span aria-hidden="true">·</span>
+                    <span>{$_("ai.chat.messages.stopped")}</span>
+                {/if}
                 {#if message.type === "assistant" && message.tokensOutput > 0}
                     <span aria-hidden="true">·</span>
                     <span>{$_("ai.chat.messages.tokensOutput", {values: {count: message.tokensOutput}})}</span>

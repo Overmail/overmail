@@ -149,14 +149,15 @@ class OAuthTokensTest {
     }
 
     @Test
-    fun `a token about to run out is renewed before it is handed out`() = runBlocking {
+    fun `handing out a token renews nothing, only the job does`() = runBlocking {
         val grantId = grant(lifetime = 1.hours)
 
-        now += 10.minutes
+        // About to run out, and still handed out as it is.
+        now += 59.minutes
         assertEquals("access-0", tokens.accessToken(grantId))
         assertTrue(tokenRequests.isEmpty())
 
-        now += 49.minutes
+        tokens.renewDue()
         assertEquals("access-1", tokens.accessToken(grantId))
         assertEquals(1, tokenRequests.size)
     }
@@ -166,15 +167,14 @@ class OAuthTokensTest {
         val grantId = grant(lifetime = 1.hours)
         down = true
 
-        // About to run out, so the connection asking for it tries to renew it.
         now += 59.minutes
+        tokens.renewDue()
         assertEquals("access-0", tokens.accessToken(grantId))
         assertEquals(1, tokenRequests.size)
         assertNotNull(database.query { OAuthGrant[grantId].renewalFailedAt })
 
-        // Neither the next connection nor the job asks again within the backoff.
+        // The job does not ask again within the backoff.
         now += 1.minutes
-        assertEquals("access-0", tokens.accessToken(grantId))
         tokens.renewDue()
         assertEquals(1, tokenRequests.size)
 

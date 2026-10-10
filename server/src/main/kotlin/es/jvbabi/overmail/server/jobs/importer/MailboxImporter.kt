@@ -37,9 +37,10 @@ class MailboxImporter(
         val pollInterval: Duration = 5.minutes,
         /**
          * How long one `IDLE` is held before it is issued again. RFC 2177 asks for at most 29
-         * minutes, and a watch that is never renewed can go quiet without ever failing.
+         * minutes; well below that, because renewing is the only thing that notices a connection
+         * that went quiet without failing, and it costs one round trip.
          */
-        val idleRenewInterval: Duration = 25.minutes,
+        val idleRenewInterval: Duration = 10.minutes,
         /** How long to wait after a failure; doubles up to [pollInterval] while the account stays unreachable. */
         val retryDelay: Duration = 30.seconds,
     )
@@ -117,10 +118,14 @@ class MailboxImporter(
      *
      * Any event is a reason to look, never the thing to fetch: the server names positions, not
      * mails. A watch that cannot hold its connection costs latency, not mail -- the poll goes on.
+     *
+     * Every `IDLE` that is issued, the first, a renewed and a recovered one, is a reason to look
+     * as well: nothing reported what changed while none was held.
      */
     private suspend fun watch(folder: MailFolder, onChange: suspend () -> Unit) {
         folder.getIdleFolder().use { idle ->
             while (true) {
+                onChange()
                 try {
                     val renewed = withTimeoutOrNull(timings.idleRenewInterval) { idle.events().collect { onChange() } } == null
                     if (renewed) continue

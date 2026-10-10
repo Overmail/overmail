@@ -254,7 +254,7 @@ private data class ApiEmailsMetaResponse(@SerialName("emails") val emails: List<
 private data class ApiEmailMeta(
     @SerialName("id") val id: Uuid,
     @SerialName("imap_account_id") val imapAccountId: Uuid,
-    @SerialName("subject") val subject: String,
+    @SerialName("subject") val subject: String?,
     @SerialName("sent") val sent: Long,
     @SerialName("is_read") val isRead: Boolean,
     @SerialName("preview") val preview: String?,

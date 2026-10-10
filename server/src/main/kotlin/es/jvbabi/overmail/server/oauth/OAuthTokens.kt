@@ -133,12 +133,17 @@ class OAuthTokens(
         return renew(grantId) ?: grant.accessToken
     }
 
-    /** Renews every grant that is due, and drops the onboardings nobody finished. Runs until cancelled. */
-    suspend fun run() {
+    /**
+     * Renews every grant that is due, and drops the onboardings nobody finished. Runs until cancelled.
+     *
+     * [onRenewed] is told the inbox of every grant that got a new access token. An importer holds
+     * the token it was started with, so this is where it is restarted onto the new one.
+     */
+    suspend fun run(onRenewed: suspend (imapAccountId: Uuid) -> Unit = {}) {
         while (true) {
             currentCoroutineContext().ensureActive()
             try {
-                renewDue()
+                renewDue(onRenewed)
                 dropAbandonedOnboardings()
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
@@ -148,14 +153,24 @@ class OAuthTokens(
         }
     }
 
-    internal suspend fun renewDue() {
+    internal suspend fun renewDue(onRenewed: suspend (imapAccountId: Uuid) -> Unit = {}) {
         val now = clock.now()
         val due = database.query {
             OAuthGrant.find {
                 OAuthGrants.refreshToken.isNotNull() and (OAuthGrants.requiresReauthentication eq false)
             }.map { it.snapshot() }
         }.filter { grant -> !grant.failedRecently(now) && now >= grant.renewalDueAt }
-        due.forEach { renew(it.id) }
+        due.forEach { grant ->
+            renew(grant.id) ?: return@forEach
+            val imapAccountId = grant.imapAccountId ?: return@forEach
+            try {
+                onRenewed(imapAccountId)
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                // The token is renewed either way; the other grants must not wait for this inbox.
+                logger.error(e) { "Restarting the importer of ${grant.address} after its renewal failed" }
+            }
+        }
     }
 
     internal suspend fun dropAbandonedOnboardings() {
@@ -237,6 +252,7 @@ class OAuthTokens(
 
     private fun OAuthGrant.snapshot() = GrantSnapshot(
         id = id.value,
+        imapAccountId = readValues[OAuthGrants.imapAccount]?.value,
         provider = provider,
         address = address,
         accessToken = accessToken,
@@ -249,6 +265,8 @@ class OAuthTokens(
 
     private data class GrantSnapshot(
         val id: Uuid,
+        /** The inbox that logs in with the grant; null while it is still an onboarding. */
+        val imapAccountId: Uuid?,
         val provider: String,
         val address: String,
         val accessToken: String,

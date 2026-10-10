@@ -68,11 +68,16 @@ private val RECONNECT_DELAY = 5.seconds
  */
 private class ConnectionLostException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/** What [ImapClient.Auth] logs in with besides the username; it keeps this out of its `toString`. */
-private val ImapClient.Auth.secret: String
+/**
+ * What of [ImapClient.Auth] goes into [ImapConnection.signature]. Spelled out because it masks its
+ * secret when printed, which would make a new password look like no change. An access token is
+ * left out: it changes every hour, and the job that renews it restarts the importer itself, see
+ * `OAuthTokens.run`.
+ */
+private val ImapClient.Auth.signature: String
     get() = when (this) {
-        is ImapClient.Auth.BasicAuth -> password
-        is ImapClient.Auth.BearerAuth -> bearer
+        is ImapClient.Auth.BasicAuth -> "$username:$password"
+        is ImapClient.Auth.BearerAuth -> "$username:oauth"
     }
 
 /**
@@ -95,13 +100,9 @@ data class ImapConnection(
     /** Whether an importer runs for the account at all. */
     val canRun: Boolean get() = !isPaused && !requiresReauthentication
 
-    /**
-     * Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. The
-     * secret is spelled out because [ImapClient.Auth] masks it when printed, and a new password or
-     * a renewed access token is exactly what the running importer has to pick up.
-     */
+    /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
     val signature: String
-        get() = "$host:$port:${authentication.username}:${authentication.secret}:" +
+        get() = "$host:$port:${authentication.signature}:" +
             folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImportSettings}/${it.createdAt}" }
 
     /** One folder's settings, as `ImapAccountFolderSyncs` holds them. */

@@ -75,9 +75,9 @@ class FolderSyncAssistantScopeTest {
     }
 
     @Test
-    fun `a renewed access token restarts the importer`() {
-        // The connection carries the token it logs in with, so the importer only gets a renewed
-        // one by being rebuilt -- and must not be rebuilt while the token is the same.
+    fun `a renewed access token is not what the sweep restarts the importer for`() {
+        // The job that renews the token restarts the importer itself; a sweep that did so too
+        // would restart it a second time.
         fun connection(bearer: String) = ImapConnection(
             id = ACCOUNT_ID,
             userId = ACCOUNT_ID,
@@ -87,8 +87,7 @@ class FolderSyncAssistantScopeTest {
             folders = listOf(sync(ImapAccountFolderSync.AiImportSettings.OnlyNewMessages)),
         )
 
-        assertTrue(connection("old").signature == connection("old").signature)
-        assertTrue(connection("old").signature != connection("new").signature)
+        assertTrue(connection("old").signature == connection("new").signature)
     }
 
     @Test

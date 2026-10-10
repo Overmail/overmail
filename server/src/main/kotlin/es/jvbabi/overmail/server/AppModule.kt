@@ -187,7 +187,8 @@ private fun Application.startJobs() {
     }
 
     launch {
-        dependencies.resolve<OAuthTokens>().run()
+        val importers = dependencies.resolve<ImporterManager>()
+        dependencies.resolve<OAuthTokens>().run(onRenewed = importers::reboot)
     }
 
     launch {

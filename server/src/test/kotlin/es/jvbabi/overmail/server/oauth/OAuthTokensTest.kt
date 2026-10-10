@@ -189,6 +189,29 @@ class OAuthTokensTest {
     }
 
     @Test
+    fun `a renewed inbox is reported, an onboarding and a failed renewal are not`() = runBlocking {
+        val inboxGrant = grant(lifetime = 1.hours, withInbox = true)
+        grant(lifetime = 1.hours)
+        val inboxId = database.query { OAuthGrant[inboxGrant].readValues[OAuthGrants.imapAccount]!!.value }
+        val renewed = mutableListOf<Uuid>()
+
+        // Not due yet: nothing is renewed, so nothing is restarted.
+        tokens.renewDue { renewed += it }
+        assertTrue(renewed.isEmpty())
+
+        now += 31.minutes
+        tokens.renewDue { renewed += it }
+        assertEquals(2, tokenRequests.size)
+        // What the importer is restarted for; the onboarding has none.
+        assertEquals(listOf(inboxId), renewed)
+
+        down = true
+        now += 31.minutes
+        tokens.renewDue { renewed += it }
+        assertEquals(listOf(inboxId), renewed)
+    }
+
+    @Test
     fun `a grant the provider refuses is locked until a new sign-in`() = runBlocking {
         val grantId = grant(lifetime = 1.hours, withInbox = true)
         refuse = true

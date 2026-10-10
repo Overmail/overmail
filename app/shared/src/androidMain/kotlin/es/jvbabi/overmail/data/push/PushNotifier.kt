@@ -20,6 +20,7 @@ import es.jvbabi.overmail.data.network.appImageLoader
 import es.jvbabi.overmail.data.network.avatarRequest
 import es.jvbabi.overmail.data.repository.NotificationChannelRepositoryImpl
 import es.jvbabi.overmail.domain.intent.AppIntent
+import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.getString
 import overmail.app.shared.generated.resources.Res
 import overmail.app.shared.generated.resources.email_no_subject
+import overmail.app.shared.generated.resources.notifications_action_archive
 import overmail.app.shared.generated.resources.notifications_new_email_fallback_title
 import overmail.app.shared.generated.resources.notifications_ping_text
 import overmail.app.shared.generated.resources.notifications_ping_title
@@ -117,6 +119,12 @@ class PushNotifier(
             emailsRepository.getEmail(message.emailId, account).filterNotNull().first()
         }
 
+        // Dealt with since the push was sent, here or on another device: nothing to announce.
+        if (email != null && (email.isRead || email.archivedState != ArchivedState.Unarchive)) {
+            logger.i { "Mail ${email.id} is read or archived already, not showing a notification" }
+            return
+        }
+
         val notification = if (email != null) emailNotification(email, account) else fallbackNotification(message, account)
         // Before its first child, so the two never show as separate notifications in between.
         if (email != null) postGroupSummary(email.imapAccount)
@@ -145,6 +153,11 @@ class PushNotifier(
             // Which mailbox, for whoever has several.
             .setSubText(email.imapAccount.username)
             .setLargeIcon(avatarOf(email.sentBy))
+            .addAction(
+                R.drawable.ic_notification,
+                getString(Res.string.notifications_action_archive),
+                NotificationActionReceiver.archive(context, accountId = account.id, emailId = email.id),
+            )
             .setGroup(groupKey(email.imapAccount.id))
             // The mail is what makes the sound, not the group it lands in.
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
@@ -240,6 +253,28 @@ class PushNotifier(
         canvas.drawText(initials(participant.displayName), size / 2f, baseline, letters)
 
         return bitmap
+    }
+
+    /**
+     * Archives the mail [emailId] of the account [accountId] and takes its notification away: the
+     * button on the notification, see [NotificationActionReceiver]. The notification goes first,
+     * so the button answers at once; the mail follows like an archive from a screen, locally and
+     * then on the server.
+     */
+    suspend fun archive(accountId: Uuid, emailId: Uuid) {
+        notificationManager.cancel(emailId.toString(), EMAIL_NOTIFICATION_ID)
+
+        val account = accountRepository.getById(accountId).first() ?: return
+        val email = withTimeoutOrNull(EMAIL_TIMEOUT) {
+            emailsRepository.getEmail(emailId, account).filterNotNull().first()
+        }
+        if (email == null) {
+            logger.w { "Could not load mail $emailId to archive it" }
+            return
+        }
+
+        emailsRepository.setArchivedState(email, ArchivedState.Archive, account)
+            .onFailure { logger.w(it) { "Could not archive mail $emailId from its notification" } }
     }
 
     /**

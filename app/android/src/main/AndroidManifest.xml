@@ -80,6 +80,11 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- The buttons on a notification, see NotificationActionReceiver. -->
+        <receiver
+            android:name="es.jvbabi.overmail.data.push.NotificationActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

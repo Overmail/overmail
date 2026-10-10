@@ -10,4 +10,7 @@
 
     <!-- A mail arrived, and the app could not load it in time to say more. -->
     <string name="notifications_new_email_fallback_title">Neue Mail</string>
+
+    <!-- The button on a mail's notification. -->
+    <string name="notifications_action_archive">Archivieren</string>
 </resources>

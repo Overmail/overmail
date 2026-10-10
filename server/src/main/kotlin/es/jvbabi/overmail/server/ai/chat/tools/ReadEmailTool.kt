@@ -62,7 +62,7 @@ class ReadEmailTool(
         @SerialName("email")
         data class Email(
             @SerialName("id") val id: String,
-            @SerialName("subject") val subject: String,
+            @SerialName("subject") val subject: String?,
             /** The sender as an entity, so answers can point at the person rather than a string. */
             @SerialName("sender_id") val senderId: String,
             @SerialName("sender_address") val senderAddress: String,
@@ -172,11 +172,11 @@ class ReadEmailTool(
          */
         fun markup(
             emailId: Uuid,
-            subject: String,
+            subject: String?,
             avatarUrl: String?,
             avatarPadding: Double?,
         ): String =
             """<toolcall-read-email emailId="$emailId" avatarUrl="${escapeAttribute(avatarUrl.orEmpty())}" """ +
-                    """avatarPadding="${avatarPadding ?: ""}" subject="${escapeAttribute(subject)}"></toolcall-read-email>"""
+                    """avatarPadding="${avatarPadding ?: ""}" subject="${escapeAttribute(subject.orEmpty())}"></toolcall-read-email>"""
     }
 }

@@ -107,7 +107,7 @@ class SearchEmailsTool(
         @Serializable
         data class Email(
             @SerialName("id") val id: String,
-            @SerialName("subject") val subject: String,
+            @SerialName("subject") val subject: String?,
             /** The sender as an entity, so answers can point at the person rather than a string. */
             @SerialName("sender_id") val senderId: String,
             @SerialName("sender_address") val senderAddress: String,
@@ -179,7 +179,7 @@ class SearchEmailsTool(
                 .limit(MAX_CANDIDATES)
                 .filter { row ->
                     val subjectMatches = args.subject.isNullOrBlank()
-                        || row[Emails.subject] fuzzyContains args.subject
+                        || (row[Emails.subject] != null && (row[Emails.subject]!! fuzzyContains args.subject))
                     // Name and address are one field to the model: it cannot know which of the
                     // two carries what it is looking for.
                     val senderMatches = args.sender.isNullOrBlank()

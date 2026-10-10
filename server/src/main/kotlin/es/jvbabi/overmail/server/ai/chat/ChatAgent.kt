@@ -415,6 +415,8 @@ class ChatAgent(
                 "asks for a name -- once per answer at most, and never on a name the user wrote " +
                 "themselves unless they ask. A chat that has no name yet is named on its own " +
                 "when your answer is done, so leave that one be.\n" +
+                "When a tool is the next step, call it: do not announce the call or say that " +
+                "you are about to make it, and never write a tool call out as text.\n" +
                 "When you mention an email, a label or a person in your answer, write it as the " +
                 "element `<email id=\"...\"></email>`, `<label id=\"...\"></label>` or " +
                 "`<person id=\"...\"></person>` with the id the tool result or the user's " +
@@ -424,8 +426,10 @@ class ChatAgent(
                 "do not repeat the subject, name or address next to the element. Use an id only " +
                 "where it came from; never invent one, and write the plain name when you have " +
                 "no id.\n" +
-                "Your tools are everything you can do: search the mailbox and read one email. " +
-                "You cannot label, archive, move, delete or send mail, you cannot change the " +
+                "Your tools are everything you can do: search the mailbox and read an email, " +
+                "look up, write and delete what you know about the user, create a label and put " +
+                "it on or take it off an email, and rename this chat. You cannot archive, move, " +
+                "delete or send mail, you cannot rename or delete a label, you cannot change the " +
                 "user's settings, and you cannot set up anything that acts on future emails. " +
                 "When the user asks for something you have no tool for, say in one sentence that " +
                 "you cannot do it, and stop there: never promise it, never ask what to set up, " +
@@ -458,11 +462,44 @@ internal fun chatPrompt(turn: ChatTurn): Prompt = prompt("overmail-chat") {
                         )
                     )
                 }
-                if (message.text.isNotBlank()) assistant(message.text)
+                // Blank once the markup is gone for an answer that was nothing but tool calls:
+                // an empty assistant message says nothing, and some providers reject it.
+                val said = stripReplayMarkup(message.text)
+                if (said.isNotBlank()) assistant(said)
             }
         }
     }
 }
+
+/**
+ * Every element a tool writes into an answer when it runs, opening and closing tag alike. Matched
+ * by the prefix rather than by a list of names, so a tool added later is covered without anyone
+ * remembering this, as long as it keeps the prefix -- `ChatPromptTest` runs the markup of every tool
+ * through it. The attributes are escaped (`escapeAttribute`), so no `>` ends the tag early.
+ */
+private val TOOL_CALL_TAG = Regex("</?toolcall-[a-zA-Z0-9-]+(?:\\s[^<>]*)?>")
+
+/**
+ * A stored answer reduced to what the model said to the user.
+ *
+ * The stored text is everything that was streamed, because that is what the client renders: the
+ * reasoning, and an element for every tool that ran. Replayed unchanged it reads to the model as
+ * something it typed itself, right next to its own remarks -- and it imitates that, announcing a
+ * call or writing out its markup instead of making it, more so with every turn. The calls are in
+ * the history as real tool calls already, so nothing is lost by leaving their rendering out.
+ *
+ * The elements standing for an email, a label or a person stay: the model is asked to write those.
+ */
+internal fun stripReplayMarkup(text: String): String = text
+    // First, and with its content: `escapeThinking` leaves no `<` inside, so the next closing tag
+    // is its own -- and a run that ended mid-thought left no closing tag at all, which takes the
+    // rest of the text with it.
+    .replace(THINKING_ELEMENT, "")
+    .replace(TOOL_CALL_TAG, "")
+    // Every element stood in a block of its own, so each one leaves its blank lines behind.
+    .replace(Regex("[ \\t]+\\n"), "\n")
+    .replace(Regex("\\n{3,}"), "\n\n")
+    .trim()
 
 /**
  * Collects what the tools of one run answered, in the order they ran.

@@ -2,10 +2,28 @@ package es.jvbabi.overmail.server.ai.chat
 
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.MessagePart
+import es.jvbabi.overmail.server.ai.chat.tools.CreateLabelTool
+import es.jvbabi.overmail.server.ai.chat.tools.DeleteKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.LabelEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.ReadEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.ReadKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.RenameChatTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchEmailsTool
+import es.jvbabi.overmail.server.ai.chat.tools.SearchKnowledgeTool
+import es.jvbabi.overmail.server.ai.chat.tools.UnlabelEmailTool
+import es.jvbabi.overmail.server.ai.chat.tools.WriteKnowledgeTool
+import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
+import es.jvbabi.overmail.server.data.notifier.AiChatMessageStream
+import es.jvbabi.overmail.server.data.notifier.AiChatNotifier
+import es.jvbabi.overmail.server.data.notifier.MailNotifier
+import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.AiChatMessage
+import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 class ChatPromptTest {
 
@@ -69,6 +87,136 @@ class ChatPromptTest {
             )
         )
 
+        assertEquals(
+            listOf(Message.System::class, Message.Assistant::class, Message.User::class),
+            prompt.messages.map { it::class },
+        )
+    }
+
+    /** The text of the assistant messages a replayed [answer] ends up as, tool calls left out. */
+    private fun replayedText(
+        answer: String,
+        toolCalls: List<AiChatMessage.MessageContent.AgentMessageContent.ToolCall> = emptyList(),
+    ): List<String> = chatPrompt(
+        ChatTurn(
+            chatId = Uuid.random(),
+            userId = Uuid.random(),
+            history = listOf(
+                ChatTurn.Message.User("Räum mein Wissen auf."),
+                ChatTurn.Message.Agent(text = answer, toolCalls = toolCalls),
+            ),
+            request = "Und jetzt?",
+        )
+    ).messages
+        .filterIsInstance<Message.Assistant>()
+        .mapNotNull { message -> message.parts.filterIsInstance<MessagePart.Text>().singleOrNull()?.text }
+
+    @Test
+    fun `what the model reasoned is not replayed as something it said`() {
+        val answer = ChatAgent.THINKING_START +
+            ChatAgent.escapeThinking("Der Nutzer will <alles> löschen.\nIch rufe das Tool auf.") +
+            ChatAgent.THINKING_END +
+            "\n\nErledigt."
+
+        assertEquals(listOf("Erledigt."), replayedText(answer))
+    }
+
+    @Test
+    fun `reasoning a run ended in is dropped up to the end`() {
+        val answer = "Ich schaue nach.\n\n" + ChatAgent.THINKING_START + "Zuerst die Suche, dann"
+
+        assertEquals(listOf("Ich schaue nach."), replayedText(answer))
+    }
+
+    @Test
+    fun `the markup of a tool call is not replayed, the remarks around it are`() {
+        // The shape a run leaves behind: thinking, a remark, the element of each call in a block
+        // of its own, the answer.
+        val answer = listOf(
+            ChatAgent.THINKING_START + "Zwei Einträge sind überholt." + ChatAgent.THINKING_END,
+            "Ich lösche die beiden Einträge.",
+            DeleteKnowledgeTool.markup("""Umzug "Berlin" > 2024"""),
+            DeleteKnowledgeTool.markup("Alter Vertrag"),
+            "Beide sind weg.",
+        ).joinToString("\n\n")
+
+        assertEquals(
+            listOf("Ich lösche die beiden Einträge.\n\nBeide sind weg."),
+            replayedText(answer, toolCalls = listOf(toolCall)),
+        )
+    }
+
+    @Test
+    fun `no tool leaves its markup in a replayed answer`() {
+        val emailId = Uuid.random()
+        val labelId = Uuid.random()
+
+        // By tool name, so the list can be held against the registry below.
+        val markup = mapOf(
+            ReadEmailTool.NAME to
+                ReadEmailTool.markup(emailId, subject = """Re: "5 < 6" & more""", avatarUrl = null, avatarPadding = null),
+            SearchEmailsTool.NAME to SearchEmailsTool.markup(subject = "Rechnung > 100 €", sender = null),
+            CreateLabelTool.NAME to CreateLabelTool.markup(labelId),
+            LabelEmailTool.NAME to LabelEmailTool.markup(emailId, labelId),
+            UnlabelEmailTool.NAME to UnlabelEmailTool.markup(emailId, labelId),
+            SearchKnowledgeTool.NAME to SearchKnowledgeTool.markup("Umzug"),
+            ReadKnowledgeTool.NAME to ReadKnowledgeTool.markup("Umzug"),
+            WriteKnowledgeTool.NAME to WriteKnowledgeTool.markup("Umzug", replaced = true),
+            DeleteKnowledgeTool.NAME to DeleteKnowledgeTool.markup("Umzug"),
+            RenameChatTool.NAME to RenameChatTool.markup("Wissen aufräumen"),
+        )
+
+        // The registry is the list of what the agent can call: a tool that is added to it has to
+        // be added here as well, or this fails -- which is what keeps a markup that does not
+        // carry the prefix from going unnoticed.
+        val database = OvermailDatabase(
+            Database.connect("jdbc:h2:mem:chat-prompt-registry;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+        )
+        val registered = chatToolRegistry(
+            userId = Uuid.random(),
+            chatId = Uuid.random(),
+            database = database,
+            mailNotifier = MailNotifier(),
+            chatNotifier = AiChatNotifier(),
+            knowledgeStore = KnowledgeStore(database),
+            stream = AiChatMessageStream(),
+        ).tools.map { it.name }.toSet()
+        assertEquals(registered, markup.keys)
+
+        markup.values.forEach { element ->
+            assertTrue(element.startsWith("<toolcall-"), "Not recognisable as a tool call: $element")
+            assertEquals("", stripReplayMarkup(element), "Left behind by $element")
+        }
+    }
+
+    @Test
+    fun `the references the model wrote stay in a replayed answer`() {
+        val answer = listOf(
+            ReadEmailTool.markup(Uuid.random(), subject = "Invoice 42", avatarUrl = null, avatarPadding = null),
+            """<email id="abc"></email> kam von <person id="def"></person> und trägt <label id="ghi"></label>.""",
+        ).joinToString("\n\n")
+
+        assertEquals(
+            listOf("""<email id="abc"></email> kam von <person id="def"></person> und trägt <label id="ghi"></label>."""),
+            replayedText(answer, toolCalls = listOf(toolCall)),
+        )
+    }
+
+    @Test
+    fun `an answer that was only markup is replayed as its tool calls alone`() {
+        val answer = ChatAgent.THINKING_START + "Erst lesen." + ChatAgent.THINKING_END + "\n\n" +
+            ReadEmailTool.markup(Uuid.random(), subject = "Invoice 42", avatarUrl = null, avatarPadding = null)
+
+        val prompt = chatPrompt(
+            ChatTurn(
+                chatId = Uuid.random(),
+                userId = Uuid.random(),
+                history = listOf(ChatTurn.Message.Agent(text = answer, toolCalls = listOf(toolCall))),
+                request = "Und weiter?",
+            )
+        )
+
+        // system, the call, its result -- and no assistant text after them.
         assertEquals(
             listOf(Message.System::class, Message.Assistant::class, Message.User::class),
             prompt.messages.map { it::class },

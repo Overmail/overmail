@@ -90,7 +90,7 @@
         return () => current = false;
     });
 
-    const subject = $derived(mail.subject.trim());
+    const subject = $derived((mail.subject ?? "").trim());
 
     /** Only a name if the mail's header carried one; the address stands in for it. */
     const senderName = $derived(displayName(mail.sender));

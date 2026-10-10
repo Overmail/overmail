@@ -14,6 +14,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.*
 import org.slf4j.LoggerFactory
@@ -473,9 +475,7 @@ class EmailImporter(
         sync: ImapConnection.FolderSync,
         folder: ImapFolder,
     ) = withContext(NonCancellable) {
-        // A missing subject stores as "", never null: the dedup below compares it with
-        // `=`, and NULL never equals NULL, so such mails would import over and over.
-        val subject = mail.subject.await().orEmpty()
+        val subject = mail.subject.await()
         val sentAt = mail.sentAt.await()
 
         // Before the body, not after: downloading it pulls the attachments too.
@@ -493,7 +493,7 @@ class EmailImporter(
 
         val fromHeader = from.firstOrNull()
         if (fromHeader == null) {
-            logger.warn("Skipping mail without a From header: $subject")
+            logger.warn("Skipping mail without a From header: ${subject.forLog()}")
             return@withContext
         }
 
@@ -510,7 +510,7 @@ class EmailImporter(
         // mail instead of failing, and half a mail would be stored as the whole of it.
         requireLiveConnection(folder, mail)
 
-        val content = withImapTimeout("downloading \"$subject\"") { mail.getContent(includeAttachments = true) }
+        val content = withImapTimeout("downloading ${subject.forLog()}") { mail.getContent(includeAttachments = true) }
 
         val storedId = insert(
             senderId = emailUsers.getValue(fromHeader.address),
@@ -554,14 +554,17 @@ class EmailImporter(
      * throwing, because half a mail beats no mail -- but it is worth a line in the log, or a
      * charset the library cannot read would quietly turn into a mailbox full of question marks.
      */
-    private fun String?.checkMailPart(part: String, subject: String): String? {
+    private fun String?.checkMailPart(part: String, subject: String?): String? {
         if (this == null) return null
         if (contains(REPLACEMENT_CHARACTER)) {
-            logger.warn("The $part part of \"$subject\" did not decode cleanly; it is stored as it came out")
+            logger.warn("The $part part of ${subject.forLog()} did not decode cleanly; it is stored as it came out")
         }
 
         return takeIf { it.isNotBlank() }
     }
+
+    /** How a subject is named in a log line, where a mail without one still has to be told apart. */
+    private fun String?.forLog(): String = if (this == null) "a mail without a subject" else "\"$this\""
 
     /**
      * Resolves the header addresses to [EmailUsers] ids, inserting the ones this user has not seen
@@ -590,7 +593,7 @@ class EmailImporter(
     private suspend fun insert(
         senderId: Uuid,
         senderName: String?,
-        subject: String,
+        subject: String?,
         sent: Instant,
         rawContent: ByteArray,
         textContent: String?,
@@ -651,14 +654,21 @@ class EmailImporter(
         emailId
     }
 
-    /** Mails are recognised by account, send second and subject, see [Emails]. */
-    private fun isKnown(sent: Instant, subject: String): Boolean =
+    /**
+     * Mails are recognised by account, send second and subject, see [Emails].
+     *
+     * A missing subject is compared with `IS NULL`, because NULL never equals NULL and such a mail
+     * would import over and over. It also matches `""`, which is what a missing subject was stored
+     * as before the column became nullable -- those mails are already here.
+     */
+    private fun isKnown(sent: Instant, subject: String?): Boolean =
         Emails
             .select(Emails.id)
             .where {
                 (Emails.imapAccount eq account.id) and
                     (Emails.sent eq sent.truncatedToSecond()) and
-                    (Emails.subject eq subject)
+                    if (subject == null) Emails.subject.isNull() or (Emails.subject eq "")
+                    else Emails.subject eq subject
             }
             .empty()
             .not()

@@ -87,7 +87,7 @@
             <h1
                     style:view-transition-name={cameFromMailList ? MAIL_SUBJECT_TRANSITION : undefined}
                     class="min-w-0 font-display text-2xl text-pretty"
-            >{mail.subject}</h1>
+            >{mail.subject?.trim() || $_("mails.noSubject")}</h1>
 
             <Head
                     class="w-auto shrink-0 px-0"

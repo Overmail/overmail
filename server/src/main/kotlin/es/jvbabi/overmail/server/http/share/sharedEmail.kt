@@ -65,7 +65,7 @@ data class SharedEmailResponse(
 
     @Serializable
     data class Metadata(
-        @SerialName("subject") val subject: String,
+        @SerialName("subject") val subject: String?,
         @JsonSchema.Description("Display name from the header of the mail; null for a bare address")
         @SerialName("sender_name") val senderName: String?,
         @SerialName("sender_address") val senderAddress: String,

@@ -1,0 +1,10 @@
+{
+  "title": "Mails without a subject",
+  "description": "A mail that was sent without a subject is now marked as such, instead of being shown with an empty one.",
+  "localized": {
+    "de": {
+      "title": "Mails ohne Betreff",
+      "description": "Eine Mail, die ohne Betreff verschickt wurde, wird jetzt als solche gekennzeichnet, statt mit einem leeren Betreff angezeigt zu werden."
+    }
+  }
+}

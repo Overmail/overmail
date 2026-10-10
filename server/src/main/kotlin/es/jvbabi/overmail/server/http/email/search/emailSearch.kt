@@ -34,7 +34,7 @@ private const val MAX_RESULTS = 10
 
 private data class Candidate(
     val id: Uuid,
-    val subject: String,
+    val subject: String?,
     val senderName: String?,
     val senderAddress: String,
     val avatarUrl: String?,
@@ -102,7 +102,7 @@ private fun Candidate.matchAgainst(query: String): MatchedCandidate? {
     var score = 0.0
 
     for (token in query.split(Regex("\\s+")).filter { it.isNotBlank() }) {
-        val subjectResult = subject detailedFuzzyContains token
+        val subjectResult = subject?.detailedFuzzyContains(token) ?: FuzzyMatchResult.NO_MATCH
         val nameResult = senderName?.detailedFuzzyContains(token) ?: FuzzyMatchResult.NO_MATCH
         val addressResult = senderAddress detailedFuzzyContains token
         if (!subjectResult.matches && !nameResult.matches && !addressResult.matches) return null
@@ -111,7 +111,7 @@ private fun Candidate.matchAgainst(query: String): MatchedCandidate? {
         addressRanges += addressResult.ranges
 
         score += maxOf(
-            fieldScore(subject, subjectResult) * SUBJECT_WEIGHT,
+            fieldScore(subject.orEmpty(), subjectResult) * SUBJECT_WEIGHT,
             fieldScore(senderName.orEmpty(), nameResult) * NAME_WEIGHT,
             fieldScore(senderAddress, addressResult) * ADDRESS_WEIGHT,
         )
@@ -216,7 +216,7 @@ fun Route.emailSearch() {
                 matched.map { (candidate, subjectRanges, nameRanges, addressRanges, _) ->
                     EmailSearchResponse.Email(
                         id = candidate.id,
-                        subject = matchable(candidate.subject, subjectRanges),
+                        subject = candidate.subject?.let { matchable(it, subjectRanges) },
                         from = EmailSearchResponse.Email.From(
                             name = candidate.senderName?.let { matchable(it, nameRanges) },
                             address = matchable(candidate.senderAddress, addressRanges),
@@ -241,7 +241,7 @@ private data class EmailSearchResponse(
     @Serializable
     data class Email(
         @SerialName("id") val id: Uuid,
-        @SerialName("subject") val subject: MatchableString,
+        @SerialName("subject") val subject: MatchableString?,
         @SerialName("from") val from: From,
         @JsonSchema.Description("Where the picture of the sender is; null when there is none")
         @SerialName("avatar_url") val avatarUrl: String?,

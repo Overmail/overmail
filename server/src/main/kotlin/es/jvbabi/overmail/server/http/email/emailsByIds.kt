@@ -97,7 +97,7 @@ private data class EmailsResponse(
     @Serializable
     data class Email(
         @SerialName("id") val id: Uuid,
-        @SerialName("subject") val subject: String,
+        @SerialName("subject") val subject: String?,
         @SerialName("sender_id") val senderId: Uuid,
         @JsonSchema.Description("Display name from the header of the mail; null for a bare address")
         @SerialName("sender_name") val senderName: String?,

@@ -6,7 +6,7 @@
 
     let {mail}: { mail: EmailMeta } = $props();
 
-    const subject = $derived(mail.subject.trim());
+    const subject = $derived((mail.subject ?? "").trim());
 </script>
 
 <!-- The subject is the column that absorbs the leftover width, so the badges have room. -->

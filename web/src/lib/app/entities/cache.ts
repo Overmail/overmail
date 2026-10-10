@@ -3,7 +3,7 @@ import Dexie, {type EntityTable} from "dexie";
 /** A mail as the app shows it in passing: subject line, who sent it, when. */
 export type CachedEmail = {
     id: string;
-    subject: string;
+    subject: string | null;
     senderId: string;
     senderName: string | null;
     senderAddress: string;

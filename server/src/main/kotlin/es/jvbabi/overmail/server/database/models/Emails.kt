@@ -31,7 +31,7 @@ object Emails : UuidTable("emails") {
      */
     val senderName = varchar("sender_name", 255).nullable()
 
-    val subject = text("subject")
+    val subject = text("subject").nullable()
 
     /** Send time, stored truncated to whole seconds so it can serve as a dedup key. */
     val sent = timestamp("sent")

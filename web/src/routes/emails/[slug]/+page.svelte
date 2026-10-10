@@ -48,7 +48,7 @@
     const title = $derived(
         mail === null
             ? $_("app.name")
-            : `${mail.subject.trim() === "" ? $_("mails.noSubject") : mail.subject} • ${$_("app.name")}`
+            : `${mail.subject?.trim() || $_("mails.noSubject")} • ${$_("app.name")}`
     );
 </script>
 

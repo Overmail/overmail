@@ -38,7 +38,7 @@ data class EmailMeta(
     @SerialName("id") val id: Uuid,
     /** The mailbox it was imported through. */
     @SerialName("imap_account_id") val imapAccountId: Uuid,
-    @SerialName("subject") val subject: String,
+    @SerialName("subject") val subject: String?,
     /** Unix seconds. */
     @SerialName("sent") val sent: Long,
     @SerialName("is_read") val isRead: Boolean,

@@ -40,7 +40,7 @@ fun Route.downloadEmail() {
             // ascii letters, digits and a few separators, everything else becomes an underscore.
             // Spelled out here rather than in a helper, see the openapi plugin note in http/api/.
             val name = StringBuilder()
-            for (character in email.subject) {
+            for (character in email.subject.orEmpty()) {
                 val keep = character.code < 128 &&
                         (character.isLetterOrDigit() || character == ' ' || character == '-' || character == '_')
                 name.append(if (keep) character else '_')

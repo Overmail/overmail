@@ -3,6 +3,7 @@ package es.jvbabi.overmail.server.jobs.preview
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailPreviews
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
@@ -39,7 +40,7 @@ class EmailPreviewQueueTest {
         val markup = addMail(text = null, html = "<p>Ihre Bestellung ist unterwegs.</p>")
         val silent = addMail(text = null, html = null)
 
-        val queue = EmailPreviewQueue(database)
+        val queue = EmailPreviewQueue(database, EmailPreviewGeneratorImpl(database))
         val consumer = CoroutineScope(Dispatchers.Default).launch { queue.consume() }
         queue.backfill()
 
@@ -63,7 +64,7 @@ class EmailPreviewQueueTest {
             }
         }
 
-        val queue = EmailPreviewQueue(database)
+        val queue = EmailPreviewQueue(database, EmailPreviewGeneratorImpl(database))
         val consumer = CoroutineScope(Dispatchers.Default).launch { queue.consume() }
         queue.backfill()
 
@@ -78,7 +79,7 @@ class EmailPreviewQueueTest {
         setUp()
         val mail = addMail(text = "Nur diese eine", html = null)
 
-        val queue = EmailPreviewQueue(database)
+        val queue = EmailPreviewQueue(database, EmailPreviewGeneratorImpl(database))
         val consumer = CoroutineScope(Dispatchers.Default).launch { queue.consume() }
         queue.enqueue(mail)
 

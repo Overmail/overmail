@@ -23,6 +23,7 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.oauthInboxSubmitRoute
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import es.jvbabi.overmail.server.jobs.importer.legacy.oauthGrantStates
 import es.jvbabi.overmail.server.jobs.importer.legacy.toConnection
@@ -568,6 +569,7 @@ class OAuthRoutesTest {
                         LegacyImporterManager(
                             database = database,
                             emailInserter = EmailInserterImpl(database),
+                            emailPreviewGenerator = EmailPreviewGeneratorImpl(database),
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(
                                 emailClassification = EmailClassification(

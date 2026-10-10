@@ -4,8 +4,8 @@ import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.Table
 
 /**
- * The first line of a mail's body, as a listing shows it next to the subject. See `mailPreview`,
- * which is what fills it.
+ * The first line of a mail's body, as a listing shows it next to the subject. See
+ * `EmailPreviewGenerator`, which is what fills it.
  *
  * Its own table rather than a column on [Emails]: a mail row is read whenever anything is read
  * about a mail, and this is derived text nobody needs there. A mail without a row here is one
@@ -18,7 +18,7 @@ import org.jetbrains.exposed.v1.core.Table
 object EmailPreviews : Table("email_previews") {
     val email = reference("email_id", Emails, onDelete = ReferenceOption.CASCADE)
 
-    /** Capped at 300, which is [es.jvbabi.overmail.server.util.MAIL_PREVIEW_LENGTH] plus its ellipsis. */
+    /** Capped at 300, which is [es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator.MAIL_PREVIEW_LENGTH] plus its ellipsis. */
     val preview = varchar("preview", 300)
 
     override val primaryKey = PrimaryKey(email)

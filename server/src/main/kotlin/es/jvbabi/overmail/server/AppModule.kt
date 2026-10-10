@@ -32,6 +32,8 @@ import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -188,15 +190,17 @@ internal fun overmailModule(application: CoroutineScope) = module {
 
     single<AvatarShapeBackfill> { AvatarShapeBackfill(database = get()) }
 
-    single<EmailPreviewQueue> { EmailPreviewQueue(database = get()) }
+    single<EmailPreviewQueue> { EmailPreviewQueue(database = get(), emailPreviewGenerator = get()) }
 
     single<EmailInserter> { EmailInserterImpl(database = get()) }
+    single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
     single<LegacyImporterManager> {
         LegacyImporterManager(
             database = get(),
             coroutineScope = application,
             emailInserter = get(),
+            emailPreviewGenerator = get(),
             emailClassificationQueue = get(),
             mailNotifier = get(),
         )

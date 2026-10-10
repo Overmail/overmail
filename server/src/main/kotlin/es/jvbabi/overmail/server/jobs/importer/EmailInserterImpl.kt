@@ -30,7 +30,7 @@ class EmailInserterImpl(
      * @throws IllegalArgumentException if the mail has no `From` header
      * @throws IllegalStateException if the mail has no readable `Date` header
      */
-    override suspend fun importEmail(
+    override suspend fun importEmailIntoDatabase(
         mail: KamelEmail,
         imapAccount: ImapAccount,
         flags: Set<KamelEmail.Flag>,

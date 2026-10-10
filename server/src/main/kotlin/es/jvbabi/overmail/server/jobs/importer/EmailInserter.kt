@@ -11,7 +11,7 @@ interface EmailInserter {
      * [flags] are what the mailbox says about the mail. They are a parameter rather than read off
      * [mail], because a parsed mail has none and fails when asked.
      */
-    suspend fun importEmail(
+    suspend fun importEmailIntoDatabase(
         mail: KamelEmail,
         imapAccount: ImapAccount,
         flags: Set<KamelEmail.Flag> = emptySet(),

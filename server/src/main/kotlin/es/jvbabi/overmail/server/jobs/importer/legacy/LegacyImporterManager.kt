@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
 import kotlinx.coroutines.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNotNull
@@ -21,6 +22,7 @@ class LegacyImporterManager(
     private val database: OvermailDatabase,
     private val coroutineScope: CoroutineScope,
     private val emailInserter: EmailInserter,
+    private val emailPreviewGenerator: EmailPreviewGenerator,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
@@ -102,6 +104,7 @@ class LegacyImporterManager(
         account = account,
         coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("LegacyEmailImporter-${account.id}"),
         emailInserter = this.emailInserter,
+        emailPreviewGenerator = this.emailPreviewGenerator,
         emailClassificationQueue = this.emailClassificationQueue,
         mailNotifier = this.mailNotifier,
     ).also { it.start() }

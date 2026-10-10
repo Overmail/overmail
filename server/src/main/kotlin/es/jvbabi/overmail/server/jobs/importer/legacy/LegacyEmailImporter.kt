@@ -1,7 +1,6 @@
 package es.jvbabi.overmail.server.jobs.importer.legacy
 
 import es.jvbabi.overmail.kamel.Email
-import es.jvbabi.overmail.kamel.Email.Flag
 import es.jvbabi.overmail.kamel.FetchRequest
 import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.kamel.ImapFolder
@@ -11,7 +10,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
-import es.jvbabi.overmail.server.util.mailPreview
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import org.jetbrains.exposed.v1.core.and
@@ -136,6 +135,7 @@ class LegacyEmailImporter(
     val account: LegacyImapConnection,
     private val coroutineScope: CoroutineScope,
     private val emailInserter: EmailInserter,
+    private val emailPreviewGenerator: EmailPreviewGenerator,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
@@ -471,8 +471,8 @@ class LegacyEmailImporter(
      * the row being written -- the mail is finished, and the cycle stops at the check before the
      * next one. It is the whole reason [stop] can promise a clean end.
      *
-     * The mail with its addresses, attachments and read flag is [emailInserter]'s; the preview,
-     * which it does not write yet, follows in a transaction of its own, see [writePreview].
+     * The mail with its addresses, attachments and read flag is [emailInserter]'s, the preview
+     * [emailPreviewGenerator]'s -- two steps, each in a transaction of its own.
      */
     private suspend fun import(
         mail: Email,
@@ -507,14 +507,7 @@ class LegacyEmailImporter(
         email.htmlContent.warnIfGarbled("html", subject)
         val storedId = email.id.value
 
-        try {
-            writePreview(email)
-        } catch (e: Exception) {
-            // The mail is stored either way, and the backfill of `EmailPreviewQueue` finds every
-            // mail without a preview -- so this must not cost the classification and the
-            // notification below.
-            logger.warn("Writing the preview of ${subject.forLog()} failed; the backfill picks it up", e)
-        }
+        emailPreviewGenerator.generatePreview(email)
 
         // Imported either way; only what the assistant reads is the user's choice per folder.
         if (sync.wantsAssistant(sentAt)) emailClassificationQueue.enqueue(storedId)
@@ -560,19 +553,7 @@ class LegacyEmailImporter(
      */
     private suspend fun insert(mail: Email): EmailInserterImpl.Result {
         val imapAccount = database.query { ImapAccount[account.id] }
-        return emailInserter.importEmail(mail, imapAccount, mail.flags.await())
-    }
-
-    /**
-     * The one thing the inserter leaves out. Written here rather than left to the queue: the body
-     * is parsed anyway, so the preview costs nothing at this point, and a mail is in a listing the
-     * moment it is imported. [email] is out of its transaction, so only its own columns are read.
-     */
-    private suspend fun writePreview(email: es.jvbabi.overmail.server.database.models.Email) = database.query {
-        EmailPreviews.upsert {
-            it[EmailPreviews.email] = email.id
-            it[preview] = mailPreview(email.textContent, email.htmlContent)
-        }
+        return emailInserter.importEmailIntoDatabase(mail, imapAccount, mail.flags.await())
     }
 
     /**

@@ -20,6 +20,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.client.request.delete
 import io.ktor.client.statement.bodyAsText
@@ -208,6 +209,7 @@ class DeleteInboxTest {
                         LegacyImporterManager(
                             database = database,
                             emailInserter = EmailInserterImpl(database),
+                            emailPreviewGenerator = EmailPreviewGeneratorImpl(database),
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(
                                 emailClassification = EmailClassification(

@@ -26,6 +26,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
+import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.client.request.get
 import io.ktor.client.request.put
@@ -393,6 +394,7 @@ class UpdateInboxTest {
                         LegacyImporterManager(
                             database = database,
                             emailInserter = EmailInserterImpl(database),
+                            emailPreviewGenerator = EmailPreviewGeneratorImpl(database),
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(
                                 emailClassification = EmailClassification(

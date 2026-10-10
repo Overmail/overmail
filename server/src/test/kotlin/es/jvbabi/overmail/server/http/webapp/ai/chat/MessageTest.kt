@@ -30,7 +30,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -45,6 +44,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 class MessageTest {
 
@@ -153,24 +154,26 @@ class MessageTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<LLModel> { model }
-                provide<AiChatNotifier> { AiChatNotifier() }
-                provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
-                provide<ChatAgent> {
-                    ChatAgent(
-                        config = ApplicationConfig.AiConfig("none", model.id, "http://localhost:1"),
-                        model = model,
-                        database = database,
-                        streamNotifier = resolve(),
-                        chatNotifier = resolve(),
-                        mailNotifier = MailNotifier(),
-                        knowledgeStore = KnowledgeStore(resolve()),
-                    )
-                }
-                // No consumer in the test: the runs are queued and stay there.
-                provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve(), streamNotifier = resolve()) }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<LLModel> { model }
+                    single<AiChatNotifier> { AiChatNotifier() }
+                    single<AiChatStreamNotifier> { AiChatStreamNotifier() }
+                    single<ChatAgent> {
+                        ChatAgent(
+                            config = ApplicationConfig.AiConfig("none", model.id, "http://localhost:1"),
+                            model = model,
+                            database = database,
+                            streamNotifier = get(),
+                            chatNotifier = get(),
+                            mailNotifier = MailNotifier(),
+                            knowledgeStore = KnowledgeStore(get()),
+                        )
+                    }
+                    // No consumer in the test: the runs are queued and stay there.
+                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
+                })
             }
             routing {
                 route("/api/webapp/ai/chat") { message() }

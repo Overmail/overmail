@@ -17,7 +17,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -32,6 +31,7 @@ import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.update
+import org.koin.ktor.ext.get
 
 /**
  * Saves the edit screen: `PUT /api/users/me/inboxes/{inboxId}`.
@@ -67,7 +67,7 @@ fun Route.updateInbox() {
         put {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.dependencies.resolve<ImporterManager>()
+            val importerManager = call.application.get<ImporterManager>()
 
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
             val request = call.receive<UpdateInboxRequest>()

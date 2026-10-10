@@ -19,7 +19,6 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
@@ -42,6 +41,8 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** Every change to a user's mail as a stream: what a client with a database of its own applies. */
 class EmailChangesTest {
@@ -213,9 +214,11 @@ class EmailChangesTest {
         install(SSE)
         installApiErrorHandling()
         install(Authentication) { alwaysSignedIn() }
-        dependencies {
-            provide<OvermailDatabase> { database }
-            provide<MailNotifier> { mailNotifier }
+        install(Koin) {
+            modules(module {
+                single<OvermailDatabase> { database }
+                single<MailNotifier> { mailNotifier }
+            })
         }
         routing {
             route("/api/emails/changes") { emailChanges(keepAlive = 100.milliseconds) }

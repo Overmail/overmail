@@ -9,7 +9,6 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.*
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -28,6 +27,7 @@ import org.jetbrains.exposed.v1.core.min
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.ktor.ext.get
 
 /** Chats per page, for the first one and for every `request.chats.more` after it. */
 private const val CHAT_PAGE_SIZE = 30
@@ -47,8 +47,8 @@ private val json = Json {
 fun Route.aiSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val chatNotifier = application.dependencies.resolve<AiChatNotifier>()
+            val database = application.get<OvermailDatabase>()
+            val chatNotifier = application.get<AiChatNotifier>()
 
             val user = call.requireAuthenticatedUser()
 

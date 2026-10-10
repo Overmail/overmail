@@ -16,7 +16,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -41,6 +40,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The index a listing is drawn from, and what keeps it current. */
 class ListingSocketTest {
@@ -354,9 +355,11 @@ class ListingSocketTest {
                 contentConverter = KotlinxWebsocketSerializationConverter(Json { encodeDefaults = true })
             }
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { mailNotifier }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { mailNotifier }
+                })
             }
             routing {
                 route("/api/webapp/listing/socket") { listingSocket() }

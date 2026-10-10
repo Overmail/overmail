@@ -15,7 +15,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -42,6 +41,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The sidebar's live list of views. */
 class ViewsSocketTest {
@@ -243,9 +244,11 @@ class ViewsSocketTest {
                 contentConverter = KotlinxWebsocketSerializationConverter(Json { encodeDefaults = true })
             }
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<ViewNotifier> { viewNotifier }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<ViewNotifier> { viewNotifier }
+                })
             }
             routing {
                 route("/api/webapp/views/socket") { viewsSocket() }

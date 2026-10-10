@@ -8,7 +8,6 @@ import es.jvbabi.overmail.server.database.models.Views
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
@@ -20,6 +19,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.ktor.ext.get
 
 /**
  * The user's views, as the sidebar lists them: `GET /api/webapp/views/socket`.
@@ -36,8 +36,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 fun Route.viewsSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val viewNotifier = application.dependencies.resolve<ViewNotifier>()
+            val database = application.get<OvermailDatabase>()
+            val viewNotifier = application.get<ViewNotifier>()
             val user = call.requireAuthenticatedUser()
 
             var sent: ViewsServerMessage.ViewList? = null

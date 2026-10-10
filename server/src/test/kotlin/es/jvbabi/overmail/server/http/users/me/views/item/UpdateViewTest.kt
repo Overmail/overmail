@@ -23,7 +23,6 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -45,6 +44,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** Single attributes of a view: its name, where it sits, what it groups and filters by. */
 class UpdateViewTest {
@@ -373,9 +374,11 @@ class UpdateViewTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<ViewNotifier> { viewNotifier }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<ViewNotifier> { viewNotifier }
+                })
             }
             routing {
                 route("/api/users/me/views/{viewId}") { updateView() }

@@ -23,7 +23,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -39,6 +38,7 @@ import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.update
+import org.koin.ktor.ext.get
 
 /**
  * Creates the inbox the "new inbox" dialog was filling in:
@@ -156,7 +156,7 @@ private suspend fun ApplicationCall.createInbox(
     folderSettings: List<SubmitInboxRequest.FolderSettings>,
 ) {
     val database = database()
-    val importerManager = application.dependencies.resolve<ImporterManager>()
+    val importerManager = application.get<ImporterManager>()
 
     if (folderSettings.isEmpty()) invalidRequest("folder_settings", "an inbox needs a folder")
 

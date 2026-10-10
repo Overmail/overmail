@@ -4,7 +4,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
-import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
@@ -32,7 +32,7 @@ import org.koin.ktor.ext.get
  * answer for "I want this to stop" that deleting is usually mistaken for.
  *
  * The row is written before the answer goes out, and the importer is dealt with after it: stopping
- * waits for the mail currently being written (see `EmailImporter.stop`) and starting opens
+ * waits for the mail currently being written (see `LegacyEmailImporter.stop`) and starting opens
  * connections, and neither is something a caller should be held on.
  */
 fun Route.setInboxPaused(paused: Boolean) {
@@ -48,7 +48,7 @@ fun Route.setInboxPaused(paused: Boolean) {
         post {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.get<ImporterManager>()
+            val importerManager = call.application.get<LegacyImporterManager>()
 
             val rawId = call.parameters["inboxId"]
             val inboxId = rawId?.let { runCatching { Uuid.parse(it) }.getOrNull() }

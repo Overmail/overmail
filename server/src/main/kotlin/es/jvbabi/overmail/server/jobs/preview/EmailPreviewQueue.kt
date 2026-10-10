@@ -33,7 +33,7 @@ private const val BATCH_SIZE = 500
  * Queue of mails whose preview has to be worked out, and the backfill that finds them.
  *
  * A mail that is imported gets its preview where it is written -- the body is parsed at that
- * moment anyway, see `EmailImporter`. This is for the ones that were stored before there was a
+ * moment anyway, see `LegacyEmailImporter`. This is for the ones that were stored before there was a
  * preview at all, and for anything that has to be redone later: [enqueue] takes a single mail,
  * [backfill] takes every mail that has no preview row yet.
  *

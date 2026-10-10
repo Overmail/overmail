@@ -25,7 +25,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
-import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -388,8 +388,8 @@ class UpdateInboxTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<OAuthTokens> { tokens }
-                    single<ImporterManager> {
-                        ImporterManager(
+                    single<LegacyImporterManager> {
+                        LegacyImporterManager(
                             database = database,
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(

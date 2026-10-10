@@ -11,7 +11,7 @@ import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.submit.lookUpNthNewestDates
-import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import es.jvbabi.overmail.server.oauth.OAuthTokens
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
@@ -67,7 +67,7 @@ fun Route.updateInbox() {
         put {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.get<ImporterManager>()
+            val importerManager = call.application.get<LegacyImporterManager>()
 
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
             val request = call.receive<UpdateInboxRequest>()

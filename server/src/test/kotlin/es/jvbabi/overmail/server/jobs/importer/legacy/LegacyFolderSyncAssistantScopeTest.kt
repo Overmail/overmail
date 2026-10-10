@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.jobs.importer
+package es.jvbabi.overmail.server.jobs.importer.legacy
 
 import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
@@ -12,14 +12,14 @@ private val ACCOUNT_ID = kotlin.uuid.Uuid.random()
 /** When the folder was added; "only new messages" is measured against exactly this. */
 private val ADDED_AT = Instant.parse("2026-06-01T12:00:00Z")
 
-private fun sync(scope: ImapAccountFolderSync.AiImportSettings) = ImapConnection.FolderSync(
+private fun sync(scope: ImapAccountFolderSync.AiImportSettings) = LegacyImapConnection.FolderSync(
     folder = "INBOX",
     imapPush = false,
     aiImportSettings = scope,
     createdAt = ADDED_AT,
 )
 
-class FolderSyncAssistantScopeTest {
+class LegacyFolderSyncAssistantScopeTest {
 
     @Test
     fun `all messages holds for anything, however old`() {
@@ -54,9 +54,9 @@ class FolderSyncAssistantScopeTest {
 
     @Test
     fun `changing what the assistant reads restarts the importer`() {
-        // The signature is what ImporterManager compares; a scope that did not show up in it would
+        // The signature is what LegacyImporterManager compares; a scope that did not show up in it would
         // leave the running importer on the old setting until the next restart.
-        val connection = ImapConnection(
+        val connection = LegacyImapConnection(
             id = kotlin.uuid.Uuid.random(),
             userId = kotlin.uuid.Uuid.random(),
             host = "imap.example.com",
@@ -78,7 +78,7 @@ class FolderSyncAssistantScopeTest {
     fun `a renewed access token is not what the sweep restarts the importer for`() {
         // The job that renews the token restarts the importer itself; a sweep that did so too
         // would restart it a second time.
-        fun connection(bearer: String) = ImapConnection(
+        fun connection(bearer: String) = LegacyImapConnection(
             id = ACCOUNT_ID,
             userId = ACCOUNT_ID,
             host = "imap.example.com",
@@ -92,7 +92,7 @@ class FolderSyncAssistantScopeTest {
 
     @Test
     fun `a changed password restarts the importer`() {
-        fun connection(password: String) = ImapConnection(
+        fun connection(password: String) = LegacyImapConnection(
             id = ACCOUNT_ID,
             userId = ACCOUNT_ID,
             host = "imap.example.com",

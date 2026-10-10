@@ -16,6 +16,7 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   http/                Ktor engine, config and routes
   http/api/            what every route needs: the current user, url resources, errors
   jobs/                background work (IMAP import)
+  jobs/importer/legacy/  the current importer, `Legacy*`; kept running until its rebuild replaces it
 
 common/                Kotlin Multiplatform code both the server and the app use (smart dates)
 
@@ -346,7 +347,7 @@ val mails = call.database().query { Email.find { Emails.imapAccount eq accountId
 - Reads are plain blocking calls inside that block: `Query` is an `Iterable`, so `map`,
   `firstOrNull` and `toList` are the normal collection functions, not flow operators.
 - Nothing observes the database. A read returns the state at that moment; there is no
-  subscription and no reload, so anything that has to stay current polls (see `ImporterManager`).
+  subscription and no reload, so anything that has to stay current polls (see `LegacyImporterManager`).
 
 ## DAO entities
 
@@ -370,7 +371,7 @@ Two things to keep in mind, both of them the price of the DAO:
   readable afterwards -- that is what lets the session principal be a `User` (see
   `auth/SessionAuthentication.kt`). A reference, a `referrersOn` collection, a write or
   `refresh()` goes back to the database and throws outside `query { }`. Anything that outlives a
-  transaction takes a snapshot instead, like `ImapConnection` in the importer.
+  transaction takes a snapshot instead, like `LegacyImapConnection` in the importer.
 - **Loading an entity reads every column**, `Emails.rawContent` included, which is the whole mail
   source. A listing that does not need it selects its columns through the DSL, see
   `http/stack/stackSocket.kt`.

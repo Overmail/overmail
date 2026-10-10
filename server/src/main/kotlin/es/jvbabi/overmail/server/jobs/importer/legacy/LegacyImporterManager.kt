@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.jobs.importer
+package es.jvbabi.overmail.server.jobs.importer.legacy
 
 import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
@@ -16,14 +16,14 @@ import kotlin.uuid.Uuid
 /** How long an added, removed or re-configured account takes to be picked up, see [start]. */
 private val RELOAD_INTERVAL = 1.minutes
 
-class ImporterManager(
+class LegacyImporterManager(
     private val database: OvermailDatabase,
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
 
-    private val importer = mutableMapOf<Uuid, EmailImporter>()
+    private val importer = mutableMapOf<Uuid, LegacyEmailImporter>()
 
     /**
      * Keeps one importer per account running. Nothing pushes account changes any more, so the
@@ -66,14 +66,14 @@ class ImporterManager(
      * Stops the importer for [accountId] and forgets it.
      *
      * What a mailbox being deleted goes through, before the row is gone: awaited (see
-     * [EmailImporter.stop]), so a mail halfway through being written is finished and nothing is
+     * [LegacyEmailImporter.stop]), so a mail halfway through being written is finished and nothing is
      * still inserting into an account that is about to disappear.
      */
     suspend fun stop(accountId: Uuid) {
         importer.remove(accountId)?.stop()
     }
 
-    private suspend fun reconcile(allAccounts: List<ImapConnection>) {
+    private suspend fun reconcile(allAccounts: List<LegacyImapConnection>) {
         // A paused account is treated as one that is not there at all: whatever importer it has is
         // stopped below and none is started for it. That also makes a pause set straight in the
         // database take hold, within RELOAD_INTERVAL -- and a grant the provider refused, which
@@ -95,10 +95,10 @@ class ImporterManager(
         }
     }
 
-    private fun startImporter(account: ImapConnection) = EmailImporter(
+    private fun startImporter(account: LegacyImapConnection) = LegacyEmailImporter(
         database = this.database,
         account = account,
-        coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("EmailImporter-${account.id}"),
+        coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("LegacyEmailImporter-${account.id}"),
         emailClassificationQueue = this.emailClassificationQueue,
         mailNotifier = this.mailNotifier,
     ).also { it.start() }
@@ -131,7 +131,7 @@ internal fun oauthGrantStates(accountId: Uuid? = null): Map<Uuid, OAuthGrantStat
  * Reads the row into the snapshot the job runs on; only valid inside the transaction. [grant] is
  * the account's, see [oauthGrantStates].
  */
-internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = ImapConnection(
+internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = LegacyImapConnection(
     id = id.value,
     userId = user.id.value,
     host = host,
@@ -145,7 +145,7 @@ internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = ImapConnection(
     // Read here, with the account: the importer outlives this transaction and could not follow
     // the reference afterwards.
     folders = folderSyncs.map { sync ->
-        ImapConnection.FolderSync(
+        LegacyImapConnection.FolderSync(
             folder = sync.folder,
             imapPush = sync.imapPush,
             aiImportSettings = sync.aiImport,

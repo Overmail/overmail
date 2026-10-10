@@ -31,7 +31,7 @@ import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
-import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -188,8 +188,8 @@ internal fun overmailModule(application: CoroutineScope) = module {
 
     single<EmailPreviewQueue> { EmailPreviewQueue(database = get()) }
 
-    single<ImporterManager> {
-        ImporterManager(
+    single<LegacyImporterManager> {
+        LegacyImporterManager(
             database = get(),
             coroutineScope = application,
             emailClassificationQueue = get(),
@@ -204,12 +204,12 @@ private fun Application.startJobs() {
     }
 
     launch {
-        val importers = get<ImporterManager>()
+        val importers = get<LegacyImporterManager>()
         get<OAuthTokens>().run(onRenewed = importers::reboot)
     }
 
     launch {
-        get<ImporterManager>().start()
+        get<LegacyImporterManager>().start()
     }
 
     launch {

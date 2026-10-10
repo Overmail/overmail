@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.jobs.importer
+package es.jvbabi.overmail.server.jobs.importer.legacy
 
 import es.jvbabi.overmail.core.Email
 import es.jvbabi.overmail.core.Email.Flag
@@ -70,7 +70,7 @@ private val RECONNECT_DELAY = 5.seconds
 private class ConnectionLostException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * What of [ImapClient.Auth] goes into [ImapConnection.signature]. Spelled out because it masks its
+ * What of [ImapClient.Auth] goes into [LegacyImapConnection.signature]. Spelled out because it masks its
  * secret when printed, which would make a new password look like no change. An access token is
  * left out: it changes every hour, and the job that renews it restarts the importer itself, see
  * `OAuthTokens.run`.
@@ -86,7 +86,7 @@ private val ImapClient.Auth.signature: String
  * outlives that transaction by hours, which a DAO entity would not: it could no longer resolve
  * [userId] from its reference.
  */
-data class ImapConnection(
+data class LegacyImapConnection(
     val id: Uuid,
     val userId: Uuid,
     val host: String,
@@ -101,7 +101,7 @@ data class ImapConnection(
     /** Whether an importer runs for the account at all. */
     val canRun: Boolean get() = !isPaused && !requiresReauthentication
 
-    /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
+    /** Changes to any of these mean the connection has to be rebuilt, see `LegacyImporterManager`. */
     val signature: String
         get() = "$host:$port:${authentication.signature}:" +
             folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImportSettings}/${it.createdAt}" }
@@ -131,15 +131,15 @@ data class ImapConnection(
     }
 }
 
-class EmailImporter(
+class LegacyEmailImporter(
     private val database: OvermailDatabase,
-    val account: ImapConnection,
+    val account: LegacyImapConnection,
     private val coroutineScope: CoroutineScope,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
 
-    private val logger = LoggerFactory.getLogger(EmailImporter::class.java)
+    private val logger = LoggerFactory.getLogger(LegacyEmailImporter::class.java)
 
     private var importerJob: Job? = null
 
@@ -160,7 +160,7 @@ class EmailImporter(
 
             try {
                 while (isActive) {
-                    // One failed cycle must not end the job: nothing restarts it (ImporterManager
+                    // One failed cycle must not end the job: nothing restarts it (LegacyImporterManager
                     // only reacts to config changes), so an uncaught error would stop the import
                     // for good. Throwable for the same reason -- the mail library answers a value
                     // it does not have with TODO(), which is an Error, not an Exception.
@@ -191,7 +191,7 @@ class EmailImporter(
      * Its own connection, because that is what `IDLE` is: a socket that says nothing until it has
      * something to say, and can therefore not be shared with the commands the pass runs.
      */
-    private suspend fun watch(sync: ImapConnection.FolderSync) {
+    private suspend fun watch(sync: LegacyImapConnection.FolderSync) {
         while (currentCoroutineContext().isActive) {
             try {
                 // Renewed by building a new connection, not by re-issuing IDLE on the old one: the
@@ -291,7 +291,7 @@ class EmailImporter(
      * @throws ConnectionLostException if the connection is gone -- the caller replaces it and
      * calls again, rather than walking the rest of the folder over a socket that answers nothing.
      */
-    private suspend fun importFolder(client: ImapClient, sync: ImapConnection.FolderSync) {
+    private suspend fun importFolder(client: ImapClient, sync: LegacyImapConnection.FolderSync) {
         val folders = withImapTimeout("listing the folders") {
             try {
                 client.getFolders()
@@ -472,7 +472,7 @@ class EmailImporter(
      */
     private suspend fun import(
         mail: Email,
-        sync: ImapConnection.FolderSync,
+        sync: LegacyImapConnection.FolderSync,
         folder: ImapFolder,
     ) = withContext(NonCancellable) {
         val subject = mail.subject.await()
@@ -604,7 +604,7 @@ class EmailImporter(
     ): Uuid? = database.query {
         // Check and insert share this transaction. The dedup key has no unique index (the subject
         // is `text` and can blow the btree key limit), so the constraint cannot do it for us --
-        // but ImporterManager keeps one importer per account, so there is no second writer.
+        // but LegacyImporterManager keeps one importer per account, so there is no second writer.
         if (isKnown(sent, subject)) return@query null
 
         val emailId = Emails.insertAndGetId {

@@ -63,3 +63,4 @@ DerivedData/
 .claude/worktrees
 # Credentials for the imap test mailbox, handed over out of band. Never commit.
 imaptestaccount
+/app/android/google-services.json

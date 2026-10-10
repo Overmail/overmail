@@ -63,6 +63,10 @@ modules are entry points and nothing else.
   For the updater: `app.check_for_updates.enable_in_debug=true` checks for updates in a debug
   build, `app.dev.fake-update=true` swaps GitHub and the installer for fakes.
   `app.dev.log_http_requests=false` silences the request log, which is on by default.
+- **Push is Firebase Cloud Messaging and Android-only** (`androidMain`, `data/push/`). The
+  google-services plugin in `:app:android` needs `app/android/google-services.json`, which is
+  gitignored and must list both application ids (`es.jvbabi.overmail` and `.debug`); without it the
+  app does not build. CI restores it from the `GOOGLE_SERVICES_FILE` secret (base64).
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 

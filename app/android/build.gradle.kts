@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    // Turns google-services.json into the resources Firebase configures itself from. The file is
+    // gitignored and has to list both application ids, the debug build carries a suffix.
+    alias(libs.plugins.google.services)
 }
 
 val localProperties = Properties().apply {

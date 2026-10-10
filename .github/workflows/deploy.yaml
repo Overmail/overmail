@@ -261,6 +261,7 @@ jobs:
         with:
           keystore_file: ${{ secrets.KEYSTORE_FILE }}
           keystore_password: ${{ secrets.KEYSTORE_PASSWORD }}
+          google_services_file: ${{ secrets.GOOGLE_SERVICES_FILE }}
 
       - name: Build Android APK
         env:

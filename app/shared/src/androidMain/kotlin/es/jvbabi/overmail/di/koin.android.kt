@@ -7,11 +7,13 @@ import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.picture.AndroidEmailPictureRenderer
 import es.jvbabi.overmail.data.picture.EmailPictureRenderer
+import es.jvbabi.overmail.data.push.FirebasePushTokenRepository
 import es.jvbabi.overmail.data.repository.OvermailAppRepositoryImpl
 import es.jvbabi.overmail.data.repository.UpdateRepositoryImpl
 import es.jvbabi.overmail.data.repository.fake.FakeOvermailAppRepository
 import es.jvbabi.overmail.data.repository.fake.FakeUpdateRepository
 import es.jvbabi.overmail.domain.repository.OvermailAppRepository
+import es.jvbabi.overmail.domain.repository.PushTokenRepository
 import es.jvbabi.overmail.domain.repository.UpdateRepository
 import es.jvbabi.overmail.domain.usecase.app.CheckAppIsLatestVersionUseCase
 import es.jvbabi.overmail.domain.usecase.app.GetReleaseChangelogsUseCase
@@ -20,6 +22,7 @@ import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.mp.KoinPlatformTools
 
@@ -33,7 +36,7 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
 }
 
 /**
- * The renderer of mail pictures, and the updater: Android is the only platform that updates
+ * The renderer of mail pictures, the push token, and the updater: Android is the only platform that updates
  * itself, so the whole updater is declared here.
  *
  * What the updater talks to the outside world through — releases on GitHub, the file system, the
@@ -45,6 +48,9 @@ actual fun platformModule(): Module = module {
 
     // At start, so it sees the activity come up: that window is where a mail is rendered.
     single<EmailPictureRenderer>(createdAtStart = true) { AndroidEmailPictureRenderer(context = get()) }
+
+    // One instance under both types: the service reports a new token to what the shared code reads.
+    singleOf(::FirebasePushTokenRepository) bind PushTokenRepository::class
 
     singleOf(::CheckAppIsLatestVersionUseCase)
     singleOf(::GetReleaseChangelogsUseCase)

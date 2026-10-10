@@ -11,6 +11,9 @@ interface AccountRepository {
 
     suspend fun saveAccount(account: OvermailAccount)
 
+    /** Stores where a push for this device goes on the session [account] is signed in with. */
+    suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit>
+
     fun getById(id: Uuid): Flow<OvermailAccount?>
 }
 

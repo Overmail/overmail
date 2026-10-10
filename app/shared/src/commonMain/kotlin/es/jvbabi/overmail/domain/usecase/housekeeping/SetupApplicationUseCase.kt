@@ -5,6 +5,7 @@ import kotlinx.coroutines.launch
 
 class SetupApplicationUseCase(
     private val keepCurrentAccountValid: KeepCurrentAccountValidUseCase,
+    private val registerPushToken: RegisterPushTokenUseCase,
 ) {
     /**
      * Starts everything that keeps the app's state in order while it runs. Each task runs for as
@@ -12,5 +13,6 @@ class SetupApplicationUseCase(
      */
     suspend operator fun invoke() = coroutineScope {
         launch { keepCurrentAccountValid() }
+        launch { registerPushToken() }
     }
 }

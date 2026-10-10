@@ -7,6 +7,9 @@ import androidx.room.RoomDatabase
 import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.picture.EmailPictureRenderer
 import es.jvbabi.overmail.data.picture.IosEmailPictureRenderer
+import es.jvbabi.overmail.domain.model.ImapAccount
+import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
 import es.jvbabi.overmail.domain.repository.PushTokenRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -28,6 +31,15 @@ actual fun platformModule(): Module = module {
     single<PushTokenRepository> {
         object : PushTokenRepository {
             override fun getToken(): Flow<String> = emptyFlow()
+        }
+    }
+
+    // Nor channels: iOS has one switch per app.
+    single<NotificationChannelRepository> {
+        object : NotificationChannelRepository {
+            override suspend fun createSystemChannel() = Unit
+            override suspend fun createAccountChannels(account: OvermailAccount, imapAccounts: List<ImapAccount>, removeOthers: Boolean) = Unit
+            override suspend fun removeOtherAccounts(accounts: List<OvermailAccount>) = Unit
         }
     }
 }

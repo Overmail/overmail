@@ -1,0 +1,4 @@
+<resources>
+    <string name="notifications_channel_system_name">System</string>
+    <string name="notifications_channel_system_description">Updates und alles, was die App selbst zu melden hat</string>
+</resources>

@@ -31,6 +31,7 @@ import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.RegisterPushTokenUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.SyncNotificationChannelsUseCase
 import es.jvbabi.overmail.page.email.EmailViewModel
 import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
@@ -162,6 +163,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::SetCurrentAccountUseCase)
         singleOf(::KeepCurrentAccountValidUseCase)
         singleOf(::RegisterPushTokenUseCase)
+        singleOf(::SyncNotificationChannelsUseCase)
         singleOf(::SetupApplicationUseCase)
 
         viewModelOf(::AppViewModel)

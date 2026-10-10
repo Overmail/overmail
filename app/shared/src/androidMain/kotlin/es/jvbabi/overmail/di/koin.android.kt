@@ -8,10 +8,12 @@ import es.jvbabi.overmail.data.database.OvermailDatabase
 import es.jvbabi.overmail.data.picture.AndroidEmailPictureRenderer
 import es.jvbabi.overmail.data.picture.EmailPictureRenderer
 import es.jvbabi.overmail.data.push.FirebasePushTokenRepository
+import es.jvbabi.overmail.data.repository.NotificationChannelRepositoryImpl
 import es.jvbabi.overmail.data.repository.OvermailAppRepositoryImpl
 import es.jvbabi.overmail.data.repository.UpdateRepositoryImpl
 import es.jvbabi.overmail.data.repository.fake.FakeOvermailAppRepository
 import es.jvbabi.overmail.data.repository.fake.FakeUpdateRepository
+import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
 import es.jvbabi.overmail.domain.repository.OvermailAppRepository
 import es.jvbabi.overmail.domain.repository.PushTokenRepository
 import es.jvbabi.overmail.domain.repository.UpdateRepository
@@ -36,7 +38,7 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
 }
 
 /**
- * The renderer of mail pictures, the push token, and the updater: Android is the only platform that updates
+ * The renderer of mail pictures, the push token, the notification channels, and the updater: Android is the only platform that updates
  * itself, so the whole updater is declared here.
  *
  * What the updater talks to the outside world through — releases on GitHub, the file system, the
@@ -51,6 +53,8 @@ actual fun platformModule(): Module = module {
 
     // One instance under both types: the service reports a new token to what the shared code reads.
     singleOf(::FirebasePushTokenRepository) bind PushTokenRepository::class
+
+    single<NotificationChannelRepository> { NotificationChannelRepositoryImpl(context = get()) }
 
     singleOf(::CheckAppIsLatestVersionUseCase)
     singleOf(::GetReleaseChangelogsUseCase)

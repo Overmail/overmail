@@ -1,0 +1,4 @@
+<resources>
+    <string name="notifications_channel_system_name">System</string>
+    <string name="notifications_channel_system_description">Updates and whatever else the app itself has to say</string>
+</resources>

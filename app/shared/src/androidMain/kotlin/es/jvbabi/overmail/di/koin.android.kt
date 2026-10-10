@@ -55,7 +55,15 @@ actual fun platformModule(): Module = module {
     // One instance under both types: the service reports a new token to what the shared code reads.
     singleOf(::FirebasePushTokenRepository) bind PushTokenRepository::class
 
-    single { PushNotifier(context = get(), notificationChannelRepository = get()) }
+    single {
+        PushNotifier(
+            context = get(),
+            notificationChannelRepository = get(),
+            accountRepository = get(),
+            emailsRepository = get(),
+            httpClient = get(),
+        )
+    }
     single<NotificationChannelRepository> { NotificationChannelRepositoryImpl(context = get()) }
 
     singleOf(::CheckAppIsLatestVersionUseCase)

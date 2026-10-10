@@ -13,6 +13,17 @@ import kotlin.uuid.Uuid
 @Serializable
 sealed class PushMessage {
 
+    /**
+     * A mail arrived that nobody has read yet, in the mailbox [imapAccountId]. What the
+     * notification shows of it is fetched, which leaves the mail in the cache for when it is opened.
+     */
+    @Serializable
+    @SerialName("new_email")
+    data class NewEmail(
+        @SerialName("email_id") val emailId: Uuid,
+        @SerialName("imap_account_id") val imapAccountId: Uuid,
+    ) : PushMessage()
+
     /** Nothing happened: a test notification is shown, which proves the whole way works. */
     @Serializable
     @SerialName("ping")

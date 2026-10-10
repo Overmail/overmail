@@ -61,12 +61,9 @@ import es.jvbabi.overmail.domain.intent.AppIntent
 import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import org.koin.compose.viewmodel.koinViewModel
-import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.setSingletonImageLoaderFactory
-import coil3.disk.DiskCache
-import coil3.network.ktor3.KtorNetworkFetcherFactory
-import es.jvbabi.overmail.data.network.ServerImageCacheStrategy
+import es.jvbabi.overmail.data.network.appImageLoader
 import es.jvbabi.overmail.page.BottomNavBar
 import es.jvbabi.overmail.page.LocalBottomNavBarHeight
 import es.jvbabi.overmail.ui.lift.LocalLiftState
@@ -76,8 +73,6 @@ import io.ktor.client.HttpClient
 import okio.Path
 import kotlin.time.Instant
 
-/** Avatars are small; this holds thousands of them. */
-private const val IMAGE_DISK_CACHE_BYTES = 64L * 1024 * 1024
 
 /**
  * Between two tabs the pages fade into each other: they sit side by side in the bottom bar, not
@@ -176,27 +171,9 @@ expect fun formatDateTime(instant: Instant, skeleton: String, languageTag: Strin
 @Composable
 @Preview
 fun App() {
-    // One loader for the whole app. It goes through the app's own client, so a picture carries
-    // the werkbank headers like every other request; the session token is added per request.
+    // One loader for the whole app, see appImageLoader.
     val httpClient = koinInject<HttpClient>()
-    setSingletonImageLoaderFactory { context ->
-        ImageLoader.Builder(context)
-            .components {
-                add(
-                    KtorNetworkFetcherFactory(
-                        httpClient = { httpClient },
-                        cacheStrategy = { ServerImageCacheStrategy() },
-                    )
-                )
-            }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(imageCacheDirectory(context))
-                    .maxSizeBytes(IMAGE_DISK_CACHE_BYTES)
-                    .build()
-            }
-            .build()
-    }
+    setSingletonImageLoaderFactory { context -> appImageLoader(context, httpClient) }
 
     SyncHumanReadableLocale()
 

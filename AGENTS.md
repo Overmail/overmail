@@ -67,6 +67,12 @@ modules are entry points and nothing else.
   google-services plugin in `:app:android` needs `app/android/google-services.json`, which is
   gitignored and must list both application ids (`es.jvbabi.overmail` and `.debug`); without it the
   app does not build. CI restores it from the `GOOGLE_SERVICES_FILE` secret (base64).
+  A push carries a `type` and ids, never content (`domain/model/PushMessage.kt`, the mirror of the
+  server's `jobs/push/PushMessage.kt`); `PushNotifier` fetches what a notification shows.
+- **What the app is asked to do from outside is an `AppIntent`** (`domain/intent/`): a tapped
+  notification today. It travels as a uri under the app's scheme, the platform entry point hands
+  that to `AppIntents`, and `App.kt` acts on it once the ui is there. A new one is a subclass, its
+  path, and a branch in `App.kt` -- no platform code.
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 
@@ -416,6 +422,25 @@ tested on its own:
 - **Tests fake the mailbox, not the database.** `MailClient`/`MailFolder` are kamel's interfaces
   and `ImporterFixtures.kt` has in-memory ones; mails are built with `KamelEmail.parse(raw, uid,
   flags)`. Timing is tested on virtual time (`runTest`), everything that stores on H2.
+
+## Push
+
+`jobs/push/` sends pushes to the app. Three parts:
+
+| Part | Job | Knows nothing about |
+|---|---|---|
+| `PushNotifications` | one function per occasion (`newEmail`, `ping`): which message, to whom | Firebase, tokens |
+| `PushQueue` | resolves a `PushTarget` into devices, sends, retries, forgets dead tokens | what a message means |
+| `PushSender` | hands one push to Firebase (`FcmPushSender`, the HTTP v1 api) | sessions, the database |
+
+- **A push never carries content**, only a `type` and ids: it travels through Google. A new kind
+  is a subclass of `PushMessage`, a function in `PushNotifications`, and the same subclass in the
+  app.
+- **A device is an Android session with a `firebaseToken`** (`Session.Client.Android`), set by the
+  app through `PUT /api/users/me/sessions/current/firebase-token`.
+- **Push is optional.** The service account is `data/firebase-service.json`, next to the config
+  file; without it `PushSender.Disabled` stands in and nothing is queued.
+- **The queue is in memory.** A push lost in a restart costs a notification, not a mail.
 
 ## Conventions
 ### General

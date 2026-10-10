@@ -17,6 +17,21 @@ class ReceivedPushTest {
     }
 
     @Test
+    fun `a new mail is read with its mail and its mailbox`() {
+        val emailId = Uuid.random()
+        val imapAccountId = Uuid.random()
+
+        val push = ReceivedPush.fromData(
+            mapOf(
+                "user_id" to userId.toString(),
+                "payload" to """{"type":"new_email","email_id":"$emailId","imap_account_id":"$imapAccountId"}""",
+            )
+        )
+
+        assertEquals(ReceivedPush(userId, PushMessage.NewEmail(emailId, imapAccountId)), push)
+    }
+
+    @Test
     fun `a field this version does not know is ignored`() {
         val push = ReceivedPush.fromData(mapOf("user_id" to userId.toString(), "payload" to """{"type":"ping","sent_at":1}"""))
 

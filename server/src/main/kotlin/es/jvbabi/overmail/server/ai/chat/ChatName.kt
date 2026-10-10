@@ -42,7 +42,7 @@ internal const val MAX_CHAT_NAME_LENGTH = 60
 private const val MAX_NAME_INPUT_LENGTH = 800
 
 /** Reasoning, including a block left open by a run that ended inside one. */
-private val THINKING_ELEMENT =
+internal val THINKING_ELEMENT =
     Regex("${ChatAgent.THINKING_START}.*?(?:${ChatAgent.THINKING_END}|\\z)", RegexOption.DOT_MATCHES_ALL)
 
 /** Every other element an answer is rendered with: the tool calls and the ones standing for an email or a label. */

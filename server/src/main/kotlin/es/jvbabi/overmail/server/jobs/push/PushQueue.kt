@@ -60,7 +60,11 @@ class PushQueue(
     suspend fun consume() {
         for ((target, message) in channel) {
             try {
-                recipientsOf(target).forEach { deliver(it, message) }
+                val recipients = recipientsOf(target)
+                val delivered = recipients.count { deliver(it, message) }
+                if (recipients.isNotEmpty()) {
+                    logger.info("Pushed ${message::class.simpleName} for $target to $delivered of ${recipients.size} device(s)")
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (cause: Exception) {
@@ -69,22 +73,23 @@ class PushQueue(
         }
     }
 
-    private suspend fun deliver(recipient: Recipient, message: PushMessage) {
+    /** Whether the push was handed over. One that was not is logged here, or its token forgotten. */
+    private suspend fun deliver(recipient: Recipient, message: PushMessage): Boolean {
         val data = message.toData(recipient.userId)
 
         var attempt = 0
         while (true) {
             when (val result = sender.send(recipient.token, data, message.isUrgent)) {
-                PushSender.Result.Sent -> return
+                PushSender.Result.Sent -> return true
                 PushSender.Result.Unregistered -> {
                     forgetToken(recipient)
-                    return
+                    return false
                 }
                 is PushSender.Result.Failed -> {
                     val wait = retryDelays.getOrNull(attempt++).takeIf { result.isRetryable }
                     if (wait == null) {
                         logger.warn("Giving up on a push to session ${recipient.sessionId}: ${result.reason}")
-                        return
+                        return false
                     }
                     delay(wait)
                 }

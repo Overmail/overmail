@@ -16,6 +16,7 @@
 
 <script lang="ts">
     import {untrack} from "svelte";
+    import {_} from "svelte-i18n";
     import {cn} from "$lib/utils";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {fly} from "svelte/transition";
@@ -247,7 +248,7 @@
                                     style:view-transition-name={MAIL_SUBJECT_TRANSITION}
                                     class="font-display text-2xl text-pretty"
                             >
-                                {mail.subject}
+                                {mail.subject?.trim() || $_("mails.noSubject")}
                             </div>
                         </div>
 

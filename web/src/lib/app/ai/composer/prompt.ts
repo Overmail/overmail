@@ -40,7 +40,8 @@ export type PromptSender = {
 
 export type PromptEmail = {
     id: string;
-    subject: string;
+    /** Null for a mail without one. */
+    subject: string | null;
     avatarUrl: string | null;
     /** How much of its box the picture gives up to fit the circle; null when it needs none. */
     avatarPadding: number | null;

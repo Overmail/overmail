@@ -11,7 +11,8 @@ export type MatchableText = {
 
 export type EmailSearchResult = {
     id: string;
-    subject: MatchableText;
+    /** Null for a mail without one. */
+    subject: MatchableText | null;
     from: {
         name: MatchableText | null;
         address: MatchableText;
@@ -58,7 +59,7 @@ export class OvermailPromptViewModel {
         const data: {
             emails: {
                 id: string;
-                subject: MatchableText;
+                subject: MatchableText | null;
                 from: {name: MatchableText | null; address: MatchableText};
                 avatar_url: string | null;
                 avatar_padding: number | null;

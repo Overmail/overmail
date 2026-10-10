@@ -13,7 +13,8 @@
 
     const email = $derived({
         id: attributeOf(attributes, "emailId") ?? "",
-        subject: attributeOf(attributes, "subject") ?? "",
+        // Absent for a mail without one.
+        subject: attributeOf(attributes, "subject") || null,
         // Empty rather than absent when the sender has no picture yet.
         avatarUrl: attributeOf(attributes, "avatarUrl") || null,
         // Empty for a picture that needs none, see EmailAvatars.circlePadding on the server.
@@ -33,6 +34,6 @@
                     class="size-4 shrink-0"
             />
         {/if}
-        <span class="truncate text-foreground" title={email.subject}>{shortSubject(email.subject)}</span>
+        <span class="truncate text-foreground" title={email.subject}>{email.subject ? shortSubject(email.subject) : $_("mails.noSubject")}</span>
     </span>
 {/if}

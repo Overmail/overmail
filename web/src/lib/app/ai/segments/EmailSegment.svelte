@@ -70,7 +70,7 @@
                 >
                     {#snippet fallback()}<EnvelopeSimpleIcon class="size-full"/>{/snippet}
                 </OvermailAvatar>
-                {shortSubject(email.subject)}
+                {email.subject ? shortSubject(email.subject) : $_("mails.noSubject")}
             </span>
         {/snippet}
     </HoverCard.Trigger>
@@ -83,7 +83,7 @@
             <!-- The subject is what the chip already carries, so the wait is only about the rest. -->
             <div class="flex flex-col gap-2 p-3">
                 <Skeleton class="h-24 w-full rounded-lg"/>
-                <span class="line-clamp-2 text-sm font-medium wrap-anywhere">{email.subject}</span>
+                <span class="line-clamp-2 text-sm font-medium wrap-anywhere">{email.subject || $_("mails.noSubject")}</span>
                 <Skeleton class="h-4 w-40 rounded"/>
             </div>
         {:else}

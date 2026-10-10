@@ -42,7 +42,7 @@ export type EmailParticipant = {
 /** Everything a screen shows of a mail without opening it. The body is fetched separately. */
 export type EmailMeta = {
     id: string;
-    subject: string;
+    subject: string | null;
     /** Unix seconds. */
     sent: number;
     isRead: boolean;
@@ -91,7 +91,7 @@ type WireParticipant = {
 
 type WireEmail = {
     id: string;
-    subject: string;
+    subject: string | null;
     sent: number;
     is_read: boolean;
     preview: string | null;

@@ -167,7 +167,7 @@
     </div>
 
     <div class="px-4 pt-6 flex flex-row flex-wrap items-center gap-x-8 text-xl wrap-anywhere sm:px-8">
-        {mail.subject}
+        {mail.subject?.trim() || $_("mails.noSubject")}
     </div>
 
     <Labels

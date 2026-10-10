@@ -108,7 +108,7 @@
             type: "email",
             email: {
                 id: email.id,
-                subject: email.subject.text,
+                subject: email.subject?.text ?? null,
                 avatarUrl: email.avatarUrl,
                 avatarPadding: email.avatarPadding,
             },
@@ -182,9 +182,13 @@
                 />
                 <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span class="w-full truncate">
-                        {#each matchParts(email.subject) as part}
-                            {#if part.matched}<span class="font-semibold">{part.text}</span>{:else}{part.text}{/if}
-                        {/each}
+                        {#if email.subject && email.subject.text.trim() !== ""}
+                            {#each matchParts(email.subject) as part}
+                                {#if part.matched}<span class="font-semibold">{part.text}</span>{:else}{part.text}{/if}
+                            {/each}
+                        {:else}
+                            <span class="text-muted-foreground">{$_("mails.noSubject")}</span>
+                        {/if}
                     </span>
                     <span class="flex w-full items-center gap-1.5 text-xs text-muted-foreground">
                         <span class="truncate">

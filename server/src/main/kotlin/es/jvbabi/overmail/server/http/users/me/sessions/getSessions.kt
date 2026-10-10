@@ -24,8 +24,8 @@ import kotlin.uuid.Uuid
  * Where this user is signed in: `GET /api/users/me/sessions`.
  *
  * Only sessions that still work -- a revoked one signs nobody in and has nothing left to do in
- * this list. Newest first. The token itself never leaves the server; `is_current_session` is how
- * a client finds its own entry.
+ * this list. Newest first. Neither the token itself nor a Firebase token leaves the server;
+ * `is_current_session` is how a client finds its own entry.
  */
 fun Route.getSessions() {
     authenticate {
@@ -51,7 +51,7 @@ fun Route.getSessions() {
                     .map { row ->
                         SessionPayload(
                             id = row[Sessions.id].value,
-                            client = row[Sessions.client],
+                            client = row[Sessions.client].withoutSecrets(),
                             issuedAt = row[Sessions.issuedAt],
                             isCurrentSession = row[Sessions.token] == currentToken,
                         )
@@ -62,6 +62,10 @@ fun Route.getSessions() {
         }
     }
 }
+
+/** The client as a listing may show it: the Firebase token addresses a device and stays on the server. */
+private fun Session.Client.withoutSecrets(): Session.Client =
+    if (this is Session.Client.Android) copy(firebaseToken = null) else this
 
 @Serializable
 private data class SessionsResponse(

@@ -59,6 +59,7 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEnt
 import es.jvbabi.overmail.server.http.users.me.password.deletePassword
 import es.jvbabi.overmail.server.http.users.me.password.getPassword
 import es.jvbabi.overmail.server.http.users.me.password.setPassword
+import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseToken
 import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
 import es.jvbabi.overmail.server.http.users.me.totp.disableTotp
 import es.jvbabi.overmail.server.http.users.me.totp.enableTotp
@@ -417,6 +418,11 @@ internal fun Application.configureRouting() {
                     // Where this user is signed in, and signing a device out again.
                     route("/sessions") {
                         getSessions()
+
+                        // The session the request came with, so a client needs no id for itself.
+                        route("/current/firebase-token") {
+                            setFirebaseToken()
+                        }
 
                         /**
                          * Path: sessionId [kotlin.uuid.Uuid] The session

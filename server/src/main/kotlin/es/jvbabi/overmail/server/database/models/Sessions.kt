@@ -38,6 +38,7 @@ class Session(id: EntityID<Uuid>): UuidEntity(id) {
             @SerialName("device") val device: String,
             @SerialName("manufacturer") val manufacturer: String,
             @SerialName("os") val os: String,
+            @SerialName("firebase_token") val firebaseToken: String? = null,
         ) : Client()
 
         @Serializable

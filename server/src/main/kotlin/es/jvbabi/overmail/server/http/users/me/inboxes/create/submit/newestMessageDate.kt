@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.submit
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant

@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
-import es.jvbabi.overmail.core.ImapClient
+import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.server.database.models.OAuthGrant
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonNull

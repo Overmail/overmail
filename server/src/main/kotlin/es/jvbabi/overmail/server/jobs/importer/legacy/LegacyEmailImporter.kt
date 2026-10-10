@@ -1,10 +1,10 @@
 package es.jvbabi.overmail.server.jobs.importer.legacy
 
-import es.jvbabi.overmail.core.Email
-import es.jvbabi.overmail.core.Email.Flag
-import es.jvbabi.overmail.core.FetchRequest
-import es.jvbabi.overmail.core.ImapClient
-import es.jvbabi.overmail.core.ImapFolder
+import es.jvbabi.overmail.kamel.Email
+import es.jvbabi.overmail.kamel.Email.Flag
+import es.jvbabi.overmail.kamel.FetchRequest
+import es.jvbabi.overmail.kamel.ImapClient
+import es.jvbabi.overmail.kamel.ImapFolder
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import es.jvbabi.overmail.core.Email.Attachment as KamelAttachment
+import es.jvbabi.overmail.kamel.Email.Attachment as KamelAttachment
 
 private val POLL_INTERVAL = 5.minutes
 
@@ -585,6 +585,12 @@ class LegacyEmailImporter(
         }
     }
 
+    private data class NewRecipient(
+        val emailUserId: Uuid,
+        val name: String?,
+        val type: EmailRecipientType,
+    )
+
     /**
      * Stores the mail together with its recipient links, or returns null and writes nothing if it
      * is already there. Never updates an existing mail: the local state (`is_read`) is ours, the
@@ -673,9 +679,5 @@ class LegacyEmailImporter(
             .empty()
             .not()
 
-    private data class NewRecipient(
-        val emailUserId: Uuid,
-        val name: String?,
-        val type: EmailRecipientType,
-    )
+
 }

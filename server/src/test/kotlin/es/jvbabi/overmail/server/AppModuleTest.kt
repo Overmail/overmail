@@ -10,7 +10,7 @@ import es.jvbabi.overmail.server.data.notifier.ViewNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
-import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.oauth.OAuthProviders
 import es.jvbabi.overmail.server.oauth.OAuthTokens
@@ -61,7 +61,7 @@ class AppModuleTest {
 
         try {
             // What `startJobs` and the routes resolve; between them they reach every definition.
-            koin.get<ImporterManager>()
+            koin.get<LegacyImporterManager>()
             koin.get<OAuthTokens>()
             koin.get<OAuthProviders>()
             koin.get<EmailClassificationQueue>()

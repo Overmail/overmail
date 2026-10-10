@@ -1,7 +1,7 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.test
 
-import es.jvbabi.overmail.core.ImapClient
-import es.jvbabi.overmail.core.ImapCommandException
+import es.jvbabi.overmail.kamel.ImapClient
+import es.jvbabi.overmail.kamel.ImapCommandException
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode

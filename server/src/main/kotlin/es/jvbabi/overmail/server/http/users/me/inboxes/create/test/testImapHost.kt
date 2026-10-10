@@ -1,6 +1,6 @@
 package es.jvbabi.overmail.server.http.users.me.inboxes.create.test
 
-import es.jvbabi.overmail.core.SocketInstance
+import es.jvbabi.overmail.kamel.SocketInstance
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import io.ktor.http.HttpStatusCode

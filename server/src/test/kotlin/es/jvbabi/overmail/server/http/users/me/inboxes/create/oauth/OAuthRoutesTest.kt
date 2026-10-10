@@ -4,6 +4,7 @@ import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import es.jvbabi.authentikt.core.session.sessions
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassification
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.config.ApplicationConfig
@@ -416,12 +417,12 @@ class OAuthRoutesTest {
         val (account, grant, importer) = database.query {
             val account = ImapAccount[inboxId].let { listOf(it.user.id.value, it.host, it.port, it.username, it.password) }
             val grant = OAuthGrant.find { OAuthGrants.imapAccount eq inboxId }.single()
-            Triple(account, grant.onboardingId to grant.accessToken, grant.id.value to ImapAccount[inboxId].toConnection(oauthGrantStates(inboxId)[inboxId]).oauthGrantId)
+            Triple(account, grant.onboardingId to grant.accessToken, ImapAccount[inboxId].toConnection(oauthGrantStates(inboxId)[inboxId]).authentication)
         }
         assertEquals(listOf(user.id.value, "outlook.office365.com", 993, MAILBOX, ""), account)
         assertEquals(null to ACCESS_TOKEN, grant)
         // What the importer logs in with.
-        assertEquals(importer.first, importer.second)
+        assertEquals(ImapClient.Auth.BearerAuth(MAILBOX, ACCESS_TOKEN), importer)
 
         // Used up: neither the dialog nor a second submit finds it again.
         assertEquals(HttpStatusCode.NotFound, client.get("$PROVIDERS/onboardings/$onboardingId").status)

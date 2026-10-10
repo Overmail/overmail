@@ -1,15 +1,16 @@
 package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.OAuthGrants
 import es.jvbabi.overmail.server.oauth.OAuthTokens
+import kotlinx.coroutines.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.jdbc.select
-import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
@@ -54,7 +55,7 @@ class ImporterManager(
         importer.remove(accountId)?.stop()
 
         val account = database.query {
-            ImapAccount.findById(accountId)?.let { it.toConnection(oauthGrantStates(accountId)[accountId]) }
+            ImapAccount.findById(accountId)?.toConnection(oauthGrantStates(accountId)[accountId])
         } ?: return
         // Rebooting a paused account means leaving it stopped; the row is what decides, not the
         // caller, so a resume and a pause can go through the same door. Same for one whose sign-in
@@ -107,18 +108,26 @@ class ImporterManager(
 }
 
 /** The grant an account logs in with, as far as the importer cares. */
-internal data class OAuthGrantState(val id: Uuid, val requiresReauthentication: Boolean)
+internal data class OAuthGrantState(
+    val id: Uuid,
+    val requiresReauthentication: Boolean,
+    val bearer: String,
+)
 
 /**
  * The grants of [accountId], or of every account when null, by account. One query for all of them,
  * so a sweep does not cost a query per account.
  */
 internal fun oauthGrantStates(accountId: Uuid? = null): Map<Uuid, OAuthGrantState> = OAuthGrants
-    .select(OAuthGrants.id, OAuthGrants.imapAccount, OAuthGrants.requiresReauthentication)
+    .select(OAuthGrants.id, OAuthGrants.imapAccount, OAuthGrants.requiresReauthentication, OAuthGrants.accessToken)
     .where { if (accountId == null) OAuthGrants.imapAccount.isNotNull() else OAuthGrants.imapAccount eq accountId }
     .associate { row ->
         row[OAuthGrants.imapAccount]!!.value to
-            OAuthGrantState(row[OAuthGrants.id].value, row[OAuthGrants.requiresReauthentication])
+            OAuthGrantState(
+                id = row[OAuthGrants.id].value,
+                requiresReauthentication = row[OAuthGrants.requiresReauthentication],
+                bearer = row[OAuthGrants.accessToken],
+            )
     }
 
 /**
@@ -130,9 +139,10 @@ internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = ImapConnection(
     userId = user.id.value,
     host = host,
     port = port,
-    username = username,
-    password = password,
-    oauthGrantId = grant?.id,
+    authentication = when (grant) {
+        null -> ImapClient.Auth.BasicAuth(username, password)
+        else -> ImapClient.Auth.BearerAuth(username, grant.bearer)
+    },
     requiresReauthentication = grant?.requiresReauthentication ?: false,
     isPaused = isPaused,
     // Read here, with the account: the importer outlives this transaction and could not follow
@@ -141,7 +151,7 @@ internal fun ImapAccount.toConnection(grant: OAuthGrantState?) = ImapConnection(
         ImapConnection.FolderSync(
             folder = sync.folder,
             imapPush = sync.imapPush,
-            aiImport = sync.aiImport,
+            aiImportSettings = sync.aiImport,
             createdAt = sync.createdAt,
         )
     },

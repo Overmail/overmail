@@ -68,6 +68,13 @@ private val RECONNECT_DELAY = 5.seconds
  */
 private class ConnectionLostException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+/** What [ImapClient.Auth] logs in with besides the username; it keeps this out of its `toString`. */
+private val ImapClient.Auth.secret: String
+    get() = when (this) {
+        is ImapClient.Auth.BasicAuth -> password
+        is ImapClient.Auth.BearerAuth -> bearer
+    }
+
 /**
  * Everything an importer needs about its account, read once while a transaction was open. The job
  * outlives that transaction by hours, which a DAO entity would not: it could no longer resolve
@@ -78,35 +85,31 @@ data class ImapConnection(
     val userId: Uuid,
     val host: String,
     val port: Int,
-    val username: String,
-    val password: String,
-    /**
-     * The grant this account logs in with instead of [password], where it was signed in to at a
-     * provider. Its token changes every hour and is fetched for every connection, so it is not
-     * part of the [signature].
-     */
-    val oauthGrantId: Uuid? = null,
+    val authentication: ImapClient.Auth,
     /** The folders this account syncs, and how. Empty means nothing is imported for it. */
     val folders: List<FolderSync>,
     /** Whether the account is paused; a paused one has no importer at all. */
     val isPaused: Boolean = false,
-    /** Whether the provider refused [oauthGrantId]; such an account has no importer until a new sign-in. */
     val requiresReauthentication: Boolean = false,
 ) {
     /** Whether an importer runs for the account at all. */
     val canRun: Boolean get() = !isPaused && !requiresReauthentication
 
-    /** Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. */
+    /**
+     * Changes to any of these mean the connection has to be rebuilt, see `ImporterManager`. The
+     * secret is spelled out because [ImapClient.Auth] masks it when printed, and a new password or
+     * a renewed access token is exactly what the running importer has to pick up.
+     */
     val signature: String
-        get() = "$host:$port:$username:$password:$oauthGrantId:" +
-            folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImport}/${it.createdAt}" }
+        get() = "$host:$port:${authentication.username}:${authentication.secret}:" +
+            folders.sortedBy { it.folder }.joinToString(",") { "${it.folder}/${it.imapPush}/${it.aiImportSettings}/${it.createdAt}" }
 
     /** One folder's settings, as `ImapAccountFolderSyncs` holds them. */
     data class FolderSync(
         val folder: String,
         /** Whether the folder is watched over an open connection rather than only polled. */
         val imapPush: Boolean,
-        val aiImport: ImapAccountFolderSync.AiImportSettings,
+        val aiImportSettings: ImapAccountFolderSync.AiImportSettings,
         /** When the folder was added, which is what "only new messages" is measured against. */
         val createdAt: Instant,
     ) {
@@ -116,7 +119,7 @@ data class ImapConnection(
          * Every mail of a synced folder is imported either way -- this only decides what the
          * assistant is paid to read, which is what the user picked per folder.
          */
-        fun wantsAssistant(sentAt: Instant): Boolean = when (val scope = aiImport) {
+        fun wantsAssistant(sentAt: Instant): Boolean = when (val scope = aiImportSettings) {
             ImapAccountFolderSync.AiImportSettings.AllMessages -> true
             // Everything already in the folder when it was added is history; "only new" means
             // what arrives from here on.
@@ -166,7 +169,7 @@ class EmailImporter(
                         importOnce()
                     } catch (e: Throwable) {
                         currentCoroutineContext().ensureActive()
-                        logger.error("Import cycle failed for ${account.username}, retrying in $POLL_INTERVAL", e)
+                        logger.error("Import cycle failed for ${account.authentication.username}, retrying in $POLL_INTERVAL", e)
                     }
                     // Whichever comes first: the timer, or a watch saying a folder changed.
                     withTimeoutOrNull(POLL_INTERVAL) { wakeUps.receive() }
@@ -199,7 +202,7 @@ class EmailImporter(
                         // An account has at least an INBOX, so an empty listing is not an account
                         // without folders: it is a socket that answered nothing. Worth a retry,
                         // where a folder that is really not there is not.
-                        if (folders.isEmpty()) throw ConnectionLostException("${account.username} listed no folders at all")
+                        if (folders.isEmpty()) throw ConnectionLostException("${account.authentication.username} listed no folders at all")
 
                         val folder = folders.firstOrNull { it.fullName == sync.folder } ?: return@use false
 
@@ -212,18 +215,18 @@ class EmailImporter(
                         }
                         // Only the timeout ends a healthy IDLE. Reconnecting right away would
                         // hammer a server that keeps dropping it, so this goes through the retry.
-                        throw ConnectionLostException("the IDLE on ${sync.folder} of ${account.username} ended by itself")
+                        throw ConnectionLostException("the IDLE on ${sync.folder} of ${account.authentication.username} ended by itself")
                     }
                 }
                 if (folderExists == false) {
-                    logger.warn("Cannot watch ${sync.folder} for ${account.username}: no such folder")
+                    logger.warn("Cannot watch ${sync.folder} for ${account.authentication.username}: no such folder")
                     return
                 }
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
                 // The poll keeps running regardless, so a watch that cannot hold its connection
                 // costs latency, not mail.
-                logger.warn("Watch on ${sync.folder} for ${account.username} failed, retrying in $IDLE_RETRY_INTERVAL", e)
+                logger.warn("Watch on ${sync.folder} for ${account.authentication.username} failed, retrying in $IDLE_RETRY_INTERVAL", e)
                 delay(IDLE_RETRY_INTERVAL)
             }
         }
@@ -253,18 +256,18 @@ class EmailImporter(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: ConnectionLostException) {
-                        logger.warn("Rebuilding the connection for ${account.username}: ${e.message}", e)
+                        logger.warn("Rebuilding the connection for ${account.authentication.username}: ${e.message}", e)
                         client.closeQuietly()
                         delay(RECONNECT_DELAY)
                         client = connect()
                     } catch (e: Exception) {
                         // Whatever this folder is, the other folders of the account still import.
-                        logger.error("Importing ${sync.folder} for ${account.username} failed, skipping it this cycle", e)
+                        logger.error("Importing ${sync.folder} for ${account.authentication.username} failed, skipping it this cycle", e)
                         return@forEach
                     }
                 }
                 logger.error(
-                    "Gave up on ${sync.folder} for ${account.username}: " +
+                    "Gave up on ${sync.folder} for ${account.authentication.username}: " +
                         "$CONNECTION_ATTEMPTS_PER_FOLDER connections in a row were gone. Retrying next cycle."
                 )
             }
@@ -277,21 +280,9 @@ class EmailImporter(
     private suspend fun connect() = ImapClient(
         host = account.host,
         port = account.port,
-        auth = auth(),
+        auth = account.authentication,
         debug = false,
     )
-
-    /**
-     * What this account logs in with right now. For a grant that is its current access token,
-     * fetched anew for every connection: one connection outlives no token, but an importer
-     * outlives many.
-     */
-    private suspend fun auth(): ImapClient.Auth {
-        val grantId = account.oauthGrantId ?: return ImapClient.Auth.BasicAuth(account.username, account.password)
-        val bearer = oauthTokens.accessToken(grantId)
-            ?: throw ConnectionLostException("the oauth grant of ${account.username} is gone")
-        return ImapClient.Auth.BearerAuth(account.username, bearer)
-    }
 
     /**
      * Selects [sync] and imports every mail in it.
@@ -306,16 +297,16 @@ class EmailImporter(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                throw ConnectionLostException("listing the folders of ${account.username} failed", e)
+                throw ConnectionLostException("listing the folders of ${account.authentication.username} failed", e)
             }
         }
         // Same as in the watch: no folder at all is a connection that said nothing, and telling
         // that apart from a renamed folder is what decides between reconnecting and skipping.
-        if (folders.isEmpty()) throw ConnectionLostException("${account.username} listed no folders at all")
+        if (folders.isEmpty()) throw ConnectionLostException("${account.authentication.username} listed no folders at all")
 
         val folder = folders.firstOrNull { it.fullName == sync.folder }
         if (folder == null) {
-            logger.warn("No folder ${sync.folder} for ${account.username}; it may have been renamed")
+            logger.warn("No folder ${sync.folder} for ${account.authentication.username}; it may have been renamed")
             return
         }
 
@@ -335,7 +326,7 @@ class EmailImporter(
                     // Throwable rather than Exception: an envelope field the library has no value
                     // for answers with TODO(), and that NotImplementedError would otherwise end
                     // the import for good -- nothing restarts an importer whose job threw.
-                    logger.error("Failed to import a mail for ${account.username}, skipping it", e)
+                    logger.error("Failed to import a mail for ${account.authentication.username}, skipping it", e)
                 }
             }
         }
@@ -359,7 +350,7 @@ class EmailImporter(
             throw e
         } catch (e: Exception) {
             logger.warn(
-                "Fetching ${folder.fullName} for ${account.username} in one go failed, " +
+                "Fetching ${folder.fullName} for ${account.authentication.username} in one go failed, " +
                     "retrying in batches of $FETCH_BATCH_SIZE",
                 e,
             )
@@ -370,7 +361,7 @@ class EmailImporter(
         // empty listing now is therefore the connection answering nothing, and a fallback over it
         // would import zero mails and call that a success.
         if (ids.isEmpty()) {
-            throw ConnectionLostException("${folder.fullName} of ${account.username} listed no mails right after a failed fetch")
+            throw ConnectionLostException("${folder.fullName} of ${account.authentication.username} listed no mails right after a failed fetch")
         }
 
         return ids
@@ -394,7 +385,7 @@ class EmailImporter(
         } catch (e: Exception) {
             logger.warn(
                 "Fetching mails ${batch.first()}:${batch.last()} of ${folder.fullName} for " +
-                    "${account.username} failed, falling back to one FETCH per mail",
+                    "${account.authentication.username} failed, falling back to one FETCH per mail",
                 e,
             )
         }
@@ -412,7 +403,7 @@ class EmailImporter(
             } catch (e: ConnectionLostException) {
                 throw e
             } catch (e: Exception) {
-                logger.error("Mail $id of ${folder.fullName} for ${account.username} cannot be fetched, skipping it", e)
+                logger.error("Mail $id of ${folder.fullName} for ${account.authentication.username} cannot be fetched, skipping it", e)
                 null
             }
         }
@@ -441,11 +432,11 @@ class EmailImporter(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                throw ConnectionLostException("the connection of ${account.username} failed on a uid lookup", e)
+                throw ConnectionLostException("the connection of ${account.authentication.username} failed on a uid lookup", e)
             }
         }
 
-        if (id == null) throw ConnectionLostException("${folder.fullName} of ${account.username} no longer answers for uid $uid")
+        if (id == null) throw ConnectionLostException("${folder.fullName} of ${account.authentication.username} no longer answers for uid $uid")
     }
 
     /**
@@ -457,7 +448,7 @@ class EmailImporter(
     private suspend fun <T> withImapTimeout(operation: String, block: suspend () -> T): T = try {
         withTimeout(IMAP_OPERATION_TIMEOUT) { block() }
     } catch (e: TimeoutCancellationException) {
-        throw ConnectionLostException("$operation for ${account.username} got no answer within $IMAP_OPERATION_TIMEOUT", e)
+        throw ConnectionLostException("$operation for ${account.authentication.username} got no answer within $IMAP_OPERATION_TIMEOUT", e)
     }
 
     /** Closing is best effort: a socket that cannot be closed must not cost the cycle. */
@@ -467,7 +458,7 @@ class EmailImporter(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            logger.warn("Closing the connection of ${account.username} failed", e)
+            logger.warn("Closing the connection of ${account.authentication.username} failed", e)
         }
     }
 

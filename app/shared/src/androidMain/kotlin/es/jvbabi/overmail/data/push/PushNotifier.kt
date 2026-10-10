@@ -21,6 +21,7 @@ import es.jvbabi.overmail.data.network.avatarRequest
 import es.jvbabi.overmail.data.repository.NotificationChannelRepositoryImpl
 import es.jvbabi.overmail.domain.intent.AppIntent
 import es.jvbabi.overmail.domain.model.Email
+import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.model.Participant
 import es.jvbabi.overmail.domain.model.PushMessage
@@ -41,12 +42,16 @@ import overmail.app.shared.generated.resources.notifications_new_email_fallback_
 import overmail.app.shared.generated.resources.notifications_ping_text
 import overmail.app.shared.generated.resources.notifications_ping_title
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 
 /** One id per kind of notification that replaces itself; a second ping is not a second notification. */
 private const val PING_NOTIFICATION_ID = 1
 
 /** A mail's notification is told apart by its tag, the mail's id, so they all share this one. */
 private const val EMAIL_NOTIFICATION_ID = 2
+
+/** The summary of a mailbox's mails, told apart by its tag, the group's key. */
+private const val EMAIL_GROUP_NOTIFICATION_ID = 3
 
 /**
  * How long a mail may take to load before its notification goes out without it. Firebase gives a
@@ -101,7 +106,7 @@ class PushNotifier(
      * begins. Loading it for that is also what puts the mail and its body into the cache, so the
      * page a tap opens has them already.
      */
-    private suspend fun showNewEmail(userId: kotlin.uuid.Uuid, message: PushMessage.NewEmail) {
+    private suspend fun showNewEmail(userId: Uuid, message: PushMessage.NewEmail) {
         // The account's id is the user's on its homeserver. Signed out since: not ours to show.
         val account = accountRepository.getById(userId).first() ?: run {
             logger.i { "A push for an account that is not signed in here, ignoring it" }
@@ -113,6 +118,8 @@ class PushNotifier(
         }
 
         val notification = if (email != null) emailNotification(email, account) else fallbackNotification(message, account)
+        // Before its first child, so the two never show as separate notifications in between.
+        if (email != null) postGroupSummary(email.imapAccount)
         post(
             tag = message.emailId.toString(),
             id = EMAIL_NOTIFICATION_ID,
@@ -138,6 +145,9 @@ class PushNotifier(
             // Which mailbox, for whoever has several.
             .setSubText(email.imapAccount.username)
             .setLargeIcon(avatarOf(email.sentBy))
+            .setGroup(groupKey(email.imapAccount.id))
+            // The mail is what makes the sound, not the group it lands in.
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             // Before Android 8 there is no channel to carry it.
             .setSound(NotificationChannelRepositoryImpl.newEmailSound(context))
             .setWhen(email.sentAt.toEpochMilliseconds())
@@ -146,6 +156,32 @@ class PushNotifier(
                 NotificationCompat.BigTextStyle().bigText(if (text.isNullOrEmpty()) subject else "$subject\n$text")
             )
     }
+
+    /**
+     * What holds the mails of one mailbox together: collapsed they are one entry under the
+     * mailbox's address, expanded each is its own. Android only bundles notifications that share
+     * a group *and* have a summary, and of the summary itself it shows no more than this header.
+     *
+     * Posted again with every mail, which changes nothing about one that is there. When the last
+     * mail of the group is gone the system stops showing the summary by itself.
+     */
+    private fun postGroupSummary(imapAccount: ImapAccount) {
+        post(
+            tag = groupKey(imapAccount.id),
+            id = EMAIL_GROUP_NOTIFICATION_ID,
+            NotificationCompat.Builder(context, NotificationChannelRepositoryImpl.imapAccountChannelId(imapAccount.id))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setSubText(imapAccount.username)
+                .setCategory(NotificationCompat.CATEGORY_EMAIL)
+                .setGroup(groupKey(imapAccount.id))
+                .setGroupSummary(true)
+                .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+                .setAutoCancel(true),
+        )
+    }
+
+    /** One group per mailbox, like the channels: what belongs together is what arrives together. */
+    private fun groupKey(imapAccountId: Uuid) = "mailbox:$imapAccountId"
 
     /** What is shown for a mail that could not be loaded in time: that there is one, and the way to it. */
     private suspend fun fallbackNotification(message: PushMessage.NewEmail, account: OvermailAccount): NotificationCompat.Builder {

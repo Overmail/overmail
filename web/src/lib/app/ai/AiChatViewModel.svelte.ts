@@ -61,6 +61,18 @@ export class AiChatViewModel {
         || this.currentChatMessages.some((message) => message.type === "assistant" && message.pending)
     );
 
+    /**
+     * The answer of the open chat that can be stopped: the one being written. Null while there
+     * is none -- and while the prompt is still on its way, because the message to stop does not
+     * exist before the server answered.
+     */
+    stoppableMessageId: string | null = $derived(
+        this.currentChatMessages.find((message) => message.type === "assistant" && message.pending)?.id ?? null
+    );
+
+    /** The stop request is on its way; a second one would ask for the same thing. */
+    isStopping: boolean = $state(false);
+
     /** A page is on its way; the scroll handler must not ask for the same one again. */
     isLoadingChats: boolean = $state(true);
 
@@ -169,6 +181,35 @@ export class AiChatViewModel {
             await this.chatHistory.loadChat(chatId, true, true);
         } finally {
             this.isSending = false;
+        }
+    }
+
+    /**
+     * Stops the answer being written. What there is of it stays, marked as stopped.
+     *
+     * The server answers once the message is finished, and the stream of the message says `done`
+     * on its own -- the reload is for the case that it did not get through, so the prompt is
+     * never left blocked by an answer nobody is writing.
+     */
+    async stopAnswer() {
+        const chatId = this.currentChatId;
+        const messageId = this.stoppableMessageId;
+        if (chatId === null || messageId === null || this.isStopping) return;
+
+        this.isStopping = true;
+        try {
+            const response = await fetch(
+                `/api/webapp/ai/chat/${chatId}/message/${messageId}/stop`,
+                {method: "POST"},
+            );
+            if (!response.ok) {
+                console.error(`Failed to stop message ${messageId}: ${response.status} ${response.statusText}`);
+                return;
+            }
+
+            await this.chatHistory.loadChat(chatId, true, true);
+        } finally {
+            this.isStopping = false;
         }
     }
 

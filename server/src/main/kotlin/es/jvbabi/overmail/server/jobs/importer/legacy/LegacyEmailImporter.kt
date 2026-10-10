@@ -9,6 +9,8 @@ import es.jvbabi.overmail.server.ai.classification.EmailClassificationQueue
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.*
+import es.jvbabi.overmail.server.jobs.importer.EmailInserter
+import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.util.mailPreview
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -16,7 +18,6 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.or
-import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.*
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
@@ -24,7 +25,6 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import es.jvbabi.overmail.kamel.Email.Attachment as KamelAttachment
 
 private val POLL_INTERVAL = 5.minutes
 
@@ -135,6 +135,7 @@ class LegacyEmailImporter(
     private val database: OvermailDatabase,
     val account: LegacyImapConnection,
     private val coroutineScope: CoroutineScope,
+    private val emailInserter: EmailInserter,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
@@ -469,6 +470,9 @@ class LegacyEmailImporter(
      * `NonCancellable`, so stopping the importer never lands between the body being downloaded and
      * the row being written -- the mail is finished, and the cycle stops at the check before the
      * next one. It is the whole reason [stop] can promise a clean end.
+     *
+     * The mail with its addresses, attachments and read flag is [emailInserter]'s; the preview,
+     * which it does not write yet, follows in a transaction of its own, see [writePreview].
      */
     private suspend fun import(
         mail: Email,
@@ -478,31 +482,14 @@ class LegacyEmailImporter(
         val subject = mail.subject.await()
         val sentAt = mail.sentAt.await()
 
-        // Before the body, not after: downloading it pulls the attachments too.
+        // Before the body, not after: downloading it pulls the attachments too. The inserter
+        // checks again, but only once it has the body.
         if (database.query { isKnown(sentAt, subject) }) return@withContext
 
-        val from = mail.from.await()
-        val to = mail.to.await()
-        val cc = mail.cc.await()
-        val bcc = mail.bcc.await()
-
-        // Only the address identifies a stored email user. The display names stay on
-        // this mail: notifications@github.com carries the acting username as its name,
-        // so a name learned here says nothing about the next mail from that address.
-        val emailUsers = findOrCreateEmailUsers((from + to + cc + bcc).map { it.address }.distinct())
-
-        val fromHeader = from.firstOrNull()
-        if (fromHeader == null) {
+        // The inserter refuses such a mail as well; asking the envelope saves the download.
+        if (mail.from.await().isEmpty()) {
             logger.warn("Skipping mail without a From header: ${subject.forLog()}")
             return@withContext
-        }
-
-        val recipients = listOf(
-            to to EmailRecipientType.RECIPIENT,
-            cc to EmailRecipientType.CC,
-            bcc to EmailRecipientType.BCC,
-        ).flatMap { (users, type) ->
-            users.map { NewRecipient(emailUsers.getValue(it.address), it.name, type) }
         }
 
         // The body is the one expensive download of this mail and the one that pulls its
@@ -510,28 +497,30 @@ class LegacyEmailImporter(
         // mail instead of failing, and half a mail would be stored as the whole of it.
         requireLiveConnection(folder, mail)
 
-        val content = withImapTimeout("downloading ${subject.forLog()}") { mail.getContent(includeAttachments = true) }
-
-        val storedId = insert(
-            senderId = emailUsers.getValue(fromHeader.address),
-            senderName = fromHeader.name,
-            subject = subject,
-            sent = sentAt,
-            rawContent = content.raw,
-            textContent = content.text.checkMailPart("text", subject),
-            htmlContent = content.html.checkMailPart("html", subject),
-            attachments = content.attachments,
-            isRead = Flag.Seen in mail.flags.await(),
-            recipients = recipients,
-        )
-
-        if (storedId != null) {
-            // Imported either way; only what the assistant reads is the user's choice per folder.
-            if (sync.wantsAssistant(sentAt)) emailClassificationQueue.enqueue(storedId)
-            // The mail is in the mailbox now, so anything showing or counting it is stale.
-            // A mail that was not there before: every listing is one longer and one row further down.
-            mailNotifier.notifyMailChanged(account.userId, storedId, movedListings = true)
+        // The download happens in the inserter, so the timeout is around all of it: it is the
+        // only thing that ends a read on a socket that stopped answering.
+        val email = when (val result = withImapTimeout("importing ${subject.forLog()}") { insert(mail) }) {
+            EmailInserterImpl.Result.AlreadyExists -> return@withContext
+            is EmailInserterImpl.Result.Imported -> result.email
         }
+        email.textContent.warnIfGarbled("text", subject)
+        email.htmlContent.warnIfGarbled("html", subject)
+        val storedId = email.id.value
+
+        try {
+            writePreview(email)
+        } catch (e: Exception) {
+            // The mail is stored either way, and the backfill of `EmailPreviewQueue` finds every
+            // mail without a preview -- so this must not cost the classification and the
+            // notification below.
+            logger.warn("Writing the preview of ${subject.forLog()} failed; the backfill picks it up", e)
+        }
+
+        // Imported either way; only what the assistant reads is the user's choice per folder.
+        if (sync.wantsAssistant(sentAt)) emailClassificationQueue.enqueue(storedId)
+        // The mail is in the mailbox now, so anything showing or counting it is stale.
+        // A mail that was not there before: every listing is one longer and one row further down.
+        mailNotifier.notifyMailChanged(account.userId, storedId, movedListings = true)
     }
 
     /**
@@ -548,116 +537,42 @@ class LegacyEmailImporter(
     }
 
     /**
-     * A body part as the mail library decoded it, or null if it is blank.
+     * Logs a body part the mail library could not decode cleanly.
      *
-     * A part that does not decode cleanly comes back with replacement characters rather than
-     * throwing, because half a mail beats no mail -- but it is worth a line in the log, or a
-     * charset the library cannot read would quietly turn into a mailbox full of question marks.
+     * Such a part comes back with replacement characters rather than throwing, because half a mail
+     * beats no mail -- but it is worth a line in the log, or a charset the library cannot read
+     * would quietly turn into a mailbox full of question marks.
      */
-    private fun String?.checkMailPart(part: String, subject: String?): String? {
-        if (this == null) return null
-        if (contains(REPLACEMENT_CHARACTER)) {
+    private fun String?.warnIfGarbled(part: String, subject: String?) {
+        if (this != null && contains(REPLACEMENT_CHARACTER)) {
             logger.warn("The $part part of ${subject.forLog()} did not decode cleanly; it is stored as it came out")
         }
-
-        return takeIf { it.isNotBlank() }
     }
 
     /** How a subject is named in a log line, where a mail without one still has to be told apart. */
     private fun String?.forLog(): String = if (this == null) "a mail without a subject" else "\"$this\""
 
     /**
-     * Resolves the header addresses to [EmailUsers] ids, inserting the ones this user has not seen
-     * before. No upsert: the row holds nothing but the key, so there would be nothing to update.
-     * `insertIgnore` returns null once the address is known -- including the row an importer of
-     * another account of the same user just committed -- and the lookup then finds it.
+     * Hands [mail] to [emailInserter], which downloads its body and stores the mail, its
+     * addresses, its recipients and its attachments, or reports that it is already there.
+     *
+     * The account is loaded for it, as this importer only holds a snapshot.
      */
-    private suspend fun findOrCreateEmailUsers(addresses: List<String>): Map<String, Uuid> = database.query {
-        addresses.associateWith { address ->
-            EmailUsers.insertIgnoreAndGetId {
-                it[user] = account.userId
-                it[EmailUsers.address] = address
-            }?.value
-                ?: EmailUsers
-                    .select(EmailUsers.id)
-                    .where { (EmailUsers.user eq account.userId) and (EmailUsers.address eq address) }
-                    .single()[EmailUsers.id].value
-        }
+    private suspend fun insert(mail: Email): EmailInserterImpl.Result {
+        val imapAccount = database.query { ImapAccount[account.id] }
+        return emailInserter.importEmail(mail, imapAccount, mail.flags.await())
     }
 
-    private data class NewRecipient(
-        val emailUserId: Uuid,
-        val name: String?,
-        val type: EmailRecipientType,
-    )
-
     /**
-     * Stores the mail together with its recipient links, or returns null and writes nothing if it
-     * is already there. Never updates an existing mail: the local state (`is_read`) is ours, the
-     * server's copy must not overwrite it.
+     * The one thing the inserter leaves out. Written here rather than left to the queue: the body
+     * is parsed anyway, so the preview costs nothing at this point, and a mail is in a listing the
+     * moment it is imported. [email] is out of its transaction, so only its own columns are read.
      */
-    private suspend fun insert(
-        senderId: Uuid,
-        senderName: String?,
-        subject: String?,
-        sent: Instant,
-        rawContent: ByteArray,
-        textContent: String?,
-        htmlContent: String?,
-        attachments: List<KamelAttachment>,
-        isRead: Boolean,
-        recipients: List<NewRecipient>,
-    ): Uuid? = database.query {
-        // Check and insert share this transaction. The dedup key has no unique index (the subject
-        // is `text` and can blow the btree key limit), so the constraint cannot do it for us --
-        // but LegacyImporterManager keeps one importer per account, so there is no second writer.
-        if (isKnown(sent, subject)) return@query null
-
-        val emailId = Emails.insertAndGetId {
-            it[imapAccount] = account.id
-            it[sender] = senderId
-            it[Emails.senderName] = senderName
-            it[Emails.subject] = subject
-            it[Emails.sent] = sent.truncatedToSecond()
-            it[Emails.rawContent] = rawContent
-            it[Emails.textContent] = textContent
-            it[Emails.htmlContent] = htmlContent
-            it[Emails.isRead] = isRead
-        }.value
-        val email = es.jvbabi.overmail.server.database.models.Email[emailId]
-
-        // Written here rather than left to the queue: the body is parsed anyway, so the preview
-        // costs nothing at this point, and a mail is in a listing the moment it is imported.
+    private suspend fun writePreview(email: es.jvbabi.overmail.server.database.models.Email) = database.query {
         EmailPreviews.upsert {
-            it[EmailPreviews.email] = emailId
-            it[preview] = mailPreview(textContent, htmlContent)
+            it[EmailPreviews.email] = email.id
+            it[preview] = mailPreview(email.textContent, email.htmlContent)
         }
-
-        attachments.forEachIndexed { index, attachment ->
-            Attachment.new {
-                this.email = email
-                this.filename = (attachment.fileName ?: "attachment-$index").take(255)
-                this.contentType = attachment.contentType.take(255)
-                this.data = ExposedBlob(attachment.data)
-                this.size = attachment.data.size.toLong()
-            }
-        }
-
-        recipients
-            // The unique index is (mail, address, field), so an address listed twice in the same
-            // field has to collapse into one row. Sorting first lets the named entry win.
-            .sortedBy { it.name == null }
-            .distinctBy { it.emailUserId to it.type }
-            .forEach { recipient ->
-                EmailRecipients.insert {
-                    it[EmailRecipients.email] = emailId
-                    it[emailUser] = recipient.emailUserId
-                    it[name] = recipient.name
-                    it[type] = recipient.type
-                }
-            }
-
-        emailId
     }
 
     /**

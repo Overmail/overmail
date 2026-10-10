@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.Attachment
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.EmailRecipientType
 import es.jvbabi.overmail.server.database.models.EmailRecipients
@@ -10,43 +11,37 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnoreAndGetId
 import org.jetbrains.exposed.v1.jdbc.select
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
-import java.io.File
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import es.jvbabi.overmail.kamel.Email as KamelEmail
 
-/**
- * Stores a mail and the addresses in its headers, and nothing else: no preview, no attachments,
- * no classification and no notification. Whoever calls this decides what follows from
- * [Result.Imported].
- */
-class EmailImporter : AbstractEmailImporter, KoinComponent {
-    private val database by inject<OvermailDatabase>()
+class EmailInserterImpl(
+    private val database: OvermailDatabase
+) : EmailInserter {
 
     /**
-     * @throws IllegalArgumentException if the file is not a message or has no `From` header
-     * @throws IllegalStateException if the message has no readable `Date` header
+     * @throws IllegalArgumentException if the mail has no `From` header
+     * @throws IllegalStateException if the mail has no readable `Date` header
      */
-    override suspend fun importEmailFile(emailFile: File, imapAccount: ImapAccount): Result {
-        val mail = withContext(Dispatchers.IO) { KamelEmail.parse(emailFile.readBytes()) }
-
+    override suspend fun importEmail(
+        mail: KamelEmail,
+        imapAccount: ImapAccount,
+        flags: Set<KamelEmail.Flag>,
+    ): Result {
         val subject = mail.subject.await()
         val sentAt = mail.sentAt.await()
         val from = mail.from.await()
         val to = mail.to.await()
         val cc = mail.cc.await()
         val bcc = mail.bcc.await()
-        val content = mail.getContent()
+        val content = mail.getContent(includeAttachments = true)
 
         val sender = requireNotNull(from.firstOrNull()) { "Mail without a From header: $subject" }
 
@@ -74,6 +69,7 @@ class EmailImporter : AbstractEmailImporter, KoinComponent {
                 this.rawContent = content.raw
                 this.textContent = content.text?.takeIf { it.isNotBlank() }
                 this.htmlContent = content.html?.takeIf { it.isNotBlank() }
+                this.isRead = KamelEmail.Flag.Seen in flags
             }
 
             listOf(
@@ -96,6 +92,16 @@ class EmailImporter : AbstractEmailImporter, KoinComponent {
                         it[type] = recipient.type
                     }
                 }
+
+            content.attachments.forEachIndexed { index, attachment ->
+                Attachment.new {
+                    this.email = email
+                    this.filename = (attachment.fileName ?: "attachment-$index").take(255)
+                    this.contentType = attachment.contentType.take(255)
+                    this.data = ExposedBlob(attachment.data)
+                    this.size = attachment.data.size.toLong()
+                }
+            }
 
             Result.Imported(email)
         }

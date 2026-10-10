@@ -15,6 +15,7 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
@@ -180,6 +181,7 @@ class SetInboxPausedTest {
                     single<LegacyImporterManager> {
                         LegacyImporterManager(
                             database = database,
+                            emailInserter = EmailInserterImpl(database),
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(
                                 emailClassification = EmailClassification(

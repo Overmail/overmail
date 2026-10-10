@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.OAuthGrants
+import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import kotlinx.coroutines.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNotNull
@@ -19,6 +20,7 @@ private val RELOAD_INTERVAL = 1.minutes
 class LegacyImporterManager(
     private val database: OvermailDatabase,
     private val coroutineScope: CoroutineScope,
+    private val emailInserter: EmailInserter,
     private val emailClassificationQueue: EmailClassificationQueue,
     private val mailNotifier: MailNotifier,
 ) {
@@ -99,6 +101,7 @@ class LegacyImporterManager(
         database = this.database,
         account = account,
         coroutineScope = CoroutineScope(coroutineScope.coroutineContext) + CoroutineName("LegacyEmailImporter-${account.id}"),
+        emailInserter = this.emailInserter,
         emailClassificationQueue = this.emailClassificationQueue,
         mailNotifier = this.mailNotifier,
     ).also { it.start() }

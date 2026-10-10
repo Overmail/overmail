@@ -17,6 +17,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -40,7 +41,6 @@ import io.ktor.server.testing.testApplication
 import java.net.ServerSocket
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -320,6 +320,7 @@ class SubmitInboxTest {
                     single<LegacyImporterManager> {
                         LegacyImporterManager(
                             database = database,
+                            emailInserter = EmailInserterImpl(database),
                             coroutineScope = CoroutineScope(Job()).also { it.cancel() },
                             emailClassificationQueue = EmailClassificationQueue(
                                 emailClassification = EmailClassification(

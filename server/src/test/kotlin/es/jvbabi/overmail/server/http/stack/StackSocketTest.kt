@@ -28,7 +28,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -55,6 +54,8 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /**
  * The pile, which since the content socket is only a question of membership: which mails, in what
@@ -219,23 +220,25 @@ class StackSocketTest {
                 contentConverter = KotlinxWebsocketSerializationConverter(Json { encodeDefaults = true })
             }
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { mailNotifier }
-                // Nothing consumes it here: the look-ahead enqueues and the ids stay in the
-                // queue, so the classification behind it is never asked to do anything.
-                provide<EmailClassificationQueue> {
-                    EmailClassificationQueue(
-                        emailClassification = EmailClassification(
-                            config = testConfig,
-                            model = testModel,
-                            overmailDatabase = database,
-                            mailNotifier = mailNotifier,
-                            knowledgeStore = KnowledgeStore(database),
-                        ),
-                        database = database,
-                    )
-                }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { mailNotifier }
+                    // Nothing consumes it here: the look-ahead enqueues and the ids stay in the
+                    // queue, so the classification behind it is never asked to do anything.
+                    single<EmailClassificationQueue> {
+                        EmailClassificationQueue(
+                            emailClassification = EmailClassification(
+                                config = testConfig,
+                                model = testModel,
+                                overmailDatabase = database,
+                                mailNotifier = mailNotifier,
+                                knowledgeStore = KnowledgeStore(database),
+                            ),
+                            database = database,
+                        )
+                    }
+                })
             }
             routing {
                 route("/api/stack") { stackSocket() }

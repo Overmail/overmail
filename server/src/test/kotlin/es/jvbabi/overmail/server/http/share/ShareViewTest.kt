@@ -23,7 +23,6 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -43,6 +42,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteAll
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** What a share link hands out to somebody who has no account here. */
 class ShareViewTest {
@@ -297,7 +298,7 @@ class ShareViewTest {
         application {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route("/api/shares/{shareId}") {
                     getShare()

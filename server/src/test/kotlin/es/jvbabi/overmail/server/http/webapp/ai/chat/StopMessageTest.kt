@@ -23,7 +23,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -36,6 +35,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /**
  * The stop endpoint: who may call it and what it answers. What a stopped run leaves behind is the
@@ -171,9 +172,11 @@ class StopMessageTest {
         application {
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<ChatAgentQueue> { queue }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<ChatAgentQueue> { queue }
+                })
             }
             routing {
                 route("/api/webapp/ai/chat/{chatId}/message/{messageId}/stop") { stopMessage() }

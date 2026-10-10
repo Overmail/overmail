@@ -18,7 +18,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -39,6 +38,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The shape of the listing: how long each stretch of it is, before a single mail is loaded. */
 class EmailListGroupsTest {
@@ -310,7 +311,7 @@ class EmailListGroupsTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route("/api/emails/list/groups") { emailListGroups() }
             }

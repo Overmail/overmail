@@ -23,7 +23,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -33,6 +32,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 class RetryMessageTest {
 
@@ -107,23 +108,25 @@ class RetryMessageTest {
         application {
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<LLModel> { model }
-                provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
-                provide<ChatAgent> {
-                    ChatAgent(
-                        config = ApplicationConfig.AiConfig("none", model.id, "http://localhost:1"),
-                        model = model,
-                        database = database,
-                        streamNotifier = resolve(),
-                        chatNotifier = AiChatNotifier(),
-                        mailNotifier = MailNotifier(),
-                        knowledgeStore = KnowledgeStore(resolve()),
-                    )
-                }
-                // No consumer in the test: the run is queued and stays there.
-                provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve(), streamNotifier = resolve()) }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<LLModel> { model }
+                    single<AiChatStreamNotifier> { AiChatStreamNotifier() }
+                    single<ChatAgent> {
+                        ChatAgent(
+                            config = ApplicationConfig.AiConfig("none", model.id, "http://localhost:1"),
+                            model = model,
+                            database = database,
+                            streamNotifier = get(),
+                            chatNotifier = AiChatNotifier(),
+                            mailNotifier = MailNotifier(),
+                            knowledgeStore = KnowledgeStore(get()),
+                        )
+                    }
+                    // No consumer in the test: the run is queued and stays there.
+                    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
+                })
             }
             routing {
                 route("/api/webapp/ai/chat/{chatId}/message/{messageId}/retry") { retryMessage() }

@@ -37,11 +37,16 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.plugins.di.*
 import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import org.koin.dsl.module
+import org.koin.ktor.ext.get
+import org.koin.ktor.plugin.Koin
+import org.koin.logger.slf4jLogger
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -75,147 +80,160 @@ fun Application.overmail() {
 }
 
 private fun Application.configureDependencies() {
-    dependencies {
-        provide<ApplicationConfig> { ApplicationConfig.load() }
-        provide<DatabaseConfig> { resolve<ApplicationConfig>().database }
-        provide<SmtpConfig> { resolve<ApplicationConfig>().email.smtp }
-        provide<ApplicationConfig.AiConfig> { resolve<ApplicationConfig>().ai }
+    install(Koin) {
+        slf4jLogger()
+        modules(overmailModule(this@configureDependencies))
+    }
+}
 
-        provide<AiChatNotifier> { AiChatNotifier() }
-        provide<AiChatStreamNotifier> { AiChatStreamNotifier() }
-        provide<AvatarNotifier> { AvatarNotifier() }
-        provide<MailNotifier> { MailNotifier() }
-        provide<ViewNotifier> { ViewNotifier() }
+/**
+ * Everything the server shares. [application] is the coroutine scope the importers run in.
+ *
+ * Every definition is a `single`, built on first use -- except the database, which is built
+ * when the application starts so a server that cannot reach it does not come up at all.
+ */
+internal fun overmailModule(application: CoroutineScope) = module {
+    single<ApplicationConfig> { ApplicationConfig.load() }
+    single<DatabaseConfig> { get<ApplicationConfig>().database }
+    single<SmtpConfig> { get<ApplicationConfig>().email.smtp }
+    single<ApplicationConfig.AiConfig> { get<ApplicationConfig>().ai }
 
-        // Creating the schema on first resolution keeps it in one place: every caller reaches
-        // the database through this provider, so nothing can query it before this ran.
-        provide<OvermailDatabase> { OvermailDatabase(resolve<DatabaseConfig>()).also { it.init() } }
+    single<AiChatNotifier> { AiChatNotifier() }
+    single<AiChatStreamNotifier> { AiChatStreamNotifier() }
+    single<AvatarNotifier> { AvatarNotifier() }
+    single<MailNotifier> { MailNotifier() }
+    single<ViewNotifier> { ViewNotifier() }
 
-        provide<JwtService> { JwtService() }
+    // Creating the schema with the instance keeps it in one place: every caller reaches the
+    // database through this definition, so nothing can query it before this ran.
+    single<OvermailDatabase>(createdAtStart = true) {
+        OvermailDatabase(get<DatabaseConfig>()).also { runBlocking { it.init() } }
+    }
 
-        provide<OAuthProviders> { resolve<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
-        provide<OAuthTokens> { OAuthTokens(resolve<OvermailDatabase>(), resolve<OAuthProviders>()) }
+    single<JwtService> { JwtService() }
 
-        provide {
-            val config = resolve<ApplicationConfig>()
-            // The provider must be LLMProvider.OpenAI: MultiLLMPromptExecutor routes requests by
-            // comparing the model's provider with the one the registered client reports, and
-            // OpenAILLMClient reports LLMProvider.OpenAI regardless of its base URL.
-            // OpenAIEndpoint.Completions is required: without it the client cannot decide
-            // between the Chat-Completions and the Responses API and refuses the request.
-            // Baseten only offers the Chat-Completions endpoint. No Schema capability, so
-            // executeStructured embeds the JSON schema and examples into the prompt (manual
-            // mode), which works regardless of what the served model supports.
-            LLModel(
-                provider = LLMProvider.OpenAI,
-                id = config.ai.model,
-                capabilities = listOf(
-                    LLMCapability.OpenAIEndpoint.Completions,
-                    LLMCapability.Completion,
-                    LLMCapability.Temperature,
-                    LLMCapability.Tools,
-                ),
-            )
-        }
+    single<OAuthProviders> { get<ApplicationConfig>().let { OAuthProviders(it.oauth, it.baseUrl) } }
+    single<OAuthTokens> { OAuthTokens(get<OvermailDatabase>(), get<OAuthProviders>()) }
 
-        provide {
-            EmailClassification(
-                config = resolve<ApplicationConfig>(),
-                model = resolve(),
-                overmailDatabase = resolve(),
-                mailNotifier = resolve(),
-                knowledgeStore = resolve(),
-            )
-        }
+    single {
+        val config = get<ApplicationConfig>()
+        // The provider must be LLMProvider.OpenAI: MultiLLMPromptExecutor routes requests by
+        // comparing the model's provider with the one the registered client reports, and
+        // OpenAILLMClient reports LLMProvider.OpenAI regardless of its base URL.
+        // OpenAIEndpoint.Completions is required: without it the client cannot decide
+        // between the Chat-Completions and the Responses API and refuses the request.
+        // Baseten only offers the Chat-Completions endpoint. No Schema capability, so
+        // executeStructured embeds the JSON schema and examples into the prompt (manual
+        // mode), which works regardless of what the served model supports.
+        LLModel(
+            provider = LLMProvider.OpenAI,
+            id = config.ai.model,
+            capabilities = listOf(
+                LLMCapability.OpenAIEndpoint.Completions,
+                LLMCapability.Completion,
+                LLMCapability.Temperature,
+                LLMCapability.Tools,
+            ),
+        )
+    }
 
-        provide<EmailClassificationQueue> {
-            EmailClassificationQueue(
-                emailClassification = resolve(),
-                database = resolve()
-            )
-        }
+    single {
+        EmailClassification(
+            config = get<ApplicationConfig>(),
+            model = get(),
+            overmailDatabase = get(),
+            mailNotifier = get(),
+            knowledgeStore = get(),
+        )
+    }
 
-        // One store for what the assistant knows: the chat agent reads and writes it through
-        // its tools, the classification reads it into its prompt and writes back what it learned.
-        provide<KnowledgeStore> { KnowledgeStore(database = resolve()) }
+    single<EmailClassificationQueue> {
+        EmailClassificationQueue(
+            emailClassification = get(),
+            database = get()
+        )
+    }
 
-        provide {
-            ChatAgent(
-                config = resolve<ApplicationConfig.AiConfig>(),
-                model = resolve(),
-                database = resolve(),
-                streamNotifier = resolve(),
-                chatNotifier = resolve(),
-                mailNotifier = resolve(),
-                knowledgeStore = resolve(),
-            )
-        }
+    // One store for what the assistant knows: the chat agent reads and writes it through
+    // its tools, the classification reads it into its prompt and writes back what it learned.
+    single<KnowledgeStore> { KnowledgeStore(database = get()) }
 
-        provide<ChatAgentQueue> { ChatAgentQueue(chatAgent = resolve(), streamNotifier = resolve()) }
+    single {
+        ChatAgent(
+            config = get<ApplicationConfig.AiConfig>(),
+            model = get(),
+            database = get(),
+            streamNotifier = get(),
+            chatNotifier = get(),
+            mailNotifier = get(),
+            knowledgeStore = get(),
+        )
+    }
 
-        // Owns an http client, so one instance rather than one per lookup.
-        provide<AvatarLookup> { AvatarLookup() }
+    single<ChatAgentQueue> { ChatAgentQueue(chatAgent = get(), streamNotifier = get()) }
 
-        provide<AvatarQueue> {
-            AvatarQueue(
-                database = resolve(),
-                avatarLookup = resolve(),
-                avatarNotifier = resolve(),
-                mailNotifier = resolve(),
-            )
-        }
+    // Owns an http client, so one instance rather than one per lookup.
+    single<AvatarLookup> { AvatarLookup() }
 
-        provide<AvatarShapeBackfill> { AvatarShapeBackfill(database = resolve()) }
+    single<AvatarQueue> {
+        AvatarQueue(
+            database = get(),
+            avatarLookup = get(),
+            avatarNotifier = get(),
+            mailNotifier = get(),
+        )
+    }
 
-        provide<EmailPreviewQueue> { EmailPreviewQueue(database = resolve()) }
+    single<AvatarShapeBackfill> { AvatarShapeBackfill(database = get()) }
 
-        provide<ImporterManager> {
-            ImporterManager(
-                database = resolve(),
-                coroutineScope = this@configureDependencies,
-                emailClassificationQueue = resolve(),
-                mailNotifier = resolve(),
-            )
-        }
+    single<EmailPreviewQueue> { EmailPreviewQueue(database = get()) }
+
+    single<ImporterManager> {
+        ImporterManager(
+            database = get(),
+            coroutineScope = application,
+            emailClassificationQueue = get(),
+            mailNotifier = get(),
+        )
     }
 }
 
 private fun Application.startJobs() {
     launch {
-        dependencies.resolve<OAuthProviders>().logConfigured()
+        get<OAuthProviders>().logConfigured()
     }
 
     launch {
-        val importers = dependencies.resolve<ImporterManager>()
-        dependencies.resolve<OAuthTokens>().run(onRenewed = importers::reboot)
+        val importers = get<ImporterManager>()
+        get<OAuthTokens>().run(onRenewed = importers::reboot)
     }
 
     launch {
-        dependencies.resolve<ImporterManager>().start()
+        get<ImporterManager>().start()
     }
 
     launch {
-        dependencies.resolve<EmailClassificationQueue>().consume()
+        get<EmailClassificationQueue>().consume()
     }
 
     launch {
-        dependencies.resolve<AvatarQueue>().consume()
+        get<AvatarQueue>().consume()
     }
 
     launch {
-        dependencies.resolve<AvatarShapeBackfill>().run()
+        get<AvatarShapeBackfill>().run()
     }
 
     launch {
-        dependencies.resolve<EmailPreviewQueue>().consume()
+        get<EmailPreviewQueue>().consume()
     }
 
     // After the consumer above, which is what drains what this fills.
     launch {
-        dependencies.resolve<EmailPreviewQueue>().backfill()
+        get<EmailPreviewQueue>().backfill()
     }
 
     launch {
-        dependencies.resolve<ChatAgentQueue>().consume()
+        get<ChatAgentQueue>().consume()
     }
 }

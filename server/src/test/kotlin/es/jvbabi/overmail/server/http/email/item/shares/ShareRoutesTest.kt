@@ -26,7 +26,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -48,6 +47,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteAll
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The links a reader hands out for one mail: making them, changing them, taking them back. */
 class ShareRoutesTest {
@@ -294,7 +295,7 @@ class ShareRoutesTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route("/api/emails/{emailId}/shares") {
                     getShares()

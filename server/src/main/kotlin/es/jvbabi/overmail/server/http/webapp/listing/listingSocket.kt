@@ -21,7 +21,6 @@ import es.jvbabi.overmail.server.http.email.list.mailSorting
 import io.ktor.http.Parameters
 import io.ktor.http.parseQueryString
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
@@ -37,6 +36,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.Op
+import org.koin.ktor.ext.get
 
 /**
  * The most pages one socket keeps up to date.
@@ -71,8 +71,8 @@ private val json = Json { ignoreUnknownKeys = true }
 fun Route.listingSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val mailNotifier = application.dependencies.resolve<MailNotifier>()
+            val database = application.get<OvermailDatabase>()
+            val mailNotifier = application.get<MailNotifier>()
             val user = call.requireAuthenticatedUser()
 
             val lock = Mutex()

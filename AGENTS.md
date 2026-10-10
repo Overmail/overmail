@@ -183,21 +183,28 @@ The path is relative to the working directory, which is why `runServer` sets
 
 ## Application wiring
 
-The Ktor `Application` is the composition root. Everything is registered in Ktor's own DI
-(`ktor-server-di`) in `AppModule.kt`, nothing is configured through an `application.conf`:
+The Ktor `Application` is the composition root. Everything is registered in a Koin module
+(`koin-ktor`) in `AppModule.kt`, nothing is configured through an `application.conf`:
 
 ```kotlin
-dependencies {
-    provide<OvermailDatabase> { OvermailDatabase(resolve<DatabaseConfig>()).also { it.init() } }
+internal fun overmailModule(application: CoroutineScope) = module {
+    single<OAuthTokens> { OAuthTokens(get<OvermailDatabase>(), get<OAuthProviders>()) }
 }
 ```
 
 - The container is small on purpose: config, the database, `JwtService`, the importer manager.
   Everything else is built where it is used.
+- Every definition is a `single`, built on first use. The database is the exception
+  (`createdAtStart`): it creates the schema, and a server that cannot reach it does not come up.
 - The `Application` doubles as the coroutine scope for the importers, so stopping the server
   tears them down.
-- Routes get their dependencies from the same container (`by dependencies` or
-  `dependencies.resolve<T>()`); do not connect to the database inside a route.
+- Routes get their dependencies from the same container (`call.dependency<T>()`, or
+  `application.get<T>()` / `by inject()` from `org.koin.ktor.ext`); do not connect to the database
+  inside a route.
+- `OAuthOnboardings` is declared after the fact (`getKoin().declare(…)` in
+  `installOAuthOnboardings()`), because it wraps the authentikt instance that install creates.
+- A test that mounts a route on its own `testApplication` installs Koin with a module of just
+  what that route asks for. `AppModuleTest` is what checks the real module still builds.
 
 ## Reverse proxy
 
@@ -305,7 +312,7 @@ else. Reach for these before writing the check by hand:
   touch one flag — the entity reads `Emails.rawContent` with it.
 - **`queryParameter` / `intQueryParameter` / `instantQueryParameter` / `uuidQueryParameter`** —
   `?name=value`, or 400 naming the parameter.
-- **`database()` / `dependency<T>()`** — out of the DI container, per call.
+- **`database()` / `dependency<T>()`** — out of the Koin container, per call.
 
 Errors all leave as the same json, `ApiErrorBody`:
 

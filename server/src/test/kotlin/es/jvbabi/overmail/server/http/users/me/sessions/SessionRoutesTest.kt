@@ -18,7 +18,6 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -36,6 +35,8 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** Listing and revoking sessions, through the real session provider. */
 class SessionRoutesTest {
@@ -140,9 +141,11 @@ class SessionRoutesTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { overmailSession() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<JwtService> { jwtService }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<JwtService> { jwtService }
+                })
             }
             routing {
                 route("/api/users/me/sessions") {

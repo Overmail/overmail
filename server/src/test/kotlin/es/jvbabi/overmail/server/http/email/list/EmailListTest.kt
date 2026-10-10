@@ -22,7 +22,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -43,6 +42,8 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The mailbox by position: what a windowed table asks for a slice of. */
 class EmailListTest {
@@ -577,7 +578,7 @@ class EmailListTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route("/api/emails/list") { emailList() }
             }

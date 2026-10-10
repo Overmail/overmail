@@ -13,7 +13,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.plugins.di.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlinx.datetime.LocalDate
@@ -26,6 +25,8 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The mail's own source, handed out as a file. */
 class DownloadEmailTest {
@@ -158,8 +159,10 @@ class DownloadEmailTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                })
             }
             routing {
                 route("/api/emails/{emailId}/download") { downloadEmail() }

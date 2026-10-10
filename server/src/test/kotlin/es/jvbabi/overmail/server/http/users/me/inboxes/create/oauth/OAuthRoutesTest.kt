@@ -51,7 +51,6 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -84,6 +83,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 private const val PROVIDERS = "/api/users/me/inboxes/create/oauth"
 private const val CALLBACK = "/api/inbox-sign-in/authentikt/static/plugins/authentikt-builtin/oidc/microsoft/callback"
@@ -555,29 +556,31 @@ class OAuthRoutesTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<OAuthProviders> { providers }
-                provide<OAuthTokens> { tokens }
-                // A manager on a scope that is already over: the submit reboots the importer after
-                // answering, and a test has no mailbox for it to connect to.
-                provide<ImporterManager> {
-                    ImporterManager(
-                        database = database,
-                        coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                        emailClassificationQueue = EmailClassificationQueue(
-                            emailClassification = EmailClassification(
-                                config = testConfig,
-                                model = testModel,
-                                overmailDatabase = database,
-                                mailNotifier = MailNotifier(),
-                                knowledgeStore = KnowledgeStore(database),
-                            ),
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<OAuthProviders> { providers }
+                    single<OAuthTokens> { tokens }
+                    // A manager on a scope that is already over: the submit reboots the importer after
+                    // answering, and a test has no mailbox for it to connect to.
+                    single<ImporterManager> {
+                        ImporterManager(
                             database = database,
-                        ),
-                        mailNotifier = MailNotifier(),
-                    )
-                }
+                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
+                            emailClassificationQueue = EmailClassificationQueue(
+                                emailClassification = EmailClassification(
+                                    config = testConfig,
+                                    model = testModel,
+                                    overmailDatabase = database,
+                                    mailNotifier = MailNotifier(),
+                                    knowledgeStore = KnowledgeStore(database),
+                                ),
+                                database = database,
+                            ),
+                            mailNotifier = MailNotifier(),
+                        )
+                    }
+                })
             }
             installOAuthOnboardings()
             routing {

@@ -5,8 +5,8 @@ import es.jvbabi.overmail.server.database.models.User
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.principal
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.util.AttributeKey
+import org.koin.ktor.ext.get
 
 private const val BEARER_PREFIX = "Bearer "
 
@@ -47,8 +47,8 @@ private suspend fun ApplicationCall.sessionUserFromToken(): User? {
 
     // Resolved per call, not at install time: pulling the database out of the container eagerly
     // would create the schema while the application is still being set up.
-    val userId = application.dependencies.resolve<JwtService>().userIdOf(token) ?: return null
-    return application.dependencies.resolve<OvermailDatabase>().sessionUser(token, userId)
+    val userId = application.get<JwtService>().userIdOf(token) ?: return null
+    return application.get<OvermailDatabase>().sessionUser(token, userId)
 }
 
 /**

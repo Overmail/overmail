@@ -16,7 +16,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -45,6 +44,8 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The home screen's live number: how many mails are in the mailbox right now. */
 class HomeSocketTest {
@@ -278,9 +279,11 @@ class HomeSocketTest {
                 contentConverter = KotlinxWebsocketSerializationConverter(Json { encodeDefaults = true })
             }
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { mailNotifier }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { mailNotifier }
+                })
             }
             routing {
                 route("/api/webapp/home/socket") { homeSocket() }

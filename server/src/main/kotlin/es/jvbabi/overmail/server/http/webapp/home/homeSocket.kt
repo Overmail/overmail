@@ -9,7 +9,6 @@ import es.jvbabi.overmail.server.database.models.emailIsNotArchived
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
@@ -40,6 +39,7 @@ import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.datetime.Date
 import org.jetbrains.exposed.v1.datetime.Year
 import org.jetbrains.exposed.v1.jdbc.select
+import org.koin.ktor.ext.get
 
 /**
  * One import cycle inserts mail after mail and announces each one, so what is on screen is read
@@ -74,8 +74,8 @@ private val json = Json { ignoreUnknownKeys = true }
 fun Route.homeSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val mailNotifier = application.dependencies.resolve<MailNotifier>()
+            val database = application.get<OvermailDatabase>()
+            val mailNotifier = application.get<MailNotifier>()
             val user = call.requireAuthenticatedUser()
 
             // Two coroutines write here: the loop below, when a year is asked for, and the

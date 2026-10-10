@@ -13,7 +13,6 @@ import es.jvbabi.overmail.server.database.models.emailIsNotArchived
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
@@ -39,6 +38,7 @@ import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
+import org.koin.ktor.ext.get
 
 private const val STACK_SIZE = 10
 
@@ -66,9 +66,9 @@ private val json = Json {
 fun Route.stackSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val classificationQueue = application.dependencies.resolve<EmailClassificationQueue>()
-            val mailNotifier = application.dependencies.resolve<MailNotifier>()
+            val database = application.get<OvermailDatabase>()
+            val classificationQueue = application.get<EmailClassificationQueue>()
+            val mailNotifier = application.get<MailNotifier>()
 
             val user = call.requireAuthenticatedUser()
 

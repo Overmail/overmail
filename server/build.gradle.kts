@@ -60,7 +60,9 @@ dependencies {
     implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.routing.openapi)
     implementation(libs.ktor.server.swagger)
-    implementation(libs.ktor.server.di)
+    // The object graph, see AppModule.kt. Its log goes through slf4j like everything else.
+    implementation(libs.koin.ktor)
+    implementation(libs.koin.logger.slf4j)
     // One error shape for the whole api, see http/api/ApiErrorHandling.kt.
     implementation(libs.ktor.server.status.pages)
     // Marks every response as ours, see http/api/BackendHeaders.kt.

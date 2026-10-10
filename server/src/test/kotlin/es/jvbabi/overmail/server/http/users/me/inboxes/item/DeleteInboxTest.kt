@@ -31,7 +31,6 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -52,6 +51,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 class DeleteInboxTest {
 
@@ -199,25 +200,27 @@ class DeleteInboxTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<ImporterManager> {
-                    ImporterManager(
-                        database = database,
-                        coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                        emailClassificationQueue = EmailClassificationQueue(
-                            emailClassification = EmailClassification(
-                                config = testConfig,
-                                model = testModel,
-                                overmailDatabase = database,
-                                mailNotifier = MailNotifier(),
-                                knowledgeStore = KnowledgeStore(database),
-                            ),
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<ImporterManager> {
+                        ImporterManager(
                             database = database,
-                        ),
-                        mailNotifier = MailNotifier(),
-                    )
-                }
+                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
+                            emailClassificationQueue = EmailClassificationQueue(
+                                emailClassification = EmailClassification(
+                                    config = testConfig,
+                                    model = testModel,
+                                    overmailDatabase = database,
+                                    mailNotifier = MailNotifier(),
+                                    knowledgeStore = KnowledgeStore(database),
+                                ),
+                                database = database,
+                            ),
+                            mailNotifier = MailNotifier(),
+                        )
+                    }
+                })
             }
             routing {
                 route("/api/users/me/inboxes/{inboxId}") { deleteInbox() }

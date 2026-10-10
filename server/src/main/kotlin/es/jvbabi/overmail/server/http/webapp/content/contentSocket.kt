@@ -7,7 +7,6 @@ import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
 import io.ktor.server.websocket.sendSerialized
@@ -25,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.koin.ktor.ext.get
 
 /**
  * How long a change waits for the ones behind it. A classification run touches a mail several
@@ -63,9 +63,9 @@ private val json = Json { ignoreUnknownKeys = true }
 fun Route.contentSocket() {
     authenticate {
         clientWebSocket {
-            val database = application.dependencies.resolve<OvermailDatabase>()
-            val mailNotifier = application.dependencies.resolve<MailNotifier>()
-            val avatarQueue = application.dependencies.resolve<AvatarQueue>()
+            val database = application.get<OvermailDatabase>()
+            val mailNotifier = application.get<MailNotifier>()
+            val avatarQueue = application.get<AvatarQueue>()
             val user = call.requireAuthenticatedUser()
 
             val lock = Mutex()

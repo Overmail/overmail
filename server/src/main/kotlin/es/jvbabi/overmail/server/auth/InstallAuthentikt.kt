@@ -20,7 +20,6 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.userAgent
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
@@ -34,6 +33,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.time.Duration.Companion.days
+import org.koin.ktor.ext.get
+import org.koin.ktor.ext.inject
 
 /** Mounted below the `/api` prefix Caddy forwards, so the flow routes end up under `/api/auth`. */
 const val AUTH_API_PREFIX = "/api/auth"
@@ -51,14 +52,14 @@ private val FLOW_USER_AGENT = AttributeKey<String>("overmail.flow-user-agent")
 fun Application.installOvermailAuthentikt() {
     // Resolved eagerly because none of these touch the database; the database itself is pulled
     // inside the suspending callback instead, so starting up does not block on schema creation.
-    val config: ApplicationConfig by dependencies
-    val jwtService: JwtService by dependencies
-    val smtpConfig: SmtpConfig by dependencies
+    val config: ApplicationConfig by inject()
+    val jwtService: JwtService by inject()
+    val smtpConfig: SmtpConfig by inject()
 
     val identifierPlugin = EmailUserSelectionPlugin<User> {
         findUserByEmail { identifier ->
             // Sign-in accepts either the username or the email, so both are matched.
-            dependencies.resolve<OvermailDatabase>()
+            get<OvermailDatabase>()
                 .query { User.find { (Users.username eq identifier) or (Users.email eq identifier) }.firstOrNull() }
                 ?.let(::OvermailAuthentiktUser)
         }
@@ -68,7 +69,7 @@ fun Application.installOvermailAuthentikt() {
     val passwordPlugin = PasswordPlugin<User> {
         checkPassword { user, password ->
             // Read fresh rather than off the entity the flow holds, which is as old as the flow.
-            val hash = dependencies.resolve<OvermailDatabase>()
+            val hash = get<OvermailDatabase>()
                 .query { Users.select(Users.password).where { Users.id eq user.id }.firstOrNull()?.get(Users.password) }
                 ?: return@checkPassword false
             verifyPassword(password, hash)
@@ -80,7 +81,7 @@ fun Application.installOvermailAuthentikt() {
     val totpPlugin = TotpPlugin<User> {
         validate { user, code ->
             // Read fresh, like the password: a second factor removed mid-flow must not be asked for.
-            val secret = dependencies.resolve<OvermailDatabase>()
+            val secret = get<OvermailDatabase>()
                 .query { Users.select(Users.totpSecret).where { Users.id eq user.id }.firstOrNull()?.get(Users.totpSecret) }
                 ?: return@validate false
             verifyTotp(secret, code)
@@ -91,7 +92,7 @@ fun Application.installOvermailAuthentikt() {
         onSuccess { session, user ->
             // The done step does not see the request, so the browser is the one that started the flow.
             val token = jwtService.issueSession(
-                database = dependencies.resolve<OvermailDatabase>(),
+                database = get<OvermailDatabase>(),
                 userId = user.id.value,
                 client = webClientOf(session.attributes[FLOW_USER_AGENT]),
             )

@@ -26,7 +26,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -43,6 +42,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The labels a reader hangs on a mail, and the ones they make while doing it. */
 class EmailLabelsTest {
@@ -274,9 +275,11 @@ class EmailLabelsTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { MailNotifier() }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { MailNotifier() }
+                })
             }
             routing {
                 route("/api/emails/{emailId}/labels/{labelId}") {

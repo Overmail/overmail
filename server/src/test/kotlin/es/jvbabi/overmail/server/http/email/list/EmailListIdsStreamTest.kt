@@ -19,7 +19,6 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
@@ -44,6 +43,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** The ids of a listing as a stream: what a client with a cache of its own follows. */
 class EmailListIdsStreamTest {
@@ -237,9 +238,11 @@ class EmailListIdsStreamTest {
         install(SSE)
         installApiErrorHandling()
         install(Authentication) { alwaysSignedIn() }
-        dependencies {
-            provide<OvermailDatabase> { database }
-            provide<MailNotifier> { mailNotifier }
+        install(Koin) {
+            modules(module {
+                single<OvermailDatabase> { database }
+                single<MailNotifier> { mailNotifier }
+            })
         }
         routing {
             route("/api/emails/list/ids/stream") { emailListIdsStream(keepAlive = 100.milliseconds) }

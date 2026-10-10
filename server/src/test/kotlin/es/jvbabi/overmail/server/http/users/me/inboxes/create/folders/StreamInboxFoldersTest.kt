@@ -19,7 +19,6 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -34,6 +33,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 private const val ROUTE = "/api/users/me/inboxes/create/folders/stream"
 
@@ -147,7 +148,7 @@ class StreamInboxFoldersTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route(ROUTE) { streamInboxFolders() }
             }

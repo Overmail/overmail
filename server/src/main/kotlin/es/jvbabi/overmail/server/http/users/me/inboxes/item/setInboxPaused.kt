@@ -8,7 +8,6 @@ import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
@@ -20,6 +19,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.update
+import org.koin.ktor.ext.get
 
 /**
  * Pauses or resumes a mailbox: `POST /api/users/me/inboxes/{inboxId}/pause` and `.../resume`.
@@ -48,7 +48,7 @@ fun Route.setInboxPaused(paused: Boolean) {
         post {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.dependencies.resolve<ImporterManager>()
+            val importerManager = call.application.get<ImporterManager>()
 
             val rawId = call.parameters["inboxId"]
             val inboxId = rawId?.let { runCatching { Uuid.parse(it) }.getOrNull() }

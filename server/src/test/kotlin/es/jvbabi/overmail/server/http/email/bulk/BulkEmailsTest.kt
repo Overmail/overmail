@@ -23,7 +23,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -40,6 +39,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /** What a picked selection is written through: one request for a stretch of the mailbox. */
 class BulkEmailsTest {
@@ -217,9 +218,11 @@ class BulkEmailsTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { MailNotifier() }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { MailNotifier() }
+                })
             }
             routing {
                 route("/api/emails/bulk") {

@@ -10,7 +10,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -22,6 +21,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.ktor.ext.get
 
 /**
  * Disconnects a mailbox: `DELETE /api/users/me/inboxes/{inboxId}`.
@@ -51,7 +51,7 @@ fun Route.deleteInbox() {
         delete {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.dependencies.resolve<ImporterManager>()
+            val importerManager = call.application.get<ImporterManager>()
 
             val rawId = call.parameters["inboxId"]
             val inboxId = rawId?.let { runCatching { Uuid.parse(it) }.getOrNull() }

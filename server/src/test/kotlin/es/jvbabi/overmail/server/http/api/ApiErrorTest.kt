@@ -22,7 +22,6 @@ import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
@@ -37,6 +36,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 /**
  * What a failing request looks like. One shape for all of them, so a client parses the answer it
@@ -159,9 +160,11 @@ class ApiErrorTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { alwaysSignedIn() }
-            dependencies {
-                provide<OvermailDatabase> { database }
-                provide<MailNotifier> { MailNotifier() }
+            install(Koin) {
+                modules(module {
+                    single<OvermailDatabase> { database }
+                    single<MailNotifier> { MailNotifier() }
+                })
             }
             routing {
                 route("/api/emails/{emailId}/read") { setEmailRead(isRead = true) }

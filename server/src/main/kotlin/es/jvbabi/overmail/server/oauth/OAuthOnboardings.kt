@@ -19,13 +19,15 @@ import org.jetbrains.exposed.v1.core.eq
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.server.application.Application
 import kotlinx.coroutines.launch
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.routing.Route
 import io.ktor.util.AttributeKey
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
+import org.koin.ktor.ext.get
+import org.koin.ktor.ext.getKoin
+import org.koin.ktor.ext.inject
 
 /**
  * Mounted below the `/api` prefix Caddy forwards. The callback of each provider ends up at
@@ -115,15 +117,15 @@ class OAuthOnboardings internal constructor(
  * makes it available as [OAuthOnboardings].
  */
 fun Application.installOAuthOnboardings() {
-    val providers: OAuthProviders by dependencies
-    val tokens: OAuthTokens by dependencies
-    val database: OvermailDatabase by dependencies
+    val providers: OAuthProviders by inject()
+    val tokens: OAuthTokens by inject()
+    val database: OvermailDatabase by inject()
 
     val signIns = providers.clients.associate { client -> client.provider to signInStep(client) }
     val folders = FoldersStep(store = { session, mailbox ->
         val reauthenticated = tokens.storeOnboarding(session.sessionId, session.attributes[OWNER]!!, mailbox)
         // Its importer was stopped while the grant was locked; it can log in again now.
-        if (reauthenticated != null) launch { dependencies.resolve<ImporterManager>().reboot(reauthenticated) }
+        if (reauthenticated != null) launch { get<ImporterManager>().reboot(reauthenticated) }
     })
 
     val instance = installAuthentikt {
@@ -146,9 +148,8 @@ fun Application.installOAuthOnboardings() {
         }
     }
 
-    dependencies {
-        provide<OAuthOnboardings> { OAuthOnboardings(instance, database) }
-    }
+    // Declared here rather than in the module: it wraps the authentikt instance installed above.
+    getKoin().declare(OAuthOnboardings(instance, database))
 }
 
 private fun signInStep(client: OAuthClient) = OIDCPlugin<OAuthMailbox> {

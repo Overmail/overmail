@@ -19,7 +19,6 @@ import io.ktor.server.auth.AuthenticationContext
 import io.ktor.server.auth.AuthenticationFailedCause
 import io.ktor.server.auth.AuthenticationProvider
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -36,6 +35,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteAll
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.koin.dsl.module
+import org.koin.ktor.plugin.Koin
 
 private const val ROUTE = "/api/users/me/knowledge"
 
@@ -176,7 +177,7 @@ class CreateKnowledgeEntryTest {
             install(ContentNegotiation) { json() }
             installApiErrorHandling()
             install(Authentication) { session() }
-            dependencies { provide<OvermailDatabase> { database } }
+            install(Koin) { modules(module { single<OvermailDatabase> { database } }) }
             routing {
                 route(ROUTE) { createKnowledgeEntry() }
             }

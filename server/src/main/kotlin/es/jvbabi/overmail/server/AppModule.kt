@@ -15,6 +15,12 @@ import es.jvbabi.overmail.server.auth.installOvermailAuthentikt
 import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
 import es.jvbabi.overmail.server.config.ApplicationConfig
+import org.slf4j.LoggerFactory
+import es.jvbabi.overmail.server.config.FirebaseServiceAccount
+import es.jvbabi.overmail.server.jobs.push.FcmPushSender
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import es.jvbabi.overmail.server.config.SmtpConfig
 import es.jvbabi.overmail.server.data.avatar.AvatarLookup
 import es.jvbabi.overmail.server.data.knowledge.KnowledgeStore
@@ -42,6 +48,7 @@ import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
 import es.jvbabi.overmail.server.jobs.importer.GeneratePreviewStep
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
+import es.jvbabi.overmail.server.jobs.importer.PushStep
 import es.jvbabi.overmail.server.jobs.importer.NotifyStep
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -200,6 +207,19 @@ internal fun overmailModule(application: CoroutineScope) = module {
 
     single<EmailPreviewQueue> { EmailPreviewQueue(database = get(), emailPreviewGenerator = get()) }
 
+    // Push is optional: without the service account file nothing is sent, and nothing is queued.
+    single<PushSender> {
+        val serviceAccount = FirebaseServiceAccount.load()
+        if (serviceAccount == null) {
+            LoggerFactory.getLogger(PushSender::class.java).info("No firebase-service.json, push is switched off")
+            PushSender.Disabled
+        } else {
+            FcmPushSender(serviceAccount)
+        }
+    }
+    single<PushQueue> { PushQueue(database = get(), sender = get()) }
+    single<PushNotifications> { PushNotifications(queue = get()) }
+
     single<EmailInserter> { EmailInserterImpl(database = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
@@ -211,6 +231,7 @@ internal fun overmailModule(application: CoroutineScope) = module {
                 GeneratePreviewStep(generator = get()),
                 ClassifyStep(enqueue = get<EmailClassificationQueue>()::enqueue),
                 NotifyStep(mailNotifier = get()),
+                PushStep(push = get<PushNotifications>()::newEmail),
             ),
         )
     }
@@ -262,5 +283,9 @@ private fun Application.startJobs() {
 
     launch {
         get<ChatAgentQueue>().consume()
+    }
+
+    launch {
+        get<PushQueue>().consume()
     }
 }

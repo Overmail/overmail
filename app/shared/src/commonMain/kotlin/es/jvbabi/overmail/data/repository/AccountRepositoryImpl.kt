@@ -81,6 +81,18 @@ class AccountRepositoryImpl(
         ))
     }
 
+    override suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit> = safeRequest {
+        val response = httpClient.put(URLBuilder(urlString = account.homeserver).apply {
+            appendPathSegments("api", "users", "me", "sessions", "current", "firebase-token")
+        }.build()) {
+            bearerAuth(account.token)
+            contentType(ContentType.Application.Json)
+            setBody(ApiFirebaseTokenRequest(token = pushToken))
+        }
+
+        if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+    }
+
     override fun getById(id: Uuid): Flow<OvermailAccount?> {
         return database.overmailAccountDao.findById(id).map { item -> item?.toModel() }
     }
@@ -88,6 +100,10 @@ class AccountRepositoryImpl(
 
 @Serializable
 private data class ApiRedeemAuthCodeResponse(@SerialName("jwt") val jwt: String)
+
+/** `PUT /api/users/me/sessions/current/firebase-token`, `http/users/me/sessions/current/setFirebaseToken.kt`. */
+@Serializable
+private data class ApiFirebaseTokenRequest(@SerialName("token") val token: String)
 
 /** `GET /api/users/me`, `http/users/me/getCurrentUser.kt`. Only what the app reads of it. */
 @Serializable

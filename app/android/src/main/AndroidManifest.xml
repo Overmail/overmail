@@ -71,6 +71,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Where Firebase delivers a push and a new registration token, see PushMessagingService. -->
+        <service
+            android:name="es.jvbabi.overmail.data.push.PushMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- The buttons on a notification, see NotificationActionReceiver. -->
+        <receiver
+            android:name="es.jvbabi.overmail.data.push.NotificationActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

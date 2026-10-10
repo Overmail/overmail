@@ -46,6 +46,8 @@ moko-permissions = "0.20.1"
 camerax = "1.6.2"
 mlkit-barcode-scanning = "17.3.0"
 coil = "3.6.3"
+google-services = "4.5.0"
+firebase-messaging = "26.0.0"
 
 [libraries]
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
@@ -152,6 +154,7 @@ app-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", versi
 app-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 app-androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 app-mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode-scanning" }
+app-firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -165,3 +168,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
+google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }

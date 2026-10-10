@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.uuid.Uuid
 
 class OnboardingAuthViewModel(
     private val permissionsController: PermissionsController,
@@ -89,7 +88,9 @@ class OnboardingAuthViewModel(
 
                     val userInfo = userinfoResult.getOrNull()!!
                     val user = OvermailAccount(
-                        id = Uuid.random(),
+                        // Who they are on the homeserver, which is how the server names the account
+                        // -- in a push, for one. Signing in again replaces the account, not adds one.
+                        id = userInfo.id,
                         username = userInfo.username,
                         firstName = userInfo.firstName,
                         lastName = userInfo.lastName,

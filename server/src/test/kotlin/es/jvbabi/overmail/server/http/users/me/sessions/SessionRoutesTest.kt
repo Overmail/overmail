@@ -8,12 +8,17 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseToken
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -23,6 +28,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
@@ -114,6 +120,61 @@ class SessionRoutesTest {
         assertEquals("unknown", session["client"]!!.jsonObject["browser"]!!.jsonPrimitive.content)
     }
 
+    @Test
+    fun `a firebase token is stored on the session it came with, and the last one wins`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, phone)
+        val other = jwtService.issueSession(database, user, phone)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.NoContent, setFirebaseToken(current, "first").status)
+        assertEquals(HttpStatusCode.NoContent, setFirebaseToken(current, "second").status)
+
+        assertEquals(phone.copy(firebaseToken = "second"), clientOf(current))
+        assertEquals(phone, clientOf(other))
+    }
+
+    @Test
+    fun `a firebase token does not show up in the listing`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), phone)
+        installRoutes()
+        setFirebaseToken(current, "secret")
+
+        val client = listSessions(current).single()["client"]!!.jsonObject
+
+        assertEquals("Pixel 8", client["device"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, client["firebase_token"])
+    }
+
+    @Test
+    fun `only a session of the android app takes a firebase token`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), browser)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.Conflict, setFirebaseToken(current, "token").status)
+        assertEquals(browser, clientOf(current))
+    }
+
+    @Test
+    fun `a blank firebase token is refused`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), phone)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.BadRequest, setFirebaseToken(current, " ").status)
+        assertEquals(phone, clientOf(current))
+    }
+
+    private suspend fun ApplicationTestBuilder.setFirebaseToken(token: String, firebaseToken: String) =
+        client.put("/api/users/me/sessions/current/firebase-token") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"token":"$firebaseToken"}""")
+        }
+
+    private suspend fun clientOf(token: String): Session.Client = database.query {
+        Sessions.select(Sessions.client).where { Sessions.token eq token }.single()[Sessions.client]
+    }
+
     private suspend fun ApplicationTestBuilder.listSessions(token: String): List<JsonObject> {
         val response = client.get("/api/users/me/sessions") { bearerAuth(token) }
         assertEquals(HttpStatusCode.OK, response.status)
@@ -150,6 +211,7 @@ class SessionRoutesTest {
             routing {
                 route("/api/users/me/sessions") {
                     getSessions()
+                    route("/current/firebase-token") { setFirebaseToken() }
                     route("/{sessionId}") { revokeSession() }
                 }
             }

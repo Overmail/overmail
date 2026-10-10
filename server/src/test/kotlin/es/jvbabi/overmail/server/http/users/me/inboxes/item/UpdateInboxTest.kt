@@ -25,9 +25,8 @@ import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSyncs
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
-import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
-import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -390,24 +389,8 @@ class UpdateInboxTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<OAuthTokens> { tokens }
-                    single<LegacyImporterManager> {
-                        LegacyImporterManager(
-                            database = database,
-                            emailInserter = EmailInserterImpl(database),
-                            emailPreviewGenerator = EmailPreviewGeneratorImpl(database),
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                    single<ImporterManager> {
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

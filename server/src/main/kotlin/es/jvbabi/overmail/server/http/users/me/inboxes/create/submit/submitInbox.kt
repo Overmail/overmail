@@ -16,7 +16,7 @@ import es.jvbabi.overmail.server.http.api.requireOwnedOAuthOnboardingFromUrl
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.api.requireThat
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.oauth.OAuthTokens
 import io.ktor.server.application.ApplicationCall
 import io.ktor.http.HttpStatusCode
@@ -156,7 +156,7 @@ private suspend fun ApplicationCall.createInbox(
     folderSettings: List<SubmitInboxRequest.FolderSettings>,
 ) {
     val database = database()
-    val importerManager = application.get<LegacyImporterManager>()
+    val importerManager = application.get<ImporterManager>()
 
     if (folderSettings.isEmpty()) invalidRequest("folder_settings", "an inbox needs a folder")
 

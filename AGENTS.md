@@ -15,8 +15,8 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   database/models/     one file per table: the UuidTable object and its UuidEntity
   http/                Ktor engine, config and routes
   http/api/            what every route needs: the current user, url resources, errors
-  jobs/                background work (IMAP import)
-  jobs/importer/legacy/  the current importer, `Legacy*`; kept running until its rebuild replaces it
+  jobs/                background work
+  jobs/importer/       the IMAP import, see [Importer](#importer)
 
 common/                Kotlin Multiplatform code both the server and the app use (smart dates)
 
@@ -193,8 +193,8 @@ internal fun overmailModule(application: CoroutineScope) = module {
 }
 ```
 
-- The container is small on purpose: config, the database, `JwtService`, the importer manager.
-  Everything else is built where it is used.
+- The container is small on purpose: config, the database, `JwtService`, the importer and its
+  parts. Everything else is built where it is used.
 - Every definition is a `single`, built on first use. The database is the exception
   (`createdAtStart`): it creates the schema, and a server that cannot reach it does not come up.
 - The `Application` doubles as the coroutine scope for the importers, so stopping the server
@@ -347,7 +347,7 @@ val mails = call.database().query { Email.find { Emails.imapAccount eq accountId
 - Reads are plain blocking calls inside that block: `Query` is an `Iterable`, so `map`,
   `firstOrNull` and `toList` are the normal collection functions, not flow operators.
 - Nothing observes the database. A read returns the state at that moment; there is no
-  subscription and no reload, so anything that has to stay current polls (see `LegacyImporterManager`).
+  subscription and no reload, so anything that has to stay current polls (see `ImporterManager`).
 
 ## DAO entities
 
@@ -371,7 +371,7 @@ Two things to keep in mind, both of them the price of the DAO:
   readable afterwards -- that is what lets the session principal be a `User` (see
   `auth/SessionAuthentication.kt`). A reference, a `referrersOn` collection, a write or
   `refresh()` goes back to the database and throws outside `query { }`. Anything that outlives a
-  transaction takes a snapshot instead, like `LegacyImapConnection` in the importer.
+  transaction takes a snapshot instead, like `ImapConnection` in the importer.
 - **Loading an entity reads every column**, `Emails.rawContent` included, which is the whole mail
   source. A listing that does not need it selects its columns through the DSL, see
   `http/stack/stackSocket.kt`.
@@ -379,6 +379,39 @@ Two things to keep in mind, both of them the price of the DAO:
 Mixing the DSL into DAO code is fine and sometimes the point: the importer uses
 `insertIgnoreAndGetId` for the address it may be inserting concurrently with another account's
 importer, because `EmailUser.new` would throw on the unique index instead.
+
+## Importer
+
+`jobs/importer/` brings mail from IMAP into the database. Five parts, each with one job and each
+tested on its own:
+
+| Part | Job | Knows nothing about |
+|---|---|---|
+| `ImporterManager` | one importer per account that can have one; `reboot`/`stop` for the routes | IMAP, mails |
+| `MailboxImporter` | *when* a folder is read: the poll timer and, with push, `IDLE` | the database |
+| `FolderSynchronizer` | *which* mails of a folder are new, by UID | what happens to a mail |
+| `EmailImportPipeline` | what happens to one mail: `EmailInserter`, then every `ImportStep` | IMAP |
+| `EmailInserter`, `ImportStep`s | one thing each: store, preview, classify, notify | each other |
+
+- **A pass reads only what is new.** `ImapFolderCursors` holds the last UID dealt with per account
+  and folder; a pass fetches `UID n+1:*`. No cursor, or a changed `UIDVALIDITY`, reads the folder
+  from its start, which is safe to repeat: `EmailInserter` recognises a stored mail (account, send
+  second, subject) before it downloads the body.
+- **The cursor never passes a mail that failed.** A failure stops the pass and the next one starts
+  at that mail; after three passes on the same mail it is left behind, so one mail cannot hold up
+  its folder for good. A mail that can never be stored (no `From`, no `Date`) is `Rejected` and
+  skipped at once.
+- **A mail is imported whole or not at all.** The pipeline runs under `NonCancellable`; stopping an
+  importer takes hold between two mails. A step failing after the insert is logged and costs the
+  other steps nothing -- the mail would never come through again.
+- **One writer per account.** The folders of an account take turns on one collector, and the
+  manager awaits the old importer before it starts a new one. The dedup key has no unique index,
+  so this is what keeps a mail from being stored twice.
+- **A new follow-up is a new `ImportStep`** in the list in `AppModule.kt`; the order there is the
+  order they run in.
+- **Tests fake the mailbox, not the database.** `MailClient`/`MailFolder` are kamel's interfaces
+  and `ImporterFixtures.kt` has in-memory ones; mails are built with `KamelEmail.parse(raw, uid,
+  flags)`. Timing is tested on virtual time (`runTest`), everything that stores on H2.
 
 ## Conventions
 ### General

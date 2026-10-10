@@ -21,7 +21,7 @@ object ImapAccounts : UuidTable("imap_accounts") {
      * Whether the importer for this account is meant to be off.
      *
      * Paused rather than deleted is the whole point of it: nothing imported so far is touched, the
-     * connection just stops being polled and watched. See `LegacyImporterManager`.
+     * connection just stops being polled and watched. See `ImporterManager`.
      */
     val isPaused = bool("is_paused").default(false)
 }

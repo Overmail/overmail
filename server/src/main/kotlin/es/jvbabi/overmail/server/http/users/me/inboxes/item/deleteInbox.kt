@@ -5,7 +5,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.http.HttpStatusCode
 import io.ktor.openapi.JsonSchema
 import io.ktor.server.application.application
@@ -51,7 +51,7 @@ fun Route.deleteInbox() {
         delete {
             val userId = call.requireAuthenticatedUserId()
             val database = call.database()
-            val importerManager = call.application.get<LegacyImporterManager>()
+            val importerManager = call.application.get<ImporterManager>()
 
             val rawId = call.parameters["inboxId"]
             val inboxId = rawId?.let { runCatching { Uuid.parse(it) }.getOrNull() }

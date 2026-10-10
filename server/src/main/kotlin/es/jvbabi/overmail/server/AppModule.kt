@@ -30,12 +30,20 @@ import es.jvbabi.overmail.server.http.api.installBackendHeaders
 import es.jvbabi.overmail.server.http.configureRouting
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
+import es.jvbabi.overmail.server.jobs.importer.ClassifyStep
+import es.jvbabi.overmail.server.jobs.importer.EmailImportPipeline
+import es.jvbabi.overmail.server.jobs.importer.EmailImportPipelineImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
+import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizer
+import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
+import es.jvbabi.overmail.server.jobs.importer.GeneratePreviewStep
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
+import es.jvbabi.overmail.server.jobs.importer.NotifyStep
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -195,15 +203,25 @@ internal fun overmailModule(application: CoroutineScope) = module {
     single<EmailInserter> { EmailInserterImpl(database = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
-    single<LegacyImporterManager> {
-        LegacyImporterManager(
-            database = get(),
-            coroutineScope = application,
-            emailInserter = get(),
-            emailPreviewGenerator = get(),
-            emailClassificationQueue = get(),
-            mailNotifier = get(),
+    // What happens to one mail: stored, then everything that follows from that, in this order.
+    single<EmailImportPipeline> {
+        EmailImportPipelineImpl(
+            inserter = get(),
+            steps = listOf(
+                GeneratePreviewStep(generator = get()),
+                ClassifyStep(enqueue = get<EmailClassificationQueue>()::enqueue),
+                NotifyStep(mailNotifier = get()),
+            ),
         )
+    }
+
+    single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), pipeline = get()) }
+
+    single<ImporterManager> {
+        val synchronizer = get<FolderSynchronizer>()
+        ImporterManager(database = get(), coroutineScope = application) { connection ->
+            MailboxImporter(connection, synchronizer).run()
+        }
     }
 }
 
@@ -213,12 +231,12 @@ private fun Application.startJobs() {
     }
 
     launch {
-        val importers = get<LegacyImporterManager>()
+        val importers = get<ImporterManager>()
         get<OAuthTokens>().run(onRenewed = importers::reboot)
     }
 
     launch {
-        get<LegacyImporterManager>().start()
+        get<ImporterManager>().run()
     }
 
     launch {

@@ -15,9 +15,8 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
-import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
-import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import kotlinx.coroutines.awaitCancellation
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -179,24 +178,8 @@ class SetInboxPausedTest {
             install(Koin) {
                 modules(module {
                     single<OvermailDatabase> { database }
-                    single<LegacyImporterManager> {
-                        LegacyImporterManager(
-                            database = database,
-                            emailInserter = EmailInserterImpl(database),
-                            emailPreviewGenerator = EmailPreviewGeneratorImpl(database),
-                            coroutineScope = CoroutineScope(Job()).also { it.cancel() },
-                            emailClassificationQueue = EmailClassificationQueue(
-                                emailClassification = EmailClassification(
-                                    config = testConfig,
-                                    model = testModel,
-                                    overmailDatabase = database,
-                                    mailNotifier = MailNotifier(),
-                                    knowledgeStore = KnowledgeStore(database),
-                                ),
-                                database = database,
-                            ),
-                            mailNotifier = MailNotifier(),
-                        )
+                    single<ImporterManager> {
+                        ImporterManager(database, CoroutineScope(Job()).also { it.cancel() }) { awaitCancellation() }
                     }
                 })
             }

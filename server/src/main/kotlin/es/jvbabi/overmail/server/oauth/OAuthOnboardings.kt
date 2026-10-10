@@ -16,7 +16,7 @@ import es.jvbabi.overmail.server.database.models.OAuthGrants
 import io.ktor.http.URLBuilder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import es.jvbabi.overmail.server.jobs.importer.legacy.LegacyImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import io.ktor.server.application.Application
 import kotlinx.coroutines.launch
 import io.ktor.server.routing.Route
@@ -125,7 +125,7 @@ fun Application.installOAuthOnboardings() {
     val folders = FoldersStep(store = { session, mailbox ->
         val reauthenticated = tokens.storeOnboarding(session.sessionId, session.attributes[OWNER]!!, mailbox)
         // Its importer was stopped while the grant was locked; it can log in again now.
-        if (reauthenticated != null) launch { get<LegacyImporterManager>().reboot(reauthenticated) }
+        if (reauthenticated != null) launch { get<ImporterManager>().reboot(reauthenticated) }
     })
 
     val instance = installAuthentikt {

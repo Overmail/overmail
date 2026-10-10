@@ -211,9 +211,10 @@ fun App() {
                             is AppIntent.OpenEmail -> {
                                 setCurrentAccount(intent.accountId)
                                 val screen = Screen.Email(intent.emailId)
-                                // Tapped twice, or the page is open already: one page per mail.
-                                backstack.remove(screen)
-                                backstack.add(screen)
+                                if (backstack.lastOrNull() != screen) {
+                                    backstack.removeAll { it is Screen.Email }
+                                    backstack.add(screen)
+                                }
                             }
                         }
                     }

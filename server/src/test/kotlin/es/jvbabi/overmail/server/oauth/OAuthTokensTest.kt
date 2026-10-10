@@ -149,14 +149,15 @@ class OAuthTokensTest {
     }
 
     @Test
-    fun `a token about to run out is renewed before it is handed out`() = runBlocking {
+    fun `handing out a token renews nothing, only the job does`() = runBlocking {
         val grantId = grant(lifetime = 1.hours)
 
-        now += 10.minutes
+        // About to run out, and still handed out as it is.
+        now += 59.minutes
         assertEquals("access-0", tokens.accessToken(grantId))
         assertTrue(tokenRequests.isEmpty())
 
-        now += 49.minutes
+        tokens.renewDue()
         assertEquals("access-1", tokens.accessToken(grantId))
         assertEquals(1, tokenRequests.size)
     }
@@ -166,15 +167,14 @@ class OAuthTokensTest {
         val grantId = grant(lifetime = 1.hours)
         down = true
 
-        // About to run out, so the connection asking for it tries to renew it.
         now += 59.minutes
+        tokens.renewDue()
         assertEquals("access-0", tokens.accessToken(grantId))
         assertEquals(1, tokenRequests.size)
         assertNotNull(database.query { OAuthGrant[grantId].renewalFailedAt })
 
-        // Neither the next connection nor the job asks again within the backoff.
+        // The job does not ask again within the backoff.
         now += 1.minutes
-        assertEquals("access-0", tokens.accessToken(grantId))
         tokens.renewDue()
         assertEquals(1, tokenRequests.size)
 
@@ -186,6 +186,29 @@ class OAuthTokensTest {
         tokens.renewDue()
         assertEquals(2, tokenRequests.size)
         assertNull(database.query { OAuthGrant[grantId].renewalFailedAt })
+    }
+
+    @Test
+    fun `a renewed inbox is reported, an onboarding and a failed renewal are not`() = runBlocking {
+        val inboxGrant = grant(lifetime = 1.hours, withInbox = true)
+        grant(lifetime = 1.hours)
+        val inboxId = database.query { OAuthGrant[inboxGrant].readValues[OAuthGrants.imapAccount]!!.value }
+        val renewed = mutableListOf<Uuid>()
+
+        // Not due yet: nothing is renewed, so nothing is restarted.
+        tokens.renewDue { renewed += it }
+        assertTrue(renewed.isEmpty())
+
+        now += 31.minutes
+        tokens.renewDue { renewed += it }
+        assertEquals(2, tokenRequests.size)
+        // What the importer is restarted for; the onboarding has none.
+        assertEquals(listOf(inboxId), renewed)
+
+        down = true
+        now += 31.minutes
+        tokens.renewDue { renewed += it }
+        assertEquals(listOf(inboxId), renewed)
     }
 
     @Test

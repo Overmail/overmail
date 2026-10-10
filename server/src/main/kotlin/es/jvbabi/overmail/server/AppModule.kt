@@ -175,7 +175,6 @@ private fun Application.configureDependencies() {
                 coroutineScope = this@configureDependencies,
                 emailClassificationQueue = resolve(),
                 mailNotifier = resolve(),
-                oauthTokens = resolve(),
             )
         }
     }
@@ -187,7 +186,8 @@ private fun Application.startJobs() {
     }
 
     launch {
-        dependencies.resolve<OAuthTokens>().run()
+        val importers = dependencies.resolve<ImporterManager>()
+        dependencies.resolve<OAuthTokens>().run(onRenewed = importers::reboot)
     }
 
     launch {

@@ -1,10 +1,13 @@
 package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.core.ImapClient
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+
+private val ACCOUNT_ID = kotlin.uuid.Uuid.random()
 
 /** When the folder was added; "only new messages" is measured against exactly this. */
 private val ADDED_AT = Instant.parse("2026-06-01T12:00:00Z")
@@ -12,7 +15,7 @@ private val ADDED_AT = Instant.parse("2026-06-01T12:00:00Z")
 private fun sync(scope: ImapAccountFolderSync.AiImportSettings) = ImapConnection.FolderSync(
     folder = "INBOX",
     imapPush = false,
-    aiImport = scope,
+    aiImportSettings = scope,
     createdAt = ADDED_AT,
 )
 
@@ -58,8 +61,7 @@ class FolderSyncAssistantScopeTest {
             userId = kotlin.uuid.Uuid.random(),
             host = "imap.example.com",
             port = 993,
-            username = "julius",
-            password = "secret",
+            authentication = ImapClient.Auth.BasicAuth("julius", "secret"),
             folders = listOf(sync(ImapAccountFolderSync.AiImportSettings.OnlyNewMessages)),
         )
         val withOtherScope = connection.copy(
@@ -70,5 +72,36 @@ class FolderSyncAssistantScopeTest {
         assertTrue(connection.signature != withOtherScope.signature)
         assertTrue(connection.signature != withPush.signature)
         assertTrue(connection.signature == connection.copy().signature)
+    }
+
+    @Test
+    fun `a renewed access token is not what the sweep restarts the importer for`() {
+        // The job that renews the token restarts the importer itself; a sweep that did so too
+        // would restart it a second time.
+        fun connection(bearer: String) = ImapConnection(
+            id = ACCOUNT_ID,
+            userId = ACCOUNT_ID,
+            host = "imap.example.com",
+            port = 993,
+            authentication = ImapClient.Auth.BearerAuth("julius", bearer),
+            folders = listOf(sync(ImapAccountFolderSync.AiImportSettings.OnlyNewMessages)),
+        )
+
+        assertTrue(connection("old").signature == connection("new").signature)
+    }
+
+    @Test
+    fun `a changed password restarts the importer`() {
+        fun connection(password: String) = ImapConnection(
+            id = ACCOUNT_ID,
+            userId = ACCOUNT_ID,
+            host = "imap.example.com",
+            port = 993,
+            authentication = ImapClient.Auth.BasicAuth("julius", password),
+            folders = listOf(sync(ImapAccountFolderSync.AiImportSettings.OnlyNewMessages)),
+        )
+
+        assertTrue(connection("old").signature == connection("old").signature)
+        assertTrue(connection("old").signature != connection("new").signature)
     }
 }

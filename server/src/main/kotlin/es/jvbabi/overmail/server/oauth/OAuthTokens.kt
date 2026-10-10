@@ -14,8 +14,6 @@ import io.ktor.http.parameters
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,7 +23,6 @@ import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -46,9 +43,6 @@ private val RENEWAL_INTERVAL = 1.minutes
 /** How long a grant whose renewal failed is left alone before it is tried again. */
 private val RENEWAL_RETRY_AFTER = 15.minutes
 
-/** Below this an access token is renewed before it is handed out, rather than left to the job. */
-private val HAND_OUT_MARGIN = 2.minutes
-
 /** How long a sign-in waits for the dialog to be submitted before its grant is dropped. */
 val ONBOARDING_LIFETIME = 1.days
 
@@ -66,9 +60,6 @@ class OAuthTokens(
     private val clock: Clock = Clock.System,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-
-    /** One renewal per grant at a time: the importer and the job may both find it due. */
-    private val renewals = ConcurrentHashMap<Uuid, Mutex>()
 
     /**
      * Writes what the sign-in [onboardingId] of [userId] came back with.
@@ -118,27 +109,26 @@ class OAuthTokens(
     }
 
     /**
-     * An access token of [grantId] that is good for a while yet, renewed first where it is about
-     * to run out. Null for a grant that is gone. A grant that cannot be renewed hands out the
-     * token it has; the provider's refusal of it is what imap then reports.
+     * The access token [grantId] has right now. Null for a grant that is gone.
      *
-     * A locked grant, or one whose renewal failed a moment ago, is not tried again here: every
-     * connection asks, and the provider would get the same doomed request from each of them.
+     * Nothing is renewed here: [run] is the only place that does, well before a token runs out. A
+     * grant it could not renew hands out the token it has; the provider's refusal of it is what
+     * imap then reports.
      */
-    suspend fun accessToken(grantId: Uuid): String? {
-        val grant = database.query { OAuthGrant.findById(grantId)?.snapshot() } ?: return null
-        val now = clock.now()
-        if (grant.expiresAt - now > HAND_OUT_MARGIN) return grant.accessToken
-        if (grant.requiresReauthentication || grant.failedRecently(now)) return grant.accessToken
-        return renew(grantId) ?: grant.accessToken
-    }
+    suspend fun accessToken(grantId: Uuid): String? =
+        database.query { OAuthGrant.findById(grantId)?.accessToken }
 
-    /** Renews every grant that is due, and drops the onboardings nobody finished. Runs until cancelled. */
-    suspend fun run() {
+    /**
+     * Renews every grant that is due, and drops the onboardings nobody finished. Runs until cancelled.
+     *
+     * [onRenewed] is told the inbox of every grant that got a new access token. An importer holds
+     * the token it was started with, so this is where it is restarted onto the new one.
+     */
+    suspend fun run(onRenewed: suspend (imapAccountId: Uuid) -> Unit = {}) {
         while (true) {
             currentCoroutineContext().ensureActive()
             try {
-                renewDue()
+                renewDue(onRenewed)
                 dropAbandonedOnboardings()
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
@@ -148,14 +138,24 @@ class OAuthTokens(
         }
     }
 
-    internal suspend fun renewDue() {
+    internal suspend fun renewDue(onRenewed: suspend (imapAccountId: Uuid) -> Unit = {}) {
         val now = clock.now()
         val due = database.query {
             OAuthGrant.find {
                 OAuthGrants.refreshToken.isNotNull() and (OAuthGrants.requiresReauthentication eq false)
             }.map { it.snapshot() }
         }.filter { grant -> !grant.failedRecently(now) && now >= grant.renewalDueAt }
-        due.forEach { renew(it.id) }
+        due.forEach { grant ->
+            renew(grant) ?: return@forEach
+            val imapAccountId = grant.imapAccountId ?: return@forEach
+            try {
+                onRenewed(imapAccountId)
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                // The token is renewed either way; the other grants must not wait for this inbox.
+                logger.error(e) { "Restarting the importer of ${grant.address} after its renewal failed" }
+            }
+        }
     }
 
     internal suspend fun dropAbandonedOnboardings() {
@@ -166,19 +166,13 @@ class OAuthTokens(
     }
 
     /** Trades the refresh token of [grantId] for a new access token. Null when that did not work. */
-    private suspend fun renew(grantId: Uuid): String? = renewals.computeIfAbsent(grantId) { Mutex() }.withLock {
-        val grant = database.query { OAuthGrant.findById(grantId)?.snapshot() } ?: return@withLock null
-        if (grant.requiresReauthentication) return@withLock null
-        // Somebody else renewed it while this one waited for the lock.
-        if (clock.now() < grant.renewalDueAt) {
-            return@withLock grant.accessToken
-        }
-
-        val refreshToken = grant.refreshToken ?: return@withLock null
+    private suspend fun renew(grant: GrantSnapshot): String? {
+        val grantId = grant.id
+        val refreshToken = grant.refreshToken ?: return null
         val client = providers.byId(grant.provider)
         if (client == null) {
             logger.warn { "Cannot renew oauth grant $grantId: no client for provider '${grant.provider}'" }
-            return@withLock null
+            return null
         }
 
         val requestedAt = clock.now()
@@ -198,7 +192,7 @@ class OAuthTokens(
                     if (refused) requiresReauthentication = true
                 }
             }
-            return@withLock null
+            return null
         }
 
         database.query {
@@ -211,7 +205,7 @@ class OAuthTokens(
             row.renewalFailedAt = null
         }
         logger.debug { "Renewed the oauth grant $grantId of ${grant.address}" }
-        tokens.accessToken
+        return tokens.accessToken
     }
 
     private suspend fun requestTokens(client: OAuthClient, refreshToken: String): RefreshResponse {
@@ -237,6 +231,7 @@ class OAuthTokens(
 
     private fun OAuthGrant.snapshot() = GrantSnapshot(
         id = id.value,
+        imapAccountId = readValues[OAuthGrants.imapAccount]?.value,
         provider = provider,
         address = address,
         accessToken = accessToken,
@@ -249,6 +244,8 @@ class OAuthTokens(
 
     private data class GrantSnapshot(
         val id: Uuid,
+        /** The inbox that logs in with the grant; null while it is still an onboarding. */
+        val imapAccountId: Uuid?,
         val provider: String,
         val address: String,
         val accessToken: String,

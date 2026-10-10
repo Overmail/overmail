@@ -1,0 +1,10 @@
+{
+  "title": "Notifications for new mail",
+  "description": "Overmail now tells you when a mail arrives: with its sender, subject and how it begins, grouped by mailbox. Tap it to open the mail, or archive it right from the notification. Each mailbox has its own notification channel, so you can silence one without the others.",
+  "localized": {
+    "de": {
+      "title": "Benachrichtigungen für neue Mails",
+      "description": "Overmail meldet sich jetzt, wenn eine Mail ankommt: mit Absender, Betreff und Textanfang, gruppiert nach Postfach. Ein Tipp öffnet die Mail, archivieren geht direkt aus der Benachrichtigung. Jedes Postfach hat seinen eigenen Benachrichtigungskanal, sodass du eines stummschalten kannst, ohne die anderen zu verlieren."
+    }
+  }
+}

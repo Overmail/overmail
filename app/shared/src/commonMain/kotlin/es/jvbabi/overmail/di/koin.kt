@@ -19,6 +19,7 @@ import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
+import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.FileRepository
@@ -158,6 +159,9 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         single { EmailPictures(renderer = get(), cache = EmailPictureCache(emailPictureCacheDirectory())) }
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
         single<FileRepository> { FileRepositoryImpl() }
+
+        // What the platform was opened with, until the ui acts on it.
+        single { AppIntents() }
 
         singleOf(::GetCurrentAccountUseCase)
         singleOf(::SetCurrentAccountUseCase)

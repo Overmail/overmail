@@ -57,6 +57,9 @@ import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.utils.SyncHumanReadableLocale
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
+import es.jvbabi.overmail.domain.intent.AppIntent
+import es.jvbabi.overmail.domain.intent.AppIntents
+import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import org.koin.compose.viewmodel.koinViewModel
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -218,6 +221,26 @@ fun App() {
         if (hasAccounts != null) {
             LaunchedEffect(hasAccounts) {
                 if (hasAccounts == false) backstack.add(Screen.Onboarding)
+            }
+
+            // What the app was opened for from outside, a tapped notification for one. Only once
+            // somebody is signed in: before that there is nothing an intent could lead to.
+            if (hasAccounts == true) {
+                val appIntents = koinInject<AppIntents>()
+                val setCurrentAccount = koinInject<SetCurrentAccountUseCase>()
+                LaunchedEffect(Unit) {
+                    appIntents.pending.collect { intent ->
+                        when (intent) {
+                            is AppIntent.OpenEmail -> {
+                                setCurrentAccount(intent.accountId)
+                                val screen = Screen.Email(intent.emailId)
+                                // Tapped twice, or the page is open already: one page per mail.
+                                backstack.remove(screen)
+                                backstack.add(screen)
+                            }
+                        }
+                    }
+                }
             }
 
             val localDensity = LocalDensity.current

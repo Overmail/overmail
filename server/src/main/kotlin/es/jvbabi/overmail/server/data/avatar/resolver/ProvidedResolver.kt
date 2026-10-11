@@ -110,6 +110,8 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "firefox.com" to "https://svgl.app/library/firefox.svg",
             "mcdonalds.com" to "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
             "*.mcdonalds.com" to "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
+            "account.pinterest.com" to "https://svgl.app/library/pinterest.svg",
+            "pinterest.com" to "https://svgl.app/library/pinterest.svg",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

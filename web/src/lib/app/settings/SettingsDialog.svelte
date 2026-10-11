@@ -4,7 +4,7 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon, SignOutIcon} from "phosphor-svelte";
+    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
@@ -36,9 +36,6 @@
         goto(url, {replaceState: false, noScroll: true});
     }
 
-    function logout() {
-        window.location.href = "/api/webapp/auth/logout"
-    }
 </script>
 
 <Dialog.Root
@@ -90,15 +87,6 @@
                     </Sidebar.Group>
                 </Sidebar.Content>
 
-                <Sidebar.Footer>
-                    <Sidebar.Menu>
-                        <Sidebar.MenuItem>
-                            <Sidebar.MenuButton variant="destructive" onclick={logout}>
-                                <SignOutIcon /> {$_("settings.logout")}
-                            </Sidebar.MenuButton>
-                        </Sidebar.MenuItem>
-                    </Sidebar.Menu>
-                </Sidebar.Footer>
             </Sidebar.Root>
             <!--
               `min-w-0`: a flex item defaults to `min-width: auto`, so it refuses to shrink below

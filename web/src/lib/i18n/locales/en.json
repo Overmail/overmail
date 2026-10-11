@@ -5,13 +5,17 @@
     "nav": {
       "home": "Home",
       "stack": "Stack",
-      "labels": "Labels"
+      "labels": "Labels",
+      "accountActions": "Actions for {name}"
     },
     "panel": {
       "resize": "Resize the assistant"
     },
     "language": {
       "label": "Language"
+    },
+    "user": {
+      "logout": "Sign out"
     }
   },
   "auth": {
@@ -338,7 +342,6 @@
   "settings": {
     "title": "Settings",
     "description": "Manage your settings.",
-    "logout": "Sign out",
     "emailAccounts": {
       "name": {
         "label": "Name",

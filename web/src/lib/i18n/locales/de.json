@@ -5,13 +5,17 @@
     "nav": {
       "home": "Start",
       "stack": "Stack",
-      "labels": "Labels"
+      "labels": "Labels",
+      "accountActions": "Aktionen für {name}"
     },
     "panel": {
       "resize": "Breite des Assistenten ändern"
     },
     "language": {
       "label": "Sprache"
+    },
+    "user": {
+      "logout": "Abmelden"
     }
   },
   "auth": {
@@ -338,7 +342,6 @@
   "settings": {
     "title": "Einstellungen",
     "description": "Verwalte deine Einstellungen.",
-    "logout": "Abmelden",
     "emailAccounts": {
       "name": {
         "label": "Name",

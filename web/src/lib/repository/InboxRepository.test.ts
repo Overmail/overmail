@@ -79,3 +79,14 @@ test("a failed read throws rather than showing an empty account list", async () 
     // An empty table would read as "you have no mailboxes", which is a different thing.
     expect(new InboxRepository().list()).rejects.toThrow();
 });
+
+test("renaming sends the name alone and answers what was stored", async () => {
+    const fetcher = answering(200, {name: "Work"});
+
+    expect(await new InboxRepository().rename("acc-1", " Work ")).toBe("Work");
+
+    const [url, init] = (fetcher as any).mock.calls[0];
+    expect(url).toBe("/api/users/me/inboxes/acc-1/name");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body)).toEqual({name: " Work "});
+});

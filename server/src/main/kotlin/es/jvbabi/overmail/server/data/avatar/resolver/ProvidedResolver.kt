@@ -59,6 +59,7 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "playpartners-noreply@google.com" to "https://svgl.app/library/googleplay.svg",
             "googleplay-noreply@google.com" to "https://svgl.app/library/googleplay.svg",
             "accounts.google.com" to "https://svgl.app/library/google.svg",
+            "PlatformNotifications-noreply@google.com" to "https://svgl.app/library/google.svg",
             "noreply-accounts@google.com" to "https://svgl.app/library/google.svg",
             "sc-noreply@google.com" to "https://svgl.app/library/google.svg",
             "cloudflare.com" to "https://svgl.app/library/cloudflare.svg",
@@ -85,6 +86,7 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "services.ovhcloud.com" to "https://www.ovhcloud.com/icon.svg",
             "jetbrains.com" to "https://svgl.app/library/jetbrainsSolid.svg",
             "microsoft.com" to "https://svgl.app/library/microsoft.svg",
+            "accountprotection.microsoft.com" to "https://svgl.app/library/microsoft.svg",
             "communication.microsoft.com" to "https://svgl.app/library/microsoft.svg",
             "windowsinsiderprogram@e-mails.microsoft.com" to "https://svgl.app/library/windows.svg",
             "e-mails.microsoft.com" to "https://svgl.app/library/microsoft.svg",
@@ -102,6 +104,12 @@ class ProvidedResolver(client: HttpClient) : AvatarResolver(client) {
             "immowelt.de" to "https://play-lh.googleusercontent.com/D6all3dWgccLFkV9lwuf8RMt7saiBcOUr4powggxcwbyb1dMbuWgHEvnPuCvWVJ-FBgc",
             "*.immowelt.de" to "https://play-lh.googleusercontent.com/D6all3dWgccLFkV9lwuf8RMt7saiBcOUr4powggxcwbyb1dMbuWgHEvnPuCvWVJ-FBgc",
             "studentendorf.berlin" to "https://www.studentendorf.berlin/wp-content/uploads/2018/07/cropped-studentendorf_favicon-1-192x192.png",
+            "dhl.de" to "https://play-lh.googleusercontent.com/rHWC-O3LDHaY9h_zhkAHsR1B54C9SIAXNV53H-Plkmy_ywPtoUD_N3GVx-xOVQhlynQsu5mwPE9FYF4bOfZJREc",
+            "lttstore.com" to "https://upload.wikimedia.org/wikipedia/commons/7/77/2018_Linus_Tech_Tips_logo.svg",
+            "tldrnewsletter.com" to "https://tldr.tech/favicon-kf-192.png",
+            "firefox.com" to "https://svgl.app/library/firefox.svg",
+            "mcdonalds.com" to "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
+            "*.mcdonalds.com" to "https://upload.wikimedia.org/wikipedia/commons/3/36/McDonald%27s_Golden_Arches.svg",
         )
 
         /** @return the logo for [address], or null when no key covers it. */

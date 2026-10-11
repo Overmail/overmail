@@ -19,7 +19,11 @@
     import favicon from "$lib/assets/favicon.svg";
 </script>
 
-<Sidebar compact>
+<!-- On the page rather than beside it: the sidebar takes the page's background instead of one of
+     its own, and no line sets it off. The colour is swapped where the component reads it, so
+     everything in here that says `bg-sidebar` follows. The border only goes where the sidebar
+     stands in the page -- as a sheet over it, on a narrow window, its edge is what shows it. -->
+<Sidebar compact class="[--sidebar:var(--background)] md:border-e-0!">
     <SidebarHeader>
         <!-- px-2.5 is the rows' own padding, so the logo stands in the column of their icons. -->
         <div class="flex h-9 items-center gap-2 px-2.5 mt-3 pb-2">

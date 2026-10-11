@@ -157,6 +157,27 @@ export class InboxRepository {
     }
 
     /**
+     * Renames a mailbox and answers the name as it is stored: trimmed, and null for one left
+     * without a name.
+     *
+     * Its own request rather than [update]: that one saves the whole mailbox and restarts its
+     * importer, which a name has nothing to do with.
+     */
+    async rename(id: string, name: string | null, signal?: AbortSignal): Promise<string | null> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/name`, {
+            method: "PUT",
+            credentials: "include",
+            headers: {"content-type": "application/json"},
+            body: JSON.stringify({name}),
+            signal,
+        });
+        if (!response.ok) throw new Error(`Could not rename the inbox: ${response.status}`);
+
+        const body = await response.json();
+        return (body.name ?? null) as string | null;
+    }
+
+    /**
      * Stops or restarts the import for a mailbox.
      *
      * Nothing is deleted either way -- this only decides whether the importer runs, which is what

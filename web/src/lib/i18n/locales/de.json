@@ -759,6 +759,8 @@
     },
     "sidebar": {
       "toggle": "Seitenleiste umschalten",
+      "collapse": "Seitenleiste einklappen",
+      "expand": "Seitenleiste ausklappen",
       "title": "Seitenleiste",
       "description": "Zeigt die mobile Seitenleiste."
     },

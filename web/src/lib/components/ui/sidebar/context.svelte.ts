@@ -24,6 +24,14 @@ class SidebarState {
 	readonly props: SidebarStateProps;
 	open = $derived.by(() => this.props.open());
 	openMobile = $state(false);
+	/**
+	 * Whether a collapsed sidebar is unfolded over the page for as long as the pointer is on it,
+	 * see `peek` on the sidebar. It is still collapsed then -- the page keeps the room of the icon
+	 * column -- but everything in it is laid out as if it were open.
+	 */
+	peeking = $state(false);
+	/** Whether what is in the sidebar has only the icon column to show itself in. */
+	iconsOnly = $derived.by(() => !this.open && !this.peeking && !this.isMobile);
 	setOpen: SidebarStateProps["setOpen"];
 	#isMobile: IsMobile;
 	state = $derived.by(() => (this.open ? "expanded" : "collapsed"));
@@ -53,6 +61,8 @@ class SidebarState {
 	};
 
 	toggle = () => {
+		// Whichever way it goes, it is no longer a look at a collapsed sidebar.
+		this.peeking = false;
 		return this.#isMobile.current ? (this.openMobile = !this.openMobile) : this.setOpen(!this.open);
 	};
 }

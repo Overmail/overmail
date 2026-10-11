@@ -17,7 +17,7 @@
     import {page} from "$app/state";
     import {Button} from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import {SidebarMenuButton, SidebarMenuTrailing} from "$lib/components/ui/sidebar";
+    import {SidebarMenuButton, SidebarMenuTrailing, useSidebar} from "$lib/components/ui/sidebar";
     import RenameInput from "$lib/app/views/RenameInput.svelte";
     import {viewHref} from "$lib/app/views/viewPath";
     import type {View} from "$lib/repository/ViewSocket";
@@ -43,6 +43,8 @@
         /** [immediately] leaves out the confirmation; shift asks for that, see the menu below. */
         onDelete: (immediately: boolean) => void;
     } = $props();
+
+    const sidebar = useSidebar();
 
     /** Whether the row's menu is open, which is while the shift key is worth watching. */
     let menuOpen = $state(false);
@@ -96,7 +98,7 @@
         {/snippet}
     </SidebarMenuButton>
 {:else}
-    <SidebarMenuButton {isActive} class="pr-8">
+    <SidebarMenuButton {isActive} class="pr-8" tooltipContent={view.name}>
         <!-- An anchor, so a view can be opened in a new tab and its address copied; the router
              handles the click. Not draggable itself: a link drags its url, and the row around it
              drags the view. -->
@@ -114,6 +116,8 @@
                     }}
                     ondblclick={(event) => {
                         event.preventDefault();
+                        // Collapsed there is no name on screen to edit, only its icon.
+                        if (sidebar.iconsOnly) return;
                         onRenameStart();
                     }}
             >

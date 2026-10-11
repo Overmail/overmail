@@ -18,7 +18,7 @@
 	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
 	import SettingsDialog from "$lib/app/settings/SettingsDialog.svelte";
 
-	let { children } = $props();
+	let { children, data } = $props();
 
 	/**
 	 * The browser's view transitions, for the one navigation that has two views of the same mail at
@@ -108,6 +108,7 @@
 		<!-- min-h-svh here rather than in the component: the settings dialog has a provider of
 		     its own, and a window-high one breaks its sidebar. -->
 		<Sidebar.Provider
+				open={data.sidebarOpen}
 				class="min-h-svh"
 				style="--panel-width: {panel.width}px;
 				       --panel-offset: {panel.open ? panel.width : 0}px;

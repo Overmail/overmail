@@ -159,6 +159,51 @@ class UpdateInboxTest {
     }
 
     @Test
+    fun `renaming changes the name and nothing else`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val account = setUpAccount(user)
+
+        suspend fun rename(body: String) = client.put("/api/users/me/inboxes/$account/name") {
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+
+        val renamed = rename("""{"name":"  Work "}""")
+        assertEquals(HttpStatusCode.OK, renamed.status)
+        assertEquals("Work", Json.parseToJsonElement(renamed.bodyAsText()).jsonObject["name"]!!.jsonPrimitive.content)
+        database.query {
+            val row = ImapAccount.findById(account)!!
+            assertEquals("Work", row.name)
+            assertEquals("imap.example.com", row.host)
+            assertEquals("secret", row.password)
+            assertEquals(2L, row.folderSyncs.count())
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, rename("""{"name":"${"x".repeat(256)}"}""").status)
+
+        // Blank is the name being taken away again.
+        assertEquals(HttpStatusCode.OK, rename("""{"name":" "}""").status)
+        assertEquals(null, database.query { ImapAccount.findById(account)!!.name })
+    }
+
+    @Test
+    fun `somebody else's mailbox cannot be renamed, and is a miss`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val account = setUpAccount(user)
+        setUpUser()
+
+        val response = client.put("/api/users/me/inboxes/$account/name") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"Mine now"}""")
+        }
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+        assertEquals(null, database.query { ImapAccount.findById(account)!!.name })
+    }
+
+    @Test
     fun `a password that was typed replaces the stored one`() = testApplication {
         val user = setUpUser()
         installRoute()
@@ -426,6 +471,7 @@ class UpdateInboxTest {
                 route("/api/users/me/inboxes/{inboxId}") {
                     getInbox()
                     updateInbox()
+                    route("/name") { setInboxName() }
                 }
             }
         }

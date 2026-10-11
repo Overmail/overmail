@@ -42,6 +42,7 @@ import es.jvbabi.overmail.server.http.users.me.inboxes.item.getInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.streamInboxFoldersForInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxName
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.setInboxPaused
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.folders.streamInboxFolders
 import es.jvbabi.overmail.server.http.users.me.inboxes.create.oauth.getOAuthOnboarding
@@ -478,6 +479,10 @@ internal fun Application.configureRouting() {
                                 route("/stream") {
                                     streamInboxFoldersForInbox()
                                 }
+                            }
+
+                            route("/name") {
+                                setInboxName()
                             }
 
                             // One route per state, like the read and archive routes above.

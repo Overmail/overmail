@@ -10,13 +10,12 @@
         SidebarMenuButton,
         SidebarMenuItem
     } from "$lib/components/ui/sidebar";
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import {TranslateIcon, UserCircleIcon} from "phosphor-svelte";
+    import {UserCircleIcon} from "phosphor-svelte";
     import {navItems} from "$lib/app/shell/nav";
     import {page} from "$app/state";
     import {onMount} from "svelte";
-    import {_, locale} from "svelte-i18n";
-    import {defaultLocale, localeNames, locales, setLocale, type Locale} from "$lib/i18n";
+    import {_} from "svelte-i18n";
+    import UserMenu from "$lib/app/shell/navbar/UserMenu.svelte";
     import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
     import favicon from "$lib/assets/favicon.svg";
     import {useRepositories} from "$lib/repository/repositories";
@@ -33,13 +32,6 @@
     onMount(() => {
         inboxes.list().then((list) => (accounts = list)).catch((error) => console.error(error));
     });
-
-    // `$locale` carries whatever was negotiated, e.g. `de-DE`; the menu only knows the base ones.
-    const currentLocale = $derived(
-        (locales as readonly string[]).includes($locale?.slice(0, 2) ?? "")
-            ? ($locale!.slice(0, 2) as Locale)
-            : defaultLocale
-    );
 </script>
 
 <Sidebar compact>
@@ -101,33 +93,6 @@
     </SidebarContent>
 
     <SidebarFooter>
-        <SidebarMenu>
-            <SidebarMenuItem>
-                <DropdownMenu.Root>
-                    <DropdownMenu.Trigger>
-                        {#snippet child({ props })}
-                            <SidebarMenuButton {...props}>
-                                <TranslateIcon />
-                                <span>{localeNames[currentLocale]}</span>
-                            </SidebarMenuButton>
-                        {/snippet}
-                    </DropdownMenu.Trigger>
-
-                    <DropdownMenu.Content side="top" align="start" class="w-48">
-                        <DropdownMenu.Label>{$_('app.language.label')}</DropdownMenu.Label>
-                        <DropdownMenu.RadioGroup
-                                value={currentLocale}
-                                onValueChange={(value) => setLocale(value as Locale)}
-                        >
-                            {#each locales as option (option)}
-                                <DropdownMenu.RadioItem value={option}>
-                                    {localeNames[option]}
-                                </DropdownMenu.RadioItem>
-                            {/each}
-                        </DropdownMenu.RadioGroup>
-                    </DropdownMenu.Content>
-                </DropdownMenu.Root>
-            </SidebarMenuItem>
-        </SidebarMenu>
+        <UserMenu />
     </SidebarFooter>
 </Sidebar>

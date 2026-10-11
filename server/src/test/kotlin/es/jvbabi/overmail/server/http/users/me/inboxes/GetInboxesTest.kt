@@ -51,6 +51,7 @@ class GetInboxesTest {
         database.query {
             val account = ImapAccount.new {
                 this.user = user
+                name = "Work"
                 host = "imap.example.com"
                 port = 993
                 username = "julius@example.com"
@@ -75,6 +76,7 @@ class GetInboxesTest {
         assertEquals(1, inboxes.size)
 
         val inbox = inboxes[0].jsonObject
+        assertEquals("Work", inbox["name"]!!.jsonPrimitive.content)
         assertEquals("imap.example.com", inbox["host"]!!.jsonPrimitive.content)
         assertEquals(993, inbox["port"]!!.jsonPrimitive.content.toInt())
         assertEquals("julius@example.com", inbox["username"]!!.jsonPrimitive.content)

@@ -90,3 +90,14 @@ internal suspend fun resolveInboxCredentials(
         auth = ImapClient.Auth.BasicAuth(username, resolvedPassword),
     )
 }
+
+/**
+ * The name an inbox is stored with, out of what a form sent: trimmed, and null for one left empty
+ * -- an inbox nobody named is shown by its login, see [ImapAccounts.name].
+ */
+internal fun inboxName(name: String?): String? {
+    val trimmed = name?.trim().orEmpty()
+    if (trimmed.length > ImapAccounts.NAME_MAX_LENGTH) invalidRequest("name", "is longer than ${ImapAccounts.NAME_MAX_LENGTH} characters")
+
+    return trimmed.ifEmpty { null }
+}

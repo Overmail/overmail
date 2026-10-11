@@ -131,6 +131,34 @@ class UpdateInboxTest {
     }
 
     @Test
+    fun `the name is saved with the rest, and one left empty takes it away again`() = testApplication {
+        val user = setUpUser()
+        installRoute()
+        val account = setUpAccount(user)
+
+        suspend fun save(name: String) = client.put("/api/users/me/inboxes/$account") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {"name":"$name","imap":{"host":"imap.example.com","port":$deadPort,"username":"julius@example.com","password":""},
+                 "folder_settings":[{"folder_name":"INBOX","imap_push":false,"ai_import":{"type":"all_messages"}}]}
+                """.trimIndent()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, save(" Work ").status)
+        assertEquals("Work", database.query { ImapAccount.findById(account)!!.name })
+
+        val detail = Json.parseToJsonElement(client.get("/api/users/me/inboxes/$account").bodyAsText()).jsonObject
+        assertEquals("Work", detail["name"]!!.jsonPrimitive.content)
+
+        assertEquals(HttpStatusCode.BadRequest, save("x".repeat(256)).status)
+
+        assertEquals(HttpStatusCode.OK, save("").status)
+        assertEquals(null, database.query { ImapAccount.findById(account)!!.name })
+    }
+
+    @Test
     fun `a password that was typed replaces the stored one`() = testApplication {
         val user = setUpUser()
         installRoute()

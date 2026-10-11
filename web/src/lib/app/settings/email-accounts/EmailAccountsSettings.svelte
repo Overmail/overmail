@@ -17,7 +17,7 @@
     import DeleteInboxDialog from "$lib/app/settings/email-accounts/DeleteInboxDialog.svelte";
     import EditEmailAccountDialog from "$lib/app/settings/email-accounts/EditEmailAccountDialog.svelte";
     import {useRepositories} from "$lib/repository/repositories";
-    import type {Inbox} from "$lib/repository/InboxRepository";
+    import {inboxLabel, type Inbox} from "$lib/repository/InboxRepository";
     import {oauthStartUrl} from "$lib/repository/InboxSetupRepository";
     import {cn} from "$lib/utils";
     import {_} from "svelte-i18n";
@@ -218,8 +218,11 @@
                                 >
                                     <div class="flex flex-col">
                                         <span>
-                                            {inbox.username}
+                                            {inboxLabel(inbox)}
                                         </span>
+                                        {#if inbox.name !== null}
+                                            <span class="text-muted-foreground text-xs font-normal">{inbox.username}</span>
+                                        {/if}
                                         <div class="flex flex-row gap-1 items-center text-muted-foreground whitespace-nowrap text-xs font-mono">
                                             {#if inbox.isPaused}
                                                 <PauseIcon class="w-3 h-3" />

@@ -470,7 +470,7 @@ test("collapsing a folder hides its grandchildren too", async () => {
 async function submittedPayload(prepare: (viewModel: NewEmailAccountViewModel) => void) {
     // Typed, so `mock.calls[0]` is the argument tuple rather than an empty one.
     const submit = mock(
-        async (_imap: InboxConnection, _folders: SubmitInboxFolder[]) => ({type: "created", id: "acc-1"}) as const,
+        async (_imap: InboxConnection, _folders: SubmitInboxFolder[], _name: string | null) => ({type: "created", id: "acc-1"}) as const,
     );
     const repository = {
         testImapHost: mock(async () => REACHABLE),
@@ -618,7 +618,7 @@ function editing(options: {
         })();
     });
     const save = mock(
-        async (_imap: InboxConnection, _folders: SubmitInboxFolder[]) =>
+        async (_imap: InboxConnection, _folders: SubmitInboxFolder[], _name: string | null) =>
             (options.save ? await options.save() : ({type: "created", id: "acc-1"} as const)),
     );
     const repository = {
@@ -707,10 +707,26 @@ test("saving an edit writes to the mailbox instead of creating a second one", as
     expect(await viewModel.submitInbox()).toBe(true);
     expect(save).toHaveBeenCalledTimes(1);
 
-    const [imap, folders] = save.mock.calls[0];
+    const [imap, folders, name] = save.mock.calls[0];
     expect(imap).toEqual({host: "imap.example.com", port: 993, username: "julius", password: ""});
+    // Nobody named it, and nothing is made up for it: it stays shown by its login.
+    expect(name).toBeNull();
     // Only what is kept, and the settings it was opened on.
     expect(folders.map((f) => f.folderName).sort()).toEqual(["Archiv.Newsletter", "Trash"]);
+});
+
+test("the name an inbox was given is what the form opens on, and what it saves", async () => {
+    const {viewModel, save} = editing();
+    viewModel.prefill({...STORED, name: "Work"} as never);
+    expect(viewModel.name).toBe("Work");
+
+    viewModel.name = "  Private ";
+    await tick(1100);
+    viewModel.goTo("folders");
+    await tick(60);
+
+    expect(await viewModel.submitInbox()).toBe(true);
+    expect(save.mock.calls[0][2]).toBe("Private");
 });
 
 test("a mailbox signed in to at a provider opens on its folders without checking anything", async () => {

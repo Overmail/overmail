@@ -266,28 +266,31 @@ export class InboxSetupRepository {
      * Creates the inbox, with one settings block per folder that is being kept.
      *
      * Answers rather than throws for a mailbox the user already has -- that is something to say
-     * in the dialog, not a broken request. Anything else throws.
+     * in the dialog, not a broken request. Anything else throws. A null [name] is an inbox
+     * nobody named, which is shown by its login.
      */
     async submitInbox(
         imap: InboxConnection,
         folders: SubmitInboxFolder[],
+        name: string | null,
         signal?: AbortSignal,
     ): Promise<SubmitInboxResult> {
-        return submit(SUBMIT_ENDPOINT, {imap, folder_settings: folders.map(toWireFolder)}, signal);
+        return submit(SUBMIT_ENDPOINT, {name, imap, folder_settings: folders.map(toWireFolder)}, signal);
     }
 
     /**
-     * Creates the inbox a sign-in at a provider came back with. Only the folders are sent: the
-     * server has the connection, and the inbox logs in with the sign-in from here on.
+     * Creates the inbox a sign-in at a provider came back with. Only its name and the folders are
+     * sent: the server has the connection, and the inbox logs in with the sign-in from here on.
      */
     async submitOAuthInbox(
         onboardingId: string,
         folders: SubmitInboxFolder[],
+        name: string | null,
         signal?: AbortSignal,
     ): Promise<SubmitInboxResult> {
         return submit(
             `${oauthOnboardingEndpoint(onboardingId)}/submit`,
-            {folder_settings: folders.map(toWireFolder)},
+            {name, folder_settings: folders.map(toWireFolder)},
             signal,
         );
     }

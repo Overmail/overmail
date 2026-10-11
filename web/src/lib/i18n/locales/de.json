@@ -341,11 +341,16 @@
     "description": "Verwalte deine Einstellungen.",
     "logout": "Abmelden",
     "emailAccounts": {
+      "name": {
+        "label": "Name",
+        "placeholder": "z. B. Arbeit",
+        "hint": "Optional. Ohne Namen wird das Postfach mit seinem Benutzernamen angezeigt."
+      },
       "title": "E-Mail-Konten",
       "add": "Neues Postfach hinzufügen",
       "list": {
         "columns": {
-          "username": "Benutzername",
+          "username": "Postfach",
           "server": "IMAP-Server",
           "folders": "Ordner"
         },

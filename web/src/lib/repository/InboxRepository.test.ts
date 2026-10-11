@@ -12,6 +12,7 @@ test("reads the mailboxes and their folders", async () => {
         inboxes: [
             {
                 id: "acc-1",
+                name: "Work",
                 host: "imap.example.com",
                 port: 993,
                 username: "julius@example.com",
@@ -27,6 +28,7 @@ test("reads the mailboxes and their folders", async () => {
     expect(await new InboxRepository().list()).toEqual([
         {
             id: "acc-1",
+            name: "Work",
             host: "imap.example.com",
             port: 993,
             username: "julius@example.com",

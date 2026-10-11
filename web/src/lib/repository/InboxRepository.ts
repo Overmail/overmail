@@ -9,6 +9,8 @@ import type {
 /** One connected mailbox, as `GET /api/users/me/inboxes` reports it. */
 export type Inbox = {
     id: string;
+    /** What the user calls it, or null for one nobody named -- see [inboxLabel]. */
+    name: string | null;
     host: string;
     port: number;
     /** The imap login, which for most providers is the address itself. */
@@ -30,6 +32,15 @@ export type Inbox = {
 
 const ENDPOINT = "/api/users/me/inboxes";
 
+/**
+ * What a mailbox is called on screen: its name, and its login where it has none.
+ *
+ * The one place that falls back, so an inbox nobody named reads the same everywhere it is listed.
+ */
+export function inboxLabel(inbox: {name: string | null; username: string}): string {
+    return inbox.name ?? inbox.username;
+}
+
 /** One folder's settings, as the edit screen reads them back and sends them again. */
 export type InboxFolderSetting = {
     folderName: string;
@@ -40,6 +51,8 @@ export type InboxFolderSetting = {
 /** Everything the edit screen opens on. No password: the server never hands one out. */
 export type InboxDetail = {
     id: string;
+    /** See [Inbox.name]. */
+    name: string | null;
     host: string;
     port: number;
     username: string;
@@ -69,6 +82,7 @@ export class InboxRepository {
         const body = await response.json();
         return (body.inboxes as any[]).map((inbox) => ({
             id: inbox.id as string,
+            name: (inbox.name ?? null) as string | null,
             host: inbox.host as string,
             port: inbox.port as number,
             username: inbox.username as string,
@@ -92,6 +106,7 @@ export class InboxRepository {
         const body = await response.json();
         return {
             id: body.id as string,
+            name: (body.name ?? null) as string | null,
             host: body.host as string,
             port: body.port as number,
             username: body.username as string,
@@ -110,12 +125,14 @@ export class InboxRepository {
      * Saves an edited mailbox.
      *
      * [folders] is the complete set the screen is showing, not a change to it: anything left out
-     * is a folder the user took out. An empty password keeps the stored one.
+     * is a folder the user took out. An empty password keeps the stored one, and a null [name]
+     * leaves the mailbox without one.
      */
     async update(
         id: string,
         imap: InboxConnection,
         folders: SubmitInboxFolder[],
+        name: string | null,
         signal?: AbortSignal,
     ): Promise<SubmitInboxResult> {
         const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}`, {
@@ -123,6 +140,7 @@ export class InboxRepository {
             credentials: "include",
             headers: {"content-type": "application/json"},
             body: JSON.stringify({
+                name,
                 imap,
                 folder_settings: folders.map((folder) => ({
                     folder_name: folder.folderName,

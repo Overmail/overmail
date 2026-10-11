@@ -14,6 +14,7 @@
     import {askToName, takeNameRequest, viewToName} from "$lib/app/views/newView.svelte";
     import {viewKey} from "$lib/app/mails/MailListViewModel.svelte";
     import {page} from "$app/state";
+    import {inboxLabel} from "$lib/repository/InboxRepository";
     import {goto} from "$app/navigation";
     import {onMount, untrack} from "svelte";
 
@@ -107,7 +108,7 @@
         if (accountId === null || accountNames !== null) return;
 
         inboxes.list()
-            .then((list) => (accountNames = Object.fromEntries(list.map((inbox) => [inbox.id, inbox.username]))))
+            .then((list) => (accountNames = Object.fromEntries(list.map((inbox) => [inbox.id, inboxLabel(inbox)]))))
             .catch((error) => console.error(error));
     });
 

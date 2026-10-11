@@ -341,11 +341,16 @@
     "description": "Manage your settings.",
     "logout": "Sign out",
     "emailAccounts": {
+      "name": {
+        "label": "Name",
+        "placeholder": "e.g. Work",
+        "hint": "Optional. Without a name the mailbox is shown by its username."
+      },
       "title": "Email accounts",
       "add": "Add a new inbox",
       "list": {
         "columns": {
-          "username": "Username",
+          "username": "Mailbox",
           "server": "IMAP server",
           "folders": "Folders"
         },

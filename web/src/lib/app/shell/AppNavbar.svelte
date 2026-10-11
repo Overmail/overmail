@@ -83,11 +83,24 @@
                         {#each accounts as account (account.id)}
                             {@const view = accountView(account.id)}
                             <SidebarMenuItem>
-                                <SidebarMenuButton isActive={page.url.pathname === "/" && page.url.searchParams.get(VIEW_PARAM) === inlineViewParam(view)}>
+                                <!-- Two lines where the account has a name: the login beneath it is
+                                     what tells two accounts of the same name apart. One without a
+                                     name is its login, and saying that twice would be noise. -->
+                                <SidebarMenuButton
+                                        isActive={page.url.pathname === "/" && page.url.searchParams.get(VIEW_PARAM) === inlineViewParam(view)}
+                                        class={account.name === null ? undefined : "h-auto group-data-[compact=true]/sidebar-root:h-auto"}
+                                >
                                     {#snippet child({ props })}
                                         <a href={inlineViewHref(view, page.url)} {...props}>
                                             <UserCircleIcon />
-                                            <span>{account.username}</span>
+                                            {#if account.name === null}
+                                                <span>{account.username}</span>
+                                            {:else}
+                                                <span class="flex min-w-0 flex-col">
+                                                    <span class="truncate">{account.name}</span>
+                                                    <span class="truncate text-xs font-normal opacity-60">{account.username}</span>
+                                                </span>
+                                            {/if}
                                         </a>
                                     {/snippet}
                                 </SidebarMenuButton>

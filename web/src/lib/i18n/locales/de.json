@@ -298,8 +298,7 @@
   "views": {
     "predefined": {
       "inbox": "Posteingang",
-      "sent": "Gesendet",
-      "account": "Konto"
+      "sent": "Gesendet"
     },
     "grouping": {
       "title": "Gruppierung",

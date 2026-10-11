@@ -9,8 +9,8 @@
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
     import type {ViewSettings} from "$lib/app/views/viewSettings";
-    import {accountOfView, INBOX_VIEW, predefinedView, isPredefinedViewId} from "$lib/app/views/predefinedViews";
-    import {openViewId, viewUrl} from "$lib/app/views/viewPath";
+    import {INBOX_VIEW, predefinedView, isPredefinedViewId} from "$lib/app/views/predefinedViews";
+    import {openInlineView, openViewId, viewUrl} from "$lib/app/views/viewPath";
     import {askToName, takeNameRequest, viewToName} from "$lib/app/views/newView.svelte";
     import {viewKey} from "$lib/app/mails/MailListViewModel.svelte";
     import {page} from "$app/state";
@@ -47,6 +47,9 @@
     /** Which view the url is asking for: a name the app brings, an id somebody stored, or none. */
     const viewId = $derived(openViewId(page.url));
 
+    /** The listing the url spells out rather than names -- a mail account's -- or null. */
+    const inline = $derived(openInlineView(page.url));
+
     /** The stored view the url points at, or null while it is one of the app's own -- or not here. */
     const stored = $derived(
         viewId === null || isPredefinedViewId(viewId)
@@ -56,11 +59,12 @@
 
     /**
      * The view as it is saved: what the page starts from, and what it goes back to when the url
-     * points somewhere else. Nothing asked for is the inbox.
+     * points somewhere else. Nothing asked for is the inbox; a listing spelled out in the url is
+     * its own saved state.
      */
     const saved = $derived<ViewSettings>(
         stored === null
-            ? predefinedView(viewId).settings
+            ? (inline ?? predefinedView(viewId).settings)
             : {groupings: stored.groupings, filter: stored.filter, sorting: stored.sorting}
     );
 
@@ -79,7 +83,7 @@
     let filledFrom = $state<string | null>(null);
 
     $effect(() => {
-        const key = `${viewId ?? INBOX_VIEW}|${viewKey(saved)}`;
+        const key = `${viewId ?? (inline === null ? INBOX_VIEW : "inline")}|${viewKey(saved)}`;
         if (filledFrom === key) return;
 
         filledFrom = key;
@@ -90,10 +94,13 @@
 
     const {inboxes} = useRepositories();
 
-    /** The mail account this is the view of, when it is one of those. */
-    const accountId = $derived(accountOfView(viewId));
+    /**
+     * The mail account this is the listing of, when the url spells out one that is on exactly
+     * one -- which is what a link in the sidebar's accounts does.
+     */
+    const accountId = $derived(inline?.filter.imapAccountIds?.length === 1 ? inline.filter.imapAccountIds[0] : null);
 
-    /** What the accounts are called, by id; read the first time an account's view is opened. */
+    /** What the accounts are called, by id; read the first time an account's listing is opened. */
     let accountNames = $state<Record<string, string> | null>(null);
 
     $effect(() => {
@@ -105,20 +112,22 @@
     });
 
     /**
-     * The name of a view the app brings, where it has one of its own to show over the listing:
-     * an account's view is called what the account is. The inbox and sent say what they hold
-     * instead, see `MailTable`.
+     * The name over an account's listing, which is what the account is called. The inbox and
+     * sent say what they hold instead, see `MailTable`.
      */
     const accountName = $derived(accountId === null ? null : (accountNames?.[accountId] ?? null));
 
     /** What the tab is called: the view, because that is what the page is showing. */
-    const viewName = $derived(stored?.name ?? accountName ?? $_(predefinedView(viewId).label));
+    const viewName = $derived(
+        stored?.name ?? accountName ?? $_(inline === null ? predefinedView(viewId).label : "app.name")
+    );
 
     /**
      * Whether this is the listing the app opens on. The inbox is what the bare url shows, so it
-     * is both "nothing asked for" and the view that names itself.
+     * is both "nothing asked for" and the view that names itself -- but not a listing the url
+     * spells out, which names no view either.
      */
-    const isInbox = $derived(viewId === null || viewId === INBOX_VIEW);
+    const isInbox = $derived(inline === null && (viewId === null || viewId === INBOX_VIEW));
 
     /**
      * Whether the view the app brought has been changed on screen -- which is the only thing

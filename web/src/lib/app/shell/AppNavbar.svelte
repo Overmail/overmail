@@ -22,8 +22,8 @@
     import favicon from "$lib/assets/favicon.svg";
     import {useRepositories} from "$lib/repository/repositories";
     import type {Inbox} from "$lib/repository/InboxRepository";
-    import {accountViewId} from "$lib/app/views/predefinedViews";
-    import {openViewId, viewHref} from "$lib/app/views/viewPath";
+    import {accountView} from "$lib/app/views/predefinedViews";
+    import {inlineViewHref, inlineViewParam, VIEW_PARAM} from "$lib/app/views/viewPath";
 
     const {inboxes} = useRepositories();
 
@@ -72,8 +72,8 @@
             </SidebarGroupContent>
         </SidebarGroup>
 
-        <!-- One row per connected mail account, each a view the app brings: the account as a
-             whole, see `accountView`. Nothing while there is none -- a heading over an empty
+        <!-- One row per connected mail account, each a listing the app builds: the account as a
+             whole, see `accountView`, spelled out in the link. Nothing while there is none -- a heading over an empty
              list says less than no heading. -->
         {#if accounts.length > 0}
             <SidebarGroup>
@@ -81,11 +81,11 @@
                 <SidebarGroupContent>
                     <SidebarMenu>
                         {#each accounts as account (account.id)}
-                            {@const viewId = accountViewId(account.id)}
+                            {@const view = accountView(account.id)}
                             <SidebarMenuItem>
-                                <SidebarMenuButton isActive={page.url.pathname === "/" && openViewId(page.url) === viewId}>
+                                <SidebarMenuButton isActive={page.url.pathname === "/" && page.url.searchParams.get(VIEW_PARAM) === inlineViewParam(view)}>
                                     {#snippet child({ props })}
-                                        <a href={viewHref(viewId, account.username, page.url)} {...props}>
+                                        <a href={inlineViewHref(view, page.url)} {...props}>
                                             <UserCircleIcon />
                                             <span>{account.username}</span>
                                         </a>

@@ -1,6 +1,15 @@
 import {expect, test} from "bun:test";
-import {accountViewId} from "./predefinedViews";
-import {openViewId, parseViewId, viewHref, viewSlug, viewUrl} from "./viewPath";
+import {accountView} from "./predefinedViews";
+import {
+    inlineViewHref,
+    openInlineView,
+    openViewId,
+    parseInlineView,
+    parseViewId,
+    viewHref,
+    viewSlug,
+    viewUrl,
+} from "./viewPath";
 
 const id = "0198f3ac-6d21-7c4e-9b0f-2a1c7d5e8f30";
 const bare = "0198f3ac6d217c4e9b0f2a1c7d5e8f30";
@@ -51,13 +60,37 @@ test("the inbox is the bare listing, not a view in the query", () => {
     expect(viewHref("sent", null, new URL("http://localhost/"))).toBe("/?view=sent");
 });
 
-test("an account's view is spelled with the account, in a parameter of its own", () => {
-    const view = accountViewId(id);
+test("a listing nothing names is spelled out in the url, and read back whole", () => {
+    const settings = accountView(id);
+    const url = new URL(inlineViewHref(settings, new URL("http://localhost/?email=x")), "http://localhost");
 
-    expect(viewHref(view, "me@example.com", new URL("http://localhost/?view=sent"))).toBe(
-        `/?account=me%40example.com-${bare}`
-    );
-    expect(openViewId(viewUrl(view, "me@example.com", new URL("http://localhost/")))).toBe(view);
-    // A stored view may be called anything, "account" included, and is still a stored view.
-    expect(openViewId(viewUrl(id, "account", new URL("http://localhost/")))).toBe(id);
+    expect(url.searchParams.has("email")).toBe(false);
+    expect(openInlineView(url)).toEqual(settings);
+    // It names no view: neither one the app brings nor a stored one.
+    expect(openViewId(url)).toBeNull();
+});
+
+test("a name or a slug is not a listing spelled out", () => {
+    expect(openInlineView(new URL("http://localhost/"))).toBeNull();
+    expect(openInlineView(new URL("http://localhost/?view=sent"))).toBeNull();
+    expect(openInlineView(viewUrl(id, "{Neue Ansicht}", new URL("http://localhost/")))).toBeNull();
+});
+
+test("what is not exactly a view is no view", () => {
+    const sorting = {kind: "date", reversed: false};
+
+    expect(parseInlineView("{")).toBeNull();
+    expect(parseInlineView(JSON.stringify({groupings: [], filter: {}}))).toBeNull();
+    expect(parseInlineView(JSON.stringify({groupings: [{kind: "colour"}], filter: {}, sorting}))).toBeNull();
+    expect(parseInlineView(JSON.stringify({groupings: [], filter: {archivedState: ["Deleted"]}, sorting}))).toBeNull();
+    expect(parseInlineView(JSON.stringify({groupings: [], filter: {hasLabels: "l-1"}, sorting}))).toBeNull();
+    // Every filter left out is every filter not set.
+    expect(parseInlineView(JSON.stringify({groupings: [], filter: {}, sorting}))?.filter).toEqual({
+        readState: null,
+        archivedState: null,
+        imapAccountIds: null,
+        sentBy: null,
+        sentTo: null,
+        hasLabels: null,
+    });
 });

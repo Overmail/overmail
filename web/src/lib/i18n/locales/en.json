@@ -298,8 +298,7 @@
   "views": {
     "predefined": {
       "inbox": "Inbox",
-      "sent": "Sent",
-      "account": "Account"
+      "sent": "Sent"
     },
     "grouping": {
       "title": "Grouping",

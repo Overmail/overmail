@@ -1,7 +1,7 @@
 import type {Component} from "svelte";
 import {PaperPlaneTiltIcon, StackIcon, TagIcon, TrayIcon} from "phosphor-svelte";
 import {INBOX_VIEW, predefinedViews} from "$lib/app/views/predefinedViews";
-import {openViewId} from "$lib/app/views/viewPath";
+import {openInlineView, openViewId} from "$lib/app/views/viewPath";
 
 /**
  * A page behind the sidebar.
@@ -38,7 +38,7 @@ export const navItems: NavItem[] = [
         matches: (url: URL) =>
             url.pathname === "/" &&
             (openViewId(url) === view.id ||
-                (view.id === INBOX_VIEW && openViewId(url) === null)),
+                (view.id === INBOX_VIEW && openViewId(url) === null && openInlineView(url) === null)),
     })),
     {
         key: "app.nav.stack",

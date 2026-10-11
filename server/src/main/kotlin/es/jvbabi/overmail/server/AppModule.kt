@@ -51,6 +51,7 @@ import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
 import es.jvbabi.overmail.server.jobs.importer.PushStep
 import es.jvbabi.overmail.server.jobs.importer.NotifyStep
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
+import es.jvbabi.overmail.server.telemetry.Telemetry
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -58,11 +59,14 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 import org.koin.ktor.ext.get
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -74,6 +78,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 fun Application.overmail() {
     configureDependencies()
+    // First of the plugins, so a request's span is there for everything that handles it.
+    install(KtorServerTelemetry) { setOpenTelemetry(get<OpenTelemetry>()) }
     installBackendHeaders()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
@@ -116,6 +122,10 @@ internal fun overmailModule(application: CoroutineScope) = module {
     single<DatabaseConfig> { get<ApplicationConfig>().database }
     single<SmtpConfig> { get<ApplicationConfig>().email.smtp }
     single<ApplicationConfig.AiConfig> { get<ApplicationConfig>().ai }
+
+    // Stopping the server closes the container, which is what sends the last of what was recorded.
+    single<Telemetry> { Telemetry.start(get<ApplicationConfig>().telemetry) } onClose { it?.close() }
+    single<OpenTelemetry> { get<Telemetry>().openTelemetry }
 
     single<AiChatNotifier> { AiChatNotifier() }
     single<AiChatStreamNotifier> { AiChatStreamNotifier() }

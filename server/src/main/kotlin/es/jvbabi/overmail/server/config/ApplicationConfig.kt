@@ -24,6 +24,9 @@ data class ApplicationConfig(
 
     /** The mail providers an inbox can be connected through by signing in there, see [OAuthClientConfig]. */
     @SerialName("oauth") val oauth: Map<String, OAuthClientConfig> = emptyMap(),
+
+    /** Where traces, metrics and logs are exported to. Nothing is exported without it. */
+    @SerialName("telemetry") val telemetry: TelemetryConfig? = null,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }

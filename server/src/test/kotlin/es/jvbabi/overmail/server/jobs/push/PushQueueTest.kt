@@ -185,7 +185,7 @@ class PushQueueTest {
     }
 
     private fun phone(token: String?) =
-        Session.Client.Android(device = "Pixel 8", manufacturer = "Google", os = "Android 15", firebaseToken = token)
+        Session.Client.Android(device = "Pixel 8", manufacturer = "Google", os = "Android 15", firebaseInstallationId = token)
 
     private suspend fun newUser(): Uuid {
         database.init()

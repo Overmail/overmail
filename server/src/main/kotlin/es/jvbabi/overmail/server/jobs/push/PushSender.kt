@@ -6,8 +6,8 @@ package es.jvbabi.overmail.server.jobs.push
  */
 fun interface PushSender {
     /**
-     * Sends [data] to the installation [token] addresses. Does not throw for a push that could
-     * not be delivered -- the [Result] says what became of it.
+     * Sends [data] to the installation [token] addresses, for Firebase its installation id. Does
+     * not throw for a push that could not be delivered -- the [Result] says what became of it.
      */
     suspend fun send(token: String, data: Map<String, String>, isUrgent: Boolean): Result
 

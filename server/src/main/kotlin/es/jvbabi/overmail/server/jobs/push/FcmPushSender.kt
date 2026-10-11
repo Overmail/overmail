@@ -74,7 +74,7 @@ class FcmPushSender(
                     json.encodeToString(
                         SendRequest(
                             Message(
-                                token = token,
+                                fid = token,
                                 data = data,
                                 android = AndroidConfig(priority = if (isUrgent) "HIGH" else "NORMAL"),
                             )
@@ -100,7 +100,7 @@ class FcmPushSender(
         val reason = "${status.value} ${errorCode ?: error?.status ?: ""}: ${error?.message ?: body.take(200)}"
 
         return when {
-            // 404 is how Firebase answers for a token that was valid once.
+            // 404 is how Firebase answers for an installation that was registered once.
             errorCode == "UNREGISTERED" || status == HttpStatusCode.NotFound -> PushSender.Result.Unregistered
             status == HttpStatusCode.Unauthorized -> {
                 // The access token was refused before its time; the next attempt asks for a new one.
@@ -144,7 +144,8 @@ class FcmPushSender(
 
     @Serializable
     private data class Message(
-        @SerialName("token") val token: String,
+        /** The Firebase Installation ID; the `token` field of the api is the deprecated registration token. */
+        @SerialName("fid") val fid: String,
         @SerialName("data") val data: Map<String, String>,
         @SerialName("android") val android: AndroidConfig,
     )

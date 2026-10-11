@@ -8,25 +8,28 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 
 /**
- * The registration token of Firebase Cloud Messaging: the one this installation has when the app
- * starts, and whatever [PushMessagingService] is handed after that.
+ * What Firebase Cloud Messaging addresses this installation by: its Firebase Installation ID.
+ *
+ * Firebase does not hand the id out, it reports it -- [register] makes it call
+ * [PushMessagingService.onRegistered], now and again whenever the id changes. So this only asks,
+ * and keeps what the service passes on.
  */
 class FirebasePushTokenRepository : PushTokenRepository {
     private val logger = Logger.withTag("FirebasePushTokenRepository")
 
-    private val token = MutableStateFlow<String?>(null)
+    private val installationId = MutableStateFlow<String?>(null)
 
     init {
-        // Without Play services or a connection there is no token. The app works without one, and
-        // the next start asks again.
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { onNewToken(it) }
-            .addOnFailureListener { logger.w(it) { "Could not fetch the Firebase registration token" } }
+        // On every start: the server is told again, which is what keeps it from holding an id
+        // that went stale. Without Play services or a connection there is none, and the app
+        // works without -- the next start asks again.
+        FirebaseMessaging.getInstance().register()
+            .addOnFailureListener { logger.w(it) { "Could not register with Firebase Cloud Messaging" } }
     }
 
-    override fun getToken(): Flow<String> = token.filterNotNull()
+    override fun getToken(): Flow<String> = installationId.filterNotNull()
 
-    fun onNewToken(newToken: String) {
-        token.value = newToken
+    fun onRegistered(newInstallationId: String) {
+        installationId.value = newInstallationId
     }
 }

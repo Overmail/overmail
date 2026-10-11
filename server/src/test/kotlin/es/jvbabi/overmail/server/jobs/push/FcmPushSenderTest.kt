@@ -62,8 +62,8 @@ class FcmPushSenderTest {
         val (authorization, body) = sent.single()
         assertEquals("Bearer access-1", authorization)
         val message = Json.parseToJsonElement(body).jsonObject.getValue("message").jsonObject
-        assertEquals(setOf("token", "data", "android"), message.keys)
-        assertEquals("device-token", message.getValue("token").jsonPrimitive.content)
+        assertEquals(setOf("fid", "data", "android"), message.keys)
+        assertEquals("device-token", message.getValue("fid").jsonPrimitive.content)
         assertEquals("{}", message.getValue("data").jsonObject.getValue("payload").jsonPrimitive.content)
         assertEquals("HIGH", message.getValue("android").jsonObject.getValue("priority").jsonPrimitive.content)
 

@@ -31,9 +31,9 @@
 <Sidebar compact>
     <SidebarHeader>
         <!-- px-2.5 is the rows' own padding, so the logo stands in the column of their icons. -->
-        <div class="flex h-9 items-center gap-2 px-2.5">
-            <img src={favicon} alt="" class="size-5" />
-            <span class="font-display text-[15px] leading-none">{$_('app.name')}</span>
+        <div class="flex h-9 items-center gap-2 px-2.5 mt-3 pb-2">
+            <img src={favicon} alt="" class="size-8" />
+            <span class="font-display text-lg leading-none">{$_('app.name')}</span>
         </div>
     </SidebarHeader>
     <SidebarContent>

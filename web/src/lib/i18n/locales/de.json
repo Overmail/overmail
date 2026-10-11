@@ -5,7 +5,8 @@
     "nav": {
       "home": "Start",
       "stack": "Stack",
-      "labels": "Labels"
+      "labels": "Labels",
+      "accounts": "Konten"
     },
     "panel": {
       "resize": "Breite des Assistenten ändern"
@@ -297,7 +298,8 @@
   "views": {
     "predefined": {
       "inbox": "Posteingang",
-      "sent": "Gesendet"
+      "sent": "Gesendet",
+      "account": "Konto"
     },
     "grouping": {
       "title": "Gruppierung",

@@ -5,7 +5,8 @@
     "nav": {
       "home": "Home",
       "stack": "Stack",
-      "labels": "Labels"
+      "labels": "Labels",
+      "accounts": "Accounts"
     },
     "panel": {
       "resize": "Resize the assistant"
@@ -297,7 +298,8 @@
   "views": {
     "predefined": {
       "inbox": "Inbox",
-      "sent": "Sent"
+      "sent": "Sent",
+      "account": "Account"
     },
     "grouping": {
       "title": "Grouping",

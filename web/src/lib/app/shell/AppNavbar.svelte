@@ -12,13 +12,28 @@
         SidebarMenuItem
     } from "$lib/components/ui/sidebar";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import {TranslateIcon} from "phosphor-svelte";
+    import {TranslateIcon, UserCircleIcon} from "phosphor-svelte";
     import {navItems} from "$lib/app/shell/nav";
     import {page} from "$app/state";
+    import {onMount} from "svelte";
     import {_, locale} from "svelte-i18n";
     import {defaultLocale, localeNames, locales, setLocale, type Locale} from "$lib/i18n";
     import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
     import favicon from "$lib/assets/favicon.svg";
+    import {useRepositories} from "$lib/repository/repositories";
+    import type {Inbox} from "$lib/repository/InboxRepository";
+    import {accountViewId} from "$lib/app/views/predefinedViews";
+    import {openViewId, viewHref} from "$lib/app/views/viewPath";
+
+    const {inboxes} = useRepositories();
+
+    let accounts = $state<Inbox[]>([]);
+
+    // Read once, in the browser: the list needs the session, and the sidebar is there for as long
+    // as the app is. An account connected since shows up with the next load.
+    onMount(() => {
+        inboxes.list().then((list) => (accounts = list)).catch((error) => console.error(error));
+    });
 
     // `$locale` carries whatever was negotiated, e.g. `de-DE`; the menu only knows the base ones.
     const currentLocale = $derived(
@@ -56,6 +71,32 @@
                 </SidebarMenu>
             </SidebarGroupContent>
         </SidebarGroup>
+
+        <!-- One row per connected mail account, each a view the app brings: the account as a
+             whole, see `accountView`. Nothing while there is none -- a heading over an empty
+             list says less than no heading. -->
+        {#if accounts.length > 0}
+            <SidebarGroup>
+                <SidebarGroupLabel>{$_('app.nav.accounts')}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        {#each accounts as account (account.id)}
+                            {@const viewId = accountViewId(account.id)}
+                            <SidebarMenuItem>
+                                <SidebarMenuButton isActive={page.url.pathname === "/" && openViewId(page.url) === viewId}>
+                                    {#snippet child({ props })}
+                                        <a href={viewHref(viewId, account.username, page.url)} {...props}>
+                                            <UserCircleIcon />
+                                            <span>{account.username}</span>
+                                        </a>
+                                    {/snippet}
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        {/each}
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+        {/if}
 
         <SidebarGroup>
             <SidebarGroupLabel>Ansichten</SidebarGroupLabel>

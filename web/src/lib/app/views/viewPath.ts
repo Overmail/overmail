@@ -1,11 +1,19 @@
 import {parseSlugId, slugParam} from "$lib/app/mails/emailPath";
-import {INBOX_VIEW, isPredefinedViewId} from "$lib/app/views/predefinedViews";
+import {accountOfView, accountViewId, INBOX_VIEW, isPredefinedViewId} from "$lib/app/views/predefinedViews";
 
 /**
  * Which view the listing is showing: `/?view=<slug>`, which is what makes a view something you
  * can link to, reload and step back out of -- the same arrangement `?email=` has for a mail.
  */
 export const VIEW_PARAM = "view";
+
+/**
+ * The same for the view of a mail account: `/?account=<slug>`.
+ *
+ * A parameter of its own rather than a spelling of `?view=`: a view's slug starts with its name,
+ * and a name can be anything -- there is no prefix a stored view could not be called.
+ */
+export const ACCOUNT_PARAM = "account";
 
 /**
  * How a view is spelled in a url: the beginning of its name, then the id without its hyphens.
@@ -33,7 +41,12 @@ export function parseViewId(value: string | null | undefined): string | null {
 
 /** The view the url [url] has open, or null when it is showing no view. */
 export function openViewId(url: URL): string | null {
-    return parseViewId(url.searchParams.get(VIEW_PARAM));
+    const view = parseViewId(url.searchParams.get(VIEW_PARAM));
+    if (view !== null) return view;
+
+    const accountId = parseSlugId(url.searchParams.get(ACCOUNT_PARAM));
+
+    return accountId === null ? null : accountViewId(accountId);
 }
 
 /**
@@ -45,6 +58,13 @@ export function openViewId(url: URL): string | null {
  */
 export function viewUrl(id: string, name: string | null | undefined, current: URL): URL {
     const url = new URL("/", current);
+
+    const accountId = accountOfView(id);
+    if (accountId !== null) {
+        url.searchParams.set(ACCOUNT_PARAM, slugParam(accountId, name));
+        return url;
+    }
+
     // The inbox is what the listing shows when nothing is asked for, so it is the bare root and
     // not `?view=inbox`: one address for one listing, and the shortest one at that.
     if (id !== INBOX_VIEW) url.searchParams.set(VIEW_PARAM, viewSlug(id, name));

@@ -1,4 +1,5 @@
 import {expect, test} from "bun:test";
+import {accountViewId} from "./predefinedViews";
 import {openViewId, parseViewId, viewHref, viewSlug, viewUrl} from "./viewPath";
 
 const id = "0198f3ac-6d21-7c4e-9b0f-2a1c7d5e8f30";
@@ -48,4 +49,15 @@ test("the inbox is the bare listing, not a view in the query", () => {
     // It is what the listing shows when nothing is asked for, so it has no parameter of its own.
     expect(viewHref("inbox", null, new URL("http://localhost/?view=sent"))).toBe("/");
     expect(viewHref("sent", null, new URL("http://localhost/"))).toBe("/?view=sent");
+});
+
+test("an account's view is spelled with the account, in a parameter of its own", () => {
+    const view = accountViewId(id);
+
+    expect(viewHref(view, "me@example.com", new URL("http://localhost/?view=sent"))).toBe(
+        `/?account=me%40example.com-${bare}`
+    );
+    expect(openViewId(viewUrl(view, "me@example.com", new URL("http://localhost/")))).toBe(view);
+    // A stored view may be called anything, "account" included, and is still a stored view.
+    expect(openViewId(viewUrl(id, "account", new URL("http://localhost/")))).toBe(id);
 });

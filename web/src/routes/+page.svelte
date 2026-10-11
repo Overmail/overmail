@@ -9,7 +9,7 @@
     import EmailGraph from "$lib/app/home/EmailGraph.svelte";
     import MailTable from "$lib/app/mails/MailTable.svelte";
     import type {ViewSettings} from "$lib/app/views/viewSettings";
-    import {INBOX_VIEW, predefinedView, isPredefinedViewId} from "$lib/app/views/predefinedViews";
+    import {accountOfView, INBOX_VIEW, predefinedView, isPredefinedViewId} from "$lib/app/views/predefinedViews";
     import {openViewId, viewUrl} from "$lib/app/views/viewPath";
     import {askToName, takeNameRequest, viewToName} from "$lib/app/views/newView.svelte";
     import {viewKey} from "$lib/app/mails/MailListViewModel.svelte";
@@ -88,8 +88,31 @@
         current = $state.snapshot(saved) as ViewSettings;
     });
 
+    const {inboxes} = useRepositories();
+
+    /** The mail account this is the view of, when it is one of those. */
+    const accountId = $derived(accountOfView(viewId));
+
+    /** What the accounts are called, by id; read the first time an account's view is opened. */
+    let accountNames = $state<Record<string, string> | null>(null);
+
+    $effect(() => {
+        if (accountId === null || accountNames !== null) return;
+
+        inboxes.list()
+            .then((list) => (accountNames = Object.fromEntries(list.map((inbox) => [inbox.id, inbox.username]))))
+            .catch((error) => console.error(error));
+    });
+
+    /**
+     * The name of a view the app brings, where it has one of its own to show over the listing:
+     * an account's view is called what the account is. The inbox and sent say what they hold
+     * instead, see `MailTable`.
+     */
+    const accountName = $derived(accountId === null ? null : (accountNames?.[accountId] ?? null));
+
     /** What the tab is called: the view, because that is what the page is showing. */
-    const viewName = $derived(stored?.name ?? $_(predefinedView(viewId).label));
+    const viewName = $derived(stored?.name ?? accountName ?? $_(predefinedView(viewId).label));
 
     /**
      * Whether this is the listing the app opens on. The inbox is what the bare url shows, so it
@@ -236,7 +259,7 @@
     <div class="px-4 pb-16">
         <MailTable
                 bind:view={current}
-                name={stored?.name ?? null}
+                name={stored?.name ?? accountName}
                 onRename={stored === null ? undefined : rename}
                 bind:renaming={renamingName}
                 actions={viewActions}

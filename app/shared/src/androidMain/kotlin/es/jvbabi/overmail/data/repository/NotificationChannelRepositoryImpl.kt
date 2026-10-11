@@ -53,7 +53,7 @@ class NotificationChannelRepositoryImpl(private val context: Context) : Notifica
 
         notificationManager.createNotificationChannelsCompat(imapAccounts.map { imapAccount ->
             NotificationChannelCompat.Builder(imapAccountChannelId(imapAccount.id), NotificationManagerCompat.IMPORTANCE_DEFAULT)
-                .setName(getString(Res.string.notifications_channel_mailbox_name, imapAccount.username))
+                .setName(getString(Res.string.notifications_channel_mailbox_name, imapAccount.displayName))
                 .setDescription(getString(Res.string.notifications_channel_mailbox_description, imapAccount.username, imapAccount.host))
                 .setGroup(groupId)
                 .setSound(newEmailSound(context), NEW_EMAIL_SOUND_ATTRIBUTES)

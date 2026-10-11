@@ -25,6 +25,8 @@ import kotlin.uuid.Uuid
 )
 data class DbImapAccount(
     @ColumnInfo(name = "id") val id: Uuid,
+    /** What the user calls it; null for one without a name, and until the next fetch after the column was added. */
+    @ColumnInfo(name = "name") val name: String?,
     @ColumnInfo(name = "host") val host: String,
     @ColumnInfo(name = "port") val port: Int,
     /** The imap login, which for most providers is the address itself. */

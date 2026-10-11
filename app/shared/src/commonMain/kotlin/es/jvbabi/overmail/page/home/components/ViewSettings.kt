@@ -112,7 +112,7 @@ fun ViewSettings(
                 showFromPicker = true
             },
             accountNames = viewState.filter.imapAccountIds.orEmpty().map { id ->
-                state.imapAccounts.firstOrNull { it.id == id }?.username ?: "…"
+                state.imapAccounts.firstOrNull { it.id == id }?.displayName ?: "…"
             },
             onAccountsClick = {
                 // Read afresh as it opens: a mailbox connected elsewhere should be in it.

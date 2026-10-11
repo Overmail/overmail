@@ -32,10 +32,12 @@ import es.jvbabi.overmail.data.database.entity.DbParticipant
         DbEmailRecipients::class,
         DbEmailAttachment::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
     autoMigrations = [
-        AutoMigration(from = 2, to = 3)
+        AutoMigration(from = 2, to = 3),
+        // imap_accounts.name, null until the next fetch fills it in.
+        AutoMigration(from = 3, to = 4),
     ]
 )
 @TypeConverters(

@@ -51,6 +51,7 @@ class ImapAccountsRepositoryImpl(
         response.body<ApiInboxesResponse>().inboxes.map { inbox ->
             DbImapAccount(
                 id = inbox.id,
+                name = inbox.name,
                 host = inbox.host,
                 port = inbox.port,
                 username = inbox.username,
@@ -68,6 +69,7 @@ private data class ApiInboxesResponse(@SerialName("inboxes") val inboxes: List<I
     @Serializable
     data class Inbox(
         @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String? = null,
         @SerialName("host") val host: String,
         @SerialName("port") val port: Int,
         @SerialName("username") val username: String,

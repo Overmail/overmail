@@ -92,17 +92,17 @@ fun ImapAccountsModal(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Checkbox(checked = checked, onCheckedChange = null)
-                    // The host under the login: two accounts at one provider differ by login,
-                    // two logins of the same name by host.
+                    // The login under the name, and the host under a login that has none: two
+                    // accounts called the same differ by login, two logins of the same name by host.
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = account.username,
+                            text = account.displayName,
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = account.host,
+                            text = if (account.name == null) account.host else account.username,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

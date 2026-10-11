@@ -67,6 +67,10 @@ kotlin {
             implementation(libs.app.androidx.camera.lifecycle)
             implementation(libs.app.androidx.camera.view)
             implementation(libs.app.mlkit.barcode.scanning)
+
+            // Push for new mail. Android only: the project it belongs to is configured by the
+            // google-services plugin in :app:android.
+            implementation(libs.app.firebase.messaging)
         }
 
         commonMain.dependencies {

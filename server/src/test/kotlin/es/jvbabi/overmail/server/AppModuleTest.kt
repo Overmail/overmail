@@ -11,6 +11,8 @@ import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
 import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import kotlinx.coroutines.awaitCancellation
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
 import es.jvbabi.overmail.server.oauth.OAuthProviders
@@ -54,6 +56,7 @@ class AppModuleTest {
                 OvermailDatabase(Database.connect("jdbc:h2:mem:app-module-${Uuid.random()};DB_CLOSE_DELAY=-1", driver = "org.h2.Driver"))
             }
             single<JwtService> { JwtService(Files.createTempDirectory("overmail-jwt").toString()) }
+            single<PushSender> { PushSender.Disabled }
         }
         val koin = koinApplication {
             allowOverride(true)
@@ -70,6 +73,7 @@ class AppModuleTest {
             koin.get<AvatarQueue>()
             koin.get<AvatarShapeBackfill>()
             koin.get<EmailPreviewQueue>()
+            koin.get<PushNotifications>()
             koin.get<ViewNotifier>()
             koin.get<JwtService>()
             koin.get<SmtpConfig>()

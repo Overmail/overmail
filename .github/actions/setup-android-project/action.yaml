@@ -8,6 +8,9 @@ inputs:
   keystore_password:
     description: "Password for the keystore"
     required: true
+  google_services_file:
+    description: "Base64 encoded google-services.json"
+    required: true
 
 runs:
   using: "composite"
@@ -43,3 +46,8 @@ runs:
           echo "signing.default.keyalias=key0"
           echo "signing.default.keypassword=${{ inputs.keystore_password }}"
         } >> local.properties
+
+    - name: Restore google-services.json
+      shell: bash
+      run: |
+        echo "${{ inputs.google_services_file }}" | base64 -d > "${GITHUB_WORKSPACE}/app/android/google-services.json"

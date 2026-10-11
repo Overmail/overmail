@@ -1,0 +1,16 @@
+<resources>
+    <string name="notifications_channel_system_name">App-Hinweise und Updates</string>
+    <string name="notifications_channel_system_description">Neue Versionen von Overmail und alles, was die App selbst zu melden hat und keine E-Mail ist</string>
+    <string name="notifications_group_account_description">Postfächer des Overmail-Kontos „%1$s“ auf „%2$s“</string>
+    <string name="notifications_channel_mailbox_name">Neue E-Mails an %1$s</string>
+    <string name="notifications_channel_mailbox_description">E-Mails, die im Postfach „%1$s“ auf „%2$s“ eingehen</string>
+
+    <string name="notifications_ping_title">Testbenachrichtigung</string>
+    <string name="notifications_ping_text">Dein Server hat dieses Gerät erreicht. Push funktioniert.</string>
+
+    <!-- A mail arrived, and the app could not load it in time to say more. -->
+    <string name="notifications_new_email_fallback_title">Neue Mail</string>
+
+    <!-- The button on a mail's notification. -->
+    <string name="notifications_action_archive">Archivieren</string>
+</resources>

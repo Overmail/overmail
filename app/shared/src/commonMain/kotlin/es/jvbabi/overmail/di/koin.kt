@@ -19,6 +19,7 @@ import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
+import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.FileRepository
@@ -29,7 +30,9 @@ import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.RegisterPushTokenUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
+import es.jvbabi.overmail.domain.usecase.housekeeping.SyncNotificationChannelsUseCase
 import es.jvbabi.overmail.page.email.EmailViewModel
 import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
@@ -157,9 +160,14 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
         single<FileRepository> { FileRepositoryImpl() }
 
+        // What the platform was opened with, until the ui acts on it.
+        single { AppIntents() }
+
         singleOf(::GetCurrentAccountUseCase)
         singleOf(::SetCurrentAccountUseCase)
         singleOf(::KeepCurrentAccountValidUseCase)
+        singleOf(::RegisterPushTokenUseCase)
+        singleOf(::SyncNotificationChannelsUseCase)
         singleOf(::SetupApplicationUseCase)
 
         viewModelOf(::AppViewModel)

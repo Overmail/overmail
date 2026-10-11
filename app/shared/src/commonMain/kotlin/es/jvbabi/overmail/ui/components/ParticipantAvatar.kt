@@ -22,9 +22,7 @@ import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
-import coil3.network.NetworkHeaders
-import coil3.network.httpHeaders
-import coil3.request.ImageRequest
+import es.jvbabi.overmail.data.network.avatarRequest
 import es.jvbabi.overmail.domain.model.Participant
 
 /**
@@ -55,14 +53,7 @@ fun ParticipantAvatar(
             val context = LocalPlatformContext.current
             val account = participant.overmailAccount
             val request = remember(account.homeserver, path, account.token) {
-                val key = account.homeserver + path
-                ImageRequest.Builder(context)
-                    .data(account.homeserver.trimEnd('/') + path)
-                    // Behind the session like everything else on the homeserver.
-                    .httpHeaders(NetworkHeaders.Builder().set("Authorization", "Bearer ${account.token}").build())
-                    .memoryCacheKey(key)
-                    .diskCacheKey(key)
-                    .build()
+                participant.avatarRequest(context)?.build()
             }
             AsyncImage(
                 model = request,
@@ -97,7 +88,7 @@ private fun Initials(name: String, size: Dp) {
 }
 
 /** Up to two initials, the web's `initials()`: from the name's words, or the address's parts. */
-private fun initials(nameOrAddress: String): String = nameOrAddress
+internal fun initials(nameOrAddress: String): String = nameOrAddress
     .split(Regex("[\\s.@_-]+"))
     .filter { it.isNotEmpty() }
     .take(2)

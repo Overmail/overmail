@@ -21,4 +21,5 @@ would help every project and should move to Scaffold.
 
 | File | Deviation | Reason | Upstream |
 | --- | --- | --- | --- |
-| – | none | – | – |
+| `.github/actions/setup-android-project/action.yaml` | `google_services_file` input, restored to `app/android/google-services.json` | the app uses Firebase Cloud Messaging and the file is not committed | – |
+| `.github/workflows/deploy.yaml` | passes the `GOOGLE_SERVICES_FILE` secret to the setup action | same | – |

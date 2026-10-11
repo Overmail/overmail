@@ -58,8 +58,10 @@
             <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
                     {#snippet child({props})}
-                        <SidebarMenuButton {...props}>
-                            <Avatar.Root size="sm" class="-ms-0.5">
+                        <!-- Collapsed, the row is the avatar: less padding than a row with an icon
+                             has, because the avatar is wider than one. -->
+                        <SidebarMenuButton {...props} class="group-data-[collapsible=icon]:p-1!">
+                            <Avatar.Root size="sm" class="-ms-0.5 shrink-0 transition-[margin] group-data-[collapsible=icon]:ms-0">
                                 <Avatar.Fallback>{initials(name || user!.address)}</Avatar.Fallback>
                             </Avatar.Root>
                             <span class="flex-1">{name || user!.address}</span>

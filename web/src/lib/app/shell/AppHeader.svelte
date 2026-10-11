@@ -47,8 +47,10 @@
         class="bg-background sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-[width,height] ease-linear h-12"
 >
     <div class="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <Sidebar.Trigger class="-ms-1" />
-        <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4" />
+        <!-- Only where the sidebar is a sheet over the page: there this is the one way to it.
+             Beside the page it folds itself, from a button of its own. -->
+        <Sidebar.Trigger class="-ms-1 md:hidden" />
+        <Separator orientation="vertical" class="mx-2 data-[orientation=vertical]:h-4 md:hidden" />
         <h1 class="text-base font-medium">{item ? $_(item.key) : $_('app.name')}</h1>
         <!-- The controls and the room next to them are one item of the bar, not two: the bar
              sets a gap between its items, and a second item appearing would step them over by it

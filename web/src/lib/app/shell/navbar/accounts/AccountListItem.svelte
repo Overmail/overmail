@@ -12,7 +12,7 @@
     import {page} from "$app/state";
     import {Button} from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import {SidebarMenuButton, SidebarMenuTrailing} from "$lib/components/ui/sidebar";
+    import {SidebarMenuButton, SidebarMenuTrailing, useSidebar} from "$lib/components/ui/sidebar";
     import RenameInput from "$lib/app/views/RenameInput.svelte";
     import {accountView} from "$lib/app/views/predefinedViews";
     import {inlineViewHref} from "$lib/app/views/viewPath";
@@ -38,6 +38,8 @@
         onDelete: () => void;
     } = $props();
 
+    const sidebar = useSidebar();
+
     /** What the row says: the name, or the login of an account nobody named. */
     const label = $derived(inboxLabel(account));
 </script>
@@ -62,7 +64,7 @@
         {/snippet}
     </SidebarMenuButton>
 {:else}
-    <SidebarMenuButton {isActive} class="pr-8">
+    <SidebarMenuButton {isActive} class="pr-8" tooltipContent={label}>
         {#snippet child({props})}
             <a
                     href={inlineViewHref(accountView(account.id), page.url)}
@@ -74,6 +76,8 @@
                     }}
                     ondblclick={(event) => {
                         event.preventDefault();
+                        // Collapsed there is no name on screen to edit, only its icon.
+                        if (sidebar.state === "collapsed" && !sidebar.isMobile) return;
                         onRenameStart();
                     }}
             >

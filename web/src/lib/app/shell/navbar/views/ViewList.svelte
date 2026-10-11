@@ -160,7 +160,7 @@
                 <SidebarMenuItem>
                     <!-- aria-disabled, not disabled: the button variant already dims and blocks
                          that, and it keeps the row in the tab order while the request is out. -->
-                    <SidebarMenuButton onclick={create} aria-disabled={creating} class="text-sidebar-foreground/50">
+                    <SidebarMenuButton onclick={create} aria-disabled={creating} class="text-sidebar-foreground/50" tooltipContent="Neue Ansicht">
                         <PlusIcon/>
                         <span>Neue Ansicht</span>
                     </SidebarMenuButton>

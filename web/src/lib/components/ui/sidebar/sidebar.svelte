@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
 	import { cn, type WithElementRef } from "$lib/utils.js";
-	import { SIDEBAR_WIDTH_COMPACT, SIDEBAR_WIDTH_MOBILE } from "./constants.js";
+	import { SIDEBAR_WIDTH_COMPACT, SIDEBAR_WIDTH_ICON_COMPACT, SIDEBAR_WIDTH_MOBILE } from "./constants.js";
 	import { useSidebar } from "./context.svelte.js";
 	import type { HTMLAttributes } from "svelte/elements";
 	import { _ } from "svelte-i18n";
@@ -31,7 +31,11 @@
 
 	// `undefined` rather than "false", so the attribute is absent when it does not apply.
 	const compactAttr = $derived(compact ? "true" : undefined);
-	const compactWidth = $derived(compact ? `--sidebar-width: ${SIDEBAR_WIDTH_COMPACT};` : undefined);
+	const compactWidth = $derived(
+		compact
+			? `--sidebar-width: ${SIDEBAR_WIDTH_COMPACT}; --sidebar-width-icon: ${SIDEBAR_WIDTH_ICON_COMPACT};`
+			: undefined
+	);
 </script>
 
 {#if collapsible === "none"}
@@ -83,11 +87,13 @@
 		data-compact={compactAttr}
 		style={compactWidth}
 	>
-		<!-- This is what handles the sidebar gap on desktop -->
+		<!-- This is what handles the sidebar gap on desktop. It and the container below move on
+		     one curve -- fast out of the gate, long in settling -- so the page and the sidebar
+		     are one movement; a linear one reads as two things sliding. -->
 		<div
 			data-slot="sidebar-gap"
 			class={cn(
-				"transition-[width] duration-200 ease-linear relative w-(--sidebar-width) bg-transparent",
+				"transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] relative w-(--sidebar-width) bg-transparent",
 				"group-data-[collapsible=offcanvas]:w-0",
 				"group-data-[side=right]:rotate-180",
 				variant === "floating" || variant === "inset"
@@ -98,7 +104,7 @@
 		<div
 			data-slot="sidebar-container"
 			class={cn(
-				"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+				"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:flex",
 				side === "left"
 					? "start-0 group-data-[collapsible=offcanvas]:start-[calc(var(--sidebar-width)*-1)]"
 					: "end-0 group-data-[collapsible=offcanvas]:end-[calc(var(--sidebar-width)*-1)]",

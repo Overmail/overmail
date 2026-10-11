@@ -31,6 +31,7 @@ class MailboxImporter(
     private val synchronizer: FolderSynchronizer,
     private val connect: (ImapConnection) -> MailClient = ::imapClient,
     private val timings: Timings = Timings(),
+    private val telemetry: ImporterTelemetry = ImporterTelemetry.Disabled,
 ) {
     data class Timings(
         /** How often a folder is looked at without anything having announced a change. */
@@ -61,6 +62,7 @@ class MailboxImporter(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                telemetry.connectionFailed(connection)
                 logger.error("The importer of $username lost its mailbox, retrying in $retryDelay", e)
                 delay(retryDelay)
                 retryDelay = (retryDelay * 2).coerceAtMost(timings.pollInterval)
@@ -75,23 +77,25 @@ class MailboxImporter(
             val folders = client.getFolders().associateBy { it.fullName }
             onConnected()
 
-            connection.folders
-                .mapNotNull { sync ->
-                    val folder = folders[sync.folder]
-                    if (folder == null) logger.warn("No folder ${sync.folder} for $username; it may have been renamed")
-                    folder?.let { triggers(it, sync).map { _ -> it to sync } }
-                }
-                .merge()
-                .collect { (folder, sync) -> synchronize(folder, sync) }
+            telemetry.connected(connection) {
+                connection.folders
+                    .mapNotNull { sync ->
+                        val folder = folders[sync.folder]
+                        if (folder == null) logger.warn("No folder ${sync.folder} for $username; it may have been renamed")
+                        folder?.let { triggers(it, sync).map { trigger -> ImportContext(connection, sync, trigger) to it } }
+                    }
+                    .merge()
+                    .collect { (context, folder) -> synchronize(folder, context) }
+            }
         } finally {
             (client as? AutoCloseable)?.close()
         }
     }
 
     /** A failed pass costs that pass: the folder is due again with its next trigger. */
-    private suspend fun synchronize(folder: MailFolder, sync: ImapConnection.FolderSync) {
+    private suspend fun synchronize(folder: MailFolder, context: ImportContext) {
         try {
-            synchronizer.synchronize(folder, ImportContext(connection, sync))
+            synchronizer.synchronize(folder, context)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -101,16 +105,17 @@ class MailboxImporter(
 
     /**
      * Emits whenever [folder] is due, the first time right away. Conflated: any number of reasons
-     * that pile up while a pass is running are one reason to look again.
+     * that pile up while a pass is running are one reason to look again, and the last of them is
+     * the one the pass is put down to.
      */
-    private fun triggers(folder: MailFolder, sync: ImapConnection.FolderSync): Flow<Unit> = channelFlow {
+    private fun triggers(folder: MailFolder, sync: ImapConnection.FolderSync): Flow<ImportTrigger> = channelFlow {
         launch {
             while (true) {
-                send(Unit)
+                send(ImportTrigger.Poll)
                 delay(timings.pollInterval)
             }
         }
-        if (sync.imapPush) launch { watch(folder) { send(Unit) } }
+        if (sync.imapPush) launch { watch(folder) { send(it) } }
     }.conflate()
 
     /**
@@ -122,17 +127,29 @@ class MailboxImporter(
      * Every `IDLE` that is issued, the first, a renewed and a recovered one, is a reason to look
      * as well: nothing reported what changed while none was held.
      */
-    private suspend fun watch(folder: MailFolder, onChange: suspend () -> Unit) {
+    private suspend fun watch(folder: MailFolder, onChange: suspend (ImportTrigger) -> Unit) {
         folder.getIdleFolder().use { idle ->
             while (true) {
-                onChange()
+                onChange(ImportTrigger.IdleStarted)
                 try {
-                    val renewed = withTimeoutOrNull(timings.idleRenewInterval) { idle.events().collect { onChange() } } == null
-                    if (renewed) continue
+                    val renewed = withTimeoutOrNull(timings.idleRenewInterval) {
+                        telemetry.watching(connection, folder) {
+                            idle.events().collect {
+                                telemetry.watchEvent(connection, folder)
+                                onChange(ImportTrigger.IdleChange)
+                            }
+                        }
+                    } == null
+                    if (renewed) {
+                        telemetry.watchEnded(connection, folder, ImporterTelemetry.WatchEnd.Renewed)
+                        continue
+                    }
+                    telemetry.watchEnded(connection, folder, ImporterTelemetry.WatchEnd.Ended)
                     logger.warn("The watch on ${folder.fullName} of $username ended by itself, watching again in ${timings.retryDelay}")
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    telemetry.watchEnded(connection, folder, ImporterTelemetry.WatchEnd.Failed)
                     logger.warn("The watch on ${folder.fullName} of $username failed, watching again in ${timings.retryDelay}", e)
                 }
                 delay(timings.retryDelay)

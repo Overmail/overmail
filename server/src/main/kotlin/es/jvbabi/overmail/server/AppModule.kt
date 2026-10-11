@@ -47,6 +47,7 @@ import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizer
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
 import es.jvbabi.overmail.server.jobs.importer.GeneratePreviewStep
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterTelemetry
 import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
 import es.jvbabi.overmail.server.jobs.importer.PushStep
 import es.jvbabi.overmail.server.jobs.importer.NotifyStep
@@ -230,6 +231,8 @@ internal fun overmailModule(application: CoroutineScope) = module {
     single<PushQueue> { PushQueue(database = get(), sender = get()) }
     single<PushNotifications> { PushNotifications(queue = get()) }
 
+    single<ImporterTelemetry> { ImporterTelemetry(openTelemetry = get()) }
+
     single<EmailInserter> { EmailInserterImpl(database = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
@@ -243,15 +246,17 @@ internal fun overmailModule(application: CoroutineScope) = module {
                 NotifyStep(mailNotifier = get()),
                 PushStep(push = get<PushNotifications>()::newEmail),
             ),
+            telemetry = get(),
         )
     }
 
-    single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), pipeline = get()) }
+    single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), telemetry = get(), pipeline = get()) }
 
     single<ImporterManager> {
         val synchronizer = get<FolderSynchronizer>()
-        ImporterManager(database = get(), coroutineScope = application) { connection ->
-            MailboxImporter(connection, synchronizer).run()
+        val telemetry = get<ImporterTelemetry>()
+        ImporterManager(database = get(), coroutineScope = application, telemetry = telemetry) { connection ->
+            MailboxImporter(connection, synchronizer, telemetry = telemetry).run()
         }
     }
 }

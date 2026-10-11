@@ -29,6 +29,7 @@ private const val MAX_ATTEMPTS_PER_MAIL = 3
  */
 class FolderSynchronizerImpl(
     private val database: OvermailDatabase,
+    private val telemetry: ImporterTelemetry = ImporterTelemetry.Disabled,
     private val pipeline: EmailImportPipeline,
 ) : FolderSynchronizer {
 
@@ -60,38 +61,45 @@ class FolderSynchronizerImpl(
 
         try {
             // The server says where its next UID starts, so "nothing new" costs no fetch.
-            if (state.uidNext?.let { start + 1 >= it } == true) return
+            if (state.uidNext?.let { start + 1 >= it } == true) {
+                telemetry.passUnchanged(context)
+                return
+            }
 
-            folder.getMails {
-                uidRange(start + 1)
-                envelope = true
-                flags = true
-                uid = true
-                onUnreadable { mail ->
-                    logger.error("Mail ${mail.uid ?: "#${mail.sequenceNumber}"} of ${folder.fullName} (${account.authentication.username}) cannot be read, skipping it", mail.cause)
-                    mail.uid?.let { reached = maxOf(reached, it) }
-                }
-            }.collect { mail ->
-                val uid = mail.uid.await()
-                try {
-                    val result = pipeline.import(mail, context)
-                    if (result is EmailInserter.Result.Rejected) {
-                        logger.warn("Skipping mail $uid of ${folder.fullName} (${account.authentication.username}): ${result.reason}")
+            telemetry.pass(context, firstUid = start + 1) { pass ->
+                folder.getMails {
+                    uidRange(start + 1)
+                    envelope = true
+                    flags = true
+                    uid = true
+                    onUnreadable { mail ->
+                        logger.error("Mail ${mail.uid ?: "#${mail.sequenceNumber}"} of ${folder.fullName} (${account.authentication.username}) cannot be read, skipping it", mail.cause)
+                        pass.unreadable()
+                        mail.uid?.let { reached = maxOf(reached, it) }
                     }
-                    failures.remove(key)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    if (!giveUpOn(key, uid)) {
-                        failedAt = uid
+                }.collect { mail ->
+                    val uid = mail.uid.await()
+                    try {
+                        val result = pass.mail(uid) { pipeline.import(mail, context) }
+                        if (result is EmailInserter.Result.Rejected) {
+                            logger.warn("Skipping mail $uid of ${folder.fullName} (${account.authentication.username}): ${result.reason}")
+                        }
+                        failures.remove(key)
+                    } catch (e: CancellationException) {
                         throw e
+                    } catch (e: Exception) {
+                        if (!giveUpOn(key, uid)) {
+                            failedAt = uid
+                            throw e
+                        }
+                        pass.abandoned()
+                        logger.error("Giving up on mail $uid of ${folder.fullName} (${account.authentication.username}) after $MAX_ATTEMPTS_PER_MAIL attempts", e)
                     }
-                    logger.error("Giving up on mail $uid of ${folder.fullName} (${account.authentication.username}) after $MAX_ATTEMPTS_PER_MAIL attempts", e)
-                }
-                reached = maxOf(reached, uid)
-                if (++sinceSave >= CURSOR_SAVE_INTERVAL) {
-                    sinceSave = 0
-                    save()
+                    reached = maxOf(reached, uid)
+                    if (++sinceSave >= CURSOR_SAVE_INTERVAL) {
+                        sinceSave = 0
+                        save()
+                    }
                 }
             }
         } finally {

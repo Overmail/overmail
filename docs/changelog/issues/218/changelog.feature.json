@@ -1,0 +1,10 @@
+{
+  "title": "Names for mailboxes",
+  "description": "A mailbox can be given a name on the web. The app shows it instead of the login: in the account filter, in groups, and on notifications.",
+  "localized": {
+    "de": {
+      "title": "Namen für Postfächer",
+      "description": "Ein Postfach kann im Web einen Namen bekommen. Die App zeigt ihn anstelle des Benutzernamens: im Konto-Filter, in Gruppen und in Benachrichtigungen."
+    }
+  }
+}

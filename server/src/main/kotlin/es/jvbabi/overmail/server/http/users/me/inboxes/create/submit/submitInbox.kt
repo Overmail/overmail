@@ -16,6 +16,7 @@ import es.jvbabi.overmail.server.http.api.requireOwnedOAuthOnboardingFromUrl
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.api.requireThat
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.inboxName
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
 import es.jvbabi.overmail.server.oauth.OAuthTokens
 import io.ktor.server.application.ApplicationCall
@@ -66,7 +67,7 @@ fun Route.inboxSubmitRoute() {
          *
          * Responses:
          *   - 201 [SubmitInboxResponse] The new inbox
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host, username or password, an invalid port, or no folders or one listed twice
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host, username or password, an invalid port, a name that is too long, or no folders or one listed twice
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user has an inbox with the same host, port and username
          */
         post {
@@ -83,6 +84,7 @@ fun Route.inboxSubmitRoute() {
 
             call.createInbox(
                 userId = user.id.value,
+                name = inboxName(request.name),
                 host = host,
                 port = request.imap.port,
                 username = request.imap.username,
@@ -115,7 +117,7 @@ fun Route.oauthInboxSubmitRoute() {
          *
          * Responses:
          *   - 201 [SubmitInboxResponse] The new inbox
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No folders, or one listed twice
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A name that is too long, no folders, or one listed twice
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The user already has an inbox for this mailbox
          */
         post {
@@ -127,6 +129,7 @@ fun Route.oauthInboxSubmitRoute() {
 
             call.createInbox(
                 userId = call.requireAuthenticatedUserId(),
+                name = inboxName(request.name),
                 host = onboarding.provider.imapHost,
                 port = onboarding.provider.imapPort,
                 username = onboarding.address,
@@ -147,6 +150,7 @@ fun Route.oauthInboxSubmitRoute() {
  */
 private suspend fun ApplicationCall.createInbox(
     userId: Uuid,
+    name: String?,
     host: String,
     port: Int,
     username: String,
@@ -204,6 +208,7 @@ private suspend fun ApplicationCall.createInbox(
 
     val accountId = database.query {
         val imapAccount = ImapAccount.new {
+            this.name = name
             this.host = host
             this.port = port
             this.username = username
@@ -268,6 +273,8 @@ private fun SubmitInboxRequest.FolderSettings.AiImportSettings.stored(
 
 @Serializable
 private data class SubmitInboxRequest(
+    @JsonSchema.Description("What the user calls it; null or blank leaves it without a name")
+    @SerialName("name") val name: String? = null,
     @SerialName("imap") val imap: Imap,
     @JsonSchema.Description("Every folder to sync")
     @SerialName("folder_settings") val folderSettings: List<FolderSettings>,
@@ -318,6 +325,8 @@ private data class SubmitInboxRequest(
 
 @Serializable
 private data class SubmitOAuthInboxRequest(
+    @JsonSchema.Description("What the user calls it; null or blank leaves it without a name")
+    @SerialName("name") val name: String? = null,
     @JsonSchema.Description("Every folder to sync")
     @SerialName("folder_settings") val folderSettings: List<SubmitInboxRequest.FolderSettings>,
 )

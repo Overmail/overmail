@@ -122,7 +122,7 @@ private fun groupLabel(group: ViewResult.Group, sender: Participant?): String = 
     is ViewResult.Group.Year -> group.year.toString()
     is ViewResult.Group.Day -> dayLabel(group.date)
     is ViewResult.Group.Sender -> sender?.name ?: sender?.email ?: stringResource(Res.string.home_group_sender_unknown)
-    is ViewResult.Group.ImapAccount -> group.imapAccount.username
+    is ViewResult.Group.ImapAccount -> group.imapAccount.displayName
     is ViewResult.Group.Read -> stringResource(if (group.isRead) Res.string.home_group_read else Res.string.home_group_unread)
     is ViewResult.Group.Archived -> stringResource(
         when (group.state) {

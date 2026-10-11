@@ -6,6 +6,7 @@
     import ServerStep from "$lib/app/settings/email-accounts/new/ServerStep.svelte";
     import CredentialsStep from "$lib/app/settings/email-accounts/new/CredentialsStep.svelte";
     import FolderStep from "$lib/app/settings/email-accounts/new/FolderStep.svelte";
+    import NameField from "$lib/app/settings/email-accounts/new/NameField.svelte";
     import {NewEmailAccountViewModel} from "$lib/app/settings/email-accounts/new/NewEmailAccountViewModel.svelte.ts";
     import {useRepositories} from "$lib/repository/repositories";
     import {OAUTH_PROVIDER_LOOKS} from "$lib/app/settings/email-accounts/new/oauthProviderLooks";
@@ -48,7 +49,7 @@
 
         const form = new NewEmailAccountViewModel(inboxSetup, {
             inboxId: target.id,
-            save: (imap, folders) => inboxRepository.update(target.id, imap, folders),
+            save: (imap, folders, name) => inboxRepository.update(target.id, imap, folders, name),
         });
         viewModel = form;
         loading = {type: "loading"};
@@ -180,8 +181,14 @@
                     </section>
                 {/if}
 
-                <!-- No folders to show while the provider refuses the sign-in: nothing could read them. -->
+                <!-- No folders to show while the provider refuses the sign-in: nothing could read them.
+                     Nor the name: it is saved with the folders, and there is no saving without them. -->
                 {#if !viewModel.requiresReauthentication}
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-medium">{$_("settings.emailAccounts.name.label")}</h3>
+                        <NameField viewModel={viewModel} labelled={false} />
+                    </section>
+
                     <section class="flex flex-col gap-2">
                         <h3 class="text-sm font-medium">{$_("settings.emailAccounts.edit.folders")}</h3>
                         <FolderStep viewModel={viewModel} />

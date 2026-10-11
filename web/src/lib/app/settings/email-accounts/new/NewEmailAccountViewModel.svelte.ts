@@ -22,7 +22,7 @@ import type {
  */
 export type InboxEditing = {
     inboxId: string;
-    save: (imap: InboxConnection, folders: SubmitInboxFolder[]) => Promise<SubmitInboxResult>;
+    save: (imap: InboxConnection, folders: SubmitInboxFolder[], name: string | null) => Promise<SubmitInboxResult>;
 };
 
 /**
@@ -140,6 +140,12 @@ export type FolderRow = {
 export class NewEmailAccountViewModel {
     step: SetupStep = $state("server");
 
+    /**
+     * What the user calls the mailbox. Optional, and checked against nothing: one left empty is
+     * a mailbox shown by its login.
+     */
+    name = $state("");
+
     host = $state("");
     port = $state(DEFAULT_IMAP_PORT);
     imapServerTest: ImapServerTest = $state({type: "idle"});
@@ -216,6 +222,7 @@ export class NewEmailAccountViewModel {
      */
     prefill(detail: InboxDetail) {
         this.#storedSettings = new Map(detail.folders.map((folder) => [folder.folderName, folder]));
+        this.name = detail.name ?? "";
         this.host = detail.host;
         this.port = detail.port;
         this.username = detail.username;
@@ -433,11 +440,12 @@ export class NewEmailAccountViewModel {
                 password: this.password,
             };
             const folders = this.keptFolders.map(toSubmitFolder);
+            const name = this.name.trim() || null;
             const result = this.editing
-                ? await this.editing.save(imap, folders)
+                ? await this.editing.save(imap, folders, name)
                 : this.oauthOnboarding
-                  ? await this.inboxSetup.submitOAuthInbox(this.oauthOnboarding.id, folders, running.signal)
-                  : await this.inboxSetup.submitInbox(imap, folders, running.signal);
+                  ? await this.inboxSetup.submitOAuthInbox(this.oauthOnboarding.id, folders, name, running.signal)
+                  : await this.inboxSetup.submitInbox(imap, folders, name, running.signal);
             if (running.signal.aborted) return false;
 
             if (result.type === "conflict") {
@@ -459,6 +467,7 @@ export class NewEmailAccountViewModel {
     reset() {
         this.dispose();
         this.step = "server";
+        this.name = "";
         this.host = "";
         this.port = DEFAULT_IMAP_PORT;
         this.imapServerTest = {type: "idle"};

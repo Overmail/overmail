@@ -12,6 +12,7 @@
     import {locale, _} from "svelte-i18n";
     import {Checkbox} from "$lib/components/ui/checkbox";
     import {cn} from "$lib/utils";
+    import {inboxLabel} from "$lib/repository/InboxRepository";
     import {useRepositories} from "$lib/repository/repositories";
     import type {MailGroupNode} from "$lib/app/mails/mailLayout";
     import type {MailListViewModel} from "$lib/app/mails/MailListViewModel.svelte";
@@ -57,7 +58,7 @@
     });
 
     /** The accounts, read once for the headers that name one. */
-    let accounts = $state<{id: string; username: string}[]>([]);
+    let accounts = $state<{id: string; label: string}[]>([]);
 
     $effect(() => {
         if (label?.kind !== "account") return;
@@ -65,7 +66,7 @@
         const controller = new AbortController();
         inboxes
             .list(controller.signal)
-            .then((result) => (accounts = result.map((inbox) => ({id: inbox.id, username: inbox.username}))))
+            .then((result) => (accounts = result.map((inbox) => ({id: inbox.id, label: inboxLabel(inbox)}))))
             .catch(() => {});
 
         return () => controller.abort();
@@ -105,7 +106,7 @@
                 return sender?.value?.name ?? sender?.value?.address ?? "…";
 
             case "account":
-                return accounts.find((account) => account.id === label.id)?.username ?? "…";
+                return accounts.find((account) => account.id === label.id)?.label ?? "…";
 
             case "read":
                 return $_(label.isRead ? "mails.groups.read" : "mails.groups.unread");

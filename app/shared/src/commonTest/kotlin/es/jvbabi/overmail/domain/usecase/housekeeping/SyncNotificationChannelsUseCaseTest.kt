@@ -130,6 +130,7 @@ class SyncNotificationChannelsUseCaseTest {
 
     private fun mailbox(name: String, account: OvermailAccount) = ImapAccount(
         id = Uuid.random(),
+        name = null,
         host = "imap.example.com",
         port = 993,
         username = name,

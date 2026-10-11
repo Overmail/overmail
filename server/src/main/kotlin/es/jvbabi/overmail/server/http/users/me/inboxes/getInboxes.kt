@@ -47,6 +47,7 @@ fun Route.getInboxes() {
                 val accounts = ImapAccounts
                     .select(
                         ImapAccounts.id,
+                        ImapAccounts.name,
                         ImapAccounts.host,
                         ImapAccounts.port,
                         ImapAccounts.username,
@@ -57,6 +58,7 @@ fun Route.getInboxes() {
                     .map { row ->
                         InboxesResponse.Inbox(
                             id = row[ImapAccounts.id].value,
+                            name = row[ImapAccounts.name],
                             host = row[ImapAccounts.host],
                             port = row[ImapAccounts.port],
                             username = row[ImapAccounts.username],
@@ -115,6 +117,8 @@ private data class InboxesResponse(
     @Serializable
     data class Inbox(
         @SerialName("id") val id: Uuid,
+        @JsonSchema.Description("What the user calls it; null for one without a name, which is shown by its username")
+        @SerialName("name") val name: String?,
         @SerialName("host") val host: String,
         @SerialName("port") val port: Int,
         @JsonSchema.Description("The IMAP login, for most providers the address itself")

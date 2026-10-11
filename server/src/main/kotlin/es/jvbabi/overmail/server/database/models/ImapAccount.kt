@@ -8,6 +8,12 @@ import kotlin.uuid.Uuid
 
 object ImapAccounts : UuidTable("imap_accounts") {
     val user = reference("user_id", Users)
+
+    /**
+     * What the user calls it. Null for one nobody named, which is shown by its [username] -- so
+     * a client falls back, and nothing here makes a name up.
+     */
+    val name = varchar("name", NAME_MAX_LENGTH).nullable()
     val host = varchar("host", 255)
     val port = integer("port")
     val username = varchar("username", 255)
@@ -24,12 +30,15 @@ object ImapAccounts : UuidTable("imap_accounts") {
      * connection just stops being polled and watched. See `ImporterManager`.
      */
     val isPaused = bool("is_paused").default(false)
+
+    const val NAME_MAX_LENGTH = 255
 }
 
 class ImapAccount(id: EntityID<Uuid>) : UuidEntity(id) {
     companion object : UuidEntityClass<ImapAccount>(ImapAccounts)
 
     var user by User referencedOn ImapAccounts.user
+    var name by ImapAccounts.name
     var host by ImapAccounts.host
     var port by ImapAccounts.port
     var username by ImapAccounts.username

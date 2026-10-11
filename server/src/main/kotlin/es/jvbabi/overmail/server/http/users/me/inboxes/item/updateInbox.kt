@@ -36,7 +36,7 @@ import org.koin.ktor.ext.get
 /**
  * Saves the edit screen: `PUT /api/users/me/inboxes/{inboxId}`.
  *
- * Everything the screen can change goes in one request -- the connection, the login, and which
+ * Everything the screen can change goes in one request -- the name, the connection, the login, and which
  * folders are synced with what. The folder rows are replaced wholesale rather than diffed: the
  * screen sends the complete set it is showing, so anything missing from it is a folder the user
  * took out, and a diff would only be a slower way of arriving at the same table.
@@ -53,7 +53,7 @@ fun Route.updateInbox() {
         /**
          * Save an inbox.
          *
-         * Description: The connection and the complete folder settings; a folder left out stops syncing. An empty password keeps the stored one; one signed in to at a provider keeps its connection. The importer restarts afterwards.
+         * Description: The name, the connection and the complete folder settings; a folder left out stops syncing. An empty password keeps the stored one; one signed in to at a provider keeps its connection. The importer restarts afterwards.
          *
          * Tag: Inboxes
          *
@@ -61,7 +61,7 @@ fun Route.updateInbox() {
          *
          * Responses:
          *   - 200 [UpdateInboxResponse] The inbox is saved
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, or no folders or one listed twice
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank host or username, an invalid port, a name that is too long, or no folders or one listed twice
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] Another inbox of the user has the same host, port and username
          */
         put {
@@ -71,6 +71,7 @@ fun Route.updateInbox() {
 
             val inboxId = inboxIdFromPath(call.parameters["inboxId"])
             val request = call.receive<UpdateInboxRequest>()
+            val name = inboxName(request.name)
 
             if (request.folderSettings.isEmpty()) invalidRequest("folder_settings", "an inbox needs a folder")
             val duplicate = request.folderSettings
@@ -133,6 +134,7 @@ fun Route.updateInbox() {
 
             database.query {
                 ImapAccounts.update({ ImapAccounts.id eq inboxId }) {
+                    it[ImapAccounts.name] = name
                     it[host] = credentials.host
                     it[port] = credentials.port
                     it[username] = credentials.username
@@ -183,6 +185,8 @@ private fun UpdateInboxRequest.FolderSettings.WireAiScope.stored(
 
 @Serializable
 internal data class UpdateInboxRequest(
+    @JsonSchema.Description("What the user calls it; null or blank leaves it without a name")
+    @SerialName("name") val name: String? = null,
     @SerialName("imap") val imap: Imap,
     @JsonSchema.Description("Every folder to sync; one left out stops syncing")
     @SerialName("folder_settings") val folderSettings: List<FolderSettings>,

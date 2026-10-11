@@ -151,7 +151,7 @@ class PushNotifier(
             .setContentTitle(email.sentBy.displayName)
             .setContentText(subject)
             // Which mailbox, for whoever has several.
-            .setSubText(email.imapAccount.username)
+            .setSubText(email.imapAccount.displayName)
             .setLargeIcon(avatarOf(email.sentBy))
             .addAction(
                 R.drawable.ic_notification,
@@ -184,7 +184,7 @@ class PushNotifier(
             id = EMAIL_GROUP_NOTIFICATION_ID,
             NotificationCompat.Builder(context, NotificationChannelRepositoryImpl.imapAccountChannelId(imapAccount.id))
                 .setSmallIcon(R.drawable.ic_notification)
-                .setSubText(imapAccount.username)
+                .setSubText(imapAccount.displayName)
                 .setCategory(NotificationCompat.CATEGORY_EMAIL)
                 .setGroup(groupKey(imapAccount.id))
                 .setGroupSummary(true)

@@ -59,7 +59,7 @@ fun Route.getInbox() {
             val inbox = call.database().query {
                 val account = ImapAccounts
                     .join(OAuthGrants, JoinType.LEFT, ImapAccounts.id, OAuthGrants.imapAccount)
-                    .select(ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused, OAuthGrants.provider, OAuthGrants.requiresReauthentication)
+                    .select(ImapAccounts.name, ImapAccounts.host, ImapAccounts.port, ImapAccounts.username, ImapAccounts.isPaused, OAuthGrants.provider, OAuthGrants.requiresReauthentication)
                     .where { (ImapAccounts.id eq inboxId) and (ImapAccounts.user eq userId) }
                     .firstOrNull() ?: return@query null
 
@@ -77,6 +77,7 @@ fun Route.getInbox() {
 
                 InboxDetailResponse(
                     id = inboxId,
+                    name = account[ImapAccounts.name],
                     host = account[ImapAccounts.host],
                     port = account[ImapAccounts.port],
                     username = account[ImapAccounts.username],
@@ -201,6 +202,8 @@ internal data class EditInboxConnectionRequest(
 @Serializable
 internal data class InboxDetailResponse(
     @SerialName("id") val id: Uuid,
+    @JsonSchema.Description("What the user calls it; null for one without a name, which is shown by its username")
+    @SerialName("name") val name: String? = null,
     @SerialName("host") val host: String,
     @SerialName("port") val port: Int,
     @SerialName("username") val username: String,

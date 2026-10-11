@@ -16,6 +16,7 @@ data class EmbeddedImapAccount(
 ) {
     fun toModel(): ImapAccount = ImapAccount(
         id = imapAccount.id,
+        name = imapAccount.name,
         host = imapAccount.host,
         port = imapAccount.port,
         username = imapAccount.username,

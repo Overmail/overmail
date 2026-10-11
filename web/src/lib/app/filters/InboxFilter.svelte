@@ -10,11 +10,9 @@
     The ids are the accounts' own, which is what `ViewFilter.imapAccountIds` holds.
 -->
 <script lang="ts" module>
-    /** The least an account has to be to be named on the chip; an [Inbox] is one. */
+    /** The least an account has to be to be picked; an [Inbox] is one. */
     export type PickedInbox = {
         id: string;
-        /** The imap login, which for most providers is the address itself. */
-        username: string;
     };
 </script>
 
@@ -25,7 +23,7 @@
     import {Skeleton} from "$lib/components/ui/skeleton";
     import {filterChip} from "$lib/app/filters/chip";
     import {summarisePicked} from "$lib/app/filters/summarise";
-    import type {Inbox} from "$lib/repository/InboxRepository";
+    import {inboxLabel, type Inbox} from "$lib/repository/InboxRepository";
     import {useRepositories} from "$lib/repository/repositories";
     import {cn} from "$lib/utils";
 
@@ -54,6 +52,9 @@
     let available: Inbox[] = $state([]);
     let listState: "loading" | "ready" | "failed" = $state("loading");
 
+    /** What an account is called, as far as the list knows it yet. */
+    const labelOf = (inbox: Inbox | undefined) => (inbox ? inboxLabel(inbox) : "…");
+
     /** No account picked is not a filter, and the chip says so by looking like every other one. */
     const active = $derived(ids.length > 0);
 
@@ -61,11 +62,11 @@
     const accounts = $derived(
         ids.map((id) => ({
             id,
-            username: available.find((inbox) => inbox.id === id)?.username ?? "…",
+            label: labelOf(available.find((inbox) => inbox.id === id)),
         }))
     );
 
-    const summary = $derived(summarisePicked(accounts.map((account) => account.username)));
+    const summary = $derived(summarisePicked(accounts.map((account) => account.label)));
 
     const chip = $derived(filterChip({active}));
 
@@ -163,11 +164,14 @@
                             onclick={() => toggle(account)}
                     >
                         <EnvelopeSimpleIcon class="size-3.5 shrink-0"/>
-                        <!-- The host under the login: two accounts at the same provider are told
-                             apart by the login, two logins of the same name by the host. -->
+                        <!-- The login under the name, and the host under a login that has none: two
+                             accounts called the same are told apart by the login, two logins of the
+                             same name by the host. -->
                         <span class="flex min-w-0 flex-1 flex-col">
-                            <span class="truncate">{account.username}</span>
-                            <span class="truncate text-xs text-muted-foreground">{account.host}</span>
+                            <span class="truncate">{inboxLabel(account)}</span>
+                            <span class="truncate text-xs text-muted-foreground">
+                                {account.name === null ? account.host : account.username}
+                            </span>
                         </span>
                         {#if ids.includes(account.id)}
                             <CheckIcon class="size-3.5 shrink-0"/>

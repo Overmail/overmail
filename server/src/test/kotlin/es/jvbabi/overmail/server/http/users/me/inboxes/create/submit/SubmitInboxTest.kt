@@ -87,8 +87,8 @@ class SubmitInboxTest {
         ai = ApplicationConfig.AiConfig(apiKey = "none", model = "test-model", baseUrl = "http://localhost:1"),
     )
 
-    private fun body(folders: String, host: String = "127.0.0.1", password: String = "secret") = """
-        {"imap":{"host":"$host","port":$deadPort,"username":"julius","password":"$password"},
+    private fun body(folders: String, host: String = "127.0.0.1", password: String = "secret", name: String? = null) = """
+        {${if (name == null) "" else "\"name\":\"$name\","}"imap":{"host":"$host","port":$deadPort,"username":"julius","password":"$password"},
          "folder_settings":[$folders]}
     """.trimIndent()
 
@@ -186,6 +186,28 @@ class SubmitInboxTest {
             ImapAccountFolderSync.AiImportSettings.AfterDate(kotlin.time.Instant.fromEpochSeconds(1700000000)),
             stored.getValue("Sent").second,
         )
+    }
+
+    @Test
+    fun `an inbox is stored with the name it was given, and without one when that is blank`() = testApplication {
+        setUpUser()
+        installRoute()
+
+        suspend fun submit(host: String, name: String?): String? {
+            val response = client.post(ROUTE) {
+                contentType(ContentType.Application.Json)
+                setBody(body(folders = folder("INBOX", false, """{"type":"all_messages"}"""), host = host, name = name))
+            }
+            assertEquals(HttpStatusCode.Created, response.status)
+            val id = Json.parseToJsonElement(response.bodyAsText()).jsonObject["id"]!!.jsonPrimitive.content
+
+            return database.query { ImapAccount.findById(Uuid.parse(id))!!.name }
+        }
+
+        assertEquals("Work", submit("127.0.0.1", "  Work "))
+        // Nothing made up for it: a client shows the login instead.
+        assertEquals(null, submit("127.0.0.2", "   "))
+        assertEquals(null, submit("127.0.0.3", null))
     }
 
     @Test

@@ -6,6 +6,7 @@
     import ServerStep from "./ServerStep.svelte";
     import CredentialsStep from "./CredentialsStep.svelte";
     import FolderStep from "./FolderStep.svelte";
+    import NameField from "./NameField.svelte";
     import AnimatedHeight from "./AnimatedHeight.svelte";
     import {useRepositories} from "$lib/repository/repositories";
     import {_} from "svelte-i18n";
@@ -134,7 +135,12 @@
                 {:else if step === "credentials"}
                     <CredentialsStep {viewModel} />
                 {:else}
-                    <FolderStep {viewModel} />
+                    <!-- With the folders, because that is the one step every way in arrives at:
+                         a sign-in at a provider skips the two before it. -->
+                    <div class="flex flex-col gap-4">
+                        <NameField {viewModel} />
+                        <FolderStep {viewModel} />
+                    </div>
                 {/if}
             </AnimatedHeight>
 

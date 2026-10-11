@@ -126,12 +126,14 @@ test("the submit body is exactly what the server's route reads", async () => {
             {folderName: "Sent", imapPush: false, aiImport: {type: "after_date", timestamp: 1757023200}},
             {folderName: "Spam", imapPush: false, aiImport: {type: "all_messages"}},
         ],
+        "Work",
     );
 
     expect(result).toEqual({type: "created", id: "acc-1"});
     // Snake case and the `type` discriminator are the contract; SubmitInboxTest.kt pins the
     // other end of it with this same payload.
     expect(JSON.parse(sent!)).toEqual({
+        name: "Work",
         imap: {host: "imap.example.com", port: 993, username: "julius", password: "secret"},
         folder_settings: [
             {folder_name: "INBOX", imap_push: true, ai_import: {type: "only_new_messages"}},
@@ -149,6 +151,7 @@ test("a mailbox the user already has is an answer, not a throw", async () => {
         await new InboxSetupRepository().submitInbox(
             {host: "h", port: 993, username: "u", password: "p"},
             [{folderName: "INBOX", imapPush: false, aiImport: {type: "all_messages"}}],
+            null,
         ),
     ).toEqual({type: "conflict"});
 });

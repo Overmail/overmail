@@ -5,7 +5,6 @@
         SidebarFooter,
         SidebarGroup,
         SidebarGroupContent,
-        SidebarGroupLabel,
         SidebarHeader,
         SidebarMenu,
         SidebarMenuButton,
@@ -21,7 +20,7 @@
     import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
     import favicon from "$lib/assets/favicon.svg";
     import {useRepositories} from "$lib/repository/repositories";
-    import type {Inbox} from "$lib/repository/InboxRepository";
+    import {inboxLabel, type Inbox} from "$lib/repository/InboxRepository";
     import {accountView} from "$lib/app/views/predefinedViews";
     import {inlineViewHref, inlineViewParam, VIEW_PARAM} from "$lib/app/views/viewPath";
 
@@ -73,11 +72,9 @@
         </SidebarGroup>
 
         <!-- One row per connected mail account, each a listing the app builds: the account as a
-             whole, see `accountView`, spelled out in the link. Nothing while there is none -- a heading over an empty
-             list says less than no heading. -->
+             whole, see `accountView`, spelled out in the link. -->
         {#if accounts.length > 0}
             <SidebarGroup>
-                <SidebarGroupLabel>{$_('app.nav.accounts')}</SidebarGroupLabel>
                 <SidebarGroupContent>
                     <SidebarMenu>
                         {#each accounts as account (account.id)}
@@ -87,7 +84,7 @@
                                     {#snippet child({ props })}
                                         <a href={inlineViewHref(view, page.url)} {...props}>
                                             <UserCircleIcon />
-                                            <span>{account.username}</span>
+                                            <span>{inboxLabel(account)}</span>
                                         </a>
                                     {/snippet}
                                 </SidebarMenuButton>
@@ -99,7 +96,6 @@
         {/if}
 
         <SidebarGroup>
-            <SidebarGroupLabel>Ansichten</SidebarGroupLabel>
             <ViewList />
         </SidebarGroup>
     </SidebarContent>

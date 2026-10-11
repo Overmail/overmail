@@ -46,6 +46,7 @@ private val PREVIEW_IMAP_ACCOUNTS = listOf("preview@example.com", "preview.work@
     .mapIndexed { index, username ->
         ImapAccount(
             id = Uuid.fromLongs(1, index.toLong()),
+            name = null,
             host = "imap.example.com",
             port = 993,
             username = username,

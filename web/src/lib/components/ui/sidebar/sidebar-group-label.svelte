@@ -15,7 +15,7 @@
 
 	const mergedProps = $derived({
 		class: cn(
-			"h-8 rounded-xl px-3 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 flex shrink-0 items-center outline-hidden [&>svg]:shrink-0",
+			"h-8 rounded-lg px-3 text-xs font-medium text-sidebar-foreground/50 ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 flex shrink-0 items-center outline-hidden [&>svg]:shrink-0",
 			// The icon-collapsed margin hides the label by pulling it up by its own height, so a
 			// shorter label needs a shorter pull. Both conditions sit on the same element, hence
 			// one selector instead of two stacked group variants.

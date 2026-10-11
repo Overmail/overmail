@@ -5,7 +5,6 @@
         SidebarFooter,
         SidebarGroup,
         SidebarGroupContent,
-        SidebarGroupLabel,
         SidebarHeader,
         SidebarMenu,
         SidebarMenuButton,
@@ -21,7 +20,7 @@
     import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
     import favicon from "$lib/assets/favicon.svg";
     import {useRepositories} from "$lib/repository/repositories";
-    import type {Inbox} from "$lib/repository/InboxRepository";
+    import {inboxLabel, type Inbox} from "$lib/repository/InboxRepository";
     import {accountView} from "$lib/app/views/predefinedViews";
     import {inlineViewHref, inlineViewParam, VIEW_PARAM} from "$lib/app/views/viewPath";
 
@@ -73,34 +72,19 @@
         </SidebarGroup>
 
         <!-- One row per connected mail account, each a listing the app builds: the account as a
-             whole, see `accountView`, spelled out in the link. Nothing while there is none -- a heading over an empty
-             list says less than no heading. -->
+             whole, see `accountView`, spelled out in the link. -->
         {#if accounts.length > 0}
             <SidebarGroup>
-                <SidebarGroupLabel>{$_('app.nav.accounts')}</SidebarGroupLabel>
                 <SidebarGroupContent>
                     <SidebarMenu>
                         {#each accounts as account (account.id)}
                             {@const view = accountView(account.id)}
                             <SidebarMenuItem>
-                                <!-- Two lines where the account has a name: the login beneath it is
-                                     what tells two accounts of the same name apart. One without a
-                                     name is its login, and saying that twice would be noise. -->
-                                <SidebarMenuButton
-                                        isActive={page.url.pathname === "/" && page.url.searchParams.get(VIEW_PARAM) === inlineViewParam(view)}
-                                        class={account.name === null ? undefined : "h-auto group-data-[compact=true]/sidebar-root:h-auto"}
-                                >
+                                <SidebarMenuButton isActive={page.url.pathname === "/" && page.url.searchParams.get(VIEW_PARAM) === inlineViewParam(view)}>
                                     {#snippet child({ props })}
                                         <a href={inlineViewHref(view, page.url)} {...props}>
                                             <UserCircleIcon />
-                                            {#if account.name === null}
-                                                <span>{account.username}</span>
-                                            {:else}
-                                                <span class="flex min-w-0 flex-col">
-                                                    <span class="truncate">{account.name}</span>
-                                                    <span class="truncate text-xs font-normal opacity-60">{account.username}</span>
-                                                </span>
-                                            {/if}
+                                            <span>{inboxLabel(account)}</span>
                                         </a>
                                     {/snippet}
                                 </SidebarMenuButton>
@@ -112,7 +96,6 @@
         {/if}
 
         <SidebarGroup>
-            <SidebarGroupLabel>Ansichten</SidebarGroupLabel>
             <ViewList />
         </SidebarGroup>
     </SidebarContent>

@@ -5,8 +5,7 @@
     "nav": {
       "home": "Home",
       "stack": "Stack",
-      "labels": "Labels",
-      "accounts": "Accounts"
+      "labels": "Labels"
     },
     "panel": {
       "resize": "Resize the assistant"

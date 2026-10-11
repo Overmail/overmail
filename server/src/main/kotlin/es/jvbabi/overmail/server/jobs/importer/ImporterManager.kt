@@ -34,6 +34,7 @@ private val RELOAD_INTERVAL = 1.minutes
 class ImporterManager(
     private val database: OvermailDatabase,
     coroutineScope: CoroutineScope,
+    private val telemetry: ImporterTelemetry = ImporterTelemetry.Disabled,
     private val runImporter: suspend (ImapConnection) -> Unit,
 ) {
     private val importers = coroutineScope + SupervisorJob(coroutineScope.coroutineContext[Job])
@@ -106,6 +107,9 @@ class ImporterManager(
 
     private fun start(account: ImapConnection) {
         val job = importers.launch(CoroutineName("MailboxImporter-${account.id}")) { runImporter(account) }
+        telemetry.importerStarted()
+        // On the job rather than in stopLocked, so an importer that ends any other way counts too.
+        job.invokeOnCompletion { telemetry.importerStopped() }
         running[account.id] = Running(account, job)
     }
 

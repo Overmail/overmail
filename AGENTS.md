@@ -17,6 +17,7 @@ server/src/main/kotlin/es/jvbabi/overmail/server/
   http/api/            what every route needs: the current user, url resources, errors
   jobs/                background work
   jobs/importer/       the IMAP import, see [Importer](#importer)
+  telemetry/           the OpenTelemetry setup and the span helper, see [Telemetry](#telemetry)
 
 common/                Kotlin Multiplatform code both the server and the app use (smart dates)
 
@@ -418,7 +419,8 @@ tested on its own:
   manager awaits the old importer before it starts a new one. The dedup key has no unique index,
   so this is what keeps a mail from being stored twice.
 - **A new follow-up is a new `ImportStep`** in the list in `AppModule.kt`; the order there is the
-  order they run in.
+  order they run in. It is a span and a duration under its class name without doing anything
+  for it, see [Telemetry](#telemetry).
 - **Tests fake the mailbox, not the database.** `MailClient`/`MailFolder` are kamel's interfaces
   and `ImporterFixtures.kt` has in-memory ones; mails are built with `KamelEmail.parse(raw, uid,
   flags)`. Timing is tested on virtual time (`runTest`), everything that stores on H2.
@@ -441,6 +443,46 @@ tested on its own:
 - **Push is optional.** The service account is `data/firebase-service.json`, next to the config
   file; without it `PushSender.Disabled` stands in and nothing is queued.
 - **The queue is in memory.** A push lost in a restart costs a notification, not a mail.
+
+## Telemetry
+
+The server exports traces, metrics and logs over OTLP (http/protobuf) with the OpenTelemetry Java
+SDK. `telemetry/Telemetry.kt` builds it from the `telemetry` section of the config:
+
+```json
+"telemetry": {
+  "endpoint": "http://localhost:4318",
+  "headers": {"Authorization": "Basic ..."},
+  "service_name": "overmail",
+  "resource": {"deployment.environment.name": "production"}
+}
+```
+
+Only `endpoint` is required, without the path of a signal. **Without the section the no-op
+instance stands in**, so nothing that records has a case for telemetry being off, and a test gets
+it for free.
+
+- **`OpenTelemetry` comes out of the container** like everything else; nothing uses
+  `GlobalOpenTelemetry`. A part that records a lot gets a class of its own that owns the
+  instruments and the names (`ImporterTelemetry`), so the code it sits in says what happened and
+  not how it is kept.
+- **A span in a coroutine is `tracer.span("name") { }`** (`telemetry/Spans.kt`). OpenTelemetry
+  keeps the current span per thread and a coroutine does not stay on one; the helper carries it
+  across suspension points and into `query { }`. A span started and made current by hand is lost
+  at the first suspension.
+- **What ends is a span, what is held open is a number.** A span is exported when it ends, so a
+  connection, an `IDLE` or a running importer is an up-down counter, not a span.
+- **Most passes leave no trace.** A pass that finds nothing new is counted and nothing else; a
+  pass that reads a folder from its start is one span without children. Only a pass in between is
+  a trace with a span per mail, its insert and every `ImportStep`.
+- **Attributes carry ids, never content**: no subject, no address. The same rule as for a push.
+- **Logs need nothing**: everything that goes through slf4j is exported, with the trace it was
+  written in. The appender is attached in code, not in `logback.xml`.
+- **HTTP and the JVM are instrumented by libraries** (`KtorServerTelemetry`, `RuntimeTelemetry`).
+  Their release and the SDK's move together, see the note in `libs.versions.toml`: a newer SDK
+  under an older instrumentation fails at runtime, not at compile time.
+- **Tests assert on what was recorded** with `InMemorySpanExporter` and `InMemoryMetricReader`
+  from `opentelemetry-sdk-testing`, see `ImporterTelemetryTest`.
 
 ## Conventions
 ### General

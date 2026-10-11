@@ -114,12 +114,24 @@ dependencies {
     implementation(libs.imageio.webp)
     implementation(libs.imageio.bmp)
 
+    // Traces, metrics and logs over OTLP, see telemetry/Telemetry.kt.
+    implementation(libs.opentelemetry.api)
+    implementation(libs.opentelemetry.sdk)
+    implementation(libs.opentelemetry.exporter.otlp)
+    // Carries the current span across suspension points and dispatchers.
+    implementation(libs.opentelemetry.extension.kotlin)
+    implementation(libs.opentelemetry.ktor)
+    implementation(libs.opentelemetry.logback.appender)
+    implementation(libs.opentelemetry.runtime.telemetry)
+
     testImplementation(kotlin("test"))
     // Drives routes through the real plugin pipeline without binding a port.
     testImplementation(libs.ktor.server.test.host)
     // In-memory database for tests that need real rows; the schema is created per test class.
     testImplementation(libs.h2)
     testImplementation(libs.kotlinx.coroutines.test)
+    // In-memory exporters, to assert on what was recorded.
+    testImplementation(libs.opentelemetry.sdk.testing)
 
     implementation(libs.koog.agents)
 }

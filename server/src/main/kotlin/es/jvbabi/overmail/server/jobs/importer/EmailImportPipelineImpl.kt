@@ -13,17 +13,18 @@ import es.jvbabi.overmail.kamel.Email as KamelEmail
 class EmailImportPipelineImpl(
     private val inserter: EmailInserter,
     private val steps: List<ImportStep>,
+    private val telemetry: ImporterTelemetry = ImporterTelemetry.Disabled,
 ) : EmailImportPipeline {
 
     private val logger = LoggerFactory.getLogger(EmailImportPipelineImpl::class.java)
 
     override suspend fun import(mail: KamelEmail, context: ImportContext): EmailInserter.Result =
         withContext(NonCancellable) {
-            val result = inserter.importEmailIntoDatabase(mail, context.account)
+            val result = telemetry.insert { inserter.importEmailIntoDatabase(mail, context.account) }
 
             if (result is EmailInserter.Result.Imported) steps.forEach { step ->
                 try {
-                    step.run(result.email, context)
+                    telemetry.step(step) { step.run(result.email, context) }
                 } catch (e: Exception) {
                     logger.error("${step::class.simpleName} failed for mail ${result.email.id.value}", e)
                 }

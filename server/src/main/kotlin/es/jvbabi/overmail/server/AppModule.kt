@@ -47,10 +47,12 @@ import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizer
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
 import es.jvbabi.overmail.server.jobs.importer.GeneratePreviewStep
 import es.jvbabi.overmail.server.jobs.importer.ImporterManager
+import es.jvbabi.overmail.server.jobs.importer.ImporterTelemetry
 import es.jvbabi.overmail.server.jobs.importer.MailboxImporter
 import es.jvbabi.overmail.server.jobs.importer.PushStep
 import es.jvbabi.overmail.server.jobs.importer.NotifyStep
 import es.jvbabi.overmail.server.jobs.preview.EmailPreviewQueue
+import es.jvbabi.overmail.server.telemetry.Telemetry
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -58,11 +60,14 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 import org.koin.ktor.ext.get
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -74,6 +79,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 fun Application.overmail() {
     configureDependencies()
+    // First of the plugins, so a request's span is there for everything that handles it.
+    install(KtorServerTelemetry) { setOpenTelemetry(get<OpenTelemetry>()) }
     installBackendHeaders()
     // Authentikt receives typed request bodies, so this has to be in place before its routes are.
     install(ContentNegotiation) { json() }
@@ -116,6 +123,10 @@ internal fun overmailModule(application: CoroutineScope) = module {
     single<DatabaseConfig> { get<ApplicationConfig>().database }
     single<SmtpConfig> { get<ApplicationConfig>().email.smtp }
     single<ApplicationConfig.AiConfig> { get<ApplicationConfig>().ai }
+
+    // Stopping the server closes the container, which is what sends the last of what was recorded.
+    single<Telemetry> { Telemetry.start(get<ApplicationConfig>().telemetry) } onClose { it?.close() }
+    single<OpenTelemetry> { get<Telemetry>().openTelemetry }
 
     single<AiChatNotifier> { AiChatNotifier() }
     single<AiChatStreamNotifier> { AiChatStreamNotifier() }
@@ -220,6 +231,8 @@ internal fun overmailModule(application: CoroutineScope) = module {
     single<PushQueue> { PushQueue(database = get(), sender = get()) }
     single<PushNotifications> { PushNotifications(queue = get()) }
 
+    single<ImporterTelemetry> { ImporterTelemetry(openTelemetry = get()) }
+
     single<EmailInserter> { EmailInserterImpl(database = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
@@ -233,15 +246,17 @@ internal fun overmailModule(application: CoroutineScope) = module {
                 NotifyStep(mailNotifier = get()),
                 PushStep(push = get<PushNotifications>()::newEmail),
             ),
+            telemetry = get(),
         )
     }
 
-    single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), pipeline = get()) }
+    single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), telemetry = get(), pipeline = get()) }
 
     single<ImporterManager> {
         val synchronizer = get<FolderSynchronizer>()
-        ImporterManager(database = get(), coroutineScope = application) { connection ->
-            MailboxImporter(connection, synchronizer).run()
+        val telemetry = get<ImporterTelemetry>()
+        ImporterManager(database = get(), coroutineScope = application, telemetry = telemetry) { connection ->
+            MailboxImporter(connection, synchronizer, telemetry = telemetry).run()
         }
     }
 }

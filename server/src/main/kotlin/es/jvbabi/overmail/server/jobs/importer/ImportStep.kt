@@ -4,11 +4,27 @@ import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.models.Email
 import kotlin.uuid.Uuid
 
-/** Where a mail came from: the account, and the folder with what the user set for it. */
+/**
+ * Where a mail came from: the account, the folder with what the user set for it, and what made
+ * the folder due.
+ */
 data class ImportContext(
     val account: ImapConnection,
     val folder: ImapConnection.FolderSync,
+    val trigger: ImportTrigger = ImportTrigger.Poll,
 )
+
+/** Why a folder is looked at, see [MailboxImporter]. Changes nothing about how it is read. */
+enum class ImportTrigger(val key: String) {
+    /** The poll timer fired. */
+    Poll("poll"),
+
+    /** An `IDLE` was issued: nothing reported what changed while none was held. */
+    IdleStarted("idle_started"),
+
+    /** The server reported a change on a held `IDLE`. */
+    IdleChange("idle_change"),
+}
 
 /**
  * Something that follows from a mail having been stored, see [EmailImportPipeline].

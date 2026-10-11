@@ -7,7 +7,10 @@ import type {ViewSettings} from "$lib/app/views/viewSettings";
  * Two of them, and both are what a mail client opens on: what is in front of you, and what you
  * sent. They are not stored anywhere -- an account has them the moment it exists, they cannot be
  * renamed or deleted, and their id is a name rather than a uuid, which is also how a url tells
- * them apart from the ones in the sidebar.
+ * them apart from the ones somebody made, and what makes them something to bookmark.
+ *
+ * A listing the app builds that takes more than a name to say -- one mail account, see
+ * [accountView] -- is not one of these: its link carries the settings.
  *
  * Their settings can still be changed for the length of a visit; saving those changes means
  * making a view of one's own out of them.
@@ -75,6 +78,30 @@ export function predefinedViews(): PredefinedView[] {
             },
         },
     ];
+}
+
+/**
+ * The listing of the mail account [accountId]: everything that came in through it, spam aside,
+ * cut up the way the inbox is.
+ *
+ * Settings and not a [PredefinedView]: there is one per connected account, so it has no name a
+ * url could call it by -- a link to it carries the settings themselves, see `inlineViewHref`.
+ */
+export function accountView(accountId: string): ViewSettings {
+    return {
+        groupings: [{kind: "date_smart", reversed: false}],
+        filter: {
+            readState: null,
+            // The account as a whole, not what is left to do in it: filed mails belong to it as
+            // much as open ones. Spam is the one thing nobody opens an account to see.
+            archivedState: ["Unarchive", "Archive"],
+            imapAccountIds: [accountId],
+            sentBy: null,
+            sentTo: null,
+            hasLabels: null,
+        },
+        sorting: {kind: "date", reversed: false},
+    };
 }
 
 /** The predefined view [id] names, or the inbox for anything else. */

@@ -5,7 +5,8 @@
     "nav": {
       "home": "Start",
       "stack": "Stack",
-      "labels": "Labels"
+      "labels": "Labels",
+      "accounts": "Konten"
     },
     "panel": {
       "resize": "Breite des Assistenten ändern"

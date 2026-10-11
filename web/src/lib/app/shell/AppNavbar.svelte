@@ -55,7 +55,7 @@
         </SidebarGroup>
     </SidebarContent>
 
-    <SidebarFooter>
+    <SidebarFooter class="mb-1.5">
         <UserMenu />
     </SidebarFooter>
 </Sidebar>

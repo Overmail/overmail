@@ -77,7 +77,7 @@
                     ondblclick={(event) => {
                         event.preventDefault();
                         // Collapsed there is no name on screen to edit, only its icon.
-                        if (sidebar.state === "collapsed" && !sidebar.isMobile) return;
+                        if (sidebar.iconsOnly) return;
                         onRenameStart();
                     }}
             >

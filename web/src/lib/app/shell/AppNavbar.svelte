@@ -28,10 +28,11 @@
      its own, and no line sets it off. The colour is swapped where the component reads it, so
      everything in here that says `bg-sidebar` follows. The border only goes where the sidebar
      stands in the page -- as a sheet over it, on a narrow window, its edge is what shows it. -->
-<!-- Collapsed it keeps its icons rather than leaving the screen. Clipped, because what is in it
+<!-- Collapsed it keeps its icons rather than leaving the screen, and unfolds over the page while
+     the pointer rests on them. Clipped, because what is in it
      is laid out for the full width and is simply covered while the sidebar is narrower -- the
      page behind it shows through, so anything standing out past its edge would be on the page. -->
-<Sidebar compact collapsible="icon" class="overflow-hidden [--sidebar:var(--background)] md:border-e-0!">
+<Sidebar compact collapsible="icon" peek class="overflow-hidden [--sidebar:var(--background)] md:border-e-0!">
     <SidebarHeader>
         <!-- px-2.5 is the rows' own padding, so the logo stands in the column of their icons;
              collapsed, the row is exactly the logo, in the middle of that column. -->

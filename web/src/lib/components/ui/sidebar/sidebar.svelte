@@ -12,6 +12,7 @@
 		variant = "sidebar",
 		collapsible = "offcanvas",
 		compact = false,
+		peek = false,
 		class: className,
 		children,
 		...restProps
@@ -25,6 +26,11 @@
 		 * inside has to be told about it.
 		 */
 		compact?: boolean;
+		/**
+		 * Unfolds a sidebar collapsed to its icons while the pointer rests on it: floating over
+		 * the page rather than pushing it aside, and gone again when the pointer leaves.
+		 */
+		peek?: boolean;
 	} = $props();
 
 	const sidebar = useSidebar();
@@ -36,6 +42,64 @@
 			? `--sidebar-width: ${SIDEBAR_WIDTH_COMPACT}; --sidebar-width-icon: ${SIDEBAR_WIDTH_ICON_COMPACT};`
 			: undefined
 	);
+
+	/** How long the pointer has to rest on the icons before they unfold; passing over them does nothing. */
+	const PEEK_DELAY_MS = 200;
+
+	/** The fixed box that is the sidebar on screen, for what is open inside it. */
+	let container: HTMLDivElement | null = $state(null);
+
+	let peekTimer: ReturnType<typeof setTimeout> | null = null;
+	let leaveTimer: ReturnType<typeof setInterval> | null = null;
+
+	function clearPeekTimers() {
+		if (peekTimer !== null) clearTimeout(peekTimer);
+		if (leaveTimer !== null) clearInterval(leaveTimer);
+		peekTimer = null;
+		leaveTimer = null;
+	}
+
+	function onPointerEnter(event: PointerEvent) {
+		// A finger has no resting: on touch the sidebar is opened by its button.
+		if (!peek || event.pointerType !== "mouse") return;
+
+		clearPeekTimers();
+		if (sidebar.open || sidebar.peeking) return;
+
+		peekTimer = setTimeout(() => {
+			peekTimer = null;
+			if (!sidebar.open) sidebar.peeking = true;
+		}, PEEK_DELAY_MS);
+	}
+
+	/**
+	 * Whether something that belongs to the sidebar is still in use though the pointer is not on
+	 * it: a menu opened from a row, which is rendered outside of it, or a name being typed.
+	 */
+	function isHeld(): boolean {
+		return container?.querySelector('[aria-expanded="true"], [data-state="open"], input:focus') != null;
+	}
+
+	function onPointerLeave() {
+		clearPeekTimers();
+		if (!sidebar.peeking) return;
+
+		if (!isHeld()) {
+			sidebar.peeking = false;
+			return;
+		}
+
+		// Folding now would pull the row out from under its own menu. Nothing announces that
+		// menu closing, so it is looked for until it has -- or until the pointer is back.
+		leaveTimer = setInterval(() => {
+			if (isHeld()) return;
+
+			clearPeekTimers();
+			sidebar.peeking = false;
+		}, PEEK_DELAY_MS);
+	}
+
+	$effect(() => clearPeekTimers);
 </script>
 
 {#if collapsible === "none"}
@@ -80,7 +144,8 @@
 		bind:this={ref}
 		class="group/sidebar-root group peer hidden text-sidebar-foreground md:block"
 		data-state={sidebar.state}
-		data-collapsible={sidebar.state === "collapsed" ? collapsible : ""}
+		data-collapsible={sidebar.state === "collapsed" && !sidebar.peeking ? collapsible : ""}
+		data-peek={sidebar.peeking ? "true" : undefined}
 		data-variant={variant}
 		data-side={side}
 		data-slot="sidebar"
@@ -98,13 +163,18 @@
 				"group-data-[side=right]:rotate-180",
 				variant === "floating" || variant === "inset"
 					? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
-					: "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+					: "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
+				// A look at the sidebar is over the page, not beside it: the room stays the icons'.
+				"group-data-[peek=true]:w-(--sidebar-width-icon)"
 			)}
 		></div>
 		<div
 			data-slot="sidebar-container"
 			class={cn(
-				"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:flex",
+				"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:flex",
+				// Over everything the page sticks to its top, and lifted off it: a ring where a
+				// border would be, because a border is the caller's to take away.
+				"group-data-[peek=true]:z-40 group-data-[peek=true]:shadow-xl group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border",
 				side === "left"
 					? "start-0 group-data-[collapsible=offcanvas]:start-[calc(var(--sidebar-width)*-1)]"
 					: "end-0 group-data-[collapsible=offcanvas]:end-[calc(var(--sidebar-width)*-1)]",
@@ -114,6 +184,9 @@
 					: "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-e group-data-[side=right]:border-s",
 				className
 			)}
+			bind:this={container}
+			onpointerenter={onPointerEnter}
+			onpointerleave={onPointerLeave}
 			{...restProps}
 		>
 			<div

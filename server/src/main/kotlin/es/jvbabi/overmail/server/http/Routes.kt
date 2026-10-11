@@ -59,7 +59,7 @@ import es.jvbabi.overmail.server.http.users.me.knowledge.item.updateKnowledgeEnt
 import es.jvbabi.overmail.server.http.users.me.password.deletePassword
 import es.jvbabi.overmail.server.http.users.me.password.getPassword
 import es.jvbabi.overmail.server.http.users.me.password.setPassword
-import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseToken
+import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseInstallationId
 import es.jvbabi.overmail.server.http.users.me.sessions.getSessions
 import es.jvbabi.overmail.server.http.users.me.totp.disableTotp
 import es.jvbabi.overmail.server.http.users.me.totp.enableTotp
@@ -420,8 +420,8 @@ internal fun Application.configureRouting() {
                         getSessions()
 
                         // The session the request came with, so a client needs no id for itself.
-                        route("/current/firebase-token") {
-                            setFirebaseToken()
+                        route("/current/firebase-installation-id") {
+                            setFirebaseInstallationId()
                         }
 
                         /**

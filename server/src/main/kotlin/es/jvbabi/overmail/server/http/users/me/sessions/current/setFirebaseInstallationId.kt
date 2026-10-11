@@ -23,45 +23,46 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.update
 
 /**
- * Where a push for this device goes: `PUT /api/users/me/sessions/current/firebase-token`.
+ * Where a push for this device goes: `PUT /api/users/me/sessions/current/firebase-installation-id`.
  *
- * The token belongs to the session the request came with, not to the user: a push is addressed to
- * one installation, and it has to stop when that session is revoked. Firebase hands out a new one
- * whenever it likes, so the app sends it again each time and the last one wins.
+ * The id is the Firebase Installation ID of the app on that device, which is what Firebase Cloud
+ * Messaging addresses a push to. It belongs to the session the request came with, not to the user:
+ * a push is meant for one installation, and it has to stop when that session is revoked. Firebase
+ * replaces the id when it likes, so the app sends it again each time and the last one wins.
  *
  * Android only for now -- the other clients have nowhere to keep one.
  */
-fun Route.setFirebaseToken() {
+fun Route.setFirebaseInstallationId() {
     authenticate {
         /**
-         * Set the Firebase token of the current session.
+         * Set the Firebase installation id of the current session.
          *
          * Description: Replaces the one stored before. Only a session of the Android app takes one.
          *
          * Tag: Sessions
          *
-         * Body: [FirebaseTokenRequest] The token
+         * Body: [FirebaseInstallationIdRequest] The installation id
          *
          * Responses:
-         *   - 204 The token is saved
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank `token`
+         *   - 204 The installation id is saved
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A blank `installation_id`
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The session is not one of the Android app
          */
         put {
             val userId = call.requireAuthenticatedUserId()
             val sessionToken = call.sessionToken() ?: unauthenticated()
-            val firebaseToken = call.receive<FirebaseTokenRequest>().token.trim()
-            if (firebaseToken.isEmpty()) invalidRequest("token", "must not be blank")
+            val firebaseInstallationId = call.receive<FirebaseInstallationIdRequest>().installationId.trim()
+            if (firebaseInstallationId.isEmpty()) invalidRequest("installation_id", "must not be blank")
 
             val saved = call.database().query {
                 val isCurrentSession = (Sessions.token eq sessionToken) and (Sessions.user eq userId)
                 val client = Sessions.select(Sessions.client).where { isCurrentSession }.single()[Sessions.client]
                 if (client !is Session.Client.Android) return@query false
 
-                Sessions.update({ isCurrentSession }) { it[Sessions.client] = client.copy(firebaseToken = firebaseToken) }
+                Sessions.update({ isCurrentSession }) { it[Sessions.client] = client.copy(firebaseInstallationId = firebaseInstallationId) }
                 true
             }
-            if (!saved) conflict("Only a session of the Android app takes a Firebase token")
+            if (!saved) conflict("Only a session of the Android app takes a Firebase installation id")
 
             call.respond(HttpStatusCode.NoContent)
         }
@@ -69,7 +70,7 @@ fun Route.setFirebaseToken() {
 }
 
 @Serializable
-data class FirebaseTokenRequest(
-    @JsonSchema.Description("The registration token Firebase Cloud Messaging gave this installation")
-    @SerialName("token") val token: String,
+data class FirebaseInstallationIdRequest(
+    @JsonSchema.Description("The Firebase Installation ID of the app on this device, as Firebase Cloud Messaging reported it")
+    @SerialName("installation_id") val installationId: String,
 )

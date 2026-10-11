@@ -438,8 +438,9 @@ tested on its own:
 - **A push never carries content**, only a `type` and ids: it travels through Google. A new kind
   is a subclass of `PushMessage`, a function in `PushNotifications`, and the same subclass in the
   app.
-- **A device is an Android session with a `firebaseToken`** (`Session.Client.Android`), set by the
-  app through `PUT /api/users/me/sessions/current/firebase-token`.
+- **A device is an Android session with a `firebaseInstallationId`** (`Session.Client.Android`), the
+  Firebase Installation ID the app registered with (registration tokens are deprecated), set by the
+  app through `PUT /api/users/me/sessions/current/firebase-installation-id`.
 - **Push is optional.** The service account is `data/firebase-service.json`, next to the config
   file; without it `PushSender.Disabled` stands in and nothing is queued.
 - **The queue is in memory.** A push lost in a restart costs a notification, not a mail.

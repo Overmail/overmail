@@ -18,6 +18,7 @@
     import {_, locale} from "svelte-i18n";
     import {defaultLocale, localeNames, locales, setLocale, type Locale} from "$lib/i18n";
     import ViewList from "$lib/app/shell/navbar/views/ViewList.svelte";
+    import favicon from "$lib/assets/favicon.svg";
 
     // `$locale` carries whatever was negotiated, e.g. `de-DE`; the menu only knows the base ones.
     const currentLocale = $derived(
@@ -28,24 +29,31 @@
 </script>
 
 <Sidebar compact>
-    <SidebarHeader />
+    <SidebarHeader>
+        <!-- px-2.5 is the rows' own padding, so the logo stands in the column of their icons. -->
+        <div class="flex h-9 items-center gap-2 px-2.5 mt-3 pb-2">
+            <img src={favicon} alt="" class="size-8" />
+            <span class="font-display text-lg leading-none">{$_('app.name')}</span>
+        </div>
+    </SidebarHeader>
     <SidebarContent>
         <SidebarGroup>
-            <SidebarGroupLabel>{$_('app.name')}</SidebarGroupLabel>
             <SidebarGroupContent>
-                {#each navItems as item (item.href)}
-                    {@const Icon = item.icon}
-                    <SidebarMenuItem>
-                        <SidebarMenuButton isActive={item.matches(page.url)}>
-                            {#snippet child({ props })}
-                                <a href={item.href} {...props}>
-                                    <Icon />
-                                    <span>{$_(item.key)}</span>
-                                </a>
-                            {/snippet}
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                {/each}
+                <SidebarMenu>
+                    {#each navItems as item (item.href)}
+                        {@const Icon = item.icon}
+                        <SidebarMenuItem>
+                            <SidebarMenuButton isActive={item.matches(page.url)}>
+                                {#snippet child({ props })}
+                                    <a href={item.href} {...props}>
+                                        <Icon />
+                                        <span>{$_(item.key)}</span>
+                                    </a>
+                                {/snippet}
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    {/each}
+                </SidebarMenu>
             </SidebarGroupContent>
         </SidebarGroup>
 

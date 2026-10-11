@@ -72,7 +72,15 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Where Firebase delivers a push and a new registration token, see PushMessagingService. -->
+        <!--
+          Registers with Firebase Cloud Messaging by Firebase Installation ID, which is what
+          FirebaseMessaging.register() and onRegistered() need; registration tokens are deprecated.
+        -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
+
+        <!-- Where Firebase delivers a push and its installation id, see PushMessagingService. -->
         <service
             android:name="es.jvbabi.overmail.data.push.PushMessagingService"
             android:exported="false">

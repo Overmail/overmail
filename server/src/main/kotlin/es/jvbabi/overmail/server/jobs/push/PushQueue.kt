@@ -112,7 +112,7 @@ class PushQueue(
                 }
             }
             .mapNotNull { row ->
-                val token = (row[Sessions.client] as? Session.Client.Android)?.firebaseToken ?: return@mapNotNull null
+                val token = (row[Sessions.client] as? Session.Client.Android)?.firebaseInstallationId ?: return@mapNotNull null
                 Recipient(sessionId = row[Sessions.id].value, userId = row[Sessions.user].value, token = token)
             }
             .distinctBy { it.token }
@@ -123,8 +123,8 @@ class PushQueue(
         database.query {
             val client = Sessions.select(Sessions.client).where { Sessions.id eq recipient.sessionId }.firstOrNull()?.get(Sessions.client)
             // Only the token that failed: the app may have registered a new one in the meantime.
-            if (client !is Session.Client.Android || client.firebaseToken != recipient.token) return@query
-            Sessions.update({ Sessions.id eq recipient.sessionId }) { it[Sessions.client] = client.copy(firebaseToken = null) }
+            if (client !is Session.Client.Android || client.firebaseInstallationId != recipient.token) return@query
+            Sessions.update({ Sessions.id eq recipient.sessionId }) { it[Sessions.client] = client.copy(firebaseInstallationId = null) }
         }
         logger.info("Session ${recipient.sessionId} no longer has a push token")
     }

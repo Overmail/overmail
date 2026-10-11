@@ -8,7 +8,7 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
-import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseToken
+import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseInstallationId
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -121,54 +121,54 @@ class SessionRoutesTest {
     }
 
     @Test
-    fun `a firebase token is stored on the session it came with, and the last one wins`() = testApplication {
+    fun `a firebase installation id is stored on the session it came with, and the last one wins`() = testApplication {
         val user = newUser()
         val current = jwtService.issueSession(database, user, phone)
         val other = jwtService.issueSession(database, user, phone)
         installRoutes()
 
-        assertEquals(HttpStatusCode.NoContent, setFirebaseToken(current, "first").status)
-        assertEquals(HttpStatusCode.NoContent, setFirebaseToken(current, "second").status)
+        assertEquals(HttpStatusCode.NoContent, setFirebaseInstallationId(current, "first").status)
+        assertEquals(HttpStatusCode.NoContent, setFirebaseInstallationId(current, "second").status)
 
-        assertEquals(phone.copy(firebaseToken = "second"), clientOf(current))
+        assertEquals(phone.copy(firebaseInstallationId = "second"), clientOf(current))
         assertEquals(phone, clientOf(other))
     }
 
     @Test
-    fun `a firebase token does not show up in the listing`() = testApplication {
+    fun `a firebase installation id does not show up in the listing`() = testApplication {
         val current = jwtService.issueSession(database, newUser(), phone)
         installRoutes()
-        setFirebaseToken(current, "secret")
+        setFirebaseInstallationId(current, "secret")
 
         val client = listSessions(current).single()["client"]!!.jsonObject
 
         assertEquals("Pixel 8", client["device"]!!.jsonPrimitive.content)
-        assertEquals(JsonNull, client["firebase_token"])
+        assertEquals(JsonNull, client["firebase_installation_id"])
     }
 
     @Test
-    fun `only a session of the android app takes a firebase token`() = testApplication {
+    fun `only a session of the android app takes a firebase installation id`() = testApplication {
         val current = jwtService.issueSession(database, newUser(), browser)
         installRoutes()
 
-        assertEquals(HttpStatusCode.Conflict, setFirebaseToken(current, "token").status)
+        assertEquals(HttpStatusCode.Conflict, setFirebaseInstallationId(current, "token").status)
         assertEquals(browser, clientOf(current))
     }
 
     @Test
-    fun `a blank firebase token is refused`() = testApplication {
+    fun `a blank firebase installation id is refused`() = testApplication {
         val current = jwtService.issueSession(database, newUser(), phone)
         installRoutes()
 
-        assertEquals(HttpStatusCode.BadRequest, setFirebaseToken(current, " ").status)
+        assertEquals(HttpStatusCode.BadRequest, setFirebaseInstallationId(current, " ").status)
         assertEquals(phone, clientOf(current))
     }
 
-    private suspend fun ApplicationTestBuilder.setFirebaseToken(token: String, firebaseToken: String) =
-        client.put("/api/users/me/sessions/current/firebase-token") {
+    private suspend fun ApplicationTestBuilder.setFirebaseInstallationId(token: String, firebaseInstallationId: String) =
+        client.put("/api/users/me/sessions/current/firebase-installation-id") {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
-            setBody("""{"token":"$firebaseToken"}""")
+            setBody("""{"installation_id":"$firebaseInstallationId"}""")
         }
 
     private suspend fun clientOf(token: String): Session.Client = database.query {
@@ -211,7 +211,7 @@ class SessionRoutesTest {
             routing {
                 route("/api/users/me/sessions") {
                     getSessions()
-                    route("/current/firebase-token") { setFirebaseToken() }
+                    route("/current/firebase-installation-id") { setFirebaseInstallationId() }
                     route("/{sessionId}") { revokeSession() }
                 }
             }

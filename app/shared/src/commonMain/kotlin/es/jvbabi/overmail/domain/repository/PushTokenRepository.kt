@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * The address a push for this installation is sent to. Platform-specific all the way down: on
- * Android it is the registration token of Firebase Cloud Messaging, iOS has none yet.
+ * Android it is the Firebase Installation ID, iOS has none yet.
  */
 interface PushTokenRepository {
     /**

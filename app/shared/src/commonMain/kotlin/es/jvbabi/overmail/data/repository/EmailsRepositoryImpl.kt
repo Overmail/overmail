@@ -69,6 +69,9 @@ import kotlin.uuid.Uuid
 
 private val logger = Logger.withTag("EmailsRepository")
 
+/** How many ids one `IN (...)` of Room binds: every id is a parameter, and SQLite takes 999 at most. */
+private const val ROOM_ID_CHUNK = 500
+
 class EmailsRepositoryImpl(
     private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
@@ -158,6 +161,30 @@ class EmailsRepositoryImpl(
             val email = stored?.toModel()
             if (email != null) lastRead = lastRead + (email.id to email)
             send(email)
+        }
+    }
+
+    override fun getEmails(emailIds: List<Uuid>, user: OvermailAccount, policy: FetchPolicy): Flow<List<Email>> = channelFlow {
+        val ids = emailIds.distinct()
+        // combine() of no flows never emits.
+        if (ids.isEmpty()) {
+            send(emptyList())
+            return@channelFlow
+        }
+        when (policy) {
+            FetchPolicy.CacheFirst -> launch { emailSync.loadMissing(user, ids) }
+            // Before the database is read, so its first value is the server's.
+            FetchPolicy.NetworkFirst -> emailSync.reload(user, ids)
+                .onFailure { logger.w(it) { "Reloading ${ids.size} mails failed, answering with what is stored" } }
+            FetchPolicy.NetworkOnly -> emailSync.reload(user, ids).getOrThrow()
+        }
+        launch { emailSync.changes(user).collect() }
+        val position = ids.withIndex().associate { (index, id) -> id to index }
+        combine(ids.chunked(ROOM_ID_CHUNK).map { overmailDatabase.emailsDao.getByIds(it) }) { chunks ->
+            chunks.flatMap { it.toList() }.map { it.toModel() }.sortedBy { position.getValue(it.id) }
+        }.collect { emails ->
+            lastRead = lastRead + emails.associateBy { it.id }
+            send(emails)
         }
     }
 

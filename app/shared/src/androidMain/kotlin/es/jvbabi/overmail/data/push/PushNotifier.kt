@@ -34,9 +34,6 @@ import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
 import es.jvbabi.overmail.shared.compose.R
 import es.jvbabi.overmail.ui.components.initials
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.withTimeoutOrNull
@@ -262,39 +259,26 @@ class PushNotifier(
     }
 
     /**
-     * Mails were read or moved, here or on another device: every one of them with a notification
-     * here is asked for again, which also brings the database up to date, and the notification
-     * goes away when the mail is dealt with now -- or gone from the server. A mail that was marked
-     * unread or put back gets no notification again.
-     *
-     * Only those: a push names up to fifty mails, and the ones without a notification are the
-     * open views' to keep current.
+     * Mails were read or moved, here or on another device: all of them are asked for again in
+     * one request, which brings the database up to date, and the notification of every one that
+     * is dealt with now -- or gone from the server -- goes away. A mail that was marked unread or
+     * put back gets no notification again.
      */
     private suspend fun dismissDealtWith(userId: Uuid, message: PushMessage.EmailsChanged) {
         val account = accountRepository.getById(userId).first() ?: return
 
-        val shown = shownEmailIds().intersect(message.emailIds.toSet())
-        if (shown.isEmpty()) return
-
-        val dealtWith = withTimeoutOrNull(EMAIL_TIMEOUT) {
-            coroutineScope {
-                shown
-                    .map { emailId ->
-                        async {
-                            // A failed request answers with the stored mail, which is what its
-                            // notification was shown for and so keeps it.
-                            val email = emailsRepository.getEmail(emailId, account, FetchPolicy.NetworkFirst).first()
-                            emailId.takeIf { email == null || email.isDealtWith }
-                        }
-                    }
-                    .awaitAll()
-                    .filterNotNull()
-            }
+        // A failed request answers with the stored mails, which are what their notifications
+        // were shown for and so keep them.
+        val emails = withTimeoutOrNull(EMAIL_TIMEOUT) {
+            emailsRepository.getEmails(message.emailIds, account, FetchPolicy.NetworkFirst).first()
         }
-        if (dealtWith == null) {
-            logger.w { "Could not load ${shown.size} changed mails in time, keeping their notifications" }
+        if (emails == null) {
+            logger.w { "Could not load ${message.emailIds.size} changed mails in time, keeping their notifications" }
             return
         }
+
+        val stillOpen = emails.filterNot { it.isDealtWith }.map { it.id }.toSet()
+        val dealtWith = shownEmailIds().intersect(message.emailIds.toSet()) - stillOpen
 
         dismiss(dealtWith)
     }

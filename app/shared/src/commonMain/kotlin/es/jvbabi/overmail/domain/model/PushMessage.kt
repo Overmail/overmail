@@ -24,6 +24,14 @@ sealed class PushMessage {
         @SerialName("imap_account_id") val imapAccountId: Uuid,
     ) : PushMessage()
 
+    /**
+     * The mails [emailIds] were read, unread or moved, on this device or another one. They are
+     * asked for again, and the notification of every one that is dealt with now goes away.
+     */
+    @Serializable
+    @SerialName("emails_changed")
+    data class EmailsChanged(@SerialName("email_ids") val emailIds: List<Uuid>) : PushMessage()
+
     /** Nothing happened: a test notification is shown, which proves the whole way works. */
     @Serializable
     @SerialName("ping")

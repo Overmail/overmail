@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailIdFromUrl
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -36,6 +37,7 @@ fun Route.setEmailArchiveState(action: EmailArchiveAction) {
          */
         post {
             val notifier = call.dependency<MailNotifier>()
+            val pushNotifications = call.dependency<PushNotifications>()
             val userId = call.requireAuthenticatedUserId()
             val emailId = call.requireOwnedEmailIdFromUrl()
 
@@ -63,7 +65,10 @@ fun Route.setEmailArchiveState(action: EmailArchiveAction) {
                 true
             }
 
-            if (moved) notifier.notifyMailChanged(userId, emailId, movedListings = true)
+            if (moved) {
+                notifier.notifyMailChanged(userId, emailId, movedListings = true)
+                pushNotifications.emailsChanged(userId, listOf(emailId))
+            }
 
             call.respond(HttpStatusCode.NoContent)
         }

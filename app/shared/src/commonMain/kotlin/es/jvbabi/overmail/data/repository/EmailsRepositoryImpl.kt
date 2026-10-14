@@ -26,6 +26,7 @@ import es.jvbabi.overmail.domain.model.ViewSorting
 import es.jvbabi.overmail.domain.model.ViewSortingKind
 import es.jvbabi.overmail.domain.model.ViewState
 import es.jvbabi.overmail.domain.repository.EmailsRepository
+import es.jvbabi.overmail.domain.repository.FetchPolicy
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
 import es.jvbabi.overmail.utils.TextSearch
@@ -142,9 +143,15 @@ class EmailsRepositoryImpl(
         // screen is the main one.
         .flowOn(Dispatchers.Default)
 
-    override fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?> = channelFlow {
-        // Only loads it when it is missing, see loadMissing.
-        launch { emailSync.loadMissing(user, listOf(emailId)) }
+    override fun getEmail(emailId: Uuid, user: OvermailAccount, policy: FetchPolicy): Flow<Email?> = channelFlow {
+        when (policy) {
+            // Only loads it when it is missing, see loadMissing.
+            FetchPolicy.CacheFirst -> launch { emailSync.loadMissing(user, listOf(emailId)) }
+            // Before the database is read, so its first value is the server's.
+            FetchPolicy.NetworkFirst -> emailSync.reload(user, listOf(emailId))
+                .onFailure { logger.w(it) { "Reloading mail $emailId failed, answering with what is stored" } }
+            FetchPolicy.NetworkOnly -> emailSync.reload(user, listOf(emailId)).getOrThrow()
+        }
         // Keeps it current while it is on screen, like a view.
         launch { emailSync.changes(user).collect() }
         overmailDatabase.emailsDao.getById(emailId).collect { stored ->

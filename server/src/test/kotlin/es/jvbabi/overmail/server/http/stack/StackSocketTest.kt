@@ -20,6 +20,9 @@ import es.jvbabi.overmail.server.database.models.EmailArchives
 import es.jvbabi.overmail.server.database.models.EmailUser
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
@@ -224,6 +227,7 @@ class StackSocketTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<MailNotifier> { mailNotifier }
+                    single<PushNotifications> { PushNotifications(PushQueue(database = get(), sender = PushSender.Disabled)) }
                     // Nothing consumes it here: the look-ahead enqueues and the ids stay in the
                     // queue, so the classification behind it is never asked to do anything.
                     single<EmailClassificationQueue> {

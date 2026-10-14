@@ -7,6 +7,7 @@ import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -47,6 +48,7 @@ fun Route.setEmailsRead(isRead: Boolean) {
          */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
+            val pushNotifications = call.dependency<PushNotifications>()
             val userId = call.requireAuthenticatedUserId()
 
             val ids = call.receive<BulkEmailsRequest>().ids.distinct()
@@ -80,6 +82,7 @@ fun Route.setEmailsRead(isRead: Boolean) {
             changed.forEach { emailId ->
                 mailNotifier.notifyMailChanged(userId, emailId, movedListings = false)
             }
+            pushNotifications.emailsChanged(userId, changed)
 
             call.respond(HttpStatusCode.OK, BulkEmailsResponse(changed = changed.size))
         }

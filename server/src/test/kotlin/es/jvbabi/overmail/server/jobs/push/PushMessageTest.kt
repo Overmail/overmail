@@ -2,6 +2,7 @@ package es.jvbabi.overmail.server.jobs.push
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.uuid.Uuid
 
 /** What a push looks like on the wire: the app reads exactly these names. */
@@ -28,5 +29,26 @@ class PushMessageTest {
     @Test
     fun `a ping is its type alone`() {
         assertEquals(mapOf("user_id" to userId.toString(), "payload" to """{"type":"ping"}"""), PushMessage.Ping.toData(userId))
+    }
+
+    @Test
+    fun `changed mails are named by their ids alone`() {
+        val first = Uuid.random()
+        val second = Uuid.random()
+
+        val data = PushMessage.EmailsChanged(listOf(first, second)).toData(userId)
+
+        assertEquals(
+            mapOf(
+                "user_id" to userId.toString(),
+                "payload" to """{"type":"emails_changed","email_ids":["$first","$second"]}""",
+            ),
+            data,
+        )
+    }
+
+    @Test
+    fun `changed mails do not wake a sleeping device`() {
+        assertFalse(PushMessage.EmailsChanged(listOf(Uuid.random())).isUrgent)
     }
 }

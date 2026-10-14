@@ -3,22 +3,8 @@ package es.jvbabi.overmail
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import es.jvbabi.overmail.page.email.EmailScreen
-import androidx.compose.animation.core.tween
-import es.jvbabi.overmail.ui.transition.LocalMailTransition
-import es.jvbabi.overmail.ui.transition.LocalScreenProgress
-import es.jvbabi.overmail.ui.transition.MailTransition
-import es.jvbabi.overmail.ui.transition.MailPageEntry
-import es.jvbabi.overmail.ui.transition.MailSceneStrategy
-import es.jvbabi.overmail.ui.transition.rememberScreenProgress
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +12,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -43,18 +28,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapperProvider
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation3.runtime.NavEntry
-import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.page.Screen
-import es.jvbabi.overmail.page.home.ListScreen
-import es.jvbabi.overmail.page.home.StackScreen
-import es.jvbabi.overmail.page.onboarding.OnboardingRoot
 import es.jvbabi.overmail.page.settings.SettingsScreen
 import es.jvbabi.overmail.ui.overlay.update_available.UpdateAvailableOverlay
 import es.jvbabi.overmail.ui.theme.AppTheme
-import es.jvbabi.overmail.utils.SyncHumanReadableLocale
 import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
 import es.jvbabi.overmail.domain.intent.AppIntent
@@ -62,49 +41,14 @@ import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
 import org.koin.compose.viewmodel.koinViewModel
 import coil3.PlatformContext
-import coil3.compose.setSingletonImageLoaderFactory
-import es.jvbabi.overmail.data.network.appImageLoader
 import es.jvbabi.overmail.page.BottomNavBar
 import es.jvbabi.overmail.page.LocalBottomNavBarHeight
 import es.jvbabi.overmail.ui.lift.LocalLiftState
 import es.jvbabi.overmail.ui.lift.liftHost
 import es.jvbabi.overmail.ui.lift.rememberLiftState
-import io.ktor.client.HttpClient
 import okio.Path
 import kotlin.time.Instant
 
-
-/**
- * Between two tabs the pages fade into each other: they sit side by side in the bottom bar, not
- * on top of one another, so sliding one in over the other would say the wrong thing.
- */
-private val TAB_TRANSITION: Map<String, Any> =
-    NavDisplay.transitionSpec { tabFade() } +
-        NavDisplay.popTransitionSpec { tabFade() } +
-        NavDisplay.predictivePopTransitionSpec { tabFade() }
-
-private fun tabFade() = fadeIn(tween(TAB_FADE_MILLIS)) togetherWith fadeOut(tween(TAB_FADE_MILLIS))
-
-private const val TAB_FADE_MILLIS = 200
-
-/**
- * The content of a NavEntry: told how far its screen has come, see [LocalScreenProgress], from
- * the NavDisplay's transition -- unless [ownProgress], for a mail's page, whose `MailScene` tells
- * it. [viewModelStoreOwner] replaces the entry's own store.
- */
-@Composable
-private fun ScreenEntry(
-    viewModelStoreOwner: ViewModelStoreOwner? = null,
-    ownProgress: Boolean = false,
-    content: @Composable () -> Unit,
-) {
-    val owner = viewModelStoreOwner ?: checkNotNull(LocalViewModelStoreOwner.current)
-    CompositionLocalProvider(
-        LocalScreenProgress provides if (ownProgress) LocalScreenProgress.current else rememberScreenProgress(),
-        LocalViewModelStoreOwner provides owner,
-        content = content,
-    )
-}
 
 /** Between the bottom nav bar and the system bar below it. */
 private val BOTTOM_NAV_BAR_MARGIN = 16.dp
@@ -171,16 +115,7 @@ expect fun formatDateTime(instant: Instant, skeleton: String, languageTag: Strin
 @Composable
 @Preview
 fun App() {
-    // One loader for the whole app, see appImageLoader.
-    val httpClient = koinInject<HttpClient>()
-    setSingletonImageLoaderFactory { context -> appImageLoader(context, httpClient) }
-
-    SyncHumanReadableLocale()
-
-    AppTheme(
-        dynamicColor = false,
-        darkTheme = isSystemInDarkTheme(),
-    ) {
+    AppSurface {
         // The back stack is the navigation state: pushing a screen onto it navigates, popping it
         // goes back, and Navigation3 renders whatever is on top.
         val backstack = remember { mutableStateListOf<Screen>(Screen.Stack) }
@@ -223,10 +158,7 @@ fun App() {
 
             val localDensity = LocalDensity.current
             var bottomNavBarHeight by remember { mutableStateOf(0.dp) }
-            // The list tab tapped again while it is open: the search is what is wanted next.
-            var focusListSearch by remember { mutableStateOf(false) }
-            // A stack worked through leads on to the archive, in the list.
-            var openListArchive by remember { mutableStateOf(false) }
+            val shell = remember { ShellState() }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             // Around the bottom bar as well: a card lifted off a page lies over it too.
@@ -236,64 +168,15 @@ fun App() {
                     LocalBottomNavBarHeight provides bottomNavBarHeight + bottomNavBarPadding,
                     LocalLiftState provides liftState,
                 ) {
-                    // The tabs and onboarding keep the view models of the whole app, as they
-                    // always have: the list keeps its view when the stack is picked in between.
-                    // A mail's page has its own, gone once it is left.
-                    val appViewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current)
-                    val mailTransition = remember { MailTransition() }
-                    CompositionLocalProvider(LocalMailTransition provides mailTransition) {
-                        NavDisplay(
-                            backStack = backstack,
-                            onBack = { backstack.removeLastOrNull() },
-                            // A mail's page lies over the screen it was opened from, which stays
-                            // composed below it, so going back starts at once.
-                            sceneStrategies = listOf(MailSceneStrategy()),
-                            entryDecorators = listOf(
-                                rememberSaveableStateHolderNavEntryDecorator(),
-                                rememberViewModelStoreNavEntryDecorator(),
-                            ),
-                            entryProvider = { key ->
-                                when (key) {
-                                    is Screen.Stack -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                        ScreenEntry(appViewModelStoreOwner) {
-                                            StackScreen(
-                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
-                                                onOpenArchive = {
-                                                    openListArchive = true
-                                                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
-                                                    backstack.add(Screen.List)
-                                                },
-                                            )
-                                        }
-                                    }
-
-                                    is Screen.List -> NavEntry(key = key, metadata = TAB_TRANSITION) {
-                                        ScreenEntry(appViewModelStoreOwner) {
-                                            ListScreen(
-                                                focusSearch = focusListSearch,
-                                                onSearchFocused = { focusListSearch = false },
-                                                openArchive = openListArchive,
-                                                onArchiveOpened = { openListArchive = false },
-                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
-                                            )
-                                        }
-                                    }
-
-                                    is Screen.Onboarding -> NavEntry(key = key) {
-                                        ScreenEntry(appViewModelStoreOwner) {
-                                            OnboardingRoot(onDone = { backstack.remove(Screen.Onboarding) })
-                                        }
-                                    }
-
-                                    is Screen.Email -> NavEntry(key = key, metadata = MailPageEntry.metadata) {
-                                        ScreenEntry(ownProgress = true) {
-                                            EmailScreen(emailId = key.emailId, onBack = { backstack.remove(key) })
-                                        }
-                                    }
-                                }
-                            },
-                        )
-                    }
+                    ScreenNavigation(
+                        backstack = backstack,
+                        shell = shell,
+                        onOpenArchive = {
+                            backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                            backstack.add(Screen.List)
+                        },
+                        onOnboardingDone = { backstack.remove(Screen.Onboarding) },
+                    )
                 }
 
                 // Kept while the bar leaves, so it goes as it was rather than with nothing selected.
@@ -311,7 +194,7 @@ fun App() {
                         selected = currentTab,
                         onSelect = { tab ->
                             if (tab == currentTab) {
-                                if (tab == Screen.List) focusListSearch = true
+                                if (tab == Screen.List) shell.focusListSearch = true
                                 return@BottomNavBar
                             }
                             // The stack is the root and every other tab lies on top of it, so back from
@@ -326,7 +209,6 @@ fun App() {
                 }
             }
         }
-
     }
 }
 

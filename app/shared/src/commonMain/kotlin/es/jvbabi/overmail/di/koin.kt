@@ -74,7 +74,7 @@ expect fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase>
  *
  * This is for dependencies whose *implementation as well as their interface* is platform-specific.
  * A dependency that the shared code uses through a common interface belongs in the module the
- * platform's entry point (`MainApplication` / `MainViewController`) passes to [initKoin] instead,
+ * platform's entry point (`MainApplication` / `IosShell`) passes to [initKoin] instead,
  * since only that knows the platform's context.
  */
 expect fun platformModule(): Module

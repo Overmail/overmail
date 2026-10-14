@@ -16,6 +16,10 @@ private const val EMAILS_PER_PUSH = 50
  */
 class PushNotifications(private val queue: PushQueue) {
 
+    /** Whether anything pushed here goes out; without Firebase credentials it is dropped. */
+    val isEnabled: Boolean
+        get() = queue.isEnabled
+
     /** Tells every device of [userId] about the mail [emailId] that arrived in the mailbox [imapAccountId]. */
     fun newEmail(userId: Uuid, emailId: Uuid, imapAccountId: Uuid) =
         queue.enqueue(PushTarget.User(userId), PushMessage.NewEmail(emailId = emailId, imapAccountId = imapAccountId))

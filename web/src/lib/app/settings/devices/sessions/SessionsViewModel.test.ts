@@ -1,12 +1,13 @@
 import {expect, mock, test} from "bun:test";
 import {SessionsViewModel} from "./SessionsViewModel.svelte";
-import type {UserSession} from "$lib/repository/SessionsRepository";
+import {PushUnavailableError, type UserSession} from "$lib/repository/SessionsRepository";
 
 const CURRENT: UserSession = {
     id: "s-1",
     client: {type: "web", browser: "Firefox 131", device: "Mac", os: "macOS"},
     issuedAt: new Date("2026-09-21T10:00:00Z"),
     isCurrentSession: true,
+    pushNotificationState: "unavailable",
 };
 
 const PHONE: UserSession = {
@@ -14,15 +15,17 @@ const PHONE: UserSession = {
     client: {type: "android", device: "Pixel 8", manufacturer: "Google", os: "Android 15"},
     issuedAt: new Date("2026-09-20T10:00:00Z"),
     isCurrentSession: false,
+    pushNotificationState: "setup",
 };
 
 /** A view model on stubs the test controls. */
 function sessions(
     list: () => Promise<UserSession[]> = async () => [CURRENT, PHONE],
     revoke: (id: string) => Promise<void> = async () => {},
+    testPush: (id: string) => Promise<void> = async () => {},
 ) {
-    const spies = {list: mock(list), revoke: mock(revoke), signedOut: mock(() => {})};
-    const viewModel = new SessionsViewModel(spies.list, spies.revoke, spies.signedOut, 10);
+    const spies = {list: mock(list), revoke: mock(revoke), signedOut: mock(() => {}), testPush: mock(testPush)};
+    const viewModel = new SessionsViewModel(spies.list, spies.revoke, spies.signedOut, spies.testPush, 10, 20);
     return {viewModel, ...spies};
 }
 
@@ -96,4 +99,45 @@ test("a failed revocation keeps the session and says so", async () => {
     expect(viewModel.failed).toBe(true);
     expect(viewModel.revoking.size).toBe(0);
     expect(signedOut).not.toHaveBeenCalled();
+});
+
+test("a test push marks its session for a moment once it went out", async () => {
+    const {viewModel, testPush} = sessions();
+
+    const sending = viewModel.sendTestPush(PHONE);
+    expect(viewModel.sendingTestPush.has(PHONE.id)).toBe(true);
+    await sending;
+
+    expect(testPush.mock.calls[0]?.[0]).toBe(PHONE.id);
+    expect(viewModel.sendingTestPush.has(PHONE.id)).toBe(false);
+    expect(viewModel.sentTestPush.has(PHONE.id)).toBe(true);
+
+    await Bun.sleep(40);
+    expect(viewModel.sentTestPush.has(PHONE.id)).toBe(false);
+    viewModel.dispose();
+});
+
+test("a failed test push is reported and marks nothing", async () => {
+    const {viewModel} = sessions(undefined, undefined, async () => {
+        throw new Error("offline");
+    });
+
+    await viewModel.sendTestPush(PHONE);
+
+    expect(viewModel.failed).toBe(true);
+    expect(viewModel.sentTestPush.has(PHONE.id)).toBe(false);
+    viewModel.dispose();
+});
+
+test("a server that cannot push says so instead of failing in general", async () => {
+    const {viewModel} = sessions(undefined, undefined, async () => {
+        throw new PushUnavailableError();
+    });
+
+    await viewModel.sendTestPush(PHONE);
+
+    expect(viewModel.pushUnavailable).toBe(true);
+    expect(viewModel.failed).toBe(false);
+    expect(viewModel.sentTestPush.has(PHONE.id)).toBe(false);
+    viewModel.dispose();
 });

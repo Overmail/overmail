@@ -47,10 +47,14 @@ class PushQueue(
 
     private val channel = Channel<Entry>(capacity = CAPACITY)
 
+    /** Whether a push could go out at all: false while the server has no Firebase credentials. */
+    val isEnabled: Boolean
+        get() = sender !== PushSender.Disabled
+
     /** Takes a push for [target]. Never suspends, never blocks a writer. */
     fun enqueue(target: PushTarget, message: PushMessage) {
         // Nothing would ever send it, so it is not worth a place in the queue.
-        if (sender === PushSender.Disabled) return
+        if (!isEnabled) return
         if (channel.trySend(Entry(target, message)).isFailure) {
             logger.warn("The push queue is full, dropping a push for $target")
         }

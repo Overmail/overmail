@@ -4,6 +4,12 @@ export type SessionClient =
     | {type: "android"; device: string; manufacturer: string; os: string}
     | {type: "ios"; device: string; os: string};
 
+/**
+ * Whether a push reaches the session: `unavailable` when its client cannot take one at all (a
+ * browser), `available` when it could but has not registered for one, `setup` when it has.
+ */
+export type PushNotificationState = "unavailable" | "available" | "setup";
+
 /** One place this user is signed in, as `GET /api/users/me/sessions` reports it. */
 export type UserSession = {
     id: string;
@@ -11,9 +17,17 @@ export type UserSession = {
     issuedAt: Date;
     /** Whether this is the session the browser asking is signed in with. */
     isCurrentSession: boolean;
+    pushNotificationState: PushNotificationState;
 };
 
 const ENDPOINT = "/api/users/me/sessions";
+
+/** The server has no Firebase credentials, so no push goes out to any device. */
+export class PushUnavailableError extends Error {
+    constructor() {
+        super("Push notifications are not configured on this server");
+    }
+}
 
 /**
  * Where this user is signed in. Nothing is cached: the list changes whenever a device signs in or
@@ -30,6 +44,7 @@ export class SessionsRepository {
             client: session.client,
             issuedAt: new Date(session.issued_at),
             isCurrentSession: session.is_current_session,
+            pushNotificationState: session.push_notification_state,
         }));
     }
 
@@ -41,5 +56,19 @@ export class SessionsRepository {
             signal,
         });
         if (!response.ok) throw new Error(`Could not revoke the session: ${response.status}`);
+    }
+
+    /**
+     * Has the session's device show a test notification. Queued: the answer does not say it
+     * arrived. Throws [PushUnavailableError] when the server cannot push at all.
+     */
+    async sendTestPush(id: string, signal?: AbortSignal): Promise<void> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/test-push`, {
+            method: "POST",
+            credentials: "include",
+            signal,
+        });
+        if (response.status === 503) throw new PushUnavailableError();
+        if (!response.ok) throw new Error(`Could not send a test push: ${response.status}`);
     }
 }

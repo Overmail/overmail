@@ -15,6 +15,7 @@
         // Hard, not through the router: this browser's session is gone, so nothing the app holds
         // in memory is worth keeping.
         () => window.location.assign("/"),
+        (id, signal) => sessionsRepository.sendTestPush(id, signal),
     );
 
     /** This browser's session, while the user is asked whether they really want to sign out. */
@@ -39,6 +40,12 @@
             {$_("settings.devices.sessions.loadFailed")}
         </span>
     {/if}
+    {#if viewModel.pushUnavailable}
+        <span class="flex flex-row gap-1 items-center text-sm text-muted-foreground">
+            <WarningCircleIcon class="size-4" />
+            {$_("settings.devices.sessions.pushUnavailable")}
+        </span>
+    {/if}
     {#if viewModel.sessions === null}
         {#if !viewModel.failed}
             <div class="h-6 w-6 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
@@ -48,6 +55,9 @@
                 sessions={viewModel.sessions}
                 revoking={viewModel.revoking}
                 onrevoke={revoke}
+                sendingTestPush={viewModel.sendingTestPush}
+                sentTestPush={viewModel.sentTestPush}
+                ontestpush={(session) => viewModel.sendTestPush(session)}
         />
     {/if}
 </section>

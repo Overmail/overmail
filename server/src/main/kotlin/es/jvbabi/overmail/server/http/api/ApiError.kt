@@ -46,6 +46,9 @@ enum class ApiErrorCode(val wire: String) {
     /** It was there and is not any more -- a share link or a device sign-in code that ran out. */
     GONE("gone"),
 
+    /** Something this server would need for the request is not set up, e.g. push without Firebase credentials. */
+    UNAVAILABLE("unavailable"),
+
     /** Anything that got out of a handler unhandled. */
     INTERNAL("internal"),
 }
@@ -127,4 +130,11 @@ fun conflict(message: String, details: Map<String, String> = emptyMap()): Nothin
     code = ApiErrorCode.CONFLICT,
     message = message,
     details = details,
+)
+
+/** The server cannot do this at all as it is configured; [message] names what is missing. */
+fun unavailable(message: String): Nothing = throw ApiException(
+    status = HttpStatusCode.ServiceUnavailable,
+    code = ApiErrorCode.UNAVAILABLE,
+    message = message,
 )

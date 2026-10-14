@@ -21,6 +21,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
 import kotlin.uuid.Uuid
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
 
 /*
@@ -117,6 +118,41 @@ suspend fun ApplicationCall.requireOwnedEmailIdFromUrl(): Uuid {
     attributes.put(URL_EMAIL_ID, id)
     rememberOwned("email")
     return id
+}
+
+/** How many ids `{emailId}` may name at once; a hundred of them is about 3.7 KB of url. */
+const val MAX_URL_EMAIL_IDS = 100
+
+/**
+ * `{emailId}` as one or more ids, separated by commas -- `/api/emails/a,b,c` -- in the order
+ * they were named, each one only once.
+ *
+ * As strict as [requireOwnedEmailIdFromUrl], for every one of them: a malformed or unknown id
+ * is 404 and somebody else's is 403, each naming the id, and the first miss fails the whole
+ * request. A path addresses resources, so naming one that is not there is an error and not an
+ * empty spot in the answer -- `QUERY /api/emails/meta` is the lookup that leaves those out.
+ * Existence and owner of all of them come out of one query.
+ */
+suspend fun ApplicationCall.requireOwnedEmailIdsFromUrl(): List<Uuid> {
+    val raw = parameters["emailId"] ?: error("this route has no {emailId}, so its emails cannot be resolved")
+    val parts = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    if (parts.size > MAX_URL_EMAIL_IDS) invalidRequest("emailId", "names more than $MAX_URL_EMAIL_IDS mails", parts.size.toString())
+    val ids = parts.map { part -> Uuid.parseOrNull(part) ?: notFound("email", part) }
+
+    val owners = database().query {
+        Emails
+            .innerJoin(ImapAccounts)
+            .select(Emails.id, ImapAccounts.user)
+            .where { Emails.id inList ids }
+            .associate { row -> row[Emails.id].value to row[ImapAccounts.user].value }
+    }
+
+    val userId = requireAuthenticatedUserId()
+    ids.forEach { id ->
+        val owner = owners[id] ?: notFound("email", id.toString())
+        if (owner != userId) forbidden("email", id.toString())
+    }
+    return ids
 }
 
 /** Who a mail belongs to: the account it was imported through decides, see [Emails.imapAccount]. */

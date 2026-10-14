@@ -6,8 +6,37 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B1A0C0DE0000000000000002 /* NotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B1A0C0DE0000000000000001 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B1A0C0DE000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F8EAE28AD368BD11B6FE2D4B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1A0C0DE0000000000000006;
+			remoteInfo = NotificationService;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B1A0C0DE000000000000000D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B1A0C0DE0000000000000002 /* NotificationService.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		F894571613709D92EA1ED470 /* Overmail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Overmail.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1A0C0DE0000000000000001 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -17,6 +46,13 @@
 				Info.plist,
 			);
 			target = 4A34531190ADBBC17EBC7477 /* iosApp */;
+		};
+		B1A0C0DE0000000000000005 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B1A0C0DE0000000000000006 /* NotificationService */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -42,10 +78,38 @@
 			path = iosApp;
 			sourceTree = "<group>";
 		};
+		B1A0C0DE0000000000000004 /* NotificationService */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B1A0C0DE0000000000000005 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = NotificationService;
+			sourceTree = "<group>";
+		};
+		B1A0C0DE0000000000000003 /* Push */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Push;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		238D2388E4B47F83ECD003B3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1A0C0DE0000000000000008 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -59,6 +123,7 @@
 			isa = PBXGroup;
 			children = (
 				F894571613709D92EA1ED470 /* Overmail.app */,
+				B1A0C0DE0000000000000001 /* NotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,6 +133,8 @@
 			children = (
 				2BBA96C0CF59C4A9F42DAEC0 /* Configuration */,
 				FC5041E2BBD25C2338813F61 /* iosApp */,
+				B1A0C0DE0000000000000004 /* NotificationService */,
+				B1A0C0DE0000000000000003 /* Push */,
 				6D964162AA43EE62CD19B257 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -83,13 +150,16 @@
 				7D0855D3F6048F8939F069CE /* Sources */,
 				238D2388E4B47F83ECD003B3 /* Frameworks */,
 				6EF607961F707958709D3CB2 /* Resources */,
+				B1A0C0DE000000000000000D /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B1A0C0DE000000000000000F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				FC5041E2BBD25C2338813F61 /* iosApp */,
+				B1A0C0DE0000000000000003 /* Push */,
 			);
 			name = iosApp;
 			packageProductDependencies = (
@@ -97,6 +167,29 @@
 			productName = iosApp;
 			productReference = F894571613709D92EA1ED470 /* Overmail.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B1A0C0DE0000000000000006 /* NotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1A0C0DE000000000000000A /* Build configuration list for PBXNativeTarget "NotificationService" */;
+			buildPhases = (
+				B1A0C0DE0000000000000007 /* Sources */,
+				B1A0C0DE0000000000000008 /* Frameworks */,
+				B1A0C0DE0000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B1A0C0DE0000000000000004 /* NotificationService */,
+				B1A0C0DE0000000000000003 /* Push */,
+			);
+			name = NotificationService;
+			packageProductDependencies = (
+			);
+			productName = NotificationService;
+			productReference = B1A0C0DE0000000000000001 /* NotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -111,6 +204,9 @@
 					4A34531190ADBBC17EBC7477 = {
 						CreatedOnToolsVersion = 16.2;
 					};
+					B1A0C0DE0000000000000006 = {
+						CreatedOnToolsVersion = 26.0;
+					};
 				};
 			};
 			buildConfigurationList = BC82C5A5BCC88ABD8CCD7378 /* Build configuration list for PBXProject "iosApp" */;
@@ -119,6 +215,7 @@
 			knownRegions = (
 				en,
 				Base,
+				de,
 			);
 			mainGroup = E2FC071C2C51BB15A169A3CB;
 			minimizedProjectReferenceProxies = 1;
@@ -128,12 +225,20 @@
 			projectRoot = "";
 			targets = (
 				4A34531190ADBBC17EBC7477 /* iosApp */,
+				B1A0C0DE0000000000000006 /* NotificationService */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		6EF607961F707958709D3CB2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1A0C0DE0000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -172,7 +277,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1A0C0DE0000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B1A0C0DE000000000000000F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1A0C0DE0000000000000006 /* NotificationService */;
+			targetProxy = B1A0C0DE000000000000000E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5312F0DCBB0A265F50D430CB /* Release */ = {
@@ -239,6 +359,7 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Configuration/iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -333,6 +454,7 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Configuration/iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -356,6 +478,56 @@
 			};
 			name = Release;
 		};
+		B1A0C0DE000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = Configuration/NotificationService.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = BYCH2H5X5G;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationService;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).NotificationService";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B1A0C0DE000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = Configuration/NotificationService.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = BYCH2H5X5G;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationService;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited).NotificationService";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -373,6 +545,15 @@
 			buildConfigurations = (
 				79357A35EFA90D29FDC4F604 /* Debug */,
 				818F09A64CD3239B5BD0571C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B1A0C0DE000000000000000A /* Build configuration list for PBXNativeTarget "NotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1A0C0DE000000000000000B /* Debug */,
+				B1A0C0DE000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

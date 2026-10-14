@@ -46,7 +46,30 @@ class Session(id: EntityID<Uuid>): UuidEntity(id) {
         data class Ios(
             @SerialName("device") val device: String,
             @SerialName("os") val os: String,
+            @SerialName("apple_push") val applePush: ApplePushRegistration? = null,
         ) : Client()
+
+        /**
+         * Where a push for an iOS device goes, and what it is sealed for: the APNs device [token]
+         * (hex), the APNs [environment] the build is signed for, and the device's P-256
+         * [publicKey], uncompressed X9.63 in base64. What a notification shows is encrypted for
+         * that key, see `ApplePushContent`.
+         */
+        @Serializable
+        data class ApplePushRegistration(
+            @SerialName("token") val token: String,
+            @SerialName("environment") val environment: ApnsEnvironment,
+            @SerialName("public_key") val publicKey: String,
+        )
+
+        /** Which APNs a device token belongs to: a token is only valid against the one that issued it. */
+        @Serializable
+        enum class ApnsEnvironment {
+            /** A debug build, signed with a development profile. */
+            @SerialName("sandbox") Sandbox,
+
+            @SerialName("production") Production,
+        }
 
         companion object {
             const val UNKNOWN = "unknown"

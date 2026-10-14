@@ -8,7 +8,10 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.http.users.me.sessions.current.setApplePush
 import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseInstallationId
+import es.jvbabi.overmail.server.jobs.push.deviceKeys
+import es.jvbabi.overmail.server.jobs.push.publicX963Base64
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.sessions.item.sendTestPush
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
@@ -66,6 +69,8 @@ class SessionRoutesTest {
 
     private val phone = Session.Client.Android(device = "Pixel 8", manufacturer = "Google", os = "Android 15")
     private val browser = Session.Client.Web(browser = "Firefox 131", device = "Mac", os = "macOS")
+    private val iPhone = Session.Client.Ios(device = "iPhone", os = "iOS 26")
+    private val publicKey = deviceKeys().publicX963Base64()
 
     /** The installation ids pushes were handed to, in order. */
     private val pushed = Channel<String>(Channel.UNLIMITED)
@@ -242,6 +247,64 @@ class SessionRoutesTest {
         assertEquals(HttpStatusCode.ServiceUnavailable, client.post("/api/users/me/sessions/${idOf(phoneWithPush)}/test-push") { bearerAuth(current) }.status)
     }
 
+    @Test
+    fun `an apns registration is stored on the ios session it came with, and the last one wins`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, iPhone)
+        val other = jwtService.issueSession(database, user, iPhone)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.NoContent, setApplePush(current, deviceToken = "AB".repeat(32)).status)
+        assertEquals(HttpStatusCode.NoContent, setApplePush(current, deviceToken = "cd".repeat(32), environment = "sandbox").status)
+
+        val registration = Session.Client.ApplePushRegistration("cd".repeat(32), Session.Client.ApnsEnvironment.Sandbox, publicKey)
+        assertEquals(iPhone.copy(applePush = registration), clientOf(current))
+        assertEquals(iPhone, clientOf(other))
+    }
+
+    @Test
+    fun `an apns registration does not show up in the listing`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), iPhone)
+        installRoutes()
+        setApplePush(current)
+
+        val client = listSessions(current).single()["client"]!!.jsonObject
+
+        assertEquals("iPhone", client["device"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, client["apple_push"])
+    }
+
+    @Test
+    fun `only a session of the ios app takes an apns registration`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), phone)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.Conflict, setApplePush(current).status)
+        assertEquals(phone, clientOf(current))
+    }
+
+    @Test
+    fun `an apns token that is not hex, or a key that is no p-256 point, is refused`() = testApplication {
+        val current = jwtService.issueSession(database, newUser(), iPhone)
+        installRoutes()
+
+        assertEquals(HttpStatusCode.BadRequest, setApplePush(current, deviceToken = "not-a-token").status)
+        assertEquals(HttpStatusCode.BadRequest, setApplePush(current, key = "AAAA").status)
+        assertEquals(HttpStatusCode.BadRequest, setApplePush(current, key = "%%%").status)
+        assertEquals(iPhone, clientOf(current))
+    }
+
+    private suspend fun ApplicationTestBuilder.setApplePush(
+        token: String,
+        deviceToken: String = "ab".repeat(32),
+        environment: String = "production",
+        key: String = publicKey,
+    ) = client.put("/api/users/me/sessions/current/apple-push") {
+        bearerAuth(token)
+        contentType(ContentType.Application.Json)
+        setBody("""{"token":"$deviceToken","environment":"$environment","public_key":"$key"}""")
+    }
+
     private suspend fun ApplicationTestBuilder.setFirebaseInstallationId(token: String, firebaseInstallationId: String) =
         client.put("/api/users/me/sessions/current/firebase-installation-id") {
             bearerAuth(token)
@@ -291,6 +354,7 @@ class SessionRoutesTest {
                 route("/api/users/me/sessions") {
                     getSessions()
                     route("/current/firebase-installation-id") { setFirebaseInstallationId() }
+                    route("/current/apple-push") { setApplePush() }
                     route("/{sessionId}") {
                         revokeSession()
                         route("/test-push") { sendTestPush() }

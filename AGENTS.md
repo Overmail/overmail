@@ -64,12 +64,21 @@ modules are entry points and nothing else.
   For the updater: `app.check_for_updates.enable_in_debug=true` checks for updates in a debug
   build, `app.dev.fake-update=true` swaps GitHub and the installer for fakes.
   `app.dev.log_http_requests=false` silences the request log, which is on by default.
-- **Push is Firebase Cloud Messaging and Android-only** (`androidMain`, `data/push/`). The
+- **Push on Android is Firebase Cloud Messaging** (`androidMain`, `data/push/`). The
   google-services plugin in `:app:android` needs `app/android/google-services.json`, which is
   gitignored and must list both application ids (`es.jvbabi.overmail` and `.debug`); without it the
   app does not build. CI restores it from the `GOOGLE_SERVICES_FILE` secret (base64).
   A push carries a `type` and ids, never content (`domain/model/PushMessage.kt`, the mirror of the
   server's `jobs/push/PushMessage.kt`); `PushNotifier` fetches what a notification shows.
+- **Push on iOS is APNs, and the notification comes with the push.** `PushDelegate.swift` gets
+  the token, makes the device key (`app/ios/Push/PushKey.swift`, P-256 in the keychain) and hands
+  both to `ApplePush` in `iosMain`, which registers them like the Firebase id. The server seals
+  sender, subject and preview for that key; the notification service extension
+  (`app/ios/NotificationService/`) opens them with `PushContentDecryptor.swift` -- no network, no
+  session -- and keeps the server's placeholder when it cannot. The sealing format lives twice, in
+  that file and in the server's `ApplePushSealing.kt`: change both together. App and extension
+  share the key through the `keychain-access-groups` entitlement in `app/ios/Configuration/`.
+  `simctl push` does not run the extension; only a push that came through APNs does.
 - **What the app is asked to do from outside is an `AppIntent`** (`domain/intent/`): a tapped
   notification today. It travels as a uri under the app's scheme, the platform entry point hands
   that to `AppIntents`, and `App.kt` acts on it once the ui is there. A new one is a subclass, its

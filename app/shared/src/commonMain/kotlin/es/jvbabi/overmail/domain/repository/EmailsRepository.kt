@@ -30,6 +30,13 @@ interface EmailsRepository {
     fun getEmail(emailId: Uuid, user: OvermailAccount, policy: FetchPolicy = FetchPolicy.CacheFirst): Flow<Email?>
 
     /**
+     * [getEmail] for several mails at once, with one request per 500 of them rather than one per
+     * mail: the ones among [emailIds] the local database holds, in that order, and again whenever
+     * one of them changes. A mail it does not hold is missing from the list.
+     */
+    fun getEmails(emailIds: List<Uuid>, user: OvermailAccount, policy: FetchPolicy = FetchPolicy.CacheFirst): Flow<List<Email>>
+
+    /**
      * The mail of [emailId] as a view or [getEmail] last read it, right away; null when neither has
      * since the app started. What a page opened on the mail starts with, so it has what it shows
      * in its first frame -- which is what it grows out of the mail that was tapped with.

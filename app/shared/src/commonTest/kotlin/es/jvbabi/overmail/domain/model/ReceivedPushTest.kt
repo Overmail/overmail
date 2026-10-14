@@ -32,6 +32,21 @@ class ReceivedPushTest {
     }
 
     @Test
+    fun `changed mails are read with their ids`() {
+        val first = Uuid.random()
+        val second = Uuid.random()
+
+        val push = ReceivedPush.fromData(
+            mapOf(
+                "user_id" to userId.toString(),
+                "payload" to """{"type":"emails_changed","email_ids":["$first","$second"]}""",
+            )
+        )
+
+        assertEquals(ReceivedPush(userId, PushMessage.EmailsChanged(listOf(first, second))), push)
+    }
+
+    @Test
     fun `a field this version does not know is ignored`() {
         val push = ReceivedPush.fromData(mapOf("user_id" to userId.toString(), "payload" to """{"type":"ping","sent_at":1}"""))
 

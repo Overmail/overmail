@@ -33,6 +33,9 @@ import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
 import es.jvbabi.overmail.shared.compose.R
 import es.jvbabi.overmail.ui.components.initials
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.withTimeoutOrNull
@@ -84,6 +87,7 @@ class PushNotifier(
     suspend fun handle(push: ReceivedPush) {
         when (val message = push.message) {
             is PushMessage.NewEmail -> showNewEmail(push.userId, message)
+            is PushMessage.EmailsChanged -> dismissDealtWith(push.userId, message)
             PushMessage.Ping -> showPing()
         }
     }
@@ -120,7 +124,7 @@ class PushNotifier(
         }
 
         // Dealt with since the push was sent, here or on another device: nothing to announce.
-        if (email != null && (email.isRead || email.archivedState != ArchivedState.Unarchive)) {
+        if (email != null && email.isDealtWith) {
             logger.i { "Mail ${email.id} is read or archived already, not showing a notification" }
             return
         }
@@ -175,8 +179,9 @@ class PushNotifier(
      * mailbox's address, expanded each is its own. Android only bundles notifications that share
      * a group *and* have a summary, and of the summary itself it shows no more than this header.
      *
-     * Posted again with every mail, which changes nothing about one that is there. When the last
-     * mail of the group is gone the system stops showing the summary by itself.
+     * Posted again with every mail, which changes nothing about one that is there. The system
+     * only takes it away by itself when the user dismisses the last mail of the group, not when
+     * the app cancels it -- see [dismiss].
      */
     private fun postGroupSummary(imapAccount: ImapAccount) {
         post(
@@ -256,14 +261,74 @@ class PushNotifier(
     }
 
     /**
+     * Mails were read or moved, here or on another device: the copy in the database is brought
+     * up to date, and the notification of every one of them that is dealt with now goes away. A
+     * mail that was marked unread or put back gets no notification again.
+     */
+    private suspend fun dismissDealtWith(userId: Uuid, message: PushMessage.EmailsChanged) {
+        val account = accountRepository.getById(userId).first() ?: return
+
+        emailsRepository.refresh(message.emailIds, account)
+            .onFailure { logger.w(it) { "Could not reload ${message.emailIds.size} changed mails" } }
+
+        // Only the mails with a notification here need a look, and they are in the database:
+        // their notification loaded them.
+        val shown = shownEmailIds().intersect(message.emailIds.toSet())
+        if (shown.isEmpty()) return
+
+        val dealtWith = withTimeoutOrNull(EMAIL_TIMEOUT) {
+            coroutineScope {
+                shown
+                    .map { emailId -> async { emailsRepository.getEmail(emailId, account).filterNotNull().first() } }
+                    .awaitAll()
+                    .filter { it.isDealtWith }
+                    .map { it.id }
+            }
+        }
+        if (dealtWith == null) {
+            logger.w { "Could not load ${shown.size} changed mails in time, keeping their notifications" }
+            return
+        }
+
+        dismiss(dealtWith)
+    }
+
+    /** The mails a notification is shown for right now. */
+    private fun shownEmailIds(): Set<Uuid> = notificationManager.activeNotifications
+        .filter { it.id == EMAIL_NOTIFICATION_ID }
+        .mapNotNull { it.tag?.let(Uuid::parseOrNull) }
+        .toSet()
+
+    /**
+     * Takes away the notifications of [emailIds], and the summary of every mailbox that has no
+     * mail left in the shade: Android leaves a summary the app posted standing when the app
+     * cancels its last child, as an empty notification with nothing but the mailbox's name.
+     */
+    private fun dismiss(emailIds: Collection<Uuid>) {
+        if (emailIds.isEmpty()) return
+        val tags = emailIds.map { it.toString() }.toSet()
+
+        // Read before cancelling: a cancel reaches the system after it returns, so a list read
+        // afterwards may still hold the notifications it took away.
+        val active = notificationManager.activeNotifications
+        tags.forEach { notificationManager.cancel(it, EMAIL_NOTIFICATION_ID) }
+
+        val groupsLeft = active
+            .filter { it.id == EMAIL_NOTIFICATION_ID && it.tag !in tags }
+            .mapNotNull { it.notification.group }
+            .toSet()
+        active
+            .filter { it.id == EMAIL_GROUP_NOTIFICATION_ID && it.tag !in groupsLeft }
+            .forEach { notificationManager.cancel(it.tag, EMAIL_GROUP_NOTIFICATION_ID) }
+    }
+
+    /**
      * Archives the mail [emailId] of the account [accountId] and takes its notification away: the
-     * button on the notification, see [NotificationActionReceiver]. The notification goes first,
-     * so the button answers at once; the mail follows like an archive from a screen, locally and
-     * then on the server.
+     * button on the notification, see [NotificationActionReceiver]. The mail goes like an archive
+     * from a screen, locally and then on the server, and the notification only once the server
+     * took it -- one that failed keeps its button to try again.
      */
     suspend fun archive(accountId: Uuid, emailId: Uuid) {
-        notificationManager.cancel(emailId.toString(), EMAIL_NOTIFICATION_ID)
-
         val account = accountRepository.getById(accountId).first() ?: return
         val email = withTimeoutOrNull(EMAIL_TIMEOUT) {
             emailsRepository.getEmail(emailId, account).filterNotNull().first()
@@ -274,6 +339,7 @@ class PushNotifier(
         }
 
         emailsRepository.setArchivedState(email, ArchivedState.Archive, account)
+            .onSuccess { dismiss(listOf(emailId)) }
             .onFailure { logger.w(it) { "Could not archive mail $emailId from its notification" } }
     }
 
@@ -300,6 +366,10 @@ class PushNotifier(
         }
         notificationManager.notify(tag, id, notification.build())
     }
+
+    /** Read, or out of the mailbox: nothing a notification has to point at anymore. */
+    private val Email.isDealtWith: Boolean
+        get() = isRead || archivedState != ArchivedState.Unarchive
 
     private companion object {
         val WHITESPACE = Regex("\\s+")

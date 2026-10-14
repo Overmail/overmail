@@ -27,6 +27,13 @@ interface EmailsRepository {
     fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?>
 
     /**
+     * Asks [user]'s homeserver again for the mails among [emailIds] the local database holds, for
+     * when something says they changed without an open view to hear of it -- a push. Mails it
+     * does not hold are not loaded.
+     */
+    suspend fun refresh(emailIds: Collection<Uuid>, user: OvermailAccount): Result<Unit>
+
+    /**
      * The mail of [emailId] as a view or [getEmail] last read it, right away; null when neither has
      * since the app started. What a page opened on the mail starts with, so it has what it shows
      * in its first frame -- which is what it grows out of the mail that was tapped with.

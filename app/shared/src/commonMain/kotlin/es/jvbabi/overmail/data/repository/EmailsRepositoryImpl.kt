@@ -154,6 +154,9 @@ class EmailsRepositoryImpl(
         }
     }
 
+    override suspend fun refresh(emailIds: Collection<Uuid>, user: OvermailAccount): Result<Unit> =
+        emailSync.reload(user, emailIds)
+
     override fun peekEmail(emailId: Uuid): Email? = lastRead[emailId]
 
     override suspend fun getBody(emailId: Uuid, user: OvermailAccount): Result<EmailBody> {

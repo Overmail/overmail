@@ -40,6 +40,12 @@
             {$_("settings.devices.sessions.loadFailed")}
         </span>
     {/if}
+    {#if viewModel.pushUnavailable}
+        <span class="flex flex-row gap-1 items-center text-sm text-muted-foreground">
+            <WarningCircleIcon class="size-4" />
+            {$_("settings.devices.sessions.pushUnavailable")}
+        </span>
+    {/if}
     {#if viewModel.sessions === null}
         {#if !viewModel.failed}
             <div class="h-6 w-6 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>

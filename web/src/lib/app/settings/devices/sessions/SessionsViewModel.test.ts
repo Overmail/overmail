@@ -1,6 +1,6 @@
 import {expect, mock, test} from "bun:test";
 import {SessionsViewModel} from "./SessionsViewModel.svelte";
-import type {UserSession} from "$lib/repository/SessionsRepository";
+import {PushUnavailableError, type UserSession} from "$lib/repository/SessionsRepository";
 
 const CURRENT: UserSession = {
     id: "s-1",
@@ -125,6 +125,19 @@ test("a failed test push is reported and marks nothing", async () => {
     await viewModel.sendTestPush(PHONE);
 
     expect(viewModel.failed).toBe(true);
+    expect(viewModel.sentTestPush.has(PHONE.id)).toBe(false);
+    viewModel.dispose();
+});
+
+test("a server that cannot push says so instead of failing in general", async () => {
+    const {viewModel} = sessions(undefined, undefined, async () => {
+        throw new PushUnavailableError();
+    });
+
+    await viewModel.sendTestPush(PHONE);
+
+    expect(viewModel.pushUnavailable).toBe(true);
+    expect(viewModel.failed).toBe(false);
     expect(viewModel.sentTestPush.has(PHONE.id)).toBe(false);
     viewModel.dispose();
 });

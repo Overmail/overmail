@@ -666,6 +666,7 @@
         "current": "Dieses Gerät",
         "revoke": "Abmelden",
         "testPush": "Testbenachrichtigung senden",
+        "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Server nicht eingerichtet.",
         "signOut": {
           "title": "Wirklich abmelden?",
           "description": "Dieses Gerät wird von Overmail abgemeldet und du musst dich erneut anmelden.",

@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.http.api.conflict
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireOwnedSessionFromUrl
+import es.jvbabi.overmail.server.http.api.unavailable
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import es.jvbabi.overmail.server.jobs.push.PushTarget
 import io.ktor.http.HttpStatusCode
@@ -31,6 +32,7 @@ fun Route.sendTestPush() {
          * Responses:
          *   - 202 The push is queued
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The session has not set up push
+         *   - 503 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The server has no Firebase credentials, so no push goes out
          */
         post {
             val session = call.requireOwnedSessionFromUrl()
@@ -39,7 +41,11 @@ fun Route.sendTestPush() {
                 conflict("The session has not set up push notifications")
             }
 
-            call.dependency<PushNotifications>().ping(PushTarget.Session(session.id.value))
+            val pushNotifications = call.dependency<PushNotifications>()
+            // Without credentials the push would be dropped in silence, which looks like a broken device.
+            if (!pushNotifications.isEnabled) unavailable("Push notifications are not configured on this server")
+
+            pushNotifications.ping(PushTarget.Session(session.id.value))
 
             call.respond(HttpStatusCode.Accepted)
         }

@@ -1,5 +1,5 @@
 import {SvelteSet} from "svelte/reactivity";
-import type {UserSession} from "$lib/repository/SessionsRepository";
+import {PushUnavailableError, type UserSession} from "$lib/repository/SessionsRepository";
 
 /** How often the list is read again; a device that signs in elsewhere shows up within this. */
 export const POLL_INTERVAL_MS = 5000;
@@ -19,6 +19,8 @@ export class SessionsViewModel {
     sessions: UserSession[] | null = $state(null);
     /** Whether the last read or revocation failed. */
     failed = $state(false);
+    /** Whether a test push was refused because the server cannot push at all. */
+    pushUnavailable = $state(false);
     /** The sessions being signed out right now, so their button cannot be pressed twice. */
     readonly revoking = new SvelteSet<string>();
     /** The sessions a test push is being sent to right now. */
@@ -82,8 +84,9 @@ export class SessionsViewModel {
         this.sentTestPush.delete(session.id);
         try {
             await this.testPush(session.id, this.abort.signal);
-        } catch {
-            if (!this.abort.signal.aborted) this.failed = true;
+        } catch (error) {
+            if (error instanceof PushUnavailableError) this.pushUnavailable = true;
+            else if (!this.abort.signal.aborted) this.failed = true;
             return;
         } finally {
             this.sendingTestPush.delete(session.id);

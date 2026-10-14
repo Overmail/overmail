@@ -666,6 +666,7 @@
         "current": "This device",
         "revoke": "Sign out",
         "testPush": "Send a test notification",
+        "pushUnavailable": "Push notifications are not set up on this server.",
         "signOut": {
           "title": "Really sign out?",
           "description": "This device will be signed out of Overmail and you will have to sign in again.",

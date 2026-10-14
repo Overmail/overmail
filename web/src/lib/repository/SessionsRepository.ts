@@ -22,6 +22,13 @@ export type UserSession = {
 
 const ENDPOINT = "/api/users/me/sessions";
 
+/** The server has no Firebase credentials, so no push goes out to any device. */
+export class PushUnavailableError extends Error {
+    constructor() {
+        super("Push notifications are not configured on this server");
+    }
+}
+
 /**
  * Where this user is signed in. Nothing is cached: the list changes whenever a device signs in or
  * is signed out, so the screen that shows it asks again on its own.
@@ -51,13 +58,17 @@ export class SessionsRepository {
         if (!response.ok) throw new Error(`Could not revoke the session: ${response.status}`);
     }
 
-    /** Has the session's device show a test notification. Queued: the answer does not say it arrived. */
+    /**
+     * Has the session's device show a test notification. Queued: the answer does not say it
+     * arrived. Throws [PushUnavailableError] when the server cannot push at all.
+     */
     async sendTestPush(id: string, signal?: AbortSignal): Promise<void> {
         const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/test-push`, {
             method: "POST",
             credentials: "include",
             signal,
         });
+        if (response.status === 503) throw new PushUnavailableError();
         if (!response.ok) throw new Error(`Could not send a test push: ${response.status}`);
     }
 }

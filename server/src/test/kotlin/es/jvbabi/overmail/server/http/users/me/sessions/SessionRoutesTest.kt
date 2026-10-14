@@ -69,7 +69,7 @@ class SessionRoutesTest {
 
     /** The installation ids pushes were handed to, in order. */
     private val pushed = Channel<String>(Channel.UNLIMITED)
-    private val pushQueue = PushQueue(database, PushSender { token, _, _ -> pushed.send(token); PushSender.Result.Sent })
+    private var pushQueue = PushQueue(database, PushSender { token, _, _ -> pushed.send(token); PushSender.Result.Sent })
 
     @Test
     fun `lists the unrevoked sessions of the caller and marks the current one`() = testApplication {
@@ -228,6 +228,18 @@ class SessionRoutesTest {
         assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(current)}/test-push") { bearerAuth(current) }.status)
         assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(phoneWithoutPush)}/test-push") { bearerAuth(current) }.status)
         assertEquals(HttpStatusCode.Forbidden, client.post("/api/users/me/sessions/${idOf(foreign)}/test-push") { bearerAuth(current) }.status)
+    }
+
+    @Test
+    fun `a test push says so when the server cannot push at all`() = testApplication {
+        pushQueue = PushQueue(database, PushSender.Disabled)
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val phoneWithPush = jwtService.issueSession(database, user, phone)
+        installRoutes()
+        setFirebaseInstallationId(phoneWithPush, "installation")
+
+        assertEquals(HttpStatusCode.ServiceUnavailable, client.post("/api/users/me/sessions/${idOf(phoneWithPush)}/test-push") { bearerAuth(current) }.status)
     }
 
     private suspend fun ApplicationTestBuilder.setFirebaseInstallationId(token: String, firebaseInstallationId: String) =

@@ -1,0 +1,10 @@
+{
+  "title": "Overmail AI in the app",
+  "description": "The assistant from the web app now has its own tab. Ask a question or give it a task, continue an earlier chat and follow the answer as it is written. In the list's search, tap \"Ask Overmail AI\" to hand what you typed straight to the assistant.",
+  "localized": {
+    "de": {
+      "title": "Overmail AI in der App",
+      "description": "Der Assistent aus der Web-App hat jetzt einen eigenen Tab. Stell eine Frage oder gib ihm eine Aufgabe, setze einen früheren Chat fort und verfolge die Antwort, während sie geschrieben wird. Tippe in der Suche der Liste auf „Overmail AI fragen“, um das Eingetippte direkt an den Assistenten zu geben."
+    }
+  }
+}

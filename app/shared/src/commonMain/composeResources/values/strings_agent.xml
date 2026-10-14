@@ -1,0 +1,41 @@
+<resources>
+    <string name="agent_title_new">New chat</string>
+    <string name="agent_title_unnamed">Untitled chat</string>
+    <string name="agent_new_chat">New chat</string>
+    <string name="agent_chats">Chats</string>
+    <string name="agent_input_placeholder">Ask Overmail AI</string>
+    <string name="agent_send">Send</string>
+    <string name="agent_tool_read_email">Reading email</string>
+    <string name="agent_tool_create_label">New label</string>
+    <string name="agent_tool_label_email">Label added</string>
+    <string name="agent_tool_unlabel_email">Label removed</string>
+    <string name="agent_tool_search_knowledge">Looking through what I know</string>
+    <string name="agent_tool_read_knowledge">Read what I know about</string>
+    <string name="agent_tool_write_knowledge">Noted</string>
+    <string name="agent_tool_update_knowledge">Updated what I know about</string>
+    <string name="agent_tool_rename_chat">Chat renamed</string>
+    <string name="agent_tool_search_emails">Searching emails</string>
+    <string name="agent_tool_search_subject">Subject: %1$s</string>
+    <string name="agent_tool_search_sender">From: %1$s</string>
+    <string name="agent_tool_thinking">Thinking</string>
+    <string name="agent_tool_working">Working</string>
+    <string name="agent_tool_deleted">Deleted</string>
+    <string name="agent_tool_expand">Show tool calls</string>
+    <plurals name="agent_tool_calls">
+        <item quantity="one">%1$d tool call</item>
+        <item quantity="other">%1$d tool calls</item>
+    </plurals>
+    <string name="agent_error_load">The chat could not be loaded.</string>
+    <string name="agent_error_send">The question could not be sent.</string>
+    <string name="agent_retry">Try again</string>
+    <string name="agent_error_retry">The answer could not be written again.</string>
+    <string name="agent_link_title">Open this link?</string>
+    <string name="agent_link_description">This link leads out of Overmail, and the text of a link is written by the assistant.</string>
+    <string name="agent_link_cancel">Cancel</string>
+    <string name="agent_link_open">Open</string>
+    <string name="agent_empty_title">What can I help with?</string>
+    <string name="agent_suggestion_today">What needs my attention today?</string>
+    <string name="agent_suggestion_summary">Sum up my unread mails</string>
+    <string name="agent_suggestion_waiting">Who is waiting for an answer from me?</string>
+    <string name="agent_scroll_to_end">Scroll to the end</string>
+</resources>

@@ -2,6 +2,7 @@ package es.jvbabi.overmail.domain.repository
 
 import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.Label
+import es.jvbabi.overmail.domain.model.LabelReference
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
@@ -25,4 +26,10 @@ interface LabelsRepository {
      * picked came out of a [search], which put it in the cache. Unknown ids are left out.
      */
     fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Label>>
+
+    /**
+     * The labels behind [ids] as the server has them now, for one that is not in the cache --
+     * created by the assistant a moment ago, say. Unknown and foreign ids are left out.
+     */
+    suspend fun lookUp(ids: List<Uuid>, overmailAccount: OvermailAccount): Result<List<LabelReference>>
 }

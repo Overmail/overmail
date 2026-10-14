@@ -72,6 +72,7 @@ fun ListScreen(
     openArchive: Boolean = false,
     onArchiveOpened: () -> Unit = {},
     onOpenEmail: (Uuid) -> Unit = {},
+    onAskAgent: (String) -> Unit = {},
 ) {
     val homeViewModel = koinViewModel<HomeViewModel>()
     val homeState by homeViewModel.state.collectAsStateWithLifecycle()
@@ -114,6 +115,7 @@ fun ListScreen(
         focusSearch = focusSearch,
         onSearchFocused = onSearchFocused,
         onOpenEmail = onOpenEmail,
+        onAskAgent = onAskAgent,
     )
 }
 
@@ -133,6 +135,7 @@ private fun ListContent(
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
     onOpenEmail: (Uuid) -> Unit = {},
+    onAskAgent: (String) -> Unit = {},
     onSearchEvent: (event: SearchEvent) -> Unit,
 ) {
     val localDensity = LocalDensity.current
@@ -303,7 +306,14 @@ private fun ListContent(
                         // Whatever is left of the height, and no more than it needs.
                         modifier = Modifier.weight(1f, fill = false),
                     ) {
-                        SearchSuggestions(state = searchState, onEvent = onSearchEvent)
+                        SearchSuggestions(
+                            state = searchState,
+                            onEvent = onSearchEvent,
+                            onAskAgent = {
+                                focusManager.clearFocus()
+                                onAskAgent(searchState.query)
+                            },
+                        )
                     }
 
                     AnimatedVisibility(

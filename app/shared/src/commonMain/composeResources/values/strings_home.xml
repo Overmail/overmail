@@ -127,6 +127,7 @@
 
     <string name="home_nav_stack">Stack</string>
     <string name="home_nav_list">List</string>
+    <string name="home_nav_agent">Agent</string>
 
     <string name="home_search_placeholder">Search mails, people and labels</string>
     <string name="home_search_reset">Reset search</string>

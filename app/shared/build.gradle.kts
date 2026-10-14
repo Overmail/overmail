@@ -114,6 +114,9 @@ kotlin {
             implementation(libs.app.coil.compose)
             implementation(libs.app.coil.network.ktor)
 
+            // The assistant's answers: parsed to a tree here, drawn by our own composables.
+            implementation(libs.app.jetbrains.markdown)
+
             api(libs.ktor.client.core)
             implementation(libs.app.ktor.client.content.negotiation)
             implementation(libs.app.ktor.client.websockets)

@@ -48,6 +48,7 @@ import androidx.navigation3.ui.NavDisplay
 import es.jvbabi.overmail.domain.model.DeviceInfo
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.page.Screen
+import es.jvbabi.overmail.page.agent.AgentScreen
 import es.jvbabi.overmail.page.home.ListScreen
 import es.jvbabi.overmail.page.home.StackScreen
 import es.jvbabi.overmail.page.onboarding.OnboardingRoot
@@ -122,6 +123,13 @@ expect fun getClipboardText(): String?
  * a buzz.
  */
 expect fun hapticFirework()
+
+/**
+ * The faintest tap the device can give, [intensity] from 0 to 1: what text arriving feels like
+ * while an answer is written. Nothing on a device that can only buzz -- a buzz per word would be
+ * the opposite of the point.
+ */
+expect fun hapticTick(intensity: Float)
 
 expect fun deviceInfo(): DeviceInfo
 
@@ -227,6 +235,10 @@ fun App() {
             var focusListSearch by remember { mutableStateOf(false) }
             // A stack worked through leads on to the archive, in the list.
             var openListArchive by remember { mutableStateOf(false) }
+            // Asked from the search: sent as a new chat once the agent's tab is there.
+            var agentQuestion by remember { mutableStateOf<String?>(null) }
+            // The agent tab tapped again while it is open: a new question is what is wanted next.
+            var newAgentChat by remember { mutableStateOf(false) }
             val bottomNavBarPadding = BOTTOM_NAV_BAR_MARGIN + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
             // Around the bottom bar as well: a card lifted off a page lies over it too.
@@ -275,6 +287,23 @@ fun App() {
                                                 openArchive = openListArchive,
                                                 onArchiveOpened = { openListArchive = false },
                                                 onOpenEmail = { backstack.add(Screen.Email(it)) },
+                                                onAskAgent = { question ->
+                                                    agentQuestion = question
+                                                    backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                                                    backstack.add(Screen.Agent)
+                                                },
+                                            )
+                                        }
+                                    }
+
+                                    is Screen.Agent -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                                        ScreenEntry(appViewModelStoreOwner) {
+                                            AgentScreen(
+                                                ask = agentQuestion,
+                                                onAsked = { agentQuestion = null },
+                                                newChat = newAgentChat,
+                                                onNewChatOpened = { newAgentChat = false },
+                                                onOpenEmail = { backstack.add(Screen.Email(it)) },
                                             )
                                         }
                                     }
@@ -312,6 +341,7 @@ fun App() {
                         onSelect = { tab ->
                             if (tab == currentTab) {
                                 if (tab == Screen.List) focusListSearch = true
+                                if (tab == Screen.Agent) newAgentChat = true
                                 return@BottomNavBar
                             }
                             // The stack is the root and every other tab lies on top of it, so back from

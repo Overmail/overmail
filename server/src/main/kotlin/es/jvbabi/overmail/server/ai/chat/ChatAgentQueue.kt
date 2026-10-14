@@ -22,7 +22,7 @@ private val logger = KotlinLogging.logger {}
  * calls at one. [stop] ends the answer of one message, wherever in here it is.
  */
 class ChatAgentQueue(
-    private val chatAgent: ChatAgent,
+    private val chatAgent: ChatResponder,
     private val streamNotifier: AiChatStreamNotifier,
 ) {
 

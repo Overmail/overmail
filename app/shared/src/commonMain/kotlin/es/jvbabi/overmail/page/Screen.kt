@@ -23,6 +23,9 @@ sealed class Screen {
     data object List : Tab()
 
     @Serializable
+    data object Agent: Tab()
+
+    @Serializable
     data object Onboarding : Screen()
 
     /** One mail on a page of its own; reachable from anywhere that knows the mail's id. */

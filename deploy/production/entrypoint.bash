@@ -7,7 +7,14 @@ set -e
 
 function start_server {
   # Reads /data/config.json, see ApplicationConfig.
-  OVERMAIL_STORAGE_DIRECTORY=/data java -jar /app/server.jar
+  # The heap gets most of the container, which it shares with bun and Caddy. A full heap ends the
+  # process with a heap dump in /data, so there is something to analyse.
+  OVERMAIL_STORAGE_DIRECTORY=/data java \
+    -XX:MaxRAMPercentage=60 \
+    -XX:+ExitOnOutOfMemoryError \
+    -XX:+HeapDumpOnOutOfMemoryError \
+    -XX:HeapDumpPath=/data \
+    -jar /app/server.jar
 }
 
 function start_web {

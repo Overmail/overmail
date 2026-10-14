@@ -22,7 +22,7 @@ import platform.Foundation.NSUserDomainMask
 
 /**
  * The renderer of mail pictures, and a push token that never comes. Everything else iOS contributes is registered from
- * `MainViewController`, and the in-app updater is Android-only.
+ * `IosShell`, and the in-app updater is Android-only.
  */
 actual fun platformModule(): Module = module {
     single<EmailPictureRenderer> { IosEmailPictureRenderer() }

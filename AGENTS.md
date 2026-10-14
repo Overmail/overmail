@@ -24,16 +24,24 @@ common/                Kotlin Multiplatform code both the server and the app use
 app/
   shared/              Compose Multiplatform: everything the app is, Android + iOS
   android/             the Android application: MainApplication, MainActivity, manifest, icons
-  ios/                 the Xcode project; it builds the ComposeApp framework from :app:shared
+  ios/                 the Xcode project: the SwiftUI shell, hosting the ComposeApp framework from :app:shared
 ```
 
 ## App
 
-`app:shared` holds the app itself and is the only place features are written; the two platform
-modules are entry points and nothing else.
+`app:shared` holds the app itself and is where features are written; `:app:android` is an entry
+point and nothing else.
+
+- **iOS is moving to SwiftUI, one piece at a time.** Swift is the entry point (`iOSApp.swift`) and
+  owns the shell (`app/ios/iosApp/Shell/`): the floating glass tab bar, the button for a new mail
+  beside it, and the onboarding over both. Every tab is a Compose view of its own, made by
+  `IosShell` (`iosMain`), which also holds what the tabs share -- the selected tab, `ShellState`,
+  each tab's back stack and the app's intents. Android keeps the Compose shell in `App.kt`; both
+  render their screens through `ScreenNavigation` (`AppNavigation.kt`). Every SwiftUI view gets a
+  `#Preview` that runs without the Kotlin framework.
 
 - **DI is Koin**, started from the platform entry point (`MainApplication` on Android,
-  `MainViewController` on iOS) so it can pass in what only that platform knows. `di/koin.kt`
+  `IosShell` on iOS) so it can pass in what only that platform knows. `di/koin.kt`
   declares everything shared; `platformModule()` is for dependencies whose interface *and*
   implementation are platform-specific.
 - **Navigation is Navigation3**: the back stack is a `SnapshotStateList<Screen>` in `App.kt`,

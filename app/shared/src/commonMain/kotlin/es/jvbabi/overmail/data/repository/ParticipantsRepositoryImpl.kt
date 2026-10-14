@@ -60,6 +60,29 @@ class ParticipantsRepositoryImpl(
     override fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Participant>> =
         overmailDatabase.participantsDao.byIds(overmailAccount.id, ids).map { participants -> participants.map { it.toModel() } }
 
+    override suspend fun lookUp(ids: List<Uuid>, overmailAccount: OvermailAccount): Result<List<Participant>> = safeRequest {
+        val response = httpClient.get(URLBuilder(urlString = overmailAccount.homeserver).apply {
+            appendPathSegments("api", "senders")
+            parameters.append("ids", ids.joinToString(","))
+        }.build()) {
+            bearerAuth(overmailAccount.token)
+        }
+
+        if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+
+        response.body<ApiSendersResponse>().senders.map { sender ->
+            Participant(
+                id = sender.id,
+                name = sender.name,
+                email = sender.address,
+                avatarUrl = sender.avatarUrl,
+                avatarPadding = sender.avatarPadding,
+                emailCount = 0,
+                overmailAccount = overmailAccount,
+            )
+        }
+    }
+
     private suspend fun fetchSearch(query: String, overmailAccount: OvermailAccount): Result<List<DbParticipant>> = safeRequest {
         val response = httpClient.get(URLBuilder(urlString = overmailAccount.homeserver).apply {
             appendPathSegments("api", "senders", "search")
@@ -83,6 +106,19 @@ class ParticipantsRepositoryImpl(
             )
         }
     }
+}
+
+/** `GET /api/senders?ids=`, `http/senders/sendersByIds.kt`. */
+@Serializable
+private data class ApiSendersResponse(@SerialName("senders") val senders: List<Sender>) {
+    @Serializable
+    data class Sender(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String?,
+        @SerialName("address") val address: String,
+        @SerialName("avatar_url") val avatarUrl: String?,
+        @SerialName("avatar_padding") val avatarPadding: Double?,
+    )
 }
 
 /** `GET /api/senders/search`, `http/senders/search/senderSearch.kt`. */

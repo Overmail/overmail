@@ -35,13 +35,18 @@ final class ShellModel {
 
 extension ShellTab {
     init(_ tab: IosTab) {
-        self = tab == .list ? .list : .stack
+        switch tab {
+        case .list: self = .list
+        case .agent: self = .agent
+        default: self = .stack
+        }
     }
 
     var kotlin: IosTab {
         switch self {
         case .stack: .stack
         case .list: .list
+        case .agent: .agent
         }
     }
 }

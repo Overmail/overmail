@@ -13,6 +13,7 @@ import es.jvbabi.overmail.data.database.converter.InstantConverter
 import es.jvbabi.overmail.data.database.converter.UuidConverter
 import es.jvbabi.overmail.data.network.installClientDefaults
 import es.jvbabi.overmail.data.repository.AccountRepositoryImpl
+import es.jvbabi.overmail.data.repository.AiChatRepositoryImpl
 import es.jvbabi.overmail.data.repository.EmailsRepositoryImpl
 import es.jvbabi.overmail.data.repository.FileRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
@@ -21,6 +22,7 @@ import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.repository.AccountRepository
+import es.jvbabi.overmail.domain.repository.AiChatRepository
 import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.FileRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
@@ -33,6 +35,7 @@ import es.jvbabi.overmail.domain.usecase.housekeeping.KeepCurrentAccountValidUse
 import es.jvbabi.overmail.domain.usecase.housekeeping.RegisterPushTokenUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SetupApplicationUseCase
 import es.jvbabi.overmail.domain.usecase.housekeeping.SyncNotificationChannelsUseCase
+import es.jvbabi.overmail.page.agent.AgentViewModel
 import es.jvbabi.overmail.page.email.EmailViewModel
 import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
@@ -159,6 +162,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         single { EmailPictures(renderer = get(), cache = EmailPictureCache(emailPictureCacheDirectory())) }
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
         single<FileRepository> { FileRepositoryImpl() }
+        singleOf(::AiChatRepositoryImpl) bind AiChatRepository::class
 
         // What the platform was opened with, until the ui acts on it.
         single { AppIntents() }
@@ -184,6 +188,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         viewModelOf(::EmailViewModel)
         viewModelOf(::AttachmentsViewModel)
         viewModelOf(::SearchViewModel)
+        viewModelOf(::AgentViewModel)
     })
 
     modules(platformModule())

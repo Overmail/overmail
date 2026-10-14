@@ -17,6 +17,9 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
 import es.jvbabi.overmail.server.jobs.avatar.AvatarQueue
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.post
@@ -383,6 +386,7 @@ class ContentSocketTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<MailNotifier> { mailNotifier }
+                    single<PushNotifications> { PushNotifications(PushQueue(database = get(), sender = PushSender.Disabled)) }
                     // Nothing consumes it in the test: the senders of a batch are enqueued and stay
                     // in the queue, which is all this socket does with it.
                     single<AvatarQueue> {

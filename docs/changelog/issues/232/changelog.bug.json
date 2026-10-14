@@ -1,0 +1,8 @@
+{
+  "description": "Archiving a mail from its notification no longer leaves an empty notification behind, and notifications of mails read or archived on another device go away by themselves.",
+  "localized": {
+    "de": {
+      "description": "Eine Mail aus ihrer Benachrichtigung zu archivieren hinterlässt keine leere Benachrichtigung mehr, und Benachrichtigungen zu Mails, die auf einem anderen Gerät gelesen oder archiviert wurden, verschwinden von selbst."
+    }
+  }
+}

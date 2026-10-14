@@ -99,6 +99,21 @@ class EmailSync(
     }
 
     /**
+     * Asks the server for [ids], held or not, and writes its answer: what it sends is stored,
+     * what it leaves out is dropped from the database. Stops at the first request that fails.
+     */
+    suspend fun reload(account: OvermailAccount, ids: List<Uuid>): Result<Unit> {
+        ids.distinct().chunked(META_CHUNK).forEach { chunk ->
+            val emails = fetchMeta(account, chunk).getOrElse { return Result.failure(it) }
+            store(account, emails)
+
+            val gone = chunk - emails.map { it.id }.toSet()
+            if (gone.isNotEmpty()) overmailDatabase.emailsDao.deleteByIds(gone)
+        }
+        return Result.success(Unit)
+    }
+
+    /**
      * Applies the changes to [account]'s mail until the server refuses the stream. Mails the
      * database does not hold are skipped: what a view needs, it loads itself.
      */
@@ -131,14 +146,7 @@ class EmailSync(
      * gone. Throws when a request fails, which reconnects the stream and so tries again.
      */
     private suspend fun reloadAll(account: OvermailAccount) {
-        val held = overmailDatabase.emailsDao.allIds(account.id)
-        held.chunked(META_CHUNK).forEach { chunk ->
-            val emails = fetchMeta(account, chunk).getOrThrow()
-            store(account, emails)
-
-            val gone = chunk - emails.map { it.id }.toSet()
-            if (gone.isNotEmpty()) overmailDatabase.emailsDao.deleteByIds(gone)
-        }
+        reload(account, overmailDatabase.emailsDao.allIds(account.id)).getOrThrow()
     }
 
     private suspend fun fetchMeta(account: OvermailAccount, ids: List<Uuid>): Result<List<ApiEmailMeta>> = safeRequest {

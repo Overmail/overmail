@@ -31,6 +31,11 @@ interface EmailsDao {
     @Query("SELECT * FROM email WHERE id = :id")
     fun getById(id: Uuid): Flow<EmbeddedEmail?>
 
+    /** The mails among [ids] that are here, and again on every change to them. */
+    @Transaction
+    @Query("SELECT * FROM email WHERE id IN (:ids)")
+    fun getByIds(ids: List<Uuid>): Flow<List<EmbeddedEmail>>
+
     @Query("SELECT id FROM email WHERE overmail_account_id = :overmailAccountId")
     suspend fun allIds(overmailAccountId: Uuid): List<Uuid>
 

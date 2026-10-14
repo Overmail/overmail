@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.database.models.ImapAccounts
 import es.jvbabi.overmail.server.database.models.emailIsNotArchived
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUser
 import es.jvbabi.overmail.server.http.clientWebSocket
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.application
@@ -69,6 +70,7 @@ fun Route.stackSocket() {
             val database = application.get<OvermailDatabase>()
             val classificationQueue = application.get<EmailClassificationQueue>()
             val mailNotifier = application.get<MailNotifier>()
+            val pushNotifications = application.get<PushNotifications>()
 
             val user = call.requireAuthenticatedUser()
 
@@ -164,7 +166,10 @@ fun Route.stackSocket() {
                                         )
                             }) { it[Emails.isRead] = true } > 0
                         }
-                        if (markedRead) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = false)
+                        if (markedRead) {
+                            mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = false)
+                            pushNotifications.emailsChanged(user.id.value, listOf(clientMessage.emailId))
+                        }
                     }
                     is StackClientMessage.ArchiveEmail -> {
                         // Reports whether a row was written, so nothing is announced for a
@@ -182,7 +187,10 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (archived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
+                        if (archived) {
+                            mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
+                            pushNotifications.emailsChanged(user.id.value, listOf(clientMessage.emailId))
+                        }
                     }
                     is StackClientMessage.UnarchiveEmail -> {
                         val unarchived = database.query {
@@ -196,7 +204,10 @@ fun Route.stackSocket() {
                             }
                             true
                         }
-                        if (unarchived) mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
+                        if (unarchived) {
+                            mailNotifier.notifyMailChanged(user.id.value, clientMessage.emailId, movedListings = true)
+                            pushNotifications.emailsChanged(user.id.value, listOf(clientMessage.emailId))
+                        }
                     }
                 }
             }

@@ -131,6 +131,7 @@ fun SearchSuggestions(
     state: SearchState,
     onEvent: (SearchEvent) -> Unit,
     modifier: Modifier = Modifier,
+    onAskAgent: () -> Unit = {},
 ) {
     val haptics = LocalHapticFeedback.current
     val participants = state.suggestedParticipants.take(MAX_SUGGESTIONS)
@@ -149,7 +150,7 @@ fun SearchSuggestions(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 4.dp),
     ) {
-        AskAiRow(query = state.query)
+        AskAiRow(query = state.query, onClick = onAskAgent)
 
         if (participants.isNotEmpty()) {
             SectionTitle(stringResource(Res.string.home_search_people))
@@ -273,12 +274,13 @@ private fun DirectionChip(text: String, icon: ImageVector, active: Boolean, onCl
 }
 
 @Composable
-private fun AskAiRow(query: String) {
+private fun AskAiRow(query: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable {}
+            // Nothing to ask without a question.
+            .clickable(enabled = query.isNotBlank(), onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

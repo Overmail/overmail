@@ -6,11 +6,14 @@ enum ShellTab: Hashable, CaseIterable {
     case stack
     /// Every mail, filtered and grouped.
     case list
+    /// The assistant, asked about the mails.
+    case agent
 
     var title: LocalizedStringKey {
         switch self {
         case .stack: "shell.tab.stack"
         case .list: "shell.tab.list"
+        case .agent: "shell.tab.agent"
         }
     }
 
@@ -18,6 +21,7 @@ enum ShellTab: Hashable, CaseIterable {
         switch self {
         case .stack: "square.stack"
         case .list: "list.bullet"
+        case .agent: "sparkles"
         }
     }
 }

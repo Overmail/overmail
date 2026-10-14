@@ -67,6 +67,13 @@ expect fun getClipboardText(): String?
  */
 expect fun hapticFirework()
 
+/**
+ * The faintest tap the device can give, [intensity] from 0 to 1: what text arriving feels like
+ * while an answer is written. Nothing on a device that can only buzz -- a buzz per word would be
+ * the opposite of the point.
+ */
+expect fun hapticTick(intensity: Float)
+
 expect fun deviceInfo(): DeviceInfo
 
 /**
@@ -175,6 +182,10 @@ fun App() {
                             backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
                             backstack.add(Screen.List)
                         },
+                        onAskAgent = {
+                            backstack.removeAll { it is Screen.Tab && it != Screen.Stack }
+                            backstack.add(Screen.Agent)
+                        },
                         onOnboardingDone = { backstack.remove(Screen.Onboarding) },
                     )
                 }
@@ -195,6 +206,7 @@ fun App() {
                         onSelect = { tab ->
                             if (tab == currentTab) {
                                 if (tab == Screen.List) shell.focusListSearch = true
+                                if (tab == Screen.Agent) shell.newAgentChat = true
                                 return@BottomNavBar
                             }
                             // The stack is the root and every other tab lies on top of it, so back from

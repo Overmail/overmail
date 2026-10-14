@@ -21,6 +21,7 @@ import androidx.navigation3.ui.NavDisplay
 import coil3.compose.setSingletonImageLoaderFactory
 import es.jvbabi.overmail.data.network.appImageLoader
 import es.jvbabi.overmail.page.Screen
+import es.jvbabi.overmail.page.agent.AgentScreen
 import es.jvbabi.overmail.page.email.EmailScreen
 import es.jvbabi.overmail.page.home.ListScreen
 import es.jvbabi.overmail.page.home.StackScreen
@@ -65,6 +66,12 @@ internal class ShellState {
 
     /** A stack worked through leads on to the archive, in the list. */
     var openListArchive by mutableStateOf(false)
+
+    /** Asked from the search: sent as a new chat once the agent's tab is there. */
+    var agentQuestion by mutableStateOf<String?>(null)
+
+    /** The agent tab tapped again while it is open: a new question is what is wanted next. */
+    var newAgentChat by mutableStateOf(false)
 }
 
 /**
@@ -105,6 +112,8 @@ private fun ScreenEntry(
  *
  * @param onOpenArchive the stack, worked through, leads to the archive in the list tab: the shell
  *   knows where that tab lives. [ShellState.openListArchive] is already set when it is called.
+ * @param onAskAgent a question from the list's search goes to the agent tab, the same way;
+ *   [ShellState.agentQuestion] is already set.
  * @param onOnboardingDone the last step of [Screen.Onboarding] is through.
  */
 @Composable
@@ -112,6 +121,7 @@ internal fun ScreenNavigation(
     backstack: SnapshotStateList<Screen>,
     shell: ShellState,
     onOpenArchive: () -> Unit,
+    onAskAgent: () -> Unit,
     onOnboardingDone: () -> Unit,
 ) {
     // The tabs and onboarding keep the view models of the whole host, as they always have: the
@@ -152,6 +162,22 @@ internal fun ScreenNavigation(
                                 onSearchFocused = { shell.focusListSearch = false },
                                 openArchive = shell.openListArchive,
                                 onArchiveOpened = { shell.openListArchive = false },
+                                onOpenEmail = { backstack.add(Screen.Email(it)) },
+                                onAskAgent = { question ->
+                                    shell.agentQuestion = question
+                                    onAskAgent()
+                                },
+                            )
+                        }
+                    }
+
+                    is Screen.Agent -> NavEntry(key = key, metadata = TAB_TRANSITION) {
+                        ScreenEntry(hostViewModelStoreOwner) {
+                            AgentScreen(
+                                ask = shell.agentQuestion,
+                                onAsked = { shell.agentQuestion = null },
+                                newChat = shell.newAgentChat,
+                                onNewChatOpened = { shell.newAgentChat = false },
                                 onOpenEmail = { backstack.add(Screen.Email(it)) },
                             )
                         }

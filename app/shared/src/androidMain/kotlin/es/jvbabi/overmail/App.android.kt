@@ -38,6 +38,15 @@ const val KOIN_ACTIVITY_CONTEXT = "koin_activity_context"
 private fun activityContext(): Context =
     KoinPlatformTools.defaultContext().get().get(named(KOIN_ACTIVITY_CONTEXT))
 
+actual fun hapticTick(intensity: Float) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val context = KoinPlatformTools.defaultContext().get().get<Context>()
+    val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator ?: return
+    val lowTick = VibrationEffect.Composition.PRIMITIVE_LOW_TICK
+    if (!vibrator.hasVibrator() || !vibrator.areAllPrimitivesSupported(lowTick)) return
+    vibrator.vibrate(VibrationEffect.startComposition().addPrimitive(lowTick, intensity.coerceIn(0f, 1f)).compose())
+}
+
 actual fun hapticFirework() {
     // Single primitives are what makes it precise; a device without them only buzzes.
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return

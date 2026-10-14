@@ -37,6 +37,8 @@ import platform.SafariServices.SFSafariViewController
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
 import platform.UIKit.UIDevice
+import platform.UIKit.UIImpactFeedbackGenerator
+import platform.UIKit.UIImpactFeedbackStyle
 import platform.UIKit.UIDocumentInteractionController
 import platform.UIKit.UIDocumentInteractionControllerDelegateProtocol
 import platform.UIKit.UIViewController
@@ -155,6 +157,13 @@ actual fun getClipboardText(): String? = UIPasteboard.generalPasteboard.string
 
 /** Kept until the firework is over: an engine that is let go of stops what it plays. */
 private var fireworkEngine: CHHapticEngine? = null
+
+/** Kept, so a tick does not pay for preparing the taptic engine every time. */
+private val tickGenerator by lazy { UIImpactFeedbackGenerator(style = UIImpactFeedbackStyle.UIImpactFeedbackStyleSoft) }
+
+actual fun hapticTick(intensity: Float) {
+    tickGenerator.impactOccurredWithIntensity(intensity.coerceIn(0f, 1f).toDouble())
+}
 
 @OptIn(ExperimentalForeignApi::class)
 actual fun hapticFirework() {

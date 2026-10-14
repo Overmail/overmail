@@ -48,6 +48,7 @@ import platform.UIKit.UIViewController
 enum class IosTab(internal val screen: Screen.Tab) {
     Stack(Screen.Stack),
     List(Screen.List),
+    Agent(Screen.Agent),
 }
 
 /** What the native shell shows, see [IosShell.observe]. */
@@ -142,6 +143,7 @@ class IosShell : KoinComponent {
     fun select(tab: IosTab) {
         if (tab == selectedTab.value) {
             if (tab == IosTab.List) shell.focusListSearch = true
+            if (tab == IosTab.Agent) shell.newAgentChat = true
             return
         }
         selectedTab.value = tab
@@ -166,6 +168,7 @@ class IosShell : KoinComponent {
                         backstack = backstacks.getValue(tab),
                         shell = shell,
                         onOpenArchive = { selectedTab.value = IosTab.List },
+                        onAskAgent = { selectedTab.value = IosTab.Agent },
                         onOnboardingDone = {},
                     )
                 }

@@ -27,14 +27,17 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.phosphor.icons.PhIcons
 import com.phosphor.icons.filled.ListBulletsFill
+import com.phosphor.icons.filled.RobotFill
 import com.phosphor.icons.filled.StackFill
 import com.phosphor.icons.regular.ListBullets
 import com.phosphor.icons.regular.PaperPlaneTilt
+import com.phosphor.icons.regular.Robot
 import com.phosphor.icons.regular.Stack
 import es.jvbabi.overmail.ui.theme.AppTheme
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import overmail.app.shared.generated.resources.Res
+import overmail.app.shared.generated.resources.home_nav_agent
 import overmail.app.shared.generated.resources.home_nav_list
 import overmail.app.shared.generated.resources.home_nav_stack
 
@@ -45,7 +48,7 @@ import overmail.app.shared.generated.resources.home_nav_stack
 val LocalBottomNavBarHeight = compositionLocalOf<Dp> { 0.dp }
 
 /** In the order the bar shows them. */
-private val TABS = listOf(Screen.Stack, Screen.List)
+private val TABS = listOf(Screen.Stack, Screen.List, Screen.Agent)
 
 private val NAV_ITEM_WIDTH = 92.dp
 private val NAV_ITEM_HEIGHT = 64.dp
@@ -98,6 +101,13 @@ fun BottomNavBar(
                     selectedIcon = PhIcons.Filled.ListBulletsFill,
                     isSelected = selected == Screen.List,
                     onClick = { onSelect(Screen.List) },
+                )
+                NavItem(
+                    label = Res.string.home_nav_agent,
+                    icon = PhIcons.Regular.Robot,
+                    selectedIcon = PhIcons.Filled.RobotFill,
+                    isSelected = selected == Screen.Agent,
+                    onClick = { onSelect(Screen.Agent) },
                 )
             }
         }

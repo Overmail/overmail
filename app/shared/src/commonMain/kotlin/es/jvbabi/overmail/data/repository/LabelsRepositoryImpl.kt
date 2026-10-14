@@ -9,6 +9,7 @@ import es.jvbabi.overmail.data.network.safeRequest
 import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.Label
+import es.jvbabi.overmail.domain.model.LabelReference
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.utils.fuzzyContains
@@ -56,6 +57,21 @@ class LabelsRepositoryImpl(
     override fun getByIds(ids: List<Uuid>, overmailAccount: OvermailAccount): Flow<List<Label>> =
         overmailDatabase.labelsDao.byIds(overmailAccount.id, ids).map { labels -> labels.map { it.toModel() } }
 
+    override suspend fun lookUp(ids: List<Uuid>, overmailAccount: OvermailAccount): Result<List<LabelReference>> = safeRequest {
+        val response = httpClient.get(URLBuilder(urlString = overmailAccount.homeserver).apply {
+            appendPathSegments("api", "labels")
+            parameters.append("ids", ids.joinToString(","))
+        }.build()) {
+            bearerAuth(overmailAccount.token)
+        }
+
+        if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
+
+        response.body<ApiLabelsResponse>().labels.map { label ->
+            LabelReference(id = label.id, name = label.name, color = parseHexColor(label.color))
+        }
+    }
+
     private suspend fun fetchSearch(query: String, overmailAccount: OvermailAccount): Result<List<DbLabels>> = safeRequest {
         val response = httpClient.get(URLBuilder(urlString = overmailAccount.homeserver).apply {
             appendPathSegments("api", "labels", "search")
@@ -84,6 +100,17 @@ class LabelsRepositoryImpl(
 
 /** `#RRGGBB`, the only form the server stores a label color in. */
 internal fun parseHexColor(hex: String): Color = Color(0xFF000000 or hex.removePrefix("#").toLong(16))
+
+/** `GET /api/labels?ids=`, `http/labels/labelsByIds.kt`. */
+@Serializable
+private data class ApiLabelsResponse(@SerialName("labels") val labels: List<Label>) {
+    @Serializable
+    data class Label(
+        @SerialName("id") val id: Uuid,
+        @SerialName("name") val name: String,
+        @SerialName("color") val color: String,
+    )
+}
 
 /** `GET /api/labels/search`, `http/labels/search/labelSearch.kt`. */
 @Serializable

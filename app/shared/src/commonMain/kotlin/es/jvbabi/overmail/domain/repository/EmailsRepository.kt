@@ -20,18 +20,14 @@ interface EmailsRepository {
     ): Flow<List<ViewResult>>
 
     /**
-     * The mail of [emailId], and again whenever it changes, for as long as it is collected. One
-     * the local database does not hold yet is loaded from [user]'s homeserver; null until then,
-     * and for good when the server does not know it either.
+     * The mail of [emailId], and again whenever it changes, for as long as it is collected; null
+     * while the local database does not hold it, and for good when the server does not know it
+     * either. [policy] decides what the first value is, see [FetchPolicy].
+     *
+     * Whatever the server answers is written to the local database, and only the database
+     * answers here -- a response never reaches the collector any other way.
      */
-    fun getEmail(emailId: Uuid, user: OvermailAccount): Flow<Email?>
-
-    /**
-     * Asks [user]'s homeserver again for the mails among [emailIds] the local database holds, for
-     * when something says they changed without an open view to hear of it -- a push. Mails it
-     * does not hold are not loaded.
-     */
-    suspend fun refresh(emailIds: Collection<Uuid>, user: OvermailAccount): Result<Unit>
+    fun getEmail(emailId: Uuid, user: OvermailAccount, policy: FetchPolicy = FetchPolicy.CacheFirst): Flow<Email?>
 
     /**
      * The mail of [emailId] as a view or [getEmail] last read it, right away; null when neither has
@@ -79,6 +75,18 @@ interface EmailsRepository {
 
     /** Marks [email] read or unread, the same way as [setArchivedState]: locally first, then on the server. */
     suspend fun setRead(email: Email, isRead: Boolean, user: OvermailAccount): Result<Unit>
+}
+
+/** How fresh the first value of a flow over the local database has to be. */
+enum class FetchPolicy {
+    /** What the database holds, right away and maybe stale. Only loaded from the server while it holds nothing. */
+    CacheFirst,
+
+    /** Asked for on the server first; when that fails, what the database holds anyway. */
+    NetworkFirst,
+
+    /** Asked for on the server first; when that fails, the flow fails with the [es.jvbabi.overmail.domain.model.NetworkException]. */
+    NetworkOnly,
 }
 
 sealed class ViewResult {

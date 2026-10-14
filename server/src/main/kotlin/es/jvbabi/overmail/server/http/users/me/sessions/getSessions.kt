@@ -54,6 +54,7 @@ fun Route.getSessions() {
                             client = row[Sessions.client].withoutSecrets(),
                             issuedAt = row[Sessions.issuedAt],
                             isCurrentSession = row[Sessions.token] == currentToken,
+                            pushNotificationState = row[Sessions.client].pushNotificationState(),
                         )
                     }
             }
@@ -66,6 +67,20 @@ fun Route.getSessions() {
 /** The client as a listing may show it: the Firebase installation id addresses a device and stays on the server. */
 private fun Session.Client.withoutSecrets(): Session.Client =
     if (this is Session.Client.Android) copy(firebaseInstallationId = null) else this
+
+/** Whether a push reaches this client: only the Android app takes one, once it registered with Firebase. */
+private fun Session.Client.pushNotificationState(): PushNotificationState = when (this) {
+    is Session.Client.Android ->
+        if (firebaseInstallationId == null) PushNotificationState.Available else PushNotificationState.Setup
+    is Session.Client.Web, is Session.Client.Ios -> PushNotificationState.Unavailable
+}
+
+@Serializable
+private enum class PushNotificationState {
+    @SerialName("unavailable") Unavailable,
+    @SerialName("available") Available,
+    @SerialName("setup") Setup,
+}
 
 @Serializable
 private data class SessionsResponse(
@@ -80,4 +95,6 @@ private data class SessionPayload(
     @SerialName("issued_at") val issuedAt: Instant,
     @JsonSchema.Description("Whether it is the session this request came with")
     @SerialName("is_current_session") val isCurrentSession: Boolean,
+    @JsonSchema.Description("`unavailable` when the client cannot take a push at all, `available` when it could but has not registered for one, `setup` when a push reaches it")
+    @SerialName("push_notification_state") val pushNotificationState: PushNotificationState,
 )

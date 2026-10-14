@@ -10,6 +10,11 @@ import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
 import es.jvbabi.overmail.server.http.users.me.sessions.current.setFirebaseInstallationId
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
+import es.jvbabi.overmail.server.http.users.me.sessions.item.sendTestPush
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
+import io.ktor.client.request.post
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -27,6 +32,11 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -40,6 +50,7 @@ import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
@@ -55,6 +66,10 @@ class SessionRoutesTest {
 
     private val phone = Session.Client.Android(device = "Pixel 8", manufacturer = "Google", os = "Android 15")
     private val browser = Session.Client.Web(browser = "Firefox 131", device = "Mac", os = "macOS")
+
+    /** The installation ids pushes were handed to, in order. */
+    private val pushed = Channel<String>(Channel.UNLIMITED)
+    private val pushQueue = PushQueue(database, PushSender { token, _, _ -> pushed.send(token); PushSender.Result.Sent })
 
     @Test
     fun `lists the unrevoked sessions of the caller and marks the current one`() = testApplication {
@@ -164,6 +179,57 @@ class SessionRoutesTest {
         assertEquals(phone, clientOf(current))
     }
 
+    @Test
+    fun `the listing says how far each session is with push`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val phoneWithPush = jwtService.issueSession(database, user, phone)
+        val phoneWithoutPush = jwtService.issueSession(database, user, phone)
+        installRoutes()
+        setFirebaseInstallationId(phoneWithPush, "installation")
+
+        val states = listSessions(current).associate { it["id"]!!.jsonPrimitive.content to it["push_notification_state"]!!.jsonPrimitive.content }
+
+        assertEquals(
+            mapOf(idOf(current) to "unavailable", idOf(phoneWithPush) to "setup", idOf(phoneWithoutPush) to "available"),
+            states,
+        )
+    }
+
+    @Test
+    fun `a test push goes to the device of the session`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val phoneWithPush = jwtService.issueSession(database, user, phone)
+        jwtService.issueSession(database, user, phone.copy(firebaseInstallationId = "other"))
+        installRoutes()
+        setFirebaseInstallationId(phoneWithPush, "installation")
+
+        assertEquals(HttpStatusCode.Accepted, client.post("/api/users/me/sessions/${idOf(phoneWithPush)}/test-push") { bearerAuth(current) }.status)
+
+        val consumer = CoroutineScope(Dispatchers.Default).launch { pushQueue.consume() }
+        try {
+            assertEquals("installation", withTimeout(5.seconds) { pushed.receive() })
+            assertEquals(null, pushed.tryReceive().getOrNull())
+        } finally {
+            consumer.cancel()
+        }
+    }
+
+    @Test
+    fun `a test push needs a session that set up push and belongs to the caller`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val phoneWithoutPush = jwtService.issueSession(database, user, phone)
+        val foreign = jwtService.issueSession(database, newUser(), phone)
+        installRoutes()
+        setFirebaseInstallationId(foreign, "installation")
+
+        assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(current)}/test-push") { bearerAuth(current) }.status)
+        assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(phoneWithoutPush)}/test-push") { bearerAuth(current) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/users/me/sessions/${idOf(foreign)}/test-push") { bearerAuth(current) }.status)
+    }
+
     private suspend fun ApplicationTestBuilder.setFirebaseInstallationId(token: String, firebaseInstallationId: String) =
         client.put("/api/users/me/sessions/current/firebase-installation-id") {
             bearerAuth(token)
@@ -206,13 +272,17 @@ class SessionRoutesTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<JwtService> { jwtService }
+                    single<PushNotifications> { PushNotifications(pushQueue) }
                 })
             }
             routing {
                 route("/api/users/me/sessions") {
                     getSessions()
                     route("/current/firebase-installation-id") { setFirebaseInstallationId() }
-                    route("/{sessionId}") { revokeSession() }
+                    route("/{sessionId}") {
+                        revokeSession()
+                        route("/test-push") { sendTestPush() }
+                    }
                 }
             }
         }

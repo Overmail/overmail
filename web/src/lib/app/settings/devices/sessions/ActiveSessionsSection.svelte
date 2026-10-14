@@ -15,6 +15,7 @@
         // Hard, not through the router: this browser's session is gone, so nothing the app holds
         // in memory is worth keeping.
         () => window.location.assign("/"),
+        (id, signal) => sessionsRepository.sendTestPush(id, signal),
     );
 
     /** This browser's session, while the user is asked whether they really want to sign out. */
@@ -48,6 +49,9 @@
                 sessions={viewModel.sessions}
                 revoking={viewModel.revoking}
                 onrevoke={revoke}
+                sendingTestPush={viewModel.sendingTestPush}
+                sentTestPush={viewModel.sentTestPush}
+                ontestpush={(session) => viewModel.sendTestPush(session)}
         />
     {/if}
 </section>

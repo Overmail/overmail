@@ -4,6 +4,9 @@ import type {UserSession} from "$lib/repository/SessionsRepository";
 /** How often the list is read again; a device that signs in elsewhere shows up within this. */
 export const POLL_INTERVAL_MS = 5000;
 
+/** How long a session shows that its test push went out. */
+export const TEST_PUSH_SENT_MS = 3000;
+
 /**
  * The sessions of this user, read again every [POLL_INTERVAL_MS], and signing one of them out.
  *
@@ -18,6 +21,10 @@ export class SessionsViewModel {
     failed = $state(false);
     /** The sessions being signed out right now, so their button cannot be pressed twice. */
     readonly revoking = new SvelteSet<string>();
+    /** The sessions a test push is being sent to right now. */
+    readonly sendingTestPush = new SvelteSet<string>();
+    /** The sessions whose test push went out a moment ago. */
+    readonly sentTestPush = new SvelteSet<string>();
 
     private nextPoll: ReturnType<typeof setTimeout> | null = null;
     private abort = new AbortController();
@@ -30,7 +37,9 @@ export class SessionsViewModel {
         private readonly list: (signal: AbortSignal) => Promise<UserSession[]>,
         private readonly revokeSession: (id: string, signal: AbortSignal) => Promise<void>,
         private readonly signedOut: () => void,
+        private readonly testPush: (id: string, signal: AbortSignal) => Promise<void>,
         private readonly pollIntervalMs: number = POLL_INTERVAL_MS,
+        private readonly testPushSentMs: number = TEST_PUSH_SENT_MS,
     ) {}
 
     /** Reads the list now, and keeps reading it until [dispose]. */
@@ -64,6 +73,24 @@ export class SessionsViewModel {
             return;
         }
         this.sessions = this.sessions?.filter((it) => it.id !== session.id) ?? null;
+    }
+
+    /** Has the device of [session] show a test notification, and marks the session for a moment once it went out. */
+    async sendTestPush(session: UserSession): Promise<void> {
+        if (this.sendingTestPush.has(session.id)) return;
+        this.sendingTestPush.add(session.id);
+        this.sentTestPush.delete(session.id);
+        try {
+            await this.testPush(session.id, this.abort.signal);
+        } catch {
+            if (!this.abort.signal.aborted) this.failed = true;
+            return;
+        } finally {
+            this.sendingTestPush.delete(session.id);
+        }
+
+        this.sentTestPush.add(session.id);
+        setTimeout(() => this.sentTestPush.delete(session.id), this.testPushSentMs);
     }
 
     dispose(): void {

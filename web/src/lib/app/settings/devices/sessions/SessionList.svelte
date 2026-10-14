@@ -1,15 +1,20 @@
 <script lang="ts">
     import {_, locale} from "svelte-i18n";
-    import {XIcon} from "phosphor-svelte";
+    import {BellRingingIcon, CheckIcon, XIcon} from "phosphor-svelte";
     import {Button} from "$lib/components/ui/button";
     import RelativeTime from "$lib/components/time/RelativeTime.svelte";
     import type {SessionClient, UserSession} from "$lib/repository/SessionsRepository";
 
-    let {sessions, revoking, onrevoke}: {
+    let {sessions, revoking, onrevoke, sendingTestPush, sentTestPush, ontestpush}: {
         sessions: UserSession[];
         /** Ids being signed out right now; their button is off meanwhile. */
         revoking: Set<string>;
         onrevoke: (session: UserSession) => void;
+        /** Ids a test push is being sent to right now; their button is off meanwhile. */
+        sendingTestPush: Set<string>;
+        /** Ids whose test push just went out; their button shows a check for a moment. */
+        sentTestPush: Set<string>;
+        ontestpush: (session: UserSession) => void;
     } = $props();
 
     /** What the session is, in a few words: the browser, or the phone for the app. */
@@ -49,16 +54,34 @@
                         {/if}
                     </span>
                 </div>
-                <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={$_("settings.devices.sessions.revoke")}
-                        title={$_("settings.devices.sessions.revoke")}
-                        disabled={revoking.has(session.id)}
-                        onclick={() => onrevoke(session)}
-                >
-                    <XIcon />
-                </Button>
+                <div class="flex flex-row gap-1 shrink-0">
+                    {#if session.pushNotificationState === "setup"}
+                        <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={$_("settings.devices.sessions.testPush")}
+                                title={$_("settings.devices.sessions.testPush")}
+                                disabled={sendingTestPush.has(session.id)}
+                                onclick={() => ontestpush(session)}
+                        >
+                            {#if sentTestPush.has(session.id)}
+                                <CheckIcon />
+                            {:else}
+                                <BellRingingIcon />
+                            {/if}
+                        </Button>
+                    {/if}
+                    <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={$_("settings.devices.sessions.revoke")}
+                            title={$_("settings.devices.sessions.revoke")}
+                            disabled={revoking.has(session.id)}
+                            onclick={() => onrevoke(session)}
+                    >
+                        <XIcon />
+                    </Button>
+                </div>
             </li>
         {/each}
     </ul>

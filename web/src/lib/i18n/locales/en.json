@@ -665,6 +665,7 @@
         "title": "Active sessions",
         "current": "This device",
         "revoke": "Sign out",
+        "testPush": "Send a test notification",
         "signOut": {
           "title": "Really sign out?",
           "description": "This device will be signed out of Overmail and you will have to sign in again.",

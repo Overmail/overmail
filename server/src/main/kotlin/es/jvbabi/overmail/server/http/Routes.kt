@@ -69,6 +69,7 @@ import es.jvbabi.overmail.server.http.users.me.totp.getTotp
 import es.jvbabi.overmail.server.http.users.me.totp.setEmailOtpActive
 import es.jvbabi.overmail.server.http.users.me.totp.setupTotp
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
+import es.jvbabi.overmail.server.http.users.me.sessions.item.sendTestPush
 import es.jvbabi.overmail.server.http.users.me.views.createView
 import es.jvbabi.overmail.server.http.users.me.views.item.deleteView
 import es.jvbabi.overmail.server.http.users.me.views.item.updateView
@@ -420,7 +421,7 @@ internal fun Application.configureRouting() {
                         }
                     }
 
-                    // Where this user is signed in, and signing a device out again.
+                    // Where this user is signed in, signing a device out again, and testing its push.
                     route("/sessions") {
                         getSessions()
 
@@ -438,6 +439,10 @@ internal fun Application.configureRouting() {
                          */
                         route("/{sessionId}") {
                             revokeSession()
+
+                            route("/test-push") {
+                                sendTestPush()
+                            }
                         }
                     }
 

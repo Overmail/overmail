@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.domain.repository
 
 import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.PushToken
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
 
@@ -12,7 +13,7 @@ interface AccountRepository {
     suspend fun saveAccount(account: OvermailAccount)
 
     /** Stores where a push for this device goes on the session [account] is signed in with. */
-    suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit>
+    suspend fun setPushToken(account: OvermailAccount, pushToken: PushToken): Result<Unit>
 
     fun getById(id: Uuid): Flow<OvermailAccount?>
 }

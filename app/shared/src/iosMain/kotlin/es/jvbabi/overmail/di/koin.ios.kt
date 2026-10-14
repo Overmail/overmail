@@ -10,9 +10,8 @@ import es.jvbabi.overmail.data.picture.IosEmailPictureRenderer
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
+import es.jvbabi.overmail.data.push.ApplePushTokenRepository
 import es.jvbabi.overmail.domain.repository.PushTokenRepository
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.cinterop.ExperimentalForeignApi
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -21,18 +20,14 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
 /**
- * The renderer of mail pictures, and a push token that never comes. Everything else iOS contributes is registered from
+ * The renderer of mail pictures, and the push token APNs gives. Everything else iOS contributes is registered from
  * `MainViewController`, and the in-app updater is Android-only.
  */
 actual fun platformModule(): Module = module {
     single<EmailPictureRenderer> { IosEmailPictureRenderer() }
 
-    // No push on iOS yet, so there is never a token to register.
-    single<PushTokenRepository> {
-        object : PushTokenRepository {
-            override fun getToken(): Flow<String> = emptyFlow()
-        }
-    }
+    // What APNs and the keychain report through the Swift side, see ApplePush.
+    single<PushTokenRepository> { ApplePushTokenRepository() }
 
     // Nor channels: iOS has one switch per app.
     single<NotificationChannelRepository> {

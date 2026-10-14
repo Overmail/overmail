@@ -7,6 +7,7 @@ import es.jvbabi.overmail.data.network.isResponseFromBackend
 import es.jvbabi.overmail.data.network.safeRequest
 import es.jvbabi.overmail.data.network.toNetworkException
 import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.PushToken
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.RedeemAuthCodeResponse
 import es.jvbabi.overmail.domain.repository.UserinfoResponse
@@ -81,13 +82,24 @@ class AccountRepositoryImpl(
         ))
     }
 
-    override suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit> = safeRequest {
+    override suspend fun setPushToken(account: OvermailAccount, pushToken: PushToken): Result<Unit> = safeRequest {
+        val path = when (pushToken) {
+            is PushToken.Firebase -> "firebase-installation-id"
+            is PushToken.Apple -> "apple-push"
+        }
         val response = httpClient.put(URLBuilder(urlString = account.homeserver).apply {
-            appendPathSegments("api", "users", "me", "sessions", "current", "firebase-installation-id")
+            appendPathSegments("api", "users", "me", "sessions", "current", path)
         }.build()) {
             bearerAuth(account.token)
             contentType(ContentType.Application.Json)
-            setBody(ApiFirebaseInstallationIdRequest(installationId = pushToken))
+            when (pushToken) {
+                is PushToken.Firebase -> setBody(ApiFirebaseInstallationIdRequest(installationId = pushToken.installationId))
+                is PushToken.Apple -> setBody(ApiApplePushRequest(
+                    token = pushToken.token,
+                    environment = if (pushToken.isSandbox) "sandbox" else "production",
+                    publicKey = pushToken.publicKey,
+                ))
+            }
         }
 
         if (!response.isResponseFromBackend() || !response.status.isSuccess()) throw response.toNetworkException()
@@ -104,6 +116,14 @@ private data class ApiRedeemAuthCodeResponse(@SerialName("jwt") val jwt: String)
 /** `PUT /api/users/me/sessions/current/firebase-installation-id`, `http/users/me/sessions/current/setFirebaseInstallationId.kt`. */
 @Serializable
 private data class ApiFirebaseInstallationIdRequest(@SerialName("installation_id") val installationId: String)
+
+/** `PUT /api/users/me/sessions/current/apple-push`, `http/users/me/sessions/current/setApplePush.kt`. */
+@Serializable
+private data class ApiApplePushRequest(
+    @SerialName("token") val token: String,
+    @SerialName("environment") val environment: String,
+    @SerialName("public_key") val publicKey: String,
+)
 
 /** `GET /api/users/me`, `http/users/me/getCurrentUser.kt`. Only what the app reads of it. */
 @Serializable

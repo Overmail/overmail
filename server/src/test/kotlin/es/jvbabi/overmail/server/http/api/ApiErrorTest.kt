@@ -8,6 +8,9 @@ import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.email.item.read.setEmailRead
 import es.jvbabi.overmail.server.http.email.list.emailList
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.statement.HttpResponse
@@ -164,6 +167,7 @@ class ApiErrorTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<MailNotifier> { MailNotifier() }
+                    single<PushNotifications> { PushNotifications(PushQueue(database = get(), sender = PushSender.Disabled)) }
                 })
             }
             routing {

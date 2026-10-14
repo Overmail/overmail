@@ -10,6 +10,9 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.User
 import es.jvbabi.overmail.server.http.api.installApiErrorHandling
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
+import es.jvbabi.overmail.server.jobs.push.PushQueue
+import es.jvbabi.overmail.server.jobs.push.PushSender
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -222,6 +225,7 @@ class BulkEmailsTest {
                 modules(module {
                     single<OvermailDatabase> { database }
                     single<MailNotifier> { MailNotifier() }
+                    single<PushNotifications> { PushNotifications(PushQueue(database = get(), sender = PushSender.Disabled)) }
                 })
             }
             routing {

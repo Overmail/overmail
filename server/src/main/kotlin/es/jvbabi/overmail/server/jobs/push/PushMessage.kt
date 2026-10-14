@@ -28,6 +28,15 @@ sealed class PushMessage {
         @SerialName("imap_account_id") val imapAccountId: Uuid,
     ) : PushMessage()
 
+    /**
+     * The mails [emailIds] were read, unread, archived, unarchived or filed as spam -- on any
+     * device, the one that did it included. The app asks for them again, which brings its copy up
+     * to date, and takes away the notification of every one that no longer needs it.
+     */
+    @Serializable
+    @SerialName("emails_changed")
+    data class EmailsChanged(@SerialName("email_ids") val emailIds: List<Uuid>) : PushMessage()
+
     /** Nothing happened: the app shows a test notification, which proves the whole way works. */
     @Serializable
     @SerialName("ping")
@@ -40,6 +49,8 @@ sealed class PushMessage {
     val isUrgent: Boolean
         get() = when (this) {
             is NewEmail, Ping -> true
+            // Shows nothing; a device that sleeps hears of it when it wakes, which is soon enough.
+            is EmailsChanged -> false
         }
 
     /**

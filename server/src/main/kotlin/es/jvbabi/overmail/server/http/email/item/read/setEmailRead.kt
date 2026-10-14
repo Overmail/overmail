@@ -6,6 +6,7 @@ import es.jvbabi.overmail.server.http.api.database
 import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailIdFromUrl
+import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -35,6 +36,7 @@ fun Route.setEmailRead(isRead: Boolean) {
          */
         post {
             val mailNotifier = call.dependency<MailNotifier>()
+            val pushNotifications = call.dependency<PushNotifications>()
             val userId = call.requireAuthenticatedUserId()
             val emailId = call.requireOwnedEmailIdFromUrl()
 
@@ -48,7 +50,10 @@ fun Route.setEmailRead(isRead: Boolean) {
             }
 
             // Nothing moved: the mail sits where it sat, it only reads differently now.
-            if (changed) mailNotifier.notifyMailChanged(userId, emailId, movedListings = false)
+            if (changed) {
+                mailNotifier.notifyMailChanged(userId, emailId, movedListings = false)
+                pushNotifications.emailsChanged(userId, listOf(emailId))
+            }
 
             call.respond(HttpStatusCode.NoContent)
         }

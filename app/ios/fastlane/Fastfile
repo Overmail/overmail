@@ -39,11 +39,6 @@ platform :ios do
     get_provisioning_profile(api_key: api_key)
     app_store_profile = lane_context[SharedValues::SIGH_NAME]
 
-    # Renewed on every build: that is how a phone registered since the last release ends up in
-    # the profile.
-    get_provisioning_profile(api_key: api_key, adhoc: true, force: true)
-    ad_hoc_profile = lane_context[SharedValues::SIGH_NAME]
-
     archive_path = "build/Overmail.xcarchive"
 
     # The project signs automatically with a development certificate, which is what running it
@@ -74,6 +69,12 @@ platform :ios do
       ipa: "build/Overmail-AppStore.ipa",
       skip_waiting_for_build_processing: true,
     )
+
+    # Renewed on every build: that is how a phone registered since the last release ends up in
+    # the profile. Fetched only now, because build_app maps every profile fetched so far onto the
+    # bundle id, over the export options, and the last one wins.
+    get_provisioning_profile(api_key: api_key, adhoc: true, force: true)
+    ad_hoc_profile = lane_context[SharedValues::SIGH_NAME]
 
     # The same archive again, re-signed for the registered devices.
     build_app(

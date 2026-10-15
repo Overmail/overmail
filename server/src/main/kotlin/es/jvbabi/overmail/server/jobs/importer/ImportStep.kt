@@ -2,6 +2,8 @@ package es.jvbabi.overmail.server.jobs.importer
 
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.models.Email
+import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -12,9 +14,31 @@ data class ImportContext(
     val account: ImapConnection,
     val folder: ImapConnection.FolderSync,
     val trigger: ImportTrigger = ImportTrigger.Poll,
-)
+) {
+    companion object {
+        /**
+         * A mail somebody handed in as a file, for [account]. It belongs to no folder, so it gets
+         * one that says what an upload is: the assistant reads every one -- nobody uploads a mail
+         * to have it left alone -- and none of them is news, because the user is holding it
+         * already. The folder being added at the end of time is what keeps [PushStep] quiet.
+         */
+        fun upload(account: ImapConnection) = ImportContext(
+            account = account,
+            folder = ImapConnection.FolderSync(
+                folder = "(upload)",
+                imapPush = false,
+                aiImportSettings = ImapAccountFolderSync.AiImportSettings.AllMessages,
+                createdAt = Instant.DISTANT_FUTURE,
+            ),
+            trigger = ImportTrigger.Upload,
+        )
+    }
+}
 
-/** Why a folder is looked at, see [MailboxImporter]. Changes nothing about how it is read. */
+/**
+ * Why a folder is looked at, see [MailboxImporter], or that no folder was: [Upload]. Changes nothing
+ * about how it is read.
+ */
 enum class ImportTrigger(val key: String) {
     /** The poll timer fired. */
     Poll("poll"),
@@ -24,6 +48,9 @@ enum class ImportTrigger(val key: String) {
 
     /** The server reported a change on a held `IDLE`. */
     IdleChange("idle_change"),
+
+    /** A mail was handed to the api as a file, see [ImportContext.upload]. */
+    Upload("upload"),
 }
 
 /**

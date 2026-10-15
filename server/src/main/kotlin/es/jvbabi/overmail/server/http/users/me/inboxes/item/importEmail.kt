@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.http.email.upload
+package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccounts
@@ -9,7 +9,6 @@ import es.jvbabi.overmail.server.http.api.invalidRequest
 import es.jvbabi.overmail.server.http.api.notFound
 import es.jvbabi.overmail.server.http.api.queryParameter
 import es.jvbabi.overmail.server.http.api.requireAuthenticatedUserId
-import es.jvbabi.overmail.server.http.api.uuidQueryParameter
 import es.jvbabi.overmail.server.jobs.importer.EmailImportPipeline
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.ImportContext
@@ -29,8 +28,8 @@ import kotlin.uuid.Uuid
 import es.jvbabi.overmail.kamel.Email as KamelEmail
 
 /**
- * Imports a mail from its source: `POST /api/emails/import?type=eml&target_inbox_id=...`, the
- * `.eml` file as the body.
+ * Imports a mail into an inbox from its source: `POST /api/users/me/inboxes/{inboxId}/import?type=eml`,
+ * the `.eml` file as the body.
  *
  * It takes the same way in as a mail the importer reads off the server -- [EmailImportPipeline],
  * so it is deduplicated against the inbox, gets its preview and goes to the assistant like any
@@ -46,18 +45,16 @@ fun Route.importEmail() {
          *
          * Description: The body is the raw RFC 5322 source; the mail is stored in the inbox, previewed and classified like an imported one.
          *
-         * Tag: Emails
+         * Tag: Inboxes
          *
          * Query parameters:
          *   - type [String] What the body is, only `eml` for now
-         *   - target_inbox_id [kotlin.uuid.Uuid] The inbox the mail goes into
          *
          * Body: message/rfc822 The source, as an `.eml` file holds it
          *
          * Responses:
          *   - 201 [ImportedEmailResponse] The mail is stored
-         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] A parameter is missing or unknown, or the body is no mail that can be stored
-         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such inbox, or not one of the current user's
+         *   - 400 [es.jvbabi.overmail.server.http.api.ApiErrorBody] `type` is missing or unknown, or the body is no mail that can be stored
          *   - 409 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The inbox holds this mail already
          */
         post {
@@ -65,8 +62,10 @@ fun Route.importEmail() {
 
             val type = call.queryParameter("type") ?: invalidRequest("type", "is required")
             if (type != "eml") invalidRequest("type", "is not one of: eml", type)
-            val inboxId = call.uuidQueryParameter("target_inbox_id")
-                ?: invalidRequest("target_inbox_id", "is required")
+
+            // Somebody else's inbox is a miss like an unknown one, as on every route of an inbox.
+            val rawId = call.parameters["inboxId"]
+            val inboxId = rawId?.let { Uuid.parseOrNull(it) } ?: notFound("inbox", rawId)
 
             // A snapshot, like the importer's: the pipeline runs outside this transaction.
             val account = call.database().query {

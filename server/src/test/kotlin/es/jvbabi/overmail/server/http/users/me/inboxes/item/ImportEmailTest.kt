@@ -1,4 +1,4 @@
-package es.jvbabi.overmail.server.http.email.upload
+package es.jvbabi.overmail.server.http.users.me.inboxes.item
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.Email
@@ -99,8 +99,6 @@ class ImportEmailTest {
 
         assertEquals(HttpStatusCode.BadRequest, upload(source, type = "mbox").status)
         assertEquals(HttpStatusCode.BadRequest, upload(source, type = null).status)
-        assertEquals(HttpStatusCode.BadRequest, upload(source, inboxId = null).status)
-        assertEquals(HttpStatusCode.BadRequest, upload(source, inboxId = "not-an-id").status)
     }
 
     @Test
@@ -110,15 +108,15 @@ class ImportEmailTest {
 
         assertEquals(HttpStatusCode.NotFound, upload(source, inboxId = strangersInbox.toString()).status)
         assertEquals(HttpStatusCode.NotFound, upload(source, inboxId = Uuid.random().toString()).status)
+        assertEquals(HttpStatusCode.NotFound, upload(source, inboxId = "not-an-id").status)
     }
 
     private suspend fun ApplicationTestBuilder.upload(
         body: ByteArray,
         type: String? = "eml",
-        inboxId: String? = inbox.toString(),
-    ) = client.post("/api/emails/import") {
+        inboxId: String = inbox.toString(),
+    ) = client.post("/api/users/me/inboxes/$inboxId/import") {
         type?.let { parameter("type", it) }
-        inboxId?.let { parameter("target_inbox_id", it) }
         contentType(ContentType("message", "rfc822"))
         setBody(body)
     }
@@ -176,7 +174,7 @@ class ImportEmailTest {
                 })
             }
             routing {
-                route("/api/emails/import") { importEmail() }
+                route("/api/users/me/inboxes/{inboxId}/import") { importEmail() }
             }
         }
     }

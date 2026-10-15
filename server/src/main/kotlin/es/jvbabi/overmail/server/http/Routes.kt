@@ -3,7 +3,6 @@ package es.jvbabi.overmail.server.http
 import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.http.auth.redeem.redeemAuthCode
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
-import es.jvbabi.overmail.server.http.email.upload.importEmail
 import es.jvbabi.overmail.server.http.users.me.apikeys.createApiKey
 import es.jvbabi.overmail.server.http.users.me.apikeys.getApiKeys
 import es.jvbabi.overmail.server.http.users.me.apikeys.item.deleteApiKey
@@ -44,6 +43,7 @@ import es.jvbabi.overmail.server.http.users.me.getCurrentUser
 import es.jvbabi.overmail.server.http.users.me.inboxes.getInboxes
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.deleteInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.getInbox
+import es.jvbabi.overmail.server.http.users.me.inboxes.item.importEmail
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.streamInboxFoldersForInbox
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.testInboxLogin
 import es.jvbabi.overmail.server.http.users.me.inboxes.item.updateInbox
@@ -252,11 +252,6 @@ internal fun Application.configureRouting() {
 
                 route("/search") {
                     emailSearch()
-                }
-
-                // POST /emails/import?type=eml&target_inbox_id= -- a mail from its source.
-                route("/import") {
-                    importEmail()
                 }
 
                 /**
@@ -519,6 +514,11 @@ internal fun Application.configureRouting() {
 
                             route("/name") {
                                 setInboxName()
+                            }
+
+                            // POST .../import?type=eml -- a mail from its source, into this inbox.
+                            route("/import") {
+                                importEmail()
                             }
 
                             // One route per state, like the read and archive routes above.

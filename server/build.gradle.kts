@@ -82,6 +82,8 @@ dependencies {
     // up on the classpath.
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
+    // APNs speaks HTTP/2 only, which CIO does not; the Java engine is the JDK's own client.
+    implementation(libs.ktor.client.java)
 
     implementation(libs.authentikt.core)
     implementation(libs.java.jwt)

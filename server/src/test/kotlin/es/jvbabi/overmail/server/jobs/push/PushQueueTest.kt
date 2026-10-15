@@ -1,6 +1,9 @@
 package es.jvbabi.overmail.server.jobs.push
 
 import es.jvbabi.overmail.server.database.OvermailDatabase
+import es.jvbabi.overmail.server.database.models.Email
+import es.jvbabi.overmail.server.database.models.EmailUser
+import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.Session
 import es.jvbabi.overmail.server.database.models.Sessions
 import es.jvbabi.overmail.server.database.models.User
@@ -33,7 +36,60 @@ class PushQueueTest {
     )
 
     private val sender = RecordingSender()
+    private val appleSender = RecordingAppleSender()
     private val message = PushMessage.Ping
+
+    @Test
+    fun `a push reaches android and ios devices, each through its own service`() = runBlocking {
+        val user = newUser()
+        newSession(user, phone("pixel"))
+        newSession(user, iPhone("iphone"))
+
+        send(PushTarget.User(user))
+
+        assertEquals(listOf("pixel"), sender.sent.map { it.token })
+        assertEquals(listOf("iphone"), appleSender.sent.map { it.first.token })
+    }
+
+    @Test
+    fun `an ios device gets what the notification shows, sealed for its key`() = runBlocking {
+        val user = newUser()
+        val keys = deviceKeys()
+        newSession(user, iPhone("iphone", keys))
+        val email = newEmail(user, senderName = "Ada Lovelace", subject = "Engines")
+
+        send(PushTarget.User(user), message = PushMessage.NewEmail(emailId = email.first, imapAccountId = email.second))
+
+        val payload = Json.parseToJsonElement(appleSender.sent.single().second.payload).jsonObject
+        val sealed = java.util.Base64.getDecoder().decode(payload.getValue("content").jsonPrimitive.content)
+        val content = Json.decodeFromString<ApplePushContent>(openSealed(sealed, keys).decodeToString())
+        assertEquals(ApplePushContent(sender = "Ada Lovelace", subject = "Engines", preview = null), content)
+        // Android still only gets the ids.
+        assertEquals(emptyList(), sender.sent)
+    }
+
+    @Test
+    fun `an apns token apple no longer knows is forgotten`() = runBlocking {
+        val user = newUser()
+        val keys = deviceKeys()
+        val iphone = newSession(user, iPhone("iphone", keys))
+        appleSender.answerFor["iphone"] = PushSender.Result.Unregistered
+
+        send(PushTarget.User(user))
+
+        assertEquals(iPhone(token = null), clientOf(iphone))
+    }
+
+    @Test
+    fun `ios devices are passed over while push to ios is switched off`() = runBlocking {
+        val user = newUser()
+        newSession(user, iPhone("iphone"))
+        newSession(user, phone("pixel"))
+
+        send(PushTarget.User(user), appleSender = ApplePushSender.Disabled)
+
+        assertEquals(listOf("pixel"), sender.sent.map { it.token })
+    }
 
     @Test
     fun `a push for a user reaches every device they are signed in on`() = runBlocking {
@@ -169,8 +225,13 @@ class PushQueueTest {
     }
 
     /** Queues one push and waits until the queue is through with it. */
-    private suspend fun send(target: PushTarget, retryDelays: List<Duration> = emptyList()) {
-        val queue = PushQueue(database, sender, retryDelays)
+    private suspend fun send(
+        target: PushTarget,
+        retryDelays: List<Duration> = emptyList(),
+        message: PushMessage = this.message,
+        appleSender: ApplePushSender = this.appleSender,
+    ) {
+        val queue = PushQueue(database, sender, appleSender, retryDelays)
         val consumer = CoroutineScope(Dispatchers.Default).launch { queue.consume() }
         val before = sender.sent.size
 
@@ -207,6 +268,31 @@ class PushQueueTest {
         }.value
     }
 
+    /** A mail of [userId]'s, and the mailbox it is in. */
+    private suspend fun newEmail(userId: Uuid, senderName: String?, subject: String?): Pair<Uuid, Uuid> = database.query {
+        val user = User[userId]
+        val account = ImapAccount.new {
+            this.user = user
+            host = "imap.example.com"
+            port = 993
+            username = "owner"
+            password = "secret"
+        }
+        val sender = EmailUser.new {
+            this.user = user
+            address = "ada@example.com"
+        }
+        val email = Email.new {
+            imapAccount = account
+            this.sender = sender
+            this.senderName = senderName
+            this.subject = subject
+            sent = Clock.System.now()
+            rawContent = ByteArray(0)
+        }
+        email.id.value to account.id.value
+    }
+
     private suspend fun clientOf(sessionId: Uuid): Session.Client = database.query {
         Sessions.select(Sessions.client).where { Sessions.id eq sessionId }.single()[Sessions.client]
     }
@@ -232,5 +318,16 @@ private class RecordingSender : PushSender {
         }
         sent += Push(token, data, isUrgent)
         return answerFor[token] ?: answers.removeFirstOrNull() ?: PushSender.Result.Sent
+    }
+}
+
+/** Records what went to APNs, and answers what the test lined up for a token. */
+private class RecordingAppleSender : ApplePushSender {
+    val sent = mutableListOf<Pair<Session.Client.ApplePushRegistration, ApplePushNotification>>()
+    val answerFor = mutableMapOf<String, PushSender.Result>()
+
+    override suspend fun send(device: Session.Client.ApplePushRegistration, notification: ApplePushNotification): PushSender.Result {
+        sent += device to notification
+        return answerFor[device.token] ?: PushSender.Result.Sent
     }
 }

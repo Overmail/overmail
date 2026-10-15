@@ -18,7 +18,10 @@ import es.jvbabi.overmail.server.auth.overmailSession
 import es.jvbabi.overmail.server.auth.registerSessionSecurityScheme
 import es.jvbabi.overmail.server.config.ApplicationConfig
 import org.slf4j.LoggerFactory
+import es.jvbabi.overmail.server.config.ApplePushKey
 import es.jvbabi.overmail.server.config.FirebaseServiceAccount
+import es.jvbabi.overmail.server.jobs.push.ApnsPushSender
+import es.jvbabi.overmail.server.jobs.push.ApplePushSender
 import es.jvbabi.overmail.server.jobs.push.FcmPushSender
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import es.jvbabi.overmail.server.jobs.push.PushQueue
@@ -243,7 +246,17 @@ internal fun overmailModule(application: CoroutineScope, serverConfig: ServerCon
             FcmPushSender(serviceAccount)
         }
     }
-    single<PushQueue> { PushQueue(database = get(), sender = get()) }
+    // The same for iOS, with the APNs key.
+    single<ApplePushSender> {
+        val key = ApplePushKey.load()
+        if (key == null) {
+            LoggerFactory.getLogger(ApplePushSender::class.java).info("No apple-push.json, push to iOS is switched off")
+            ApplePushSender.Disabled
+        } else {
+            ApnsPushSender(key)
+        }
+    }
+    single<PushQueue> { PushQueue(database = get(), sender = get(), appleSender = get()) }
     single<PushNotifications> { PushNotifications(queue = get()) }
 
     single<ImporterTelemetry> { ImporterTelemetry(openTelemetry = get()) }

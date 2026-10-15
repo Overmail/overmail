@@ -1,0 +1,78 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "PUSH_NEW_EMAIL_BODY" : {
+      "comment" : "The placeholder of a new mail's notification, shown when its content cannot be opened. Named by the server (ApplePushPayloads).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast eine neue Mail."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have a new mail."
+          }
+        }
+      }
+    },
+    "PUSH_NEW_EMAIL_TITLE" : {
+      "comment" : "The placeholder title of a new mail's notification. Named by the server (ApplePushPayloads).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Mail"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New mail"
+          }
+        }
+      }
+    },
+    "PUSH_PING_BODY" : {
+      "comment" : "The test notification sent from the settings. Named by the server (ApplePushPayloads).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Server hat dieses Gerät erreicht. Push funktioniert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your server reached this device. Push works."
+          }
+        }
+      }
+    },
+    "PUSH_PING_TITLE" : {
+      "comment" : "The title of the test notification. Named by the server (ApplePushPayloads).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testbenachrichtigung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test notification"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

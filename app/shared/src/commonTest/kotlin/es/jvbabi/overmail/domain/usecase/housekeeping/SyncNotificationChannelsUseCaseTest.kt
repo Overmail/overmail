@@ -4,6 +4,7 @@ import es.jvbabi.overmail.domain.model.CacheableResource
 import es.jvbabi.overmail.domain.model.CacheableResource.Source
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.PushToken
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
@@ -163,7 +164,7 @@ private class FakeAccountList(private val all: Flow<List<OvermailAccount>>) : Ac
     override fun getAccounts(): Flow<List<OvermailAccount>> = all
     override fun getById(id: Uuid): Flow<OvermailAccount?> = all.map { accounts -> accounts.find { it.id == id } }
 
-    override suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit> = error("not used")
+    override suspend fun setPushToken(account: OvermailAccount, pushToken: PushToken): Result<Unit> = error("not used")
     override suspend fun saveAccount(account: OvermailAccount) = error("not used")
     override suspend fun redeemAuthCode(homeserver: String, code: String): Result<RedeemAuthCodeResponse> = error("not used")
     override suspend fun getUserInfo(homeserver: String, token: String): Result<UserinfoResponse> = error("not used")

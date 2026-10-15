@@ -23,8 +23,9 @@ private const val CAPACITY = 1_000
  * Queue of pushes on their way out.
  *
  * [enqueue] never waits, so whoever has something to announce -- an import step, a route -- is
- * not held up by Firebase. [consume] resolves each target into the devices behind it and hands the
- * push to the [sender], once per device.
+ * not held up by Firebase or APNs. [consume] resolves each target into the devices behind it and
+ * hands the push to the [sender] of an Android device or the [appleSender] of an iOS one, once
+ * per device.
  *
  * Kept in memory on purpose. A push only says "ask the server"; one lost in a restart costs a
  * notification, not a mail.
@@ -35,6 +36,7 @@ private const val CAPACITY = 1_000
 class PushQueue(
     private val database: OvermailDatabase,
     private val sender: PushSender,
+    private val appleSender: ApplePushSender = ApplePushSender.Disabled,
     private val retryDelays: List<Duration> = listOf(1.seconds, 5.seconds),
 ) {
 
@@ -43,13 +45,24 @@ class PushQueue(
     private data class Entry(val target: PushTarget, val message: PushMessage)
 
     /** One device a push goes to. */
-    private data class Recipient(val sessionId: Uuid, val userId: Uuid, val token: String)
+    private data class Recipient(val sessionId: Uuid, val userId: Uuid, val device: Device)
+
+    /** How a device is reached, and what addresses it. */
+    private sealed class Device {
+        abstract val token: String
+
+        data class Firebase(override val token: String) : Device()
+
+        data class Apple(val registration: Session.Client.ApplePushRegistration) : Device() {
+            override val token get() = registration.token
+        }
+    }
 
     private val channel = Channel<Entry>(capacity = CAPACITY)
 
-    /** Whether a push could go out at all: false while the server has no Firebase credentials. */
+    /** Whether a push could go out at all: false while the server has neither Firebase nor APNs credentials. */
     val isEnabled: Boolean
-        get() = sender !== PushSender.Disabled
+        get() = sender !== PushSender.Disabled || appleSender !== ApplePushSender.Disabled
 
     /** Takes a push for [target]. Never suspends, never blocks a writer. */
     fun enqueue(target: PushTarget, message: PushMessage) {
@@ -65,7 +78,9 @@ class PushQueue(
         for ((target, message) in channel) {
             try {
                 val recipients = recipientsOf(target)
-                val delivered = recipients.count { deliver(it, message) }
+                // Read once for every iOS device, and not at all without one.
+                val appleContent = if (recipients.any { it.device is Device.Apple }) ApplePushContent.of(database, message) else null
+                val delivered = recipients.count { deliver(it, message, appleContent) }
                 if (recipients.isNotEmpty()) {
                     logger.info("Pushed ${message::class.simpleName} for $target to $delivered of ${recipients.size} device(s)")
                 }
@@ -78,12 +93,27 @@ class PushQueue(
     }
 
     /** Whether the push was handed over. One that was not is logged here, or its token forgotten. */
-    private suspend fun deliver(recipient: Recipient, message: PushMessage): Boolean {
-        val data = message.toData(recipient.userId)
+    private suspend fun deliver(recipient: Recipient, message: PushMessage, appleContent: ApplePushContent?): Boolean {
+        val send: suspend () -> PushSender.Result = when (val device = recipient.device) {
+            is Device.Firebase -> {
+                val data = message.toData(recipient.userId)
+                ({ sender.send(device.token, data, message.isUrgent) })
+            }
+            is Device.Apple -> {
+                // Sealed once, for this device's key; a key that does not read costs this device alone.
+                val notification = try {
+                    ApplePushPayloads.build(message, recipient.userId, appleContent, device.registration)
+                } catch (cause: IllegalArgumentException) {
+                    logger.warn("Cannot seal a push for session ${recipient.sessionId}: ${cause.message}")
+                    return false
+                }
+                ({ appleSender.send(device.registration, notification) })
+            }
+        }
 
         var attempt = 0
         while (true) {
-            when (val result = sender.send(recipient.token, data, message.isUrgent)) {
+            when (val result = send()) {
                 PushSender.Result.Sent -> return true
                 PushSender.Result.Unregistered -> {
                     forgetToken(recipient)
@@ -102,8 +132,8 @@ class PushQueue(
     }
 
     /**
-     * The devices behind [target]: its sessions that still work and have a token. A token is sent
-     * to once, even if two sessions of the same device hold it.
+     * The devices behind [target]: its sessions that still work and have a token a configured
+     * sender can use. A token is sent to once, even if two sessions of the same device hold it.
      */
     private suspend fun recipientsOf(target: PushTarget): List<Recipient> = database.query {
         Sessions
@@ -116,19 +146,38 @@ class PushQueue(
                 }
             }
             .mapNotNull { row ->
-                val token = (row[Sessions.client] as? Session.Client.Android)?.firebaseInstallationId ?: return@mapNotNull null
-                Recipient(sessionId = row[Sessions.id].value, userId = row[Sessions.user].value, token = token)
+                val device = deviceOf(row[Sessions.client]) ?: return@mapNotNull null
+                Recipient(sessionId = row[Sessions.id].value, userId = row[Sessions.user].value, device = device)
             }
-            .distinctBy { it.token }
+            .distinctBy { it.device.token }
     }
 
-    /** Drops a token Firebase no longer knows, so it is not sent to again. */
+    /** Whether a push to [client] goes out: it has a token, and the sender of its platform is not disabled. */
+    fun reaches(client: Session.Client): Boolean = deviceOf(client) != null
+
+    private fun deviceOf(client: Session.Client): Device? = when (client) {
+        is Session.Client.Android -> client.firebaseInstallationId
+            ?.takeIf { sender !== PushSender.Disabled }
+            ?.let(Device::Firebase)
+        is Session.Client.Ios -> client.applePush
+            ?.takeIf { appleSender !== ApplePushSender.Disabled }
+            ?.let(Device::Apple)
+        is Session.Client.Web -> null
+    }
+
+    /** Drops a token Firebase or APNs no longer knows, so it is not sent to again. */
     private suspend fun forgetToken(recipient: Recipient) {
         database.query {
             val client = Sessions.select(Sessions.client).where { Sessions.id eq recipient.sessionId }.firstOrNull()?.get(Sessions.client)
             // Only the token that failed: the app may have registered a new one in the meantime.
-            if (client !is Session.Client.Android || client.firebaseInstallationId != recipient.token) return@query
-            Sessions.update({ Sessions.id eq recipient.sessionId }) { it[Sessions.client] = client.copy(firebaseInstallationId = null) }
+            val withoutToken = when {
+                client is Session.Client.Android && client.firebaseInstallationId == recipient.device.token ->
+                    client.copy(firebaseInstallationId = null)
+                client is Session.Client.Ios && client.applePush?.token == recipient.device.token ->
+                    client.copy(applePush = null)
+                else -> return@query
+            }
+            Sessions.update({ Sessions.id eq recipient.sessionId }) { it[Sessions.client] = withoutToken }
         }
         logger.info("Session ${recipient.sessionId} no longer has a push token")
     }

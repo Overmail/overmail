@@ -64,15 +64,18 @@ fun Route.getSessions() {
     }
 }
 
-/** The client as a listing may show it: the Firebase installation id addresses a device and stays on the server. */
-private fun Session.Client.withoutSecrets(): Session.Client =
-    if (this is Session.Client.Android) copy(firebaseInstallationId = null) else this
+/** The client as a listing may show it: a push token addresses a device and stays on the server. */
+private fun Session.Client.withoutSecrets(): Session.Client = when (this) {
+    is Session.Client.Android -> copy(firebaseInstallationId = null)
+    is Session.Client.Ios -> copy(applePush = null)
+    is Session.Client.Web -> this
+}
 
-/** Whether a push reaches this client: only the Android app takes one, once it registered with Firebase. */
-private fun Session.Client.pushNotificationState(): PushNotificationState = when (this) {
-    is Session.Client.Android ->
-        if (firebaseInstallationId == null) PushNotificationState.Available else PushNotificationState.Setup
-    is Session.Client.Web, is Session.Client.Ios -> PushNotificationState.Unavailable
+/** Whether a push reaches this client: the apps take one once they registered, a browser never. */
+private fun Session.Client.pushNotificationState(): PushNotificationState = when {
+    this is Session.Client.Web -> PushNotificationState.Unavailable
+    hasPushToken -> PushNotificationState.Setup
+    else -> PushNotificationState.Available
 }
 
 @Serializable

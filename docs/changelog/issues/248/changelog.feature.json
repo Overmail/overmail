@@ -1,0 +1,10 @@
+{
+  "title": "iOS builds on TestFlight",
+  "description": "Every release of the iOS app is now also on TestFlight.",
+  "localized": {
+    "de": {
+      "title": "iOS-Builds über TestFlight",
+      "description": "Jede Version der iOS-App gibt es jetzt auch über TestFlight."
+    }
+  }
+}

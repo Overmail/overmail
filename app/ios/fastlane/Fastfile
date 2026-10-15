@@ -1,10 +1,11 @@
-# Builds the IPA that deploy.yaml attaches to a release. Ad hoc: it installs on the devices
-# registered with the team, which is every phone Xcode has run the app on.
+# Builds what deploy.yaml ships of the iOS app: one archive, uploaded to TestFlight and exported as
+# the ad hoc IPA the release carries. Ad hoc installs on the devices registered with the team,
+# which is every phone Xcode has run the app on.
 
 default_platform(:ios)
 
 platform :ios do
-  desc "Build a signed ad hoc IPA of the Release configuration into build/"
+  desc "Upload the Release configuration to TestFlight and export an ad hoc IPA into build/"
   lane :release_ipa do
     # A throwaway keychain, so nothing waits for a password prompt on the runner.
     setup_ci
@@ -35,32 +36,55 @@ platform :ios do
       )
     end
 
+    get_provisioning_profile(api_key: api_key)
+    app_store_profile = lane_context[SharedValues::SIGH_NAME]
+
     # Renewed on every build: that is how a phone registered since the last release ends up in
     # the profile.
-    get_provisioning_profile(
-      api_key: api_key,
-      adhoc: true,
-      force: true,
-    )
-    profile = lane_context[SharedValues::SIGH_NAME]
+    get_provisioning_profile(api_key: api_key, adhoc: true, force: true)
+    ad_hoc_profile = lane_context[SharedValues::SIGH_NAME]
+
+    archive_path = "build/Overmail.xcarchive"
 
     # The project signs automatically with a development certificate, which is what running it
-    # from Xcode wants. Here the build is signed by hand with the distribution certificate.
+    # from Xcode wants. Here the archive is signed by hand with the distribution certificate.
     build_app(
       project: "iosApp.xcodeproj",
       scheme: "Overmail",
       configuration: "Release",
-      export_method: "ad-hoc",
+      archive_path: archive_path,
+      export_method: "app-store",
       export_options: {
-        provisioningProfiles: { "es.jvbabi.overmail" => profile },
+        provisioningProfiles: { bundle_id => app_store_profile },
       },
       xcargs: [
         "CODE_SIGN_STYLE=Manual",
         "CODE_SIGN_IDENTITY='Apple Distribution'",
-        "PROVISIONING_PROFILE_SPECIFIER='#{profile}'",
-        # Has to grow from build to build; the release tag already says which one it is.
+        "PROVISIONING_PROFILE_SPECIFIER='#{app_store_profile}'",
+        # Has to grow from build to build, for TestFlight too; the release tag says which one it is.
         "CURRENT_PROJECT_VERSION=#{ENV.fetch("BUILD_TIMESTAMP", "1")}",
       ].join(" "),
+      output_directory: "build",
+      output_name: "Overmail-AppStore.ipa",
+    )
+
+    # Internal testers get every build without a review, so there is nothing to wait for.
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "build/Overmail-AppStore.ipa",
+      skip_waiting_for_build_processing: true,
+    )
+
+    # The same archive again, re-signed for the registered devices.
+    build_app(
+      project: "iosApp.xcodeproj",
+      scheme: "Overmail",
+      skip_build_archive: true,
+      archive_path: archive_path,
+      export_method: "ad-hoc",
+      export_options: {
+        provisioningProfiles: { bundle_id => ad_hoc_profile },
+      },
       output_directory: "build",
       output_name: "Overmail.ipa",
     )

@@ -77,9 +77,11 @@ modules are entry points and nothing else.
 - **iOS has a debug and a release app**, like Android: `Debug` is `es.jvbabi.overmail.debug`,
   "Overmail:Dev" with the green icon, `Release` is `es.jvbabi.overmail`. What differs lives in
   `app/ios/Configuration/{Debug,Release}.xcconfig`; the shared schemes "Overmail Dev" and
-  "Overmail" run one each. A release carries an ad hoc IPA from `app/ios/fastlane/` (`bundle exec
-  fastlane ios release_ipa`), which installs on the phones registered with the Apple team; the
-  profile is renewed on every build, so a phone Xcode has run the app on is in the next release.
+  "Overmail" run one each. A release uploads the app to TestFlight and carries an ad hoc IPA, both from one archive
+  built by `app/ios/fastlane/` (`bundle exec fastlane ios release_ipa`). The ad hoc IPA installs on
+  the phones registered with the Apple team; its profile is renewed on every build, so a phone
+  Xcode has run the app on is in the next release. The TestFlight upload needs the app record in
+  App Store Connect, which the api key cannot create.
   It signs with the secrets `IOS_DISTRIBUTION_CERTIFICATE` (base64 `.p12`),
   `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` and an App Store Connect api key
   (`APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY`
@@ -147,7 +149,7 @@ A merge to `main` runs [deploy.yaml](.github/workflows/deploy.yaml), which build
 
 | Label                               | Effect on a merge to `main`                  |
 |-------------------------------------|----------------------------------------------|
-| `project:app`                       | builds the APKs and the IPA, publishes a GitHub release |
+| `project:app`                       | builds the APKs and the IPA, uploads to TestFlight, publishes a GitHub release |
 | `project:server` / `project:webapp` | builds and pushes `ghcr.io/overmail/overmail:latest` |
 | `project:other`                     | builds nothing                                 |
 | none                                | builds everything, with a notice               |

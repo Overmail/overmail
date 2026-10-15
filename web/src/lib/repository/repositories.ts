@@ -22,6 +22,7 @@ import {DevicesSettingsRepository} from "$lib/repository/DevicesSettingsReposito
 import {SessionsRepository} from "$lib/repository/SessionsRepository";
 import {PasswordRepository} from "$lib/repository/PasswordRepository";
 import {TotpRepository} from "$lib/repository/TotpRepository";
+import {ApiKeysRepository} from "$lib/repository/ApiKeysRepository";
 
 /**
  * Every repository the app talks to, in one place.
@@ -61,6 +62,8 @@ export type Repositories = {
     password: PasswordRepository;
     /** The authenticator app, as the security settings set it up and remove it. */
     totp: TotpRepository;
+    /** The keys scripts sign in with, as the api settings list and make them. */
+    apiKeys: ApiKeysRepository;
 };
 
 /** One builder per key, so nothing is constructed before somebody asks for it. */
@@ -81,6 +84,7 @@ const factories: {[K in keyof Repositories]: () => Repositories[K]} = {
     sessions: () => new SessionsRepository(),
     password: () => new PasswordRepository(),
     totp: () => new TotpRepository(),
+    apiKeys: () => new ApiKeysRepository(),
     emails: createEmailRepository,
     labels: createLabelRepository,
     senders: createSenderRepository,

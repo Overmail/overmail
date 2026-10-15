@@ -676,6 +676,59 @@
         "empty": "Du bist nirgendwo sonst angemeldet.",
         "loadFailed": "Ein Fehler ist aufgetreten"
       }
+    },
+    "api": {
+      "title": "API",
+      "intro": "Mit API-Schlüsseln können deine eigenen Skripte und Tools Overmail in deinem Namen nutzen. Ein Schlüssel darf alles, was du darfst – halte ihn geheim.",
+      "documentation": "API-Dokumentation",
+      "add": "API-Schlüssel erstellen",
+      "list": {
+        "loading": "API-Schlüssel werden geladen…",
+        "failed": "Die API-Schlüssel konnten nicht geladen werden.",
+        "neverUsed": "Nie",
+        "columns": {
+          "name": "Name",
+          "key": "Schlüssel",
+          "created": "Erstellt",
+          "lastUsed": "Zuletzt verwendet"
+        },
+        "actions": {
+          "delete": "Schlüssel löschen"
+        },
+        "empty": {
+          "title": "Noch keine API-Schlüssel",
+          "description": "Erstelle einen Schlüssel, um die Overmail-API aus einem Skript aufzurufen."
+        }
+      },
+      "new": {
+        "title": "API-Schlüssel erstellen",
+        "description": "Benenne den Schlüssel nach dem, was ihn nutzt, damit du später weißt, welchen du löschen musst.",
+        "name": "Name",
+        "namePlaceholder": "Backup-Skript",
+        "nameHint": "Höchstens 100 Zeichen.",
+        "saving": "Wird erstellt…",
+        "failed": "Der Schlüssel konnte nicht erstellt werden.",
+        "cancel": "Abbrechen",
+        "submit": "Erstellen",
+        "created": {
+          "title": "Dein neuer API-Schlüssel",
+          "description": "Sende ihn als Authorization: Bearer-Header.",
+          "key": "API-Schlüssel",
+          "copy": "Kopieren",
+          "copied": "Kopiert",
+          "copyFailed": "Der Schlüssel konnte nicht kopiert werden.",
+          "once": "Der Schlüssel wird nur dieses eine Mal angezeigt. Kopiere ihn jetzt – wenn du ihn verlierst, lösche ihn und erstelle einen neuen.",
+          "done": "Fertig"
+        }
+      },
+      "delete": {
+        "title": "Diesen API-Schlüssel löschen?",
+        "description": "Alles, was „{name}“ verwendet, wird ab sofort abgewiesen. Das kann nicht rückgängig gemacht werden.",
+        "deleting": "Wird gelöscht…",
+        "failed": "Der Schlüssel konnte nicht gelöscht werden.",
+        "cancel": "Abbrechen",
+        "confirm": "Löschen"
+      }
     }
   },
   "ai": {

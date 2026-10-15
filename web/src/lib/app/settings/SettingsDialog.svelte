@@ -4,12 +4,13 @@
     import * as Sidebar from "$lib/components/ui/sidebar";
     import * as Breadcrumb from "$lib/components/ui/breadcrumb";
     import {goto} from "$app/navigation";
-    import {BrainIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon} from "phosphor-svelte";
+    import {BrainIcon, CodeIcon, DeviceMobileIcon, EnvelopeSimpleIcon, LockIcon} from "phosphor-svelte";
     import {_} from "svelte-i18n";
     import EmailAccountsSettings from "$lib/app/settings/email-accounts/EmailAccountsSettings.svelte";
     import KnowledgeSettings from "$lib/app/settings/knowledge/KnowledgeSettings.svelte";
     import DevicesSettings from "$lib/app/settings/devices/DevicesSettings.svelte";
     import SecuritySettings from "$lib/app/settings/security/SecuritySettings.svelte";
+    import ApiSettings from "$lib/app/settings/api/ApiSettings.svelte";
     import {SidebarGroupContent} from "$lib/components/ui/sidebar/index.ts";
 
     let showSettingsDialog = $derived(page.url.searchParams.has("settings"));
@@ -26,6 +27,7 @@
         {name: $_("settings.knowledge.title"), icon: BrainIcon, key: "knowledge"},
         {name: $_("settings.security.title"), icon: LockIcon, key: "security"},
         {name: $_("settings.devices.name"), icon: DeviceMobileIcon, key: "devices"},
+        {name: $_("settings.api.title"), icon: CodeIcon, key: "api"},
     ]);
 
     const currentNavItem = $derived(nav.find((item) => item.key === page.url.searchParams.get("settings")) ?? nav[0]);
@@ -120,6 +122,8 @@
                         <SecuritySettings />
                     {:else if currentNavItem.key === "devices"}
                         <DevicesSettings />
+                    {:else if currentNavItem.key === "api"}
+                        <ApiSettings />
                     {/if}
                 </div>
             </main>

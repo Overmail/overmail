@@ -4,6 +4,9 @@ import es.jvbabi.overmail.server.database.models.EmailArchiveAction
 import es.jvbabi.overmail.server.http.auth.redeem.redeemAuthCode
 import es.jvbabi.overmail.server.http.avatar.item.getAvatar
 import es.jvbabi.overmail.server.http.email.upload.importEmail
+import es.jvbabi.overmail.server.http.users.me.apikeys.createApiKey
+import es.jvbabi.overmail.server.http.users.me.apikeys.getApiKeys
+import es.jvbabi.overmail.server.http.users.me.apikeys.item.deleteApiKey
 import es.jvbabi.overmail.server.http.email.emailsByIds
 import es.jvbabi.overmail.server.http.email.item.archive.setEmailArchiveState
 import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
@@ -144,6 +147,7 @@ internal fun Application.configureRouting() {
                 tag("Authentication", "Signing in: the web sign-in flow, and pairing the app through a device code.")
                 tag("Account", "Who is signed in, and the addresses they receive mail under.")
                 tag("Sessions", "The devices the current user is signed in on.")
+                tag("ApiKeys", "Keys that sign a script in as the current user, through `Authorization: Bearer`.")
                 tag("Emails", "One mail or a selection of them: lookup, body, source, attachments, state and labels.")
                 tag("Listing", "What a listing holds -- its groups, a page of a group, a whole group -- and the quick search.")
                 tag("Shares", "Links that hand one mail out to somebody without an account, as the owner manages them.")
@@ -424,6 +428,23 @@ internal fun Application.configureRouting() {
 
                         route("/email-otp") {
                             setEmailOtpActive()
+                        }
+                    }
+
+                    // Keys for scripts: making one, listing them, taking one away.
+                    route("/api-keys") {
+                        getApiKeys()
+                        createApiKey()
+
+                        /**
+                         * Path: apiKeyId [kotlin.uuid.Uuid] The api key
+                         *
+                         * Responses:
+                         *   - 403 [es.jvbabi.overmail.server.http.api.ApiErrorBody] The key belongs to somebody else
+                         *   - 404 [es.jvbabi.overmail.server.http.api.ApiErrorBody] No such key
+                         */
+                        route("/{apiKeyId}") {
+                            deleteApiKey()
                         }
                     }
 

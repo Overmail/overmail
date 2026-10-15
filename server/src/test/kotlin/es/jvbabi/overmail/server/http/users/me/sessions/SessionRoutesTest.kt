@@ -14,6 +14,7 @@ import es.jvbabi.overmail.server.jobs.push.deviceKeys
 import es.jvbabi.overmail.server.jobs.push.publicX963Base64
 import es.jvbabi.overmail.server.http.users.me.sessions.item.revokeSession
 import es.jvbabi.overmail.server.http.users.me.sessions.item.sendTestPush
+import es.jvbabi.overmail.server.jobs.push.ApplePushSender
 import es.jvbabi.overmail.server.jobs.push.PushNotifications
 import es.jvbabi.overmail.server.jobs.push.PushQueue
 import es.jvbabi.overmail.server.jobs.push.PushSender
@@ -72,9 +73,11 @@ class SessionRoutesTest {
     private val iPhone = Session.Client.Ios(device = "iPhone", os = "iOS 26")
     private val publicKey = deviceKeys().publicX963Base64()
 
-    /** The installation ids pushes were handed to, in order. */
+    /** The installation ids and APNs tokens pushes were handed to, in order. */
     private val pushed = Channel<String>(Channel.UNLIMITED)
-    private var pushQueue = PushQueue(database, PushSender { token, _, _ -> pushed.send(token); PushSender.Result.Sent })
+    private val firebase = PushSender { token, _, _ -> pushed.send(token); PushSender.Result.Sent }
+    private val apns = ApplePushSender { device, _ -> pushed.send(device.token); PushSender.Result.Sent }
+    private var pushQueue = PushQueue(database, firebase, apns)
 
     @Test
     fun `lists the unrevoked sessions of the caller and marks the current one`() = testApplication {
@@ -190,13 +193,22 @@ class SessionRoutesTest {
         val current = jwtService.issueSession(database, user, browser)
         val phoneWithPush = jwtService.issueSession(database, user, phone)
         val phoneWithoutPush = jwtService.issueSession(database, user, phone)
+        val iPhoneWithPush = jwtService.issueSession(database, user, iPhone)
+        val iPhoneWithoutPush = jwtService.issueSession(database, user, iPhone)
         installRoutes()
         setFirebaseInstallationId(phoneWithPush, "installation")
+        setApplePush(iPhoneWithPush)
 
         val states = listSessions(current).associate { it["id"]!!.jsonPrimitive.content to it["push_notification_state"]!!.jsonPrimitive.content }
 
         assertEquals(
-            mapOf(idOf(current) to "unavailable", idOf(phoneWithPush) to "setup", idOf(phoneWithoutPush) to "available"),
+            mapOf(
+                idOf(current) to "unavailable",
+                idOf(phoneWithPush) to "setup",
+                idOf(phoneWithoutPush) to "available",
+                idOf(iPhoneWithPush) to "setup",
+                idOf(iPhoneWithoutPush) to "available",
+            ),
             states,
         )
     }
@@ -222,16 +234,36 @@ class SessionRoutesTest {
     }
 
     @Test
+    fun `a test push goes to an iphone through apns`() = testApplication {
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val iPhoneWithPush = jwtService.issueSession(database, user, iPhone)
+        installRoutes()
+        setApplePush(iPhoneWithPush, deviceToken = "ab".repeat(32))
+
+        assertEquals(HttpStatusCode.Accepted, client.post("/api/users/me/sessions/${idOf(iPhoneWithPush)}/test-push") { bearerAuth(current) }.status)
+
+        val consumer = CoroutineScope(Dispatchers.Default).launch { pushQueue.consume() }
+        try {
+            assertEquals("ab".repeat(32), withTimeout(5.seconds) { pushed.receive() })
+        } finally {
+            consumer.cancel()
+        }
+    }
+
+    @Test
     fun `a test push needs a session that set up push and belongs to the caller`() = testApplication {
         val user = newUser()
         val current = jwtService.issueSession(database, user, browser)
         val phoneWithoutPush = jwtService.issueSession(database, user, phone)
+        val iPhoneWithoutPush = jwtService.issueSession(database, user, iPhone)
         val foreign = jwtService.issueSession(database, newUser(), phone)
         installRoutes()
         setFirebaseInstallationId(foreign, "installation")
 
         assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(current)}/test-push") { bearerAuth(current) }.status)
         assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(phoneWithoutPush)}/test-push") { bearerAuth(current) }.status)
+        assertEquals(HttpStatusCode.Conflict, client.post("/api/users/me/sessions/${idOf(iPhoneWithoutPush)}/test-push") { bearerAuth(current) }.status)
         assertEquals(HttpStatusCode.Forbidden, client.post("/api/users/me/sessions/${idOf(foreign)}/test-push") { bearerAuth(current) }.status)
     }
 
@@ -245,6 +277,21 @@ class SessionRoutesTest {
         setFirebaseInstallationId(phoneWithPush, "installation")
 
         assertEquals(HttpStatusCode.ServiceUnavailable, client.post("/api/users/me/sessions/${idOf(phoneWithPush)}/test-push") { bearerAuth(current) }.status)
+    }
+
+    @Test
+    fun `a test push is refused for the platform the server has no credentials for`() = testApplication {
+        pushQueue = PushQueue(database, firebase, ApplePushSender.Disabled)
+        val user = newUser()
+        val current = jwtService.issueSession(database, user, browser)
+        val phoneWithPush = jwtService.issueSession(database, user, phone)
+        val iPhoneWithPush = jwtService.issueSession(database, user, iPhone)
+        installRoutes()
+        setFirebaseInstallationId(phoneWithPush, "installation")
+        setApplePush(iPhoneWithPush)
+
+        assertEquals(HttpStatusCode.ServiceUnavailable, client.post("/api/users/me/sessions/${idOf(iPhoneWithPush)}/test-push") { bearerAuth(current) }.status)
+        assertEquals(HttpStatusCode.Accepted, client.post("/api/users/me/sessions/${idOf(phoneWithPush)}/test-push") { bearerAuth(current) }.status)
     }
 
     @Test

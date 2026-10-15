@@ -22,7 +22,7 @@ export type UserSession = {
 
 const ENDPOINT = "/api/users/me/sessions";
 
-/** The server has no Firebase credentials, so no push goes out to any device. */
+/** The server has no credentials for the device's platform (Firebase, APNs), so no push goes out to it. */
 export class PushUnavailableError extends Error {
     constructor() {
         super("Push notifications are not configured on this server");
@@ -60,7 +60,7 @@ export class SessionsRepository {
 
     /**
      * Has the session's device show a test notification. Queued: the answer does not say it
-     * arrived. Throws [PushUnavailableError] when the server cannot push at all.
+     * arrived. Throws [PushUnavailableError] when the server cannot push to that device.
      */
     async sendTestPush(id: string, signal?: AbortSignal): Promise<void> {
         const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/test-push`, {

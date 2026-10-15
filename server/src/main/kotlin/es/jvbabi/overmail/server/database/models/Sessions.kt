@@ -24,6 +24,14 @@ class Session(id: EntityID<Uuid>): UuidEntity(id) {
 
     @Serializable
     sealed class Client {
+        /** Whether the client registered for pushes: the Android app with Firebase, the iOS app with APNs. */
+        val hasPushToken: Boolean
+            get() = when (this) {
+                is Android -> firebaseInstallationId != null
+                is Ios -> applePush != null
+                is Web -> false
+            }
+
         @Serializable
         @SerialName("web")
         data class Web(

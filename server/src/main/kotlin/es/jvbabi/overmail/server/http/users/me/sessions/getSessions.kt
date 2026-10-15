@@ -71,11 +71,11 @@ private fun Session.Client.withoutSecrets(): Session.Client = when (this) {
     is Session.Client.Web -> this
 }
 
-/** Whether a push reaches this client: only the Android app takes one, once it registered with Firebase. */
-private fun Session.Client.pushNotificationState(): PushNotificationState = when (this) {
-    is Session.Client.Android ->
-        if (firebaseInstallationId == null) PushNotificationState.Available else PushNotificationState.Setup
-    is Session.Client.Web, is Session.Client.Ios -> PushNotificationState.Unavailable
+/** Whether a push reaches this client: the apps take one once they registered, a browser never. */
+private fun Session.Client.pushNotificationState(): PushNotificationState = when {
+    this is Session.Client.Web -> PushNotificationState.Unavailable
+    hasPushToken -> PushNotificationState.Setup
+    else -> PushNotificationState.Available
 }
 
 @Serializable

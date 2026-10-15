@@ -152,6 +152,9 @@ class PushQueue(
             .distinctBy { it.device.token }
     }
 
+    /** Whether a push to [client] goes out: it has a token, and the sender of its platform is not disabled. */
+    fun reaches(client: Session.Client): Boolean = deviceOf(client) != null
+
     private fun deviceOf(client: Session.Client): Device? = when (client) {
         is Session.Client.Android -> client.firebaseInstallationId
             ?.takeIf { sender !== PushSender.Disabled }

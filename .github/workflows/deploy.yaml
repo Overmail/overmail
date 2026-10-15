@@ -277,10 +277,69 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  # An ad hoc IPA, see app/ios/fastlane/Fastfile. It installs on the phones registered with the
+  # Apple team, which is what a release for personal use needs.
+  build-ios:
+    runs-on: macos-26
+    needs: [setup]
+    if: needs.setup.outputs.build_app == 'true'
+    steps:
+      - uses: actions/checkout@v5
+        name: Checkout code
+
+      # The Xcode build compiles the Kotlin framework through Gradle.
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: konan-
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+          working-directory: app/ios
+
+      - name: Restore distribution certificate
+        run: echo "$CERTIFICATE" | base64 -d > "$RUNNER_TEMP/distribution.p12"
+        env:
+          CERTIFICATE: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE }}
+
+      - name: Build IPA
+        working-directory: app/ios
+        env:
+          BUILD_TIMESTAMP: ${{ needs.setup.outputs.build_timestamp }}
+          BUILD_TAG: ${{ needs.setup.outputs.build_tag }}
+          IOS_DISTRIBUTION_CERTIFICATE_PATH: ${{ runner.temp }}/distribution.p12
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: bundle exec fastlane ios release_ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-ipa
+          path: app/ios/build/Overmail.ipa
+          compression-level: 0
+          if-no-files-found: error
+
   create_release:
     runs-on: ubuntu-latest
-    needs: [setup, build-docker, build-android]
-    # A release is the app's delivery vehicle: it carries the APKs and the
+    needs: [setup, build-docker, build-android, build-ios]
+    # A release is the app's delivery vehicle: it carries the APKs, the IPA and the
     # changelog the app reads, so a server-only change produces none. Its
     # changelog entries are not lost — the changelog is generated from the
     # commits since the last release, so they land in the next app release.
@@ -288,6 +347,7 @@ jobs:
     if: >-
       !cancelled()
       && needs.build-android.result == 'success'
+      && needs.build-ios.result == 'success'
       && needs.build-docker.result != 'failure'
     permissions:
       packages: write
@@ -353,12 +413,22 @@ jobs:
             mv "$apk" "apks/$APP_NAME ${{ needs.setup.outputs.build_tag }} ${base}"
           done
 
+      - name: Download iOS IPA artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ios-ipa
+          path: ipa/
+
+      - name: Rename IPA artifact for release
+        run: mv ipa/Overmail.ipa "ipa/$APP_NAME ${{ needs.setup.outputs.build_tag }}.ipa"
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             apks/${{ env.APP_NAME }}*
+            ipa/${{ env.APP_NAME }}*
             build/changelog/changelog*.json
           body_path: build/changelog/CHANGELOG.md
           draft: ${{ inputs.draft || false }}

@@ -1,0 +1,6 @@
+#include "Config.xcconfig"
+
+BUNDLE_ID_SUFFIX=.debug
+APP_DISPLAY_NAME=Overmail:Dev
+// Green, like the debug launcher icon on Android.
+APP_ICON_NAME=AppIcon-Debug

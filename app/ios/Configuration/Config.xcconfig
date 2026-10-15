@@ -1,7 +1,12 @@
-TEAM_ID=
+// Shared by every configuration; Debug.xcconfig and Release.xcconfig include it and set what
+// tells the two apart.
 
 PRODUCT_NAME=Overmail
-PRODUCT_BUNDLE_IDENTIFIER=es.jvbabi.overmail.Overmail$(TEAM_ID)
+// The same ids as on Android, so a debug build sits next to an installed release one.
+PRODUCT_BUNDLE_IDENTIFIER=es.jvbabi.overmail$(BUNDLE_ID_SUFFIX)
+INFOPLIST_KEY_CFBundleDisplayName=$(APP_DISPLAY_NAME)
+ASSETCATALOG_COMPILER_APPICON_NAME=$(APP_ICON_NAME)
 
+// CI sets CURRENT_PROJECT_VERSION to the build timestamp, see fastlane/Fastfile.
 CURRENT_PROJECT_VERSION=1
 MARKETING_VERSION=1.0

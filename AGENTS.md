@@ -74,6 +74,16 @@ modules are entry points and nothing else.
   notification today. It travels as a uri under the app's scheme, the platform entry point hands
   that to `AppIntents`, and `App.kt` acts on it once the ui is there. A new one is a subclass, its
   path, and a branch in `App.kt` -- no platform code.
+- **iOS has a debug and a release app**, like Android: `Debug` is `es.jvbabi.overmail.debug`,
+  "Overmail:Dev" with the green icon, `Release` is `es.jvbabi.overmail`. What differs lives in
+  `app/ios/Configuration/{Debug,Release}.xcconfig`; the shared schemes "Overmail Dev" and
+  "Overmail" run one each. A release carries an ad hoc IPA from `app/ios/fastlane/` (`bundle exec
+  fastlane ios release_ipa`), which installs on the phones registered with the Apple team; the
+  profile is renewed on every build, so a phone Xcode has run the app on is in the next release.
+  It signs with the secrets `IOS_DISTRIBUTION_CERTIFICATE` (base64 `.p12`),
+  `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` and an App Store Connect api key
+  (`APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY`
+  as base64 `.p8`).
 - The Android module pins a JDK 21 toolchain: AGP's JDK image transform cannot be built by a
   jlink newer than the compile SDK, and `:server` needs JDK 26.
 
@@ -137,7 +147,7 @@ A merge to `main` runs [deploy.yaml](.github/workflows/deploy.yaml), which build
 
 | Label                               | Effect on a merge to `main`                  |
 |-------------------------------------|----------------------------------------------|
-| `project:app`                       | builds the APKs and publishes a GitHub release |
+| `project:app`                       | builds the APKs and the IPA, publishes a GitHub release |
 | `project:server` / `project:webapp` | builds and pushes `ghcr.io/overmail/overmail:latest` |
 | `project:other`                     | builds nothing                                 |
 | none                                | builds everything, with a notice               |

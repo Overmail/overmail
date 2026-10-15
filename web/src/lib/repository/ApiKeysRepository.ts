@@ -63,7 +63,8 @@ function toApiKey(key: any): ApiKey {
         id: key.id as string,
         name: key.name as string,
         prefix: key.prefix as string,
-        createdAt: new Date(key.created_at),
-        lastUsedAt: key.last_used_at ? new Date(key.last_used_at) : null,
+        // Whole seconds since the epoch, like every timestamp of this api.
+        createdAt: new Date((key.created_at as number) * 1000),
+        lastUsedAt: key.last_used_at != null ? new Date((key.last_used_at as number) * 1000) : null,
     };
 }

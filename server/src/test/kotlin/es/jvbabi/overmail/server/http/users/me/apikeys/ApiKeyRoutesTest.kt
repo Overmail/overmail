@@ -33,9 +33,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import kotlin.io.path.createTempDirectory
+import kotlin.math.abs
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -68,6 +71,9 @@ class ApiKeyRoutesTest {
         assertTrue(key.startsWith(apiKey["prefix"]!!.jsonPrimitive.content))
         assertEquals("Backup script", apiKey["name"]!!.jsonPrimitive.content)
         assertEquals(JsonNull, apiKey["last_used_at"])
+        // Whole seconds since the epoch, like every timestamp of the api -- not an ISO string.
+        val createdAt = apiKey["created_at"]!!.jsonPrimitive.long
+        assertTrue(abs(createdAt - Clock.System.now().epochSeconds) < 60, "created_at: $createdAt")
 
         // The key works where a session does, and the list shows it used -- without the key.
         val listed = list(key).single()

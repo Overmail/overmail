@@ -23,6 +23,18 @@ platform :ios do
       keychain_password: "",
     )
 
+    # Xcode only registers the App ID once the Release scheme ran on a phone; this way the first
+    # release does not depend on that. The api key above is also Spaceship's token.
+    bundle_id = CredentialsManager::AppfileConfig.try_fetch_value(:app_identifier)
+    unless Spaceship::ConnectAPI::BundleId.find(bundle_id)
+      UI.message("Registering the App ID #{bundle_id}")
+      Spaceship::ConnectAPI::BundleId.create(
+        name: "Overmail",
+        identifier: bundle_id,
+        platform: "IOS",
+      )
+    end
+
     # Renewed on every build: that is how a phone registered since the last release ends up in
     # the profile.
     get_provisioning_profile(

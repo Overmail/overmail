@@ -23,3 +23,4 @@ would help every project and should move to Scaffold.
 | --- | --- | --- | --- |
 | `.github/actions/setup-android-project/action.yaml` | `google_services_file` input, restored to `app/android/google-services.json` | the app uses Firebase Cloud Messaging and the file is not committed | – |
 | `.github/workflows/deploy.yaml` | passes the `GOOGLE_SERVICES_FILE` secret to the setup action | same | – |
+| `.github/workflows/deploy.yaml` | `build-ios` job: an ad hoc IPA through fastlane (`app/ios/fastlane/`), attached to the release; the release waits for it | the app ships on iOS too, for the phones registered with the Apple team | yes, for every Compose Multiplatform project with an iOS app |

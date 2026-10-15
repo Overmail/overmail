@@ -1,0 +1,5 @@
+#include "Config.xcconfig"
+
+BUNDLE_ID_SUFFIX=
+APP_DISPLAY_NAME=Overmail
+APP_ICON_NAME=AppIcon

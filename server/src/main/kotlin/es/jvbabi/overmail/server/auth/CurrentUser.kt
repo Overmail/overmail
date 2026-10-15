@@ -41,9 +41,12 @@ suspend fun ApplicationCall.authenticatedUserOrNull(): User? {
  * [JwtService] decides whether the token is genuine and unexpired; [sessionUser] then loads the
  * user and checks the session, so a token for a meanwhile deleted account or a revoked session
  * authenticates nobody.
+ *
+ * An api key comes in the same header and signs in the same way, as its user -- see [apiKeyUser].
  */
 private suspend fun ApplicationCall.sessionUserFromToken(): User? {
     val token = sessionToken() ?: return null
+    if (isApiKey(token)) return application.get<OvermailDatabase>().apiKeyUser(token)
 
     // Resolved per call, not at install time: pulling the database out of the container eagerly
     // would create the schema while the application is still being set up.
@@ -53,7 +56,8 @@ private suspend fun ApplicationCall.sessionUserFromToken(): User? {
 
 /**
  * The token of the request: the cookie a browser sends on its own -- websocket handshakes
- * included -- or an `Authorization: Bearer` header for clients that have no cookie jar.
+ * included -- or an `Authorization: Bearer` header for clients that have no cookie jar. The
+ * header is also where an api key comes in.
  */
 internal fun ApplicationCall.sessionToken(): String? =
     request.cookies[SESSION_COOKIE_NAME]

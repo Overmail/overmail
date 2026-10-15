@@ -676,6 +676,59 @@
         "empty": "You are not signed in anywhere else.",
         "loadFailed": "An error occurred"
       }
+    },
+    "api": {
+      "title": "API",
+      "intro": "API keys let your own scripts and tools use Overmail on your behalf. A key can do everything you can, so keep it secret.",
+      "documentation": "API documentation",
+      "add": "Create API key",
+      "list": {
+        "loading": "Loading API keys…",
+        "failed": "The API keys could not be loaded.",
+        "neverUsed": "Never",
+        "columns": {
+          "name": "Name",
+          "key": "Key",
+          "created": "Created",
+          "lastUsed": "Last used"
+        },
+        "actions": {
+          "delete": "Delete key"
+        },
+        "empty": {
+          "title": "No API keys yet",
+          "description": "Create a key to call the Overmail API from a script."
+        }
+      },
+      "new": {
+        "title": "Create API key",
+        "description": "Name the key after what will use it, so you know which one to delete later.",
+        "name": "Name",
+        "namePlaceholder": "Backup script",
+        "nameHint": "At most 100 characters.",
+        "saving": "Creating…",
+        "failed": "The key could not be created.",
+        "cancel": "Cancel",
+        "submit": "Create",
+        "created": {
+          "title": "Your new API key",
+          "description": "Send it as an Authorization: Bearer header.",
+          "key": "API key",
+          "copy": "Copy",
+          "copied": "Copied",
+          "copyFailed": "The key could not be copied.",
+          "once": "This is the only time the key is shown. Copy it now — if you lose it, delete it and create a new one.",
+          "done": "Done"
+        }
+      },
+      "delete": {
+        "title": "Delete this API key?",
+        "description": "Anything that uses “{name}” will be refused from now on. This cannot be undone.",
+        "deleting": "Deleting…",
+        "failed": "The key could not be deleted.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
     }
   },
   "ai": {

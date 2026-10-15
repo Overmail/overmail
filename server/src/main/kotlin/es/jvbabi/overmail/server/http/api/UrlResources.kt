@@ -1,6 +1,8 @@
 package es.jvbabi.overmail.server.http.api
 
 import es.jvbabi.overmail.server.database.models.AiChat
+import es.jvbabi.overmail.server.database.models.ApiKey
+import es.jvbabi.overmail.server.database.models.ApiKeys
 import es.jvbabi.overmail.server.database.models.AiChatMessage
 import es.jvbabi.overmail.server.database.models.AiChatMessages
 import es.jvbabi.overmail.server.database.models.AiChats
@@ -47,6 +49,7 @@ internal val URL_LABEL = AttributeKey<Label>("overmail.url.label")
 internal val URL_CHAT = AttributeKey<AiChat>("overmail.url.chat")
 internal val URL_CHAT_MESSAGE = AttributeKey<AiChatMessage>("overmail.url.chat-message")
 internal val URL_SESSION = AttributeKey<Session>("overmail.url.session")
+internal val URL_API_KEY = AttributeKey<ApiKey>("overmail.url.api-key")
 
 /** Which resources this call already established belong to the caller. */
 internal val URL_OWNED = AttributeKey<MutableSet<String>>("overmail.url.owned")
@@ -273,6 +276,29 @@ suspend fun ApplicationCall.requireOwnedSessionFromUrl(): Session {
 
     rememberOwned("session")
     return session
+}
+
+/** `{apiKeyId}` as the stored key -- its hash and prefix, the key itself is nowhere. */
+suspend fun ApplicationCall.requireApiKeyFromUrl(): ApiKey {
+    attributes.getOrNull(URL_API_KEY)?.let { return it }
+
+    val id = idFromUrl("apiKeyId", "api_key")
+    val apiKey = database().query { ApiKey.findById(id) } ?: notFound("api_key", id.toString())
+
+    attributes.put(URL_API_KEY, apiKey)
+    return apiKey
+}
+
+suspend fun ApplicationCall.requireOwnedApiKeyFromUrl(): ApiKey {
+    val apiKey = requireApiKeyFromUrl()
+    if (isKnownOwned("api_key")) return apiKey
+
+    if (apiKey.readValues[ApiKeys.user].value != requireAuthenticatedUserId()) {
+        forbidden("api_key", apiKey.id.value.toString())
+    }
+
+    rememberOwned("api_key")
+    return apiKey
 }
 
 /**

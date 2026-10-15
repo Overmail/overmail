@@ -58,6 +58,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(Shares)
             SchemaUtils.create(Views)
             SchemaUtils.create(Sessions)
+            SchemaUtils.create(ApiKeys)
         }
     }
 

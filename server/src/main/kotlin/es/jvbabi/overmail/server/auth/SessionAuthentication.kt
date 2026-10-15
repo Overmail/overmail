@@ -53,7 +53,7 @@ fun AuthenticationConfig.overmailSession(name: String? = null) {
  * only, so without this every operation would require a `default` scheme that is defined nowhere.
  *
  * Declared as a bearer token because that is what Swagger UI can be given; the cookie carries the
- * same JWT and a browser sends it on its own.
+ * same JWT and a browser sends it on its own. An api key goes into the same field.
  */
 fun Application.registerSessionSecurityScheme() {
     registerSecurityScheme(
@@ -62,7 +62,7 @@ fun Application.registerSessionSecurityScheme() {
             scheme = "bearer",
             bearerFormat = "JWT",
             description = "The session JWT, from the `$SESSION_COOKIE_NAME` cookie or an " +
-                    "`Authorization: Bearer` header.",
+                    "`Authorization: Bearer` header, or an api key (`$API_KEY_PREFIX...`) in that header.",
         ),
     )
 }

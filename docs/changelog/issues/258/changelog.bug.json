@@ -1,0 +1,8 @@
+{
+  "description": "The iOS app no longer crashes on accounts with mail from more than 999 people.",
+  "localized": {
+    "de": {
+      "description": "Die iOS-App stürzt bei Konten mit Mails von mehr als 999 Personen nicht mehr ab."
+    }
+  }
+}

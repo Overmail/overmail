@@ -12,8 +12,11 @@ data class EmbeddedEmailRecipient(
         entity = DbParticipant::class,
         parentColumn = "participant_id",
         entityColumn = "id",
-    ) val participant: EmbeddedParticipant,
+    ) val participants: List<EmbeddedParticipant>,
 ) {
+    /** A list of one, for the reason in [EmbeddedEmail.sender]. */
+    val participant: EmbeddedParticipant get() = participants.single()
+
     fun toModel(): EmailRecipient = EmailRecipient(
         participant = participant.toModel(),
         type = recipient.type,

@@ -30,7 +30,7 @@ data class EmbeddedEmail(
         entity = DbParticipant::class,
         parentColumn = "sent_from_participant_id",
         entityColumn = "id"
-    ) val sender: EmbeddedParticipant,
+    ) val senders: List<EmbeddedParticipant>,
     @Relation(
         entity = DbLabels::class,
         parentColumn = "id",
@@ -52,6 +52,13 @@ data class EmbeddedEmail(
         entityColumn = "email_id"
     ) val attachments: List<DbEmailAttachment>,
 ) {
+    /**
+     * A list of one, read as [sender]: Room loads a relation to a single row of more than 999 keys
+     * by writing into the map it iterates, which Kotlin/Native's HashMap rejects; a list relation
+     * does not (#258).
+     */
+    val sender: EmbeddedParticipant get() = senders.single()
+
     fun toModel() = Email(
         id = dbEmail.id,
         overmailAccount = overmailAccount.toModel(),

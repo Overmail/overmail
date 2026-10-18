@@ -112,6 +112,19 @@ class ImporterTelemetryTest {
     }
 
     @Test
+    fun `an idle event with nothing new is counted as unchanged`() = runBlocking {
+        val account = database.addAccount()
+        val folder = FakeFolder(mails = listOf(mail(1)))
+        val synchronizer = synchronizer()
+        synchronizer.synchronize(folder, ImportContext(account, folderSync()))
+
+        synchronizer.synchronize(folder, ImportContext(account, folderSync(), ImportTrigger.IdleChange))
+
+        assertEquals(1, counted("overmail.importer.passes") { it.get(TRIGGER) == "idle_change" && it.get(OUTCOME) == "unchanged" })
+        assertEquals(0, counted("overmail.importer.passes") { it.get(TRIGGER) == "idle_change" && it.get(OUTCOME) == "completed" })
+    }
+
+    @Test
     fun `a mail that cannot be stored fails its span and the pass`() = runBlocking {
         val context = ImportContext(database.addAccount(), folderSync())
         val folder = FakeFolder(mails = listOf(mail(1)))

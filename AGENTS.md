@@ -487,7 +487,9 @@ it for free.
   connection, an `IDLE` or a running importer is an up-down counter, not a span.
 - **Most passes leave no trace.** A pass that finds nothing new is counted and nothing else; a
   pass that reads a folder from its start is one span without children. Only a pass in between is
-  a trace with a span per mail, its insert and every `ImportStep`.
+  a trace with a span per mail, its insert and every `ImportStep`. A pass after an `IDLE` event
+  fetches without asking `STATUS` first, so one that finds nothing is a span without children,
+  still counted as unchanged.
 - **Attributes carry ids, never content**: no subject, no address. The same rule as for a push.
 - **Logs need nothing**: everything that goes through slf4j is exported, with the trace it was
   written in. The appender is attached in code, not in `logback.xml`.

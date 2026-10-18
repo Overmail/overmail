@@ -51,6 +51,34 @@ class FolderSynchronizerImplTest {
     }
 
     @Test
+    fun `a pass after an idle event fetches even when the status says nothing is new`() = runBlocking {
+        val account = database.addAccount()
+        val folder = FakeFolder(mails = listOf(mail(1)))
+        synchronizer.synchronize(folder, ImportContext(account, folderSync()))
+
+        folder.mails += mail(2)
+        folder.staleUidNext = 2
+        synchronizer.synchronize(folder, ImportContext(account, folderSync(), ImportTrigger.IdleChange))
+
+        assertEquals(listOf(1L, 2L), imported)
+        assertEquals(listOf(1L, 2L), folder.fetchedFrom)
+    }
+
+    @Test
+    fun `a poll trusts the status`() = runBlocking {
+        val account = database.addAccount()
+        val folder = FakeFolder(mails = listOf(mail(1)))
+        synchronizer.synchronize(folder, ImportContext(account, folderSync()))
+
+        folder.mails += mail(2)
+        folder.staleUidNext = 2
+        synchronizer.synchronize(folder, ImportContext(account, folderSync(), ImportTrigger.Poll))
+
+        assertEquals(listOf(1L), imported)
+        assertEquals(listOf(1L), folder.fetchedFrom)
+    }
+
+    @Test
     fun `how far a folder was read survives a restart`() = runBlocking {
         val context = ImportContext(database.addAccount(), folderSync())
         val folder = FakeFolder(mails = listOf(mail(1), mail(2)))

@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.server.jobs.push
 
+import es.jvbabi.overmail.server.database.models.Session
 import kotlin.uuid.Uuid
 
 /**
@@ -16,9 +17,11 @@ private const val EMAILS_PER_PUSH = 50
  */
 class PushNotifications(private val queue: PushQueue) {
 
-    /** Whether anything pushed here goes out; without Firebase credentials it is dropped. */
-    val isEnabled: Boolean
-        get() = queue.isEnabled
+    /**
+     * Whether a push to [client] goes out: it registered for one, and the server has the
+     * credentials of its platform -- Firebase for Android, APNs for iOS.
+     */
+    fun reaches(client: Session.Client): Boolean = queue.reaches(client)
 
     /** Tells every device of [userId] about the mail [emailId] that arrived in the mailbox [imapAccountId]. */
     fun newEmail(userId: Uuid, emailId: Uuid, imapAccountId: Uuid) =

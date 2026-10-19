@@ -1,0 +1,10 @@
+{
+  "title": "Notifications on iPhone and iPad",
+  "description": "The iOS app now tells you about new mail with a notification showing the sender, the subject and how the mail begins. What it shows is encrypted on your server for your device alone, so neither Apple nor anyone in between can read it. Tapping it opens the mail.",
+  "localized": {
+    "de": {
+      "title": "Benachrichtigungen auf iPhone und iPad",
+      "description": "Die iOS-App meldet neue Mails jetzt mit einer Benachrichtigung, die Absender, Betreff und den Anfang der Mail zeigt. Was sie zeigt, verschlüsselt dein Server nur für dein Gerät, sodass weder Apple noch sonst jemand unterwegs es lesen kann. Ein Tippen darauf öffnet die Mail."
+    }
+  }
+}

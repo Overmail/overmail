@@ -64,12 +64,21 @@ modules are entry points and nothing else.
   For the updater: `app.check_for_updates.enable_in_debug=true` checks for updates in a debug
   build, `app.dev.fake-update=true` swaps GitHub and the installer for fakes.
   `app.dev.log_http_requests=false` silences the request log, which is on by default.
-- **Push is Firebase Cloud Messaging and Android-only** (`androidMain`, `data/push/`). The
+- **Push on Android is Firebase Cloud Messaging** (`androidMain`, `data/push/`). The
   google-services plugin in `:app:android` needs `app/android/google-services.json`, which is
   gitignored and must list both application ids (`es.jvbabi.overmail` and `.debug`); without it the
   app does not build. CI restores it from the `GOOGLE_SERVICES_FILE` secret (base64).
   A push carries a `type` and ids, never content (`domain/model/PushMessage.kt`, the mirror of the
   server's `jobs/push/PushMessage.kt`); `PushNotifier` fetches what a notification shows.
+- **Push on iOS is APNs, and the notification comes with the push.** `PushDelegate.swift` gets
+  the token, makes the device key (`app/ios/Push/PushKey.swift`, P-256 in the keychain) and hands
+  both to `ApplePush` in `iosMain`, which registers them like the Firebase id. The server seals
+  sender, subject and preview for that key; the notification service extension
+  (`app/ios/NotificationService/`) opens them with `PushContentDecryptor.swift` -- no network, no
+  session -- and keeps the server's placeholder when it cannot. The sealing format lives twice, in
+  that file and in the server's `ApplePushSealing.kt`: change both together. App and extension
+  share the key through the `keychain-access-groups` entitlement in `app/ios/Configuration/`.
+  `simctl push` does not run the extension; only a push that came through APNs does.
 - **What the app is asked to do from outside is an `AppIntent`** (`domain/intent/`): a tapped
   notification today. It travels as a uri under the app's scheme, the platform entry point hands
   that to `AppIntents`, and `App.kt` acts on it once the ui is there. A new one is a subclass, its
@@ -439,22 +448,33 @@ tested on its own:
 
 ## Push
 
-`jobs/push/` sends pushes to the app. Three parts:
+`jobs/push/` sends pushes to the app, through Firebase to Android and through APNs to iOS:
 
 | Part | Job | Knows nothing about |
 |---|---|---|
-| `PushNotifications` | one function per occasion (`newEmail`, `ping`): which message, to whom | Firebase, tokens |
+| `PushNotifications` | one function per occasion (`newEmail`, `ping`): which message, to whom | Firebase, APNs, tokens |
 | `PushQueue` | resolves a `PushTarget` into devices, sends, retries, forgets dead tokens | what a message means |
 | `PushSender` | hands one push to Firebase (`FcmPushSender`, the HTTP v1 api) | sessions, the database |
+| `ApplePushSender` | hands one push to APNs (`ApnsPushSender`, HTTP/2 with a token signed by the key) | sessions, the database |
+| `ApplePushPayloads` | builds the iOS notification and seals its `ApplePushContent` for the device | how it is sent |
 
-- **A push never carries content**, only a `type` and ids: it travels through Google. A new kind
-  is a subclass of `PushMessage`, a function in `PushNotifications`, and the same subclass in the
-  app.
-- **A device is an Android session with a `firebaseInstallationId`** (`Session.Client.Android`), the
-  Firebase Installation ID the app registered with (registration tokens are deprecated), set by the
-  app through `PUT /api/users/me/sessions/current/firebase-installation-id`.
-- **Push is optional.** The service account is `data/firebase-service.json`, next to the config
-  file; without it `PushSender.Disabled` stands in and nothing is queued.
+- **A push never carries content in the clear.** To Android it is a `type` and ids, and the app
+  fetches the rest. iOS cannot do that -- a silent push is throttled, and dropped for an app that
+  was swiped away -- so a push to iOS is the notification itself: a placeholder text, the same ids,
+  and what it shows (sender, subject, preview) encrypted for the device's key (`ApplePushSealing`,
+  ECIES on P-256). The notification service extension opens it without asking the server. The
+  content is padded to one size, so its length gives nothing away.
+- A new kind is a subclass of `PushMessage`, a function in `PushNotifications`, the same subclass
+  in the app, and a branch in `ApplePushPayloads` and `ApplePushContent.of`.
+- **A device is a session with a push token.** An Android session carries the Firebase
+  Installation ID (`Session.Client.Android.firebaseInstallationId`, registration tokens are
+  deprecated), set through `PUT /api/users/me/sessions/current/firebase-installation-id`. An iOS
+  session carries `ApplePushRegistration` -- the APNs token, the APNs environment of the build and
+  the device's public key -- set through `PUT /api/users/me/sessions/current/apple-push`.
+- **Push is optional, per platform.** The Firebase service account is `data/firebase-service.json`,
+  the APNs key `data/apple-push.json` (`ApplePushKey`), both next to the config file. Without one,
+  `PushSender.Disabled` or `ApplePushSender.Disabled` stands in and that platform's devices are
+  passed over; without both nothing is queued.
 - **The queue is in memory.** A push lost in a restart costs a notification, not a mail.
 
 ## Telemetry

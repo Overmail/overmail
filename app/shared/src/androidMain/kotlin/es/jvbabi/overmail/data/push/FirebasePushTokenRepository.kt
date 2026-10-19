@@ -2,10 +2,12 @@ package es.jvbabi.overmail.data.push
 
 import co.touchlab.kermit.Logger
 import com.google.firebase.messaging.FirebaseMessaging
+import es.jvbabi.overmail.domain.model.PushToken
 import es.jvbabi.overmail.domain.repository.PushTokenRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 
 /**
  * What Firebase Cloud Messaging addresses this installation by: its Firebase Installation ID.
@@ -27,7 +29,7 @@ class FirebasePushTokenRepository : PushTokenRepository {
             .addOnFailureListener { logger.w(it) { "Could not register with Firebase Cloud Messaging" } }
     }
 
-    override fun getToken(): Flow<String> = installationId.filterNotNull()
+    override fun getToken(): Flow<PushToken> = installationId.filterNotNull().map(PushToken::Firebase)
 
     fun onRegistered(newInstallationId: String) {
         installationId.value = newInstallationId

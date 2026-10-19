@@ -1,6 +1,7 @@
 package es.jvbabi.overmail.domain.usecase.housekeeping
 
 import es.jvbabi.overmail.domain.model.OvermailAccount
+import es.jvbabi.overmail.domain.model.PushToken
 import es.jvbabi.overmail.domain.repository.AccountRepository
 import es.jvbabi.overmail.domain.repository.PushTokenRepository
 import es.jvbabi.overmail.domain.repository.RedeemAuthCodeResponse
@@ -22,9 +23,9 @@ import kotlin.uuid.Uuid
 class RegisterPushTokenUseCaseTest {
 
     private val accounts = FakeAccounts()
-    private val pushToken = MutableStateFlow<String?>(null)
+    private val pushToken = MutableStateFlow<PushToken?>(null)
     private val pushTokens = object : PushTokenRepository {
-        override fun getToken(): Flow<String> = pushToken.filterNotNull()
+        override fun getToken(): Flow<PushToken> = pushToken.filterNotNull()
     }
 
     private val first = account("first")
@@ -33,7 +34,7 @@ class RegisterPushTokenUseCaseTest {
     @Test
     fun `every account gets the token`() = runTest {
         accounts.all.value = listOf(first, second)
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
 
         start()
 
@@ -52,10 +53,10 @@ class RegisterPushTokenUseCaseTest {
     @Test
     fun `a replaced token is sent again`() = runTest {
         accounts.all.value = listOf(first)
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
         start()
 
-        pushToken.value = "push-2"
+        pushToken.value = PushToken.Firebase("push-2")
         runCurrent()
 
         assertEquals(listOf("first" to "push-1", "first" to "push-2"), accounts.registered)
@@ -63,7 +64,7 @@ class RegisterPushTokenUseCaseTest {
 
     @Test
     fun `an account that signs in later gets the token`() = runTest {
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
         start()
         assertEquals(emptyList(), accounts.registered)
 
@@ -76,7 +77,7 @@ class RegisterPushTokenUseCaseTest {
     @Test
     fun `a change that is not a sign-in sends nothing`() = runTest {
         accounts.all.value = listOf(first)
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
         start()
 
         accounts.all.value = listOf(first.copy(firstName = "Renamed"))
@@ -88,7 +89,7 @@ class RegisterPushTokenUseCaseTest {
     @Test
     fun `signing in again is a new session and gets the token`() = runTest {
         accounts.all.value = listOf(first)
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
         start()
 
         accounts.all.value = listOf(first.copy(token = "first-again"))
@@ -101,7 +102,7 @@ class RegisterPushTokenUseCaseTest {
     fun `an account that cannot be reached does not keep the others from theirs`() = runTest {
         accounts.all.value = listOf(first, second)
         accounts.unreachable += "first"
-        pushToken.value = "push-1"
+        pushToken.value = PushToken.Firebase("push-1")
 
         start()
 
@@ -135,9 +136,9 @@ private class FakeAccounts : AccountRepository {
 
     override fun getAccounts(): Flow<List<OvermailAccount>> = all
 
-    override suspend fun setPushToken(account: OvermailAccount, pushToken: String): Result<Unit> {
+    override suspend fun setPushToken(account: OvermailAccount, pushToken: PushToken): Result<Unit> {
         if (account.token in unreachable) return Result.failure(IllegalStateException("unreachable"))
-        registered += account.token to pushToken
+        registered += account.token to (pushToken as PushToken.Firebase).installationId
         return Result.success(Unit)
     }
 

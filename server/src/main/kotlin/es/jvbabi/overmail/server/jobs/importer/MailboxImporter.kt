@@ -37,11 +37,12 @@ class MailboxImporter(
         /** How often a folder is looked at without anything having announced a change. */
         val pollInterval: Duration = 5.minutes,
         /**
-         * How long one `IDLE` is held before it is issued again. RFC 2177 asks for at most 29
-         * minutes; well below that, because renewing is the only thing that notices a connection
-         * that went quiet without failing, and it costs one round trip.
+         * How long one `IDLE` is held before it is issued again. Renewing is what notices a
+         * connection a NAT or firewall dropped silently: Gmail and Outlook send nothing while
+         * idling, and common NAT idle timeouts are around 5 minutes (AWS NAT: 350 s), so this
+         * stays below that. It costs one round trip.
          */
-        val idleRenewInterval: Duration = 10.minutes,
+        val idleRenewInterval: Duration = 4.minutes,
         /** How long to wait after a failure; doubles up to [pollInterval] while the account stays unreachable. */
         val retryDelay: Duration = 30.seconds,
     )

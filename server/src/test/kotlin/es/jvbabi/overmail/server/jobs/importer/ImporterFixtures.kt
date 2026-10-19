@@ -122,9 +122,12 @@ internal class FakeFolder(
     /** How many of the next watches fail instead of watching. */
     var failingWatches = 0
 
+    /** A `UIDNEXT` to report instead of the real one, like a server whose `STATUS` lags behind. */
+    var staleUidNext: Long? = null
+
     override suspend fun state() = FolderState(
         uidValidity = uidValidity,
-        uidNext = (mails.maxOfOrNull { it.uidValue() } ?: 0) + 1,
+        uidNext = staleUidNext ?: ((mails.maxOfOrNull { it.uidValue() } ?: 0) + 1),
         exists = mails.size,
     )
 

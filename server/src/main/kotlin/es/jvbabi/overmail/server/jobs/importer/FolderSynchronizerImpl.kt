@@ -60,8 +60,13 @@ class FolderSynchronizerImpl(
         }
 
         try {
-            // The server says where its next UID starts, so "nothing new" costs no fetch.
-            if (state.uidNext?.let { start + 1 >= it } == true) {
+            // The server says where its next UID starts, so "nothing new" costs no fetch. Not
+            // after an IDLE event though: STATUS runs on another connection, and some servers
+            // (Exchange) answer it from a cache that lags behind the EXISTS the IDLE just
+            // reported. The fetch below drops what is outside its range, so nothing new stays
+            // an empty fetch.
+            val trustUidNext = context.trigger != ImportTrigger.IdleChange
+            if (trustUidNext && state.uidNext?.let { start + 1 >= it } == true) {
                 telemetry.passUnchanged(context)
                 return
             }

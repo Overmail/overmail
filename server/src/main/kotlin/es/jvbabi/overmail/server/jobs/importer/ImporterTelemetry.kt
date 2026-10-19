@@ -163,8 +163,11 @@ class ImporterTelemetry(openTelemetry: OpenTelemetry) {
             outcome = "failed"
             throw e
         } finally {
+            // A fetch that came back empty (one after an IDLE event, see FolderSynchronizerImpl)
+            // is counted like a pass the STATUS check ended, and has no duration worth keeping.
+            if (outcome == "completed" && pass.read == 0L) outcome = "unchanged"
             passes.add(1, passAttributes(context, outcome))
-            passDuration.record(
+            if (outcome != "unchanged") passDuration.record(
                 started.seconds(),
                 folderAttributes(context.account, context.folder.folder).toBuilder().put(OUTCOME, outcome).build(),
             )

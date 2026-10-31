@@ -25,6 +25,7 @@ app/
   shared/              Compose Multiplatform: everything the app is, Android + iOS
   android/             the Android application: MainApplication, MainActivity, manifest, icons
   ios/                 the Xcode project; it builds the ComposeApp framework from :app:shared
+  html-renderer/       the Rust crate that renders html mails with Blitz, see [App](#app)
 ```
 
 ## App
@@ -74,6 +75,19 @@ modules are entry points and nothing else.
   notification today. It travels as a uri under the app's scheme, the platform entry point hands
   that to `AppIntents`, and `App.kt` acts on it once the ui is there. A new one is a subclass, its
   path, and a branch in `App.kt` -- no platform code.
+- **Html mails are rendered by [Blitz](https://github.com/DioxusLabs/blitz)**, not a web view:
+  `app/html-renderer` lays a mail out once and rasterises it in tiles on the CPU, offline but for
+  `data:` urls (how the server ships embedded images). Android reaches it through JNI
+  (`src/jni.rs`), iOS through a C ABI and a cinterop (`src/ffi.rs`, `include/`), and
+  `ui/components/blitz/BlitzMailView.kt` draws the tiles as Compose images -- so a mail moves,
+  fades and blurs with its card, which a web view does not. A card and its page share one layout
+  (the window width in dp, at least 640 css px) and each rasterises at its own pixel width, so
+  nothing reflows on the way between them. `cargo run --release --example render -- mail.html`
+  in the crate renders a mail to a png on the desktop.
+  The Gradle build compiles it, so building the app needs rustup with the targets
+  `aarch64-linux-android x86_64-linux-android` (plus `cargo install cargo-ndk` and an NDK in the
+  SDK) for Android, and `aarch64-apple-ios aarch64-apple-ios-sim` for iOS. anyrender does not
+  build for 32-bit targets, so the APKs are 64-bit only.
 - **iOS has a debug and a release app**, like Android: `Debug` is `es.jvbabi.overmail.debug`,
   "Overmail:Dev" with the green icon, `Release` is `es.jvbabi.overmail`. What differs lives in
   `app/ios/Configuration/{Debug,Release}.xcconfig`; the shared schemes "Overmail Dev" and

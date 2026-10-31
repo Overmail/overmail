@@ -1,0 +1,10 @@
+{
+  "title": "Smoother, sharper mails",
+  "description": "Mails are now drawn by the app itself instead of a built-in browser. They move with the cards and the page without flickering, stay sharp on phones and tablets, and no longer crash the pile on Android.",
+  "localized": {
+    "de": {
+      "title": "Flüssigere, schärfere Mails",
+      "description": "Mails zeichnet die App jetzt selbst statt über einen eingebauten Browser. Sie bewegen sich ohne Flackern mit den Karten und der Seite, bleiben auf Telefon und Tablet scharf und bringen den Stapel unter Android nicht mehr zum Absturz."
+    }
+  }
+}

@@ -14,12 +14,13 @@ import kotlin.uuid.Uuid
 
 /**
  * What mails say, fetched with [fetch] as they are asked for and kept for as long as [scope] lives.
- * An html mail is shown as a picture, which [picture] makes right after the body is here; a picture
- * is large, so only those [keepPictures] names are held on to.
+ * Where an html mail is shown as a picture, [picture] makes it right after the body is here; a
+ * picture is large, so only those [keepPictures] names are held on to. Without [picture] an html
+ * mail is shown live, and its body is all there is to it.
  */
 class EmailBodies(
     private val scope: CoroutineScope,
-    private val picture: suspend (emailId: Uuid, html: String, order: () -> Int) -> ImageBitmap?,
+    private val picture: (suspend (emailId: Uuid, html: String, order: () -> Int) -> ImageBitmap?)?,
     private val fetch: suspend (emailId: Uuid, account: OvermailAccount) -> Result<EmailBody>,
 ) {
     val bodies: StateFlow<Map<Uuid, StackCardBody>>
@@ -77,6 +78,7 @@ class EmailBodies(
     }
 
     private fun loadPicture(emailId: Uuid, html: String, order: () -> Int) {
+        val picture = picture ?: return
         pictureJobs[emailId] = scope.launch {
             val made = picture(emailId, html, order)
             // One that would not render is told like a body that would not load, and tried again with it.

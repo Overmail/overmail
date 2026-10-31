@@ -25,10 +25,15 @@ import platform.WebKit.WKNavigationTypeLinkActivated
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
 import platform.darwin.NSObject
+import kotlin.uuid.Uuid
 
+/** A `UIKitView` lies over the Compose layer and does not turn or scale with it. */
+actual val htmlMailsMoveLive: Boolean = false
+
+/** Only on a mail's page, once it has arrived, so nothing is kept for [poolKey]. */
 @OptIn(ExperimentalForeignApi::class)
 @Composable
-actual fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifier: Modifier) {
+actual fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifier: Modifier, poolKey: Uuid?) {
     val currentOnContentHeight by rememberUpdatedState(onContentHeight)
     // The view only holds it weakly.
     val delegate = remember { EmailNavigationDelegate { currentOnContentHeight(it) } }

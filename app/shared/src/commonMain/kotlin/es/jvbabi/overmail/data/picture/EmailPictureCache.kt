@@ -16,7 +16,7 @@ private val logger = Logger.withTag("EmailPictureCache")
  * Bumped whenever a picture would come out differently -- its size, what the document holds -- so
  * the old ones are not shown any more; they are left for the system to clear.
  */
-private const val PICTURE_VERSION = 1
+private const val PICTURE_VERSION = 2
 
 /**
  * The pictures of html mails, one file each in [directory], the way `EmailBodyCache` keeps the

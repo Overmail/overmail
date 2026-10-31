@@ -17,12 +17,14 @@ import es.jvbabi.overmail.server.http.avatar.avatarPadding
 import es.jvbabi.overmail.server.http.avatar.avatarUrlOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import io.ktor.openapi.JsonSchema
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.select
 import kotlin.uuid.Uuid
 
@@ -62,6 +64,7 @@ data class EmailMeta(
     @SerialName("cc") val cc: List<Participant>,
     @SerialName("bcc") val bcc: List<Participant>,
     @SerialName("labels") val labels: List<Label>,
+    @JsonSchema.Description("Without the images the html body shows, which come with the body")
     @SerialName("attachments") val attachments: List<Attachment>,
 ) {
     /** Somebody a mail is from or to, as the address book has them. */
@@ -153,7 +156,8 @@ fun loadEmailMeta(userId: User.Id, ids: Collection<Uuid>): List<EmailMeta> {
 
     val attachmentsByMail = Attachments
         .select(Attachments.email, Attachments.id, Attachments.filename, Attachments.size, Attachments.contentType)
-        .where { Attachments.email inList wanted }
+        // The images the html body shows are part of it, see `util/EmbeddedImages.kt`.
+        .where { (Attachments.email inList wanted) and Attachments.contentId.isNull() }
         .toList()
         .groupBy({ row -> row[Attachments.email].value }) { row ->
             EmailMeta.Attachment(

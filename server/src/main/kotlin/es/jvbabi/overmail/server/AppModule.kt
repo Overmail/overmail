@@ -45,6 +45,7 @@ import es.jvbabi.overmail.server.jobs.importer.EmailImportPipelineImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
+import es.jvbabi.overmail.server.jobs.importer.EmbeddedImageBackfill
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizer
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
@@ -249,6 +250,7 @@ internal fun overmailModule(application: CoroutineScope, serverConfig: ServerCon
     single<ImporterTelemetry> { ImporterTelemetry(openTelemetry = get()) }
 
     single<EmailInserter> { EmailInserterImpl(database = get()) }
+    single<EmbeddedImageBackfill> { EmbeddedImageBackfill(database = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
     // What happens to one mail: stored, then everything that follows from that, in this order.
@@ -300,6 +302,10 @@ private fun Application.startJobs() {
 
     launch {
         get<AvatarShapeBackfill>().run()
+    }
+
+    launch {
+        get<EmbeddedImageBackfill>().run()
     }
 
     launch {

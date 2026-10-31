@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
+import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 
 /**
  * The pile: the inbox, newest first, one mail at a time. It does not follow the
@@ -59,7 +60,7 @@ class EmailStackViewModel(
     /** Archive requests still on their way, so an undo comes after them rather than before. */
     private val archiving = mutableMapOf<Uuid, Deferred<Result<Unit>>>()
 
-    private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
+    private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture.takeUnless { htmlMailsMoveLive }, emailsRepository::getBody)
 
     private val account = accountRepository.getAccounts()
         .map { it.firstOrNull() }

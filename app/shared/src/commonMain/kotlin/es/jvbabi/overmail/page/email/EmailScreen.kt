@@ -51,6 +51,7 @@ import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import es.jvbabi.overmail.shareUrl
 import es.jvbabi.overmail.ui.components.EmailHtmlBody
+import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.theme.AppTheme
 import es.jvbabi.overmail.ui.theme.displayFontFamily
@@ -214,8 +215,8 @@ private fun ActionButton(icon: ImageVector, description: StringResource, onClick
 }
 
 /**
- * What the mail says. An html mail is live only once the page has arrived: a web view does not
- * move with the page on its way in or out, so it is its picture until then.
+ * What the mail says. An html mail is live from the start where a web view moves with the page,
+ * see [htmlMailsMoveLive]; elsewhere only once the page has arrived, and its picture until then.
  */
 @Composable
 private fun EmailBody(body: StackCardBody) {
@@ -226,7 +227,7 @@ private fun EmailBody(body: StackCardBody) {
         is StackCardBody.Html -> EmailHtmlBody(
             html = body.html,
             picture = body.picture,
-            isLive = isScreenSettled(),
+            isLive = htmlMailsMoveLive || isScreenSettled(),
             modifier = Modifier.padding(horizontal = 8.dp),
         )
         is StackCardBody.Text -> Text(

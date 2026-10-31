@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
+import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 
 /**
  * The view the listing shows -- filter, groupings, sorting -- and the mails in it. What goes into
@@ -59,7 +60,7 @@ class ViewViewModel(
         .map { it.firstOrNull() }
         .distinctUntilChanged()
 
-    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
+    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture.takeUnless { htmlMailsMoveLive }, emailsRepository::getBody)
 
     /** What the mails of the listing say, as far as a preview has asked for it, see [ViewEvent.LoadBody]. */
     val bodies: StateFlow<Map<Uuid, StackCardBody>> = emailBodies.bodies

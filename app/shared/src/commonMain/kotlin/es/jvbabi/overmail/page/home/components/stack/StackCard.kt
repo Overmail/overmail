@@ -127,6 +127,7 @@ internal fun MailCard(
     ) {
         // The whole card, starting below the header: scrolled, it goes on behind it.
         CardBody(
+            emailId = email.id,
             body = body,
             scroll = scroll,
             topInset = headerHeight,

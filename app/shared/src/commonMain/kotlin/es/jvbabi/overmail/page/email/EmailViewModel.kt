@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
+import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 
 /**
  * One mail on a page of its own, [emailId]: kept current while the page is open, and read as soon
@@ -47,7 +48,7 @@ class EmailViewModel(
         .map { it.firstOrNull() }
         .distinctUntilChanged()
 
-    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
+    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture.takeUnless { htmlMailsMoveLive }, emailsRepository::getBody)
 
     /** Whether opening the page has marked the mail read already; only the first sight of it does. */
     private var hasMarkedRead = false

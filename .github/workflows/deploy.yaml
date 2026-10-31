@@ -263,11 +263,28 @@ jobs:
           keystore_password: ${{ secrets.KEYSTORE_PASSWORD }}
           google_services_file: ${{ secrets.GOOGLE_SERVICES_FILE }}
 
+      # The html renderer, app/html-renderer, is Rust, built by cargo-ndk from the Gradle build.
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/html-renderer
+
       - name: Build Android APK
         env:
           BUILD_TIMESTAMP: ${{ needs.setup.outputs.build_timestamp }}
           BUILD_TAG: ${{ needs.setup.outputs.build_tag }}
-        run: ./gradlew :app:android:assembleRelease
+        # The newest NDK of the runner: older ones do not align for 16 KB pages by default.
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" ./gradlew :app:android:assembleRelease
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v7
@@ -303,6 +320,17 @@ jobs:
           path: ~/.konan
           key: konan-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-
+
+      # The html renderer, app/html-renderer, is Rust, linked into the framework by the Gradle build.
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/html-renderer
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1

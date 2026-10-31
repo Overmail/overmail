@@ -44,3 +44,18 @@ val buildTag = localProperties.getProperty("app.version_name")?.takeIf { it.isNo
 
 extra["buildTime"] = buildTime
 extra["buildTag"] = buildTag
+
+/**
+ * cargo for building app/html-renderer: `CARGO` when it is set, else the first one in
+ * `CARGO_HOME`, on the PATH or in ~/.cargo/bin. A Gradle daemon started from an IDE has no PATH to
+ * ~/.cargo/bin, and a rustup from Homebrew (the macOS runners) puts nothing there at all.
+ */
+val cargo = System.getenv("CARGO")
+    ?: (listOfNotNull(System.getenv("CARGO_HOME")?.let { "$it/bin" }) +
+        System.getenv("PATH").orEmpty().split(File.pathSeparator) +
+        "${System.getProperty("user.home")}/.cargo/bin")
+        .map { File(it, "cargo") }
+        .firstOrNull { it.canExecute() }?.absolutePath
+    ?: "cargo"
+
+extra["cargo"] = cargo

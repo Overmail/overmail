@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
-import kotlin.uuid.Uuid
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -40,8 +38,6 @@ import es.jvbabi.overmail.utils.progressiveBackground
 import es.jvbabi.overmail.utils.progressiveBackgroundBlur
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.ui.components.EmailCardHtml
-import es.jvbabi.overmail.ui.components.EmailPicture
-import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 import es.jvbabi.overmail.ui.components.LabelBadge
 import es.jvbabi.overmail.ui.components.ScrollOffset
 import es.jvbabi.overmail.ui.components.ParticipantAvatar
@@ -56,12 +52,8 @@ sealed interface StackCardBody {
     /** On its way from the server, or from the cache. */
     data object Loading : StackCardBody
 
-    /**
-     * A mail with an html part, which is what is shown of it then: live, or as its [picture] where
-     * a live one would not move with the card (see `htmlMailsMoveLive`), null until that is made,
-     * or while it is not kept -- see `EmailBodies`.
-     */
-    data class Html(val html: String, val picture: ImageBitmap? = null) : StackCardBody
+    /** A mail with an html part, which is what is shown of it then. */
+    data class Html(val html: String) : StackCardBody
 
     /** A mail with only a text part. */
     data class Text(val text: String) : StackCardBody
@@ -177,7 +169,6 @@ private val OVERFLOW_FADE = 48.dp
  */
 @Composable
 internal fun CardBody(
-    emailId: Uuid,
     body: StackCardBody,
     scroll: ScrollOffset,
     topInset: Dp,
@@ -211,15 +202,8 @@ internal fun CardBody(
             StackCardBody.Loading -> Box(Modifier.fillMaxSize().padding(top = topInset), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is StackCardBody.Html -> if (htmlMailsMoveLive) EmailCardHtml(
-                emailId = emailId,
+            is StackCardBody.Html -> EmailCardHtml(
                 html = body.html,
-                scroll = scroll,
-                topInset = topInset,
-                modifier = Modifier.fillMaxSize(),
-            )
-            else EmailPicture(
-                picture = body.picture,
                 scroll = scroll,
                 topInset = topInset,
                 modifier = Modifier.fillMaxSize(),

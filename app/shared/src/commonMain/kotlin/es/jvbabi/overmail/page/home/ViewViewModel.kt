@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
-import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 
 /**
  * The view the listing shows -- filter, groupings, sorting -- and the mails in it. What goes into
@@ -60,7 +59,7 @@ class ViewViewModel(
         .map { it.firstOrNull() }
         .distinctUntilChanged()
 
-    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture.takeUnless { htmlMailsMoveLive }, emailsRepository::getBody)
+    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getBody)
 
     /** What the mails of the listing say, as far as a preview has asked for it, see [ViewEvent.LoadBody]. */
     val bodies: StateFlow<Map<Uuid, StackCardBody>> = emailBodies.bodies
@@ -101,10 +100,7 @@ class ViewViewModel(
             }
             is ViewEvent.LoadBody -> viewModelScope.launch {
                 val account = account.first() ?: return@launch
-                // One mail is previewed at a time, and it is wanted now: ahead of whatever the pile
-                // is having pictured.
-                emailBodies.keepPictures(setOf(event.emailId))
-                emailBodies.load(event.emailId, account, order = { PREVIEW_RENDER_ORDER })
+                emailBodies.load(event.emailId, account)
             }
         }
     }
@@ -134,9 +130,6 @@ private fun List<ViewResult>.senderIds(): Set<Uuid> = buildSet {
     }
     visit(this@senderIds)
 }
-
-/** Where a previewed mail goes in line for its picture: before any card of the pile. */
-private const val PREVIEW_RENDER_ORDER = -1
 
 /** How long the listing waits for the next key before it searches for what is typed. */
 private const val SEARCH_QUERY_DEBOUNCE_MILLIS = 250L

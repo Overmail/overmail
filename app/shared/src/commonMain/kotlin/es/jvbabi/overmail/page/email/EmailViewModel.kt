@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
-import es.jvbabi.overmail.ui.components.htmlMailsMoveLive
 
 /**
  * One mail on a page of its own, [emailId]: kept current while the page is open, and read as soon
@@ -48,7 +47,7 @@ class EmailViewModel(
         .map { it.firstOrNull() }
         .distinctUntilChanged()
 
-    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getPicture.takeUnless { htmlMailsMoveLive }, emailsRepository::getBody)
+    private val emailBodies = EmailBodies(viewModelScope, emailsRepository::getBody)
 
     /** Whether opening the page has marked the mail read already; only the first sight of it does. */
     private var hasMarkedRead = false
@@ -75,12 +74,11 @@ class EmailViewModel(
     private fun peekBody(): StackCardBody {
         val body = emailsRepository.peekBody(emailId) ?: return StackCardBody.Loading
         val html = body.html ?: return StackCardBody.Text(body.text.orEmpty())
-        return StackCardBody.Html(html, emailsRepository.peekPicture(emailId))
+        return StackCardBody.Html(html)
     }
 
     private fun onEmailLoaded(email: Email) {
-        // The picture is only what is shown on the way in and out, so it goes before any card of the pile.
-        emailBodies.load(email.id, email.overmailAccount, order = { PAGE_RENDER_ORDER })
+        emailBodies.load(email.id, email.overmailAccount)
         if (hasMarkedRead) return
         hasMarkedRead = true
         if (!email.isRead) setRead(email, true)
@@ -110,9 +108,6 @@ data class EmailState(
     val email: Email? = null,
     val body: StackCardBody = StackCardBody.Loading,
 )
-
-/** Where the page's picture of its mail goes in line: before any card of the pile. */
-private const val PAGE_RENDER_ORDER = -1
 
 sealed class EmailEvent {
     data class SetRead(val isRead: Boolean) : EmailEvent()

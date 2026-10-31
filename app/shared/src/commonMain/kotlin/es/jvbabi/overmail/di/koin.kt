@@ -1,8 +1,5 @@
 package es.jvbabi.overmail.di
 
-import es.jvbabi.overmail.data.picture.EmailPictureCache
-import es.jvbabi.overmail.data.picture.EmailPictures
-import es.jvbabi.overmail.emailPictureCacheDirectory
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import es.jvbabi.overmail.AppViewModel
@@ -159,7 +156,6 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::LabelsRepositoryImpl) bind LabelsRepository::class
         singleOf(::ParticipantsRepositoryImpl) bind ParticipantsRepository::class
         singleOf(::ImapAccountsRepositoryImpl) bind ImapAccountsRepository::class
-        single { EmailPictures(renderer = get(), cache = EmailPictureCache(emailPictureCacheDirectory())) }
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
         single<FileRepository> { FileRepositoryImpl() }
         singleOf(::AiChatRepositoryImpl) bind AiChatRepository::class

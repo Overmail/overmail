@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import co.touchlab.kermit.Logger
-import es.jvbabi.overmail.data.picture.EMAIL_DESIGN_WIDTH
 import es.jvbabi.overmail.openUrl
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -45,10 +44,11 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /*
- * Experimental: html mails rendered by Blitz (`app/html-renderer`) rather than a web view, switched
- * on with `app.dev.html_renderer=blitz`. Blitz lays a mail out and rasterises it in the process,
- * into bitmaps Compose draws like any other image -- so a mail turns, scales, fades and is blurred
- * with the card or the page it is on, and nothing has to be swapped for a picture on the way.
+ * Html mails are rendered by Blitz (`app/html-renderer`) rather than a web view. It lays a mail
+ * out and rasterises it in the process, into bitmaps Compose draws like any other image -- so a
+ * mail turns, scales, fades and is blurred with the card or the page it is on, as nothing else
+ * does: a web view either lies over the Compose layer (iOS) or crashes and flickers in the
+ * offscreen layers of a card (Android).
  *
  * Two sizes, decided apart:
  * - The layout is the device's, not the view's: as wide as the window in dp, but never narrower
@@ -63,6 +63,9 @@ import kotlin.math.roundToInt
  */
 
 private val logger = Logger.withTag("BlitzMailView")
+
+/** The width html mails are typically designed for, in css px; none is laid out narrower. */
+private const val EMAIL_DESIGN_WIDTH = 640
 
 /** How tall the viewport is that a mail measures `vh` and a screen-sized layout against, in widths of it. */
 private const val VIEWPORT_ASPECT = 1.6f

@@ -5,8 +5,6 @@ package es.jvbabi.overmail.di
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import es.jvbabi.overmail.data.database.OvermailDatabase
-import es.jvbabi.overmail.data.picture.EmailPictureRenderer
-import es.jvbabi.overmail.data.picture.IosEmailPictureRenderer
 import es.jvbabi.overmail.domain.model.ImapAccount
 import es.jvbabi.overmail.domain.model.OvermailAccount
 import es.jvbabi.overmail.domain.repository.NotificationChannelRepository
@@ -21,12 +19,10 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
 /**
- * The renderer of mail pictures, and a push token that never comes. Everything else iOS contributes is registered from
+ * A push token that never comes. Everything else iOS contributes is registered from
  * `MainViewController`, and the in-app updater is Android-only.
  */
 actual fun platformModule(): Module = module {
-    single<EmailPictureRenderer> { IosEmailPictureRenderer() }
-
     // No push on iOS yet, so there is never a token to register.
     single<PushTokenRepository> {
         object : PushTokenRepository {

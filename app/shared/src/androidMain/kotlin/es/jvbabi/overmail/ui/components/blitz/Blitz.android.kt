@@ -24,7 +24,7 @@ internal actual fun rgbaToImageBitmap(rgba: ByteArray, width: Int, height: Int):
         .apply { copyPixelsFromBuffer(ByteBuffer.wrap(rgba)) }
         .asImageBitmap()
 
-/** `app/html-renderer/src/jni.rs`. Loaded on first use, so a build without the renderer never asks for it. */
+/** `app/html-renderer/src/jni.rs`, built into the APK by `:app:android`'s `buildBlitz`. */
 private object BlitzHtmlRenderer {
     init {
         System.loadLibrary("overmail_html_renderer")

@@ -145,9 +145,6 @@ expect fun imageCacheDirectory(context: PlatformContext): Path
  */
 expect fun emailBodyCacheDirectory(): Path
 
-/** Where the pictures of html mails are kept on disk, see `EmailPictureCache`: in the platform's cache as well. */
-expect fun emailPictureCacheDirectory(): Path
-
 /**
  * Where downloaded attachments are kept, see `FileRepositoryImpl`: in the platform's cache as well,
  * so the system may clear it. On Android it is also what the FileProvider may hand out.

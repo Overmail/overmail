@@ -1,6 +1,5 @@
 package es.jvbabi.overmail.domain.repository
 
-import androidx.compose.ui.graphics.ImageBitmap
 import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.domain.model.EmailBody
@@ -62,16 +61,6 @@ interface EmailsRepository {
 
     /** What [getBody] last answered for the mail of [emailId], if it was lately; without waiting, like [peekEmail]. */
     fun peekBody(emailId: Uuid): EmailBody?
-
-    /** The picture [getPicture] last answered for the mail of [emailId], if it was lately; without waiting. */
-    fun peekPicture(emailId: Uuid): ImageBitmap?
-
-    /**
-     * A picture of the html part of the mail of [emailId], [html], the way it is shown on a card;
-     * null when it would not render. Kept in a file cache like the body. Rendered one at a time for
-     * the whole app, [order] first the lowest, asked again at every turn.
-     */
-    suspend fun getPicture(emailId: Uuid, html: String, order: () -> Int): ImageBitmap?
 
     /**
      * Moves [email] to [archivedState]: in the local database at once, so every view takes it

@@ -114,6 +114,34 @@ android {
     }
 }
 
+// Experimental: html mails rendered by Blitz instead of a web view, see app/html-renderer. Only
+// built when a developer machine opts in with app.dev.html_renderer=blitz, which needs rustup with
+// the Android targets, cargo-ndk and the NDK; without it the app is built as it always was.
+val useBlitz = localProperties["app.dev.html_renderer"]?.toString() == "blitz"
+val blitzJniLibs = layout.buildDirectory.dir("generated/blitz/jniLibs")
+
+val buildBlitz = tasks.register<Exec>("buildBlitz") {
+    val crate = rootProject.file("app/html-renderer")
+    val ndk = localProperties["sdk.dir"]?.let { file(it.toString()).resolve("ndk").listFiles()?.maxByOrNull { dir -> dir.name } }
+    workingDir = crate
+    inputs.dir(crate.resolve("src"))
+    inputs.file(crate.resolve("Cargo.toml"))
+    outputs.dir(blitzJniLibs)
+    environment("ANDROID_NDK_HOME", ndk?.absolutePath ?: "")
+    environment("PATH", "${System.getProperty("user.home")}/.cargo/bin:${System.getenv("PATH")}")
+    // rustup installs into ~/.cargo/bin, which a Gradle daemon started from an IDE has no PATH to.
+    commandLine(
+        "${System.getProperty("user.home")}/.cargo/bin/cargo", "ndk", "-t", "arm64-v8a", "-t", "x86_64", "-P", "26",
+        "-o", blitzJniLibs.get().asFile.absolutePath,
+        "build", "--release", "--lib",
+    )
+}
+
+if (useBlitz) {
+    android.sourceSets.getByName("main").jniLibs.srcDir(blitzJniLibs.get().asFile)
+    tasks.named("preBuild") { dependsOn(buildBlitz) }
+}
+
 // AGP builds a JDK image for the compile classpath, and jlink from a JDK newer than this cannot
 // read the platform jar of compileSdk 37. Pinning the toolchain keeps the build working with
 // whatever JDK Gradle itself runs on -- :server needs 26.

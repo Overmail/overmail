@@ -23,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.picture.emailHtmlDocument
 import kotlin.math.roundToInt
 import kotlin.uuid.Uuid
@@ -119,7 +120,9 @@ fun EmailHtmlBody(
             modifier = Modifier.fillMaxWidth().height(height),
         )
 
-        if (!isLive || contentHeight == null) Box(
+        // Blitz draws nothing until it has the mail, so there is nothing to cover -- and covering
+        // it would blank out a page that has its tiles from the card already for a frame.
+        if (!isLive || (contentHeight == null && !BuildKonfig.BLITZ_HTML_RENDERER)) Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)

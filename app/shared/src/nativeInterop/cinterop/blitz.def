@@ -1,0 +1,6 @@
+# Experimental: html mails rendered by Blitz, see app/html-renderer and app/shared/build.gradle.kts.
+headers = overmail_html_renderer.h
+package = es.jvbabi.overmail.blitz
+staticLibraries = libovermail_html_renderer.a
+# What the renderer needs from the system: fonts through CoreText.
+linkerOpts = -framework CoreText -framework CoreGraphics -framework CoreFoundation

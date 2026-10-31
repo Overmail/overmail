@@ -8,7 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitView
+import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.openUrl
+import es.jvbabi.overmail.ui.components.blitz.BlitzMailView
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.readValue
@@ -27,13 +29,29 @@ import platform.WebKit.WKWebViewConfiguration
 import platform.darwin.NSObject
 import kotlin.uuid.Uuid
 
-/** A `UIKitView` lies over the Compose layer and does not turn or scale with it. */
-actual val htmlMailsMoveLive: Boolean = false
+/**
+ * A `UIKitView` lies over the Compose layer and does not turn or scale with it. A mail rendered by
+ * Blitz is a bitmap Compose draws, which does.
+ */
+actual val htmlMailsMoveLive: Boolean = BuildKonfig.BLITZ_HTML_RENDERER
 
-/** Only on a mail's page, once it has arrived, so nothing is kept for [poolKey]. */
-@OptIn(ExperimentalForeignApi::class)
+/**
+ * Blitz where it is switched on, see [BlitzMailView]; a link is opened from a mail's page only, a
+ * tap on a card is the card's. Otherwise a web view, only on a mail's page once it has arrived, so
+ * nothing is kept for [poolKey].
+ */
 @Composable
 actual fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifier: Modifier, poolKey: Uuid?) {
+    if (BuildKonfig.BLITZ_HTML_RENDERER) {
+        BlitzMailView(document = document, onContentHeight = onContentHeight, links = poolKey == null, modifier = modifier)
+    } else {
+        MailWebView(document = document, onContentHeight = onContentHeight, modifier = modifier)
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+@Composable
+private fun MailWebView(document: String, onContentHeight: (Dp) -> Unit, modifier: Modifier) {
     val currentOnContentHeight by rememberUpdatedState(onContentHeight)
     // The view only holds it weakly.
     val delegate = remember { EmailNavigationDelegate { currentOnContentHeight(it) } }

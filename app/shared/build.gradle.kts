@@ -20,6 +20,36 @@ val localProperties = Properties().apply {
     }
 }
 
+// Experimental: html mails rendered by Blitz (app/html-renderer) instead of a web view, opted into
+// per developer machine with app.dev.html_renderer=blitz. On iOS the renderer is a static library
+// reached through a cinterop; without the flag neither is set up, and iosMain gets actuals that
+// never call it (src/iosBlitzOff), so the framework carries no reference to symbols nobody links.
+val useBlitz = localProperties["app.dev.html_renderer"]?.toString() == "blitz"
+val blitzCrate = rootProject.file("app/html-renderer")
+
+/** cargo builds the static library of [rustTarget] into the crate's own target directory. */
+fun blitzStaticLibrary(rustTarget: String): TaskProvider<Exec> =
+    tasks.register<Exec>("buildBlitz${rustTarget.split('-').joinToString("") { it.replaceFirstChar(Char::uppercase) }}") {
+        workingDir = blitzCrate
+        inputs.dir(blitzCrate.resolve("src"))
+        inputs.file(blitzCrate.resolve("Cargo.toml"))
+        outputs.file(blitzCrate.resolve("target/$rustTarget/release/libovermail_html_renderer.a"))
+        // The deployment target of app/ios, which the library is linked into.
+        environment("IPHONEOS_DEPLOYMENT_TARGET", "18.2")
+        // The release profile strips everything, which in an archive takes the symbol table the
+        // app is linked against with it; debug info is still dropped.
+        environment("CARGO_PROFILE_RELEASE_STRIP", "debuginfo")
+        // With LTO an archive holds bitcode of rustc's LLVM, which the older one of Xcode's linker
+        // cannot read; machine code it can.
+        environment("CARGO_PROFILE_RELEASE_LTO", "off")
+        inputs.property("profile", "strip=debuginfo,lto=off")
+        // rustup installs into ~/.cargo/bin, which a Gradle daemon started from an IDE has no PATH to.
+        commandLine(
+            "${System.getProperty("user.home")}/.cargo/bin/cargo",
+            "build", "--release", "--lib", "--target", rustTarget,
+        )
+    }
+
 kotlin {
     compilerOptions {
         optIn.add("kotlin.uuid.ExperimentalUuidApi")
@@ -47,13 +77,42 @@ kotlin {
     }
 
     listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
+        iosArm64() to "aarch64-apple-ios",
+        iosSimulatorArm64() to "aarch64-apple-ios-sim",
+    ).forEach { (iosTarget, rustTarget) ->
         iosTarget.binaries.framework {
             // What the Xcode project imports, see app/ios/iosApp/ContentView.swift.
             baseName = "ComposeApp"
             isStatic = true
+        }
+
+        if (useBlitz) {
+            val library = blitzStaticLibrary(rustTarget)
+            val archive = blitzCrate.resolve("target/$rustTarget/release/libovermail_html_renderer.a")
+            // A static framework is an archive Xcode links, and Kotlin/Native does not put the
+            // libraries of a cinterop into it: the renderer is added to it once it is linked.
+            iosTarget.binaries.withType<org.jetbrains.kotlin.gradle.plugin.mpp.Framework>().configureEach {
+                val framework = this
+                linkTaskProvider.configure {
+                    dependsOn(library)
+                    doLast {
+                        val binary = framework.outputFile.resolve(framework.baseName)
+                        val merged = File(binary.path + ".merged")
+                        providers.exec { commandLine("libtool", "-static", "-o", merged.absolutePath, binary.absolutePath, archive.absolutePath) }.result.get()
+                        merged.renameTo(binary)
+                    }
+                }
+            }
+            iosTarget.compilations.getByName("main").cinterops.create("blitz") {
+                definitionFile.set(project.file("src/nativeInterop/cinterop/blitz.def"))
+                includeDirs(blitzCrate.resolve("include"))
+                // The header needs nothing but the C library; resolving the compilation's own
+                // dependencies for it fails on koin-androidx-compose, which has no cinterop variant.
+                dependencyFiles = files()
+                // The library goes into the klib, and from there into the framework.
+                extraOpts("-libraryPath", blitzCrate.resolve("target/$rustTarget/release").absolutePath)
+                tasks.named(interopProcessingTaskName) { dependsOn(library) }
+            }
         }
     }
 
@@ -137,6 +196,9 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.app.ktor.client.darwin)
         }
+
+        // The actuals of BlitzNative: over the cinterop, or ones that never call it, see useBlitz.
+        iosMain.get().kotlin.srcDir(if (useBlitz) "src/iosBlitzOn/kotlin" else "src/iosBlitzOff/kotlin")
     }
 }
 
@@ -192,6 +254,15 @@ buildkonfig {
             type = Type.BOOLEAN,
             name = "LOG_HTTP_REQUESTS",
             value = (localProperties["app.dev.log_http_requests"]?.toString()?.toBoolean() ?: true).toString(),
+            nullable = false,
+            const = true,
+        )
+        // Experimental: html mails pictured by Blitz (app/html-renderer) instead of a web view,
+        // on Android. Opt in per developer machine with app.dev.html_renderer=blitz.
+        buildConfigField(
+            type = Type.BOOLEAN,
+            name = "BLITZ_HTML_RENDERER",
+            value = (localProperties["app.dev.html_renderer"]?.toString() == "blitz").toString(),
             nullable = false,
             const = true,
         )

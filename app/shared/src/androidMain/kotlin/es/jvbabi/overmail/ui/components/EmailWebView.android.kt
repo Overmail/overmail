@@ -20,6 +20,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.viewinterop.AndroidView
 import co.touchlab.kermit.Logger
+import es.jvbabi.overmail.BuildKonfig
+import es.jvbabi.overmail.ui.components.blitz.BlitzMailView
 import es.jvbabi.overmail.openUrl
 import kotlin.uuid.Uuid
 
@@ -34,6 +36,9 @@ actual val htmlMailsMoveLive: Boolean = true
 
 @Composable
 actual fun EmailWebView(document: String, onContentHeight: (Dp) -> Unit, modifier: Modifier, poolKey: Uuid?) {
+    // Experimental, see BlitzMailView. A pooled view is a card's, which a tap opens rather than a link.
+    if (BuildKonfig.BLITZ_HTML_RENDERER) return BlitzMailView(document, onContentHeight, links = poolKey == null, modifier = modifier)
+
     val density = LocalDensity.current
     val currentOnContentHeight by rememberUpdatedState(onContentHeight)
     val reportHeight = remember(density) { { height: Float -> currentOnContentHeight(with(density) { height.toDp() }) } }

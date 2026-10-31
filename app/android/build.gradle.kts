@@ -130,11 +130,11 @@ val buildBlitz = tasks.register<Exec>("buildBlitz") {
     val ndk = System.getenv("ANDROID_NDK_HOME")
         ?: androidComponents.sdkComponents.sdkDirectory.get().asFile.resolve("ndk").listFiles()?.maxByOrNull { it.name }?.absolutePath
     environment("ANDROID_NDK_HOME", ndk ?: "")
-    // rustup installs into ~/.cargo/bin, which a Gradle daemon started from an IDE has no PATH to.
-    val cargoBin = "${System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"}/bin"
-    environment("PATH", "$cargoBin:${System.getenv("PATH")}")
+    // cargo-ndk is found next to cargo, see the root build script.
+    val cargo = rootProject.extra["cargo"] as String
+    File(cargo).parent?.let { environment("PATH", "$it:${System.getenv("PATH")}") }
     commandLine(
-        "$cargoBin/cargo", "ndk",
+        cargo, "ndk",
         "-t", "arm64-v8a", "-t", "x86_64",
         "-P", libs.versions.android.minSdk.get(),
         "-o", blitzJniLibs.get().asFile.absolutePath,

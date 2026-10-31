@@ -327,6 +327,11 @@ jobs:
         with:
           targets: aarch64-apple-ios
 
+      # rustup comes from Homebrew here, not ~/.cargo/bin, and the Xcode build that runs Gradle
+      # does not keep the PATH, so cargo is named outright.
+      - name: Locate cargo
+        run: echo "CARGO=$(command -v cargo)" >> "$GITHUB_ENV"
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:

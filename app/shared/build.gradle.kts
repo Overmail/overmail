@@ -40,9 +40,9 @@ fun blitzStaticLibrary(rustTarget: String): TaskProvider<Exec> =
         // cannot read; machine code it can.
         environment("CARGO_PROFILE_RELEASE_LTO", "off")
         inputs.property("profile", "strip=debuginfo,lto=off")
-        // rustup installs into ~/.cargo/bin, which a Gradle daemon started from an IDE has no PATH to.
+        // Wherever rustup put it, see the root build script.
         commandLine(
-            "${System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"}/bin/cargo",
+            rootProject.extra["cargo"] as String,
             "build", "--release", "--lib", "--target", rustTarget,
         )
     }

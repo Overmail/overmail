@@ -45,12 +45,13 @@ android {
     }
 
     // One APK per ABI plus a universal one: the per-ABI builds are what a release links to, the
-    // universal one is the fallback for anything that cannot tell which it needs.
+    // universal one is the fallback for anything that cannot tell which it needs. 64-bit only:
+    // anyrender, which the html renderer draws through, does not build for 32-bit targets.
     splits {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("arm64-v8a", "x86_64")
             isUniversalApk = true
         }
     }
@@ -113,6 +114,36 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
+// Html mails are rendered by Blitz, app/html-renderer: cargo-ndk builds it for every ABI the APKs
+// are split into (see splits above), see AGENTS.md for the toolchain it needs.
+val blitzJniLibs = layout.buildDirectory.dir("generated/blitz/jniLibs")
+
+val buildBlitz = tasks.register<Exec>("buildBlitz") {
+    val crate = rootProject.file("app/html-renderer")
+    workingDir = crate
+    inputs.dir(crate.resolve("src"))
+    inputs.file(crate.resolve("Cargo.toml"))
+    inputs.file(crate.resolve("Cargo.lock"))
+    outputs.dir(blitzJniLibs)
+    // The newest NDK of the SDK, unless one is named: CI runners bring theirs.
+    val ndk = System.getenv("ANDROID_NDK_HOME")
+        ?: androidComponents.sdkComponents.sdkDirectory.get().asFile.resolve("ndk").listFiles()?.maxByOrNull { it.name }?.absolutePath
+    environment("ANDROID_NDK_HOME", ndk ?: "")
+    // rustup installs into ~/.cargo/bin, which a Gradle daemon started from an IDE has no PATH to.
+    val cargoBin = "${System.getenv("CARGO_HOME") ?: "${System.getProperty("user.home")}/.cargo"}/bin"
+    environment("PATH", "$cargoBin:${System.getenv("PATH")}")
+    commandLine(
+        "$cargoBin/cargo", "ndk",
+        "-t", "arm64-v8a", "-t", "x86_64",
+        "-P", libs.versions.android.minSdk.get(),
+        "-o", blitzJniLibs.get().asFile.absolutePath,
+        "build", "--release", "--lib",
+    )
+}
+
+android.sourceSets.getByName("main").jniLibs.srcDir(blitzJniLibs.get().asFile)
+tasks.named("preBuild") { dependsOn(buildBlitz) }
 
 // AGP builds a JDK image for the compile classpath, and jlink from a JDK newer than this cannot
 // read the platform jar of compileSdk 37. Pinning the toolchain keeps the build working with

@@ -61,10 +61,6 @@ actual fun emailBodyCacheDirectory(): Path {
     return "$caches/email-bodies".toPath()
 }
 
-actual fun emailPictureCacheDirectory(): Path {
-    val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
-    return "$caches/email-pictures".toPath()
-}
 
 actual fun attachmentCacheDirectory(): Path {
     val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String

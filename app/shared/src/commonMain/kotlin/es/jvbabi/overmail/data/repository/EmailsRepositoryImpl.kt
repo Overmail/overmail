@@ -1,7 +1,5 @@
 package es.jvbabi.overmail.data.repository
 
-import androidx.compose.ui.graphics.ImageBitmap
-import es.jvbabi.overmail.data.picture.EmailPictures
 import co.touchlab.kermit.Logger
 import es.jvbabi.overmail.common.email.grouping.smartDateBoundaries
 import es.jvbabi.overmail.data.cache.EmailBodyCache
@@ -76,7 +74,6 @@ class EmailsRepositoryImpl(
     private val httpClient: HttpClient,
     private val overmailDatabase: OvermailDatabase,
     imapAccountsRepository: ImapAccountsRepository,
-    private val emailPictures: EmailPictures,
 ) : EmailsRepository {
     private val emailSync = EmailSync(httpClient, overmailDatabase, imapAccountsRepository)
     private val emailBodyCache = EmailBodyCache(emailBodyCacheDirectory())
@@ -229,11 +226,6 @@ class EmailsRepositoryImpl(
             }
         }
     }
-
-    override fun peekPicture(emailId: Uuid): ImageBitmap? = emailPictures.peek(emailId)
-
-    override suspend fun getPicture(emailId: Uuid, html: String, order: () -> Int): ImageBitmap? =
-        emailPictures.get(emailId, html, order)
 
     override suspend fun setArchivedState(email: Email, archivedState: ArchivedState, user: OvermailAccount): Result<Unit> {
         overmailDatabase.emailsDao.setArchivedState(email.id, archivedState)

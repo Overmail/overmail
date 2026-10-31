@@ -12,6 +12,8 @@ import es.jvbabi.overmail.server.database.models.Emails
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.truncatedToSecond
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter.Result
+import es.jvbabi.overmail.server.util.embeddedContentId
+import es.jvbabi.overmail.server.util.referencedContentIds
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
@@ -102,13 +104,17 @@ class EmailInserterImpl(
                     }
                 }
 
+            val referencedContentIds = referencedContentIds(email.htmlContent)
             content.attachments.forEachIndexed { index, attachment ->
+                val contentId = embeddedContentId(attachment.contentId, attachment.contentType, referencedContentIds)
                 Attachment.new {
                     this.email = email
                     this.filename = (attachment.fileName ?: "attachment-$index").take(255)
                     this.contentType = attachment.contentType.take(255)
                     this.data = ExposedBlob(attachment.data)
                     this.size = attachment.data.size.toLong()
+                    this.contentId = contentId
+                    this.isEmbedded = contentId != null
                 }
             }
 

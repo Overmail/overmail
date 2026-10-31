@@ -59,7 +59,7 @@ class EmailStackViewModel(
     /** Archive requests still on their way, so an undo comes after them rather than before. */
     private val archiving = mutableMapOf<Uuid, Deferred<Result<Unit>>>()
 
-    private val bodies = EmailBodies(viewModelScope, emailsRepository::getPicture, emailsRepository::getBody)
+    private val bodies = EmailBodies(viewModelScope, emailsRepository::getBody)
 
     private val account = accountRepository.getAccounts()
         .map { it.firstOrNull() }
@@ -87,9 +87,7 @@ class EmailStackViewModel(
                     // One that failed is asked for again, the next time the pile changes with it
                     // still near the top.
                     val ahead = emails.take(BODIES_AHEAD)
-                    // A card that has left the pile no longer needs its picture held.
-                    bodies.keepPictures(ahead.mapTo(HashSet()) { it.id })
-                    if (account != null) ahead.forEach { email -> bodies.load(email.id, account, order = { placeOnPile(email.id) }) }
+                    if (account != null) ahead.forEach { email -> bodies.load(email.id, account) }
                 }
         }
         viewModelScope.launch {
@@ -99,10 +97,6 @@ class EmailStackViewModel(
             handled.collect { handled -> state.update { it.copy(handled = handled) } }
         }
     }
-
-    /** Where the mail of [emailId] lies on the pile now, 0 on top; far down once it is off it. */
-    private fun placeOnPile(emailId: Uuid): Int =
-        state.value.emails.indexOfFirst { it.id == emailId }.takeIf { it >= 0 } ?: Int.MAX_VALUE
 
     fun onEvent(event: EmailStackEvent) {
         when (event) {

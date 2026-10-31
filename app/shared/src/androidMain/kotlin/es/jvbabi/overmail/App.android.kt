@@ -78,9 +78,6 @@ actual fun imageCacheDirectory(context: PlatformContext): Path =
 actual fun emailBodyCacheDirectory(): Path =
     KoinPlatformTools.defaultContext().get().get<Context>().cacheDir.resolve("email-bodies").absolutePath.toPath()
 
-actual fun emailPictureCacheDirectory(): Path =
-    KoinPlatformTools.defaultContext().get().get<Context>().cacheDir.resolve("email-pictures").absolutePath.toPath()
-
 /** Has to match the `cache-path` of the attachments in `res/xml/file_paths.xml` of `:app:android`. */
 private const val ATTACHMENT_CACHE_DIRECTORY = "attachments"
 

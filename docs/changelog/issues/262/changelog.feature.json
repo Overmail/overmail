@@ -1,0 +1,10 @@
+{
+  "title": "Images inside mails",
+  "description": "Images a mail carries along, like logos and signatures, now show in the mail itself instead of only in its attachments.",
+  "localized": {
+    "de": {
+      "title": "Bilder in Mails",
+      "description": "Bilder, die eine Mail mitbringt, etwa Logos und Signaturen, erscheinen jetzt in der Mail selbst statt nur bei den Anhängen."
+    }
+  }
+}

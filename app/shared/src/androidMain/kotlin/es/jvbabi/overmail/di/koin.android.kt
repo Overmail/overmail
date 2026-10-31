@@ -5,8 +5,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import es.jvbabi.overmail.BuildKonfig
 import es.jvbabi.overmail.data.database.OvermailDatabase
-import es.jvbabi.overmail.data.picture.AndroidEmailPictureRenderer
-import es.jvbabi.overmail.data.picture.EmailPictureRenderer
 import es.jvbabi.overmail.data.push.FirebasePushTokenRepository
 import es.jvbabi.overmail.data.push.PushNotifier
 import es.jvbabi.overmail.data.repository.NotificationChannelRepositoryImpl
@@ -39,7 +37,7 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
 }
 
 /**
- * The renderer of mail pictures, the push token, the notification channels, and the updater: Android is the only platform that updates
+ * The push token, the notification channels, and the updater: Android is the only platform that updates
  * itself, so the whole updater is declared here.
  *
  * What the updater talks to the outside world through — releases on GitHub, the file system, the
@@ -48,9 +46,6 @@ actual fun getDatabaseBuilder(): RoomDatabase.Builder<OvermailDatabase> {
  */
 actual fun platformModule(): Module = module {
     includes(if (BuildKonfig.FAKE_UPDATE) fakeUpdateScenario else realUpdateScenario)
-
-    // At start, so it sees the activity come up: that window is where a mail is rendered.
-    single<EmailPictureRenderer>(createdAtStart = true) { AndroidEmailPictureRenderer(context = get()) }
 
     // One instance under both types: the service reports a new token to what the shared code reads.
     singleOf(::FirebasePushTokenRepository) bind PushTokenRepository::class

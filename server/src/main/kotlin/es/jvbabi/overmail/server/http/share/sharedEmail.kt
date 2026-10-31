@@ -19,7 +19,10 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import es.jvbabi.overmail.server.util.withEmbeddedImages
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
@@ -199,10 +202,11 @@ internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked
             .where { EmailLabels.email eq share.emailId }
             .map { SharedEmailResponse.Label(name = it[Labels.name], color = it[Labels.color]) }
 
-        // Without the bytes: those are fetched one by one, see `downloadSharedAttachment`.
+        // Without the bytes: those are fetched one by one, see `downloadSharedAttachment`. The
+        // images the body shows are part of the body, not attachments, see below.
         val attachments = if (!unlocked || !share.includeAttachments) emptyList() else Attachments
             .select(Attachments.id, Attachments.filename, Attachments.size, Attachments.contentType)
-            .where { Attachments.email eq share.emailId }
+            .where { (Attachments.email eq share.emailId) and Attachments.contentId.isNull() }
             .map {
                 SharedEmailResponse.Attachment(
                     id = it[Attachments.id].value,
@@ -224,7 +228,9 @@ internal suspend fun ApplicationCall.readSharedEmail(share: SharedLink, unlocked
             ),
             content = if (!unlocked) null else SharedEmailResponse.Content(
                 text = row[Emails.textContent],
-                html = row[Emails.htmlContent],
+                // With its images whether or not the share hands out attachments: they are what
+                // the mail looks like, a logo or a signature, not files to take away.
+                html = row[Emails.htmlContent]?.let { withEmbeddedImages(share.emailId, it) },
                 attachments = attachments,
             ),
         )

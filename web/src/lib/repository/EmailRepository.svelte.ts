@@ -385,6 +385,21 @@ export class EmailRepository {
     }
 
     /**
+     * Has the server import [id] again from its mailbox: `POST /api/emails/{id}/reimport`.
+     *
+     * Queued like [requestClassification]: the server looks for the mail in every folder of its
+     * inbox, which takes a while, and the content it stores arrives over the socket as a change.
+     */
+    async requestReimport(id: string): Promise<boolean> {
+        const response = await fetch(`/api/emails/${id}/reimport`, {method: "POST"});
+        if (!response.ok) {
+            console.error(`Could not re-import mail ${id}: ${response.status} ${response.statusText}`);
+        }
+
+        return response.ok;
+    }
+
+    /**
      * What follows any of the writes above.
      *
      * The mail is read again rather than assumed, see [requestSnapshot]: nothing about it is

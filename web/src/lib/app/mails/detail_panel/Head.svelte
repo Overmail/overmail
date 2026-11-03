@@ -4,6 +4,7 @@
     import {
         ArchiveIcon,
         ArrowSquareUpRightIcon,
+        ArrowsClockwiseIcon,
         CaretDownIcon,
         CaretUpIcon,
         CheckIcon,
@@ -44,6 +45,7 @@
         onDownloadMail,
         onChangeReadState,
         onReclassify,
+        onReimport,
         class: propsClass,
     }: {
         mail: EmailMeta,
@@ -66,6 +68,8 @@
         onChangeReadState: (isRead: boolean) => Promise<void>;
         /** Hands the mail back to the classification agent; see the menu at the end of the bar. */
         onReclassify: () => void;
+        /** Has the server import the mail again from its mailbox, for one that came in wrong. */
+        onReimport: () => void;
         class?: string;
     } = $props();
 
@@ -364,6 +368,10 @@
                 <DropdownMenu.Item onclick={onReclassify}>
                     <SparkleIcon />
                     {$_('mails.panel.reclassify')}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onclick={onReimport}>
+                    <ArrowsClockwiseIcon />
+                    {$_('mails.panel.reimport')}
                 </DropdownMenu.Item>
             </DropdownMenu.Content>
         </DropdownMenu.Root>

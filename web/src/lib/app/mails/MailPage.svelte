@@ -98,6 +98,7 @@
                     onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
                     onDownloadMail={() => mails.downloadMail(mail.id)}
                     onReclassify={() => mails.requestClassification(mail.id)}
+                    onReimport={() => mails.requestReimport(mail.id)}
             />
         </div>
 

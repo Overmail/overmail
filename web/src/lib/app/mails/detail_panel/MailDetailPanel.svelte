@@ -220,6 +220,7 @@
                 onShareMail={() => showShareDialog = true}
                 onChangeReadState={(isRead) => mails.setRead(mail.id, isRead)}
                 onReclassify={() => mails.requestClassification(mail.id)}
+                onReimport={() => mails.requestReimport(mail.id)}
         />
 
         <!-- Everything the mail is scrolls in here, under a bar that stays put. -->

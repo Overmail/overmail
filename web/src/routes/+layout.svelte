@@ -17,6 +17,7 @@
 	import {fade} from 'svelte/transition';
 	import {morphsBetweenPanelAndPage, startMorph} from '$lib/app/mails/mailViewTransition';
 	import SettingsDialog from "$lib/app/settings/SettingsDialog.svelte";
+	import FileDrop from "$lib/app/file-drop/FileDrop.svelte";
 
 	let { children, data } = $props();
 
@@ -107,6 +108,9 @@
 		     whatever follows the width would trail a fifth of a second behind the pointer. -->
 		<!-- min-h-svh here rather than in the component: the settings dialog has a provider of
 		     its own, and a window-high one breaks its sidebar. -->
+		<!-- Only in the signed-in shell: a file dropped on the sign-in or a shared mail has no
+		     mailbox to go to. -->
+		<FileDrop>
 		<Sidebar.Provider
 				open={data.sidebarOpen}
 				class="min-h-svh"
@@ -160,6 +164,7 @@
 				<AppSidebar />
 			</div>
 		</Sidebar.Provider>
+		</FileDrop>
 	{:else}
 		{@render children()}
 	{/if}

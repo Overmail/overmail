@@ -32,6 +32,14 @@ export type Inbox = {
 
 const ENDPOINT = "/api/users/me/inboxes";
 
+/** How importing one mail from its source went. */
+export type ImportEmailResult =
+    | {type: "imported"; id: string}
+    /** The inbox holds this mail already, imported or uploaded before. */
+    | {type: "already_exists"}
+    /** The file is no mail the server can store; [reason] is its message, for the record. */
+    | {type: "rejected"; reason: string | null};
+
 /**
  * What a mailbox is called on screen: its name, and its login where it has none.
  *
@@ -208,5 +216,30 @@ export class InboxRepository {
 
         const body = await response.json();
         return (body.deleted_emails ?? 0) as number;
+    }
+
+    /**
+     * Imports a mail into a mailbox from its source, the content of an `.eml` file.
+     *
+     * The server takes it the way its importer takes a mail off the IMAP server, so a mail the
+     * inbox holds already is answered as such rather than stored twice. Anything but those three
+     * answers is thrown.
+     */
+    async importEml(id: string, source: Blob, signal?: AbortSignal): Promise<ImportEmailResult> {
+        const response = await fetch(`${ENDPOINT}/${encodeURIComponent(id)}/import?type=eml`, {
+            method: "POST",
+            credentials: "include",
+            headers: {"content-type": "message/rfc822"},
+            body: source,
+            signal,
+        });
+
+        if (response.status === 201) return {type: "imported", id: (await response.json()).id as string};
+        if (response.status === 409) return {type: "already_exists"};
+        if (response.status === 400) {
+            const body = await response.json().catch(() => null);
+            return {type: "rejected", reason: (body?.error?.message ?? null) as string | null};
+        }
+        throw new Error(`Could not import the mail: ${response.status}`);
     }
 }

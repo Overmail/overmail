@@ -78,10 +78,12 @@
      collapse out through the body, and position keeps anything absolutely positioned from
      hanging off the document rather than off the mail. */
   #${ROOT} { display: flow-root; position: relative; }
-  /* Mails are written for a fixed-width client; clamp the usual offenders to the card width. */
+  /* Mails are written for a fixed-width client; clamp the usual offenders to the card width.
+     Tables keep their automatic layout: a fixed one takes its columns from the first row alone,
+     and templates open with a spacer row (a <td colspan="3">) that carries no widths -- the
+     600px column of such a mail came out a third of the frame wide. */
   img, video, table { max-width: 100%; }
   img { height: auto; }
-  table { table-layout: fixed; }
 </style>
 </head><body><div id="${ROOT}">${html}</div></body></html>`);
 

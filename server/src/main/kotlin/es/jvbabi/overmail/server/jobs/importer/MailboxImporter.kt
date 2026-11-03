@@ -159,7 +159,7 @@ class MailboxImporter(
     }
 }
 
-private fun imapClient(connection: ImapConnection): MailClient = ImapClient(
+internal fun imapClient(connection: ImapConnection): MailClient = ImapClient(
     host = connection.host,
     port = connection.port,
     auth = connection.authentication,

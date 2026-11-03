@@ -132,9 +132,18 @@ internal class FakeFolder(
     )
 
     override fun getMails(config: FetchRequest.() -> Unit): Flow<KamelEmail> = flow {
-        val range = FetchRequest().apply(config).selection as FetchRequest.Selection.UidRange
-        fetchedFrom += range.from
-        mails.filter { it.uidValue() in range }.sortedBy { it.uidValue() }.forEach { emit(it) }
+        val sorted = mails.sortedBy { it.uidValue() }
+        val selected = when (val selection = FetchRequest().apply(config).selection) {
+            is FetchRequest.Selection.UidRange -> {
+                fetchedFrom += selection.from
+                sorted.filter { it.uidValue() in selection }
+            }
+            // By position, as `getAll()` asks: sequence numbers follow the UIDs.
+            is FetchRequest.Selection.IdRange ->
+                sorted.filterIndexed { index, _ -> index + 1 >= selection.from && (selection.to == null || index + 1 <= selection.to!!) }
+            else -> error("FakeFolder does not fetch by $selection")
+        }
+        selected.forEach { emit(it) }
     }
 
     override fun getIdleFolder() = object : IdleFolder {

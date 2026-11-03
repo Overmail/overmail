@@ -12,6 +12,7 @@ import es.jvbabi.overmail.server.http.email.item.body.getEmailBody
 import es.jvbabi.overmail.server.http.email.item.attachments.downloadAttachment
 import es.jvbabi.overmail.server.http.email.item.download.downloadEmail
 import es.jvbabi.overmail.server.http.email.item.classify.classifyEmailRequest
+import es.jvbabi.overmail.server.http.email.item.reimport.reimportEmailRequest
 import es.jvbabi.overmail.server.http.email.item.meta.getEmailMeta
 import es.jvbabi.overmail.server.http.email.item.labels.attachEmailLabel
 import es.jvbabi.overmail.server.http.email.item.labels.detachEmailLabel
@@ -283,6 +284,10 @@ internal fun Application.configureRouting() {
 
                     route("/classify") {
                         classifyEmailRequest()
+                    }
+
+                    route("/reimport") {
+                        reimportEmailRequest()
                     }
 
                     route("/shares") {

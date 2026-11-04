@@ -34,8 +34,9 @@ private val COPIED_FLASH = 2.seconds
  * ([ShareState.linkToShare]); its settings open beneath, for whoever wants to change them. Most
  * links never need to: the link stays the same whatever is changed later.
  *
- * Kept as long as the mail's page, so the sheet calls [onEvent] with [ShareEvent.Open] each time
- * it comes up: back to the list, as it stands now.
+ * Kept as long as the mail's page, and made with it: the list is read as soon as the page opens,
+ * so the sheet has it from its first frame. The sheet calls [onEvent] with [ShareEvent.Open] each
+ * time it comes up, which reads it again behind what is already shown.
  */
 class ShareViewModel(
     private val email: Email,
@@ -49,6 +50,10 @@ class ShareViewModel(
 
     private var copiedReset: Job? = null
     private var loadJob: Job? = null
+
+    init {
+        load()
+    }
 
     fun onEvent(event: ShareEvent) {
         when (event) {
@@ -98,7 +103,9 @@ class ShareViewModel(
     private fun load() {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            state.update { it.copy(listState = if (it.shares.isEmpty()) ShareListState.Loading else it.listState) }
+            // Loading is only shown before the first answer; after it, a reload happens behind the
+            // list as it stands -- an empty one included.
+            state.update { it.copy(listState = if (it.listState == ShareListState.Ready) it.listState else ShareListState.Loading) }
             sharesRepository.list(email.id, email.overmailAccount)
                 .onSuccess { shares -> state.update { it.copy(shares = shares, listState = ShareListState.Ready) } }
                 .onFailure { state.update { it.copy(listState = ShareListState.Failed) } }

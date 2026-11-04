@@ -98,6 +98,21 @@ class ShareViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
+    fun theListIsReadWithThePageAndReloadedBehindItWhenTheSheetOpens() = runTest(dispatcher) {
+        val repository = FakeSharesRepository()
+        val viewModel = viewModel(repository, mutableListOf())
+        advanceUntilIdle()
+
+        // Read before the sheet was ever opened: an empty list, but a known one.
+        assertEquals(ShareListState.Ready, viewModel.state.value.listState)
+
+        viewModel.onEvent(ShareEvent.Open)
+        assertEquals(ShareListState.Ready, viewModel.state.value.listState)
+        advanceUntilIdle()
+        assertEquals(2, repository.listCalls)
+    }
+
+    @Test
     fun creatingMakesADefaultShareHandsItOnAndOpensItsSettings() = runTest(dispatcher) {
         val repository = FakeSharesRepository()
         val copied = mutableListOf<String>()
@@ -222,8 +237,12 @@ private class FakeSharesRepository : SharesRepository {
     val created = mutableListOf<ShareDraft>()
     val updated = mutableListOf<Pair<Uuid, ShareDraft>>()
     var failDeletes = false
+    var listCalls = 0
 
-    override suspend fun list(emailId: Uuid, account: OvermailAccount) = Result.success(shares.toList())
+    override suspend fun list(emailId: Uuid, account: OvermailAccount): Result<List<Share>> {
+        listCalls++
+        return Result.success(shares.toList())
+    }
 
     override suspend fun create(emailId: Uuid, draft: ShareDraft, account: OvermailAccount): Result<Share> {
         created += draft

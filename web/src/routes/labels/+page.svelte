@@ -81,7 +81,7 @@
         const [right, bottom] = screenToWorld(width, height, width, height, {cameraX, cameraY, zoom});
 
         // Read once: a computed style in every frame can make Safari recalculate styles.
-        font ??= `500 ${BASE_FONT_SIZE}px ${getComputedStyle(canvas).fontFamily}`;
+        font ??= `400 ${BASE_FONT_SIZE}px ${getComputedStyle(canvas).fontFamily}`;
         context.font = font;
         context.textAlign = "center";
         context.textBaseline = "middle";

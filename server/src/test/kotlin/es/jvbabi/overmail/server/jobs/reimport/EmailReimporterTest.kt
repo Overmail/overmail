@@ -43,6 +43,10 @@ class EmailReimporterTest {
         val result = reimporter(inbox, archive).reimport(id)
 
         assertEquals(EmailReimporter.Result.Reimported("Archive"), result)
+        // Searched on the server, so only the candidate was fetched, and nothing of the inbox.
+        assertEquals(1, inbox.searches.size)
+        assertEquals(emptyList(), inbox.fetchedUids)
+        assertEquals(listOf(7L), archive.fetchedUids)
         database.query {
             val email = Email[id]
             assertEquals("The whole mail.", email.textContent?.trim())
@@ -68,6 +72,15 @@ class EmailReimporterTest {
         val other = mail(8, subject = "Mail 7")
 
         assertEquals(EmailReimporter.Result.NotFound, reimporter(FakeFolder(mails = listOf(other))).reimport(id))
+    }
+
+    @Test
+    fun `a mail without a subject is searched by its days alone`() = runBlocking {
+        val id = stored(mail(7, subject = null, body = "Garbled."))
+        val inbox = FakeFolder(mails = listOf(mail(6), mail(7, subject = null, body = "The whole mail.")))
+
+        assertEquals(EmailReimporter.Result.Reimported("INBOX"), reimporter(inbox).reimport(id))
+        database.query { assertEquals("The whole mail.", Email[id].textContent?.trim()) }
     }
 
     @Test

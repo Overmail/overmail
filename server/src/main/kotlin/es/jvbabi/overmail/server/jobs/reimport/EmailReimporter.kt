@@ -23,6 +23,11 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.slf4j.LoggerFactory
@@ -34,7 +39,7 @@ import es.jvbabi.overmail.kamel.Email as KamelEmail
  * Imports one stored mail again from its mailbox, for a mail that came in wrong.
  *
  * The mail is looked for in every folder of its inbox, by what the importer recognises a mail by:
- * send second and subject. The first match replaces what is stored -- sender, recipients, both
+ * send second and subject. Each folder is searched on the server, so only candidates are fetched. The first match replaces what is stored -- sender, recipients, both
  * bodies, the attachments and the source -- in one transaction. The row itself stays, and with it
  * the id, the labels, the read state and every share; the subject and the date are what it was
  * found by and so cannot have changed.
@@ -99,17 +104,28 @@ class EmailReimporter(
     }
 
     /**
-     * Looks through the envelopes of [folder] for the mail and, on a match, stores it again.
+     * Asks [folder] for the mail and, on a match, stores it again.
+     *
+     * The server searches by subject and by the days around the send date -- whole days in the
+     * time zone the `Date` header is written in, which can be a day off UTC -- and only those
+     * candidates are fetched and compared to the second. A mail without a subject is searched by
+     * the days alone: IMAP cannot ask for an empty one.
      *
      * The body is downloaded while the fetch is still being collected, as the importer does it:
      * the mail is bound to the folder's connection, and `take(1)` ends the fetch once it is through.
      */
     private suspend fun replaceFrom(folder: MailFolder, emailId: Email.Id, target: Target): Boolean {
-        // TODO(Overmail/kamel#53): ask the server with a SEARCH (subject, sent on that day) once
-        //  kamel can, instead of fetching every envelope of every folder and comparing here.
+        val day = target.sent.toLocalDateTime(TimeZone.UTC).date
+        val candidates = folder.search {
+            target.subject?.takeIf { it.isNotEmpty() }?.let { subject(it) }
+            sentSince(day.minus(1, DateTimeUnit.DAY))
+            sentBefore(day.plus(2, DateTimeUnit.DAY))
+        }
+        if (candidates.isEmpty()) return false
+
         var replaced = false
         folder.getMails {
-            getAll()
+            uids(candidates)
             envelope = true
             uid = true
             onUnreadable { logger.debug("Skipping an unreadable mail of ${folder.fullName} while looking for $emailId") }

@@ -8,6 +8,8 @@ import es.jvbabi.overmail.kamel.ImapClient
 import es.jvbabi.overmail.kamel.ImapFolder
 import es.jvbabi.overmail.kamel.MailClient
 import es.jvbabi.overmail.kamel.MailFolder
+import es.jvbabi.overmail.kamel.SearchCriterion
+import es.jvbabi.overmail.kamel.SearchRequest
 import es.jvbabi.overmail.server.database.OvermailDatabase
 import es.jvbabi.overmail.server.database.models.ImapAccount
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import org.jetbrains.exposed.v1.jdbc.Database
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import es.jvbabi.overmail.kamel.Email as KamelEmail
@@ -114,6 +117,12 @@ internal class FakeFolder(
     /** The first UID of every fetch, in the order they were made. */
     val fetchedFrom = mutableListOf<Long>()
 
+    /** Every search, as the criterion it was made with. */
+    val searches = mutableListOf<SearchCriterion>()
+
+    /** Every mail fetched by its UID, see [FetchRequest.uids]. */
+    val fetchedUids = mutableListOf<Long>()
+
     val idleEvents = MutableSharedFlow<IdleEvent>(extraBufferCapacity = 16)
 
     /** How often an `IDLE` was issued. */
@@ -141,9 +150,22 @@ internal class FakeFolder(
             // By position, as `getAll()` asks: sequence numbers follow the UIDs.
             is FetchRequest.Selection.IdRange ->
                 sorted.filterIndexed { index, _ -> index + 1 >= selection.from && (selection.to == null || index + 1 <= selection.to!!) }
+            is FetchRequest.Selection.Uids -> {
+                fetchedUids += selection.uids
+                sorted.filter { it.uidValue() in selection.uids }
+            }
             else -> error("FakeFolder does not fetch by $selection")
         }
         selected.forEach { emit(it) }
+    }
+
+    override suspend fun search(criteria: SearchRequest.() -> Unit): List<Long> {
+        val criterion = SearchRequest().apply(criteria).criterion
+        searches += criterion
+        return mails
+            .filter { criterion.matches(it.getContent(includeAttachments = false).raw, receivedAt = Clock.System.now()) }
+            .map { it.uidValue() }
+            .sorted()
     }
 
     override fun getIdleFolder() = object : IdleFolder {

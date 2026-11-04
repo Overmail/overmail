@@ -88,6 +88,13 @@ modules are entry points and nothing else.
   `aarch64-linux-android x86_64-linux-android` (plus `cargo install cargo-ndk` and an NDK in the
   SDK) for Android, and `aarch64-apple-ios aarch64-apple-ios-sim` for iOS. anyrender does not
   build for 32-bit targets, so the APKs are 64-bit only.
+- **A screen iOS draws natively is SwiftUI on top of the shared view model.** `NativeViews`
+  (`iosMain`) is implemented in Swift (`app/ios/iosApp/NativeViews.swift`) and handed to
+  `MainViewController`; the Kotlin side presents the `UIViewController` it returns. Swift cannot
+  collect a `StateFlow`, so a small watcher class calls back with every state
+  (`ShareStateWatcher`). Texts of those screens are in `app/ios/iosApp/Localizable.xcstrings`.
+  The share sheet (`page/email/share/`) is the first: a Compose bottom sheet on Android, SwiftUI
+  on iOS.
 - **iOS has a debug and a release app**, like Android: `Debug` is `es.jvbabi.overmail.debug`,
   "Overmail:Dev" with the green icon, `Release` is `es.jvbabi.overmail`. What differs lives in
   `app/ios/Configuration/{Debug,Release}.xcconfig`; the shared schemes "Overmail Dev" and

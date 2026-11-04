@@ -86,7 +86,7 @@ private class DocumentDelegate : NSObject(), UIDocumentInteractionControllerDele
 private var openDocument: Pair<UIDocumentInteractionController, DocumentDelegate>? = null
 
 /** What is on top, so a preview is not presented under a sheet that is already up. */
-private fun topViewController(): UIViewController? {
+internal fun topViewController(): UIViewController? {
     var controller = UIApplication.sharedApplication.keyWindow?.rootViewController
     while (controller?.presentedViewController != null) controller = controller.presentedViewController
     return controller
@@ -150,6 +150,10 @@ actual fun shareUrl(url: String, title: String?) {
 }
 
 actual fun getClipboardText(): String? = UIPasteboard.generalPasteboard.string
+
+actual fun setClipboardText(text: String) {
+    UIPasteboard.generalPasteboard.string = text
+}
 
 /** Kept until the firework is over: an engine that is let go of stops what it plays. */
 private var fireworkEngine: CHHapticEngine? = null

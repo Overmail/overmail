@@ -144,6 +144,12 @@ actual fun getClipboardText(): String? {
     return clipboard?.primaryClip?.getItemAt(0)?.text?.toString()
 }
 
+actual fun setClipboardText(text: String) {
+    val clipboard = activityContext()
+        .getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(null, text))
+}
+
 actual fun deviceInfo(): DeviceInfo = DeviceInfo(
     platform = "android",
     device = Build.MODEL,

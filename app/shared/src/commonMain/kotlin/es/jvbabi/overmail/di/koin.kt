@@ -16,6 +16,7 @@ import es.jvbabi.overmail.data.repository.FileRepositoryImpl
 import es.jvbabi.overmail.data.repository.LabelsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ImapAccountsRepositoryImpl
 import es.jvbabi.overmail.data.repository.ParticipantsRepositoryImpl
+import es.jvbabi.overmail.data.repository.SharesRepositoryImpl
 import es.jvbabi.overmail.data.repository.KeyValueRepositoryImpl
 import es.jvbabi.overmail.domain.intent.AppIntents
 import es.jvbabi.overmail.domain.repository.AccountRepository
@@ -25,6 +26,7 @@ import es.jvbabi.overmail.domain.repository.FileRepository
 import es.jvbabi.overmail.domain.repository.LabelsRepository
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ParticipantsRepository
+import es.jvbabi.overmail.domain.repository.SharesRepository
 import es.jvbabi.overmail.domain.repository.KeyValueRepository
 import es.jvbabi.overmail.domain.usecase.account.GetCurrentAccountUseCase
 import es.jvbabi.overmail.domain.usecase.account.SetCurrentAccountUseCase
@@ -35,6 +37,7 @@ import es.jvbabi.overmail.domain.usecase.housekeeping.SyncNotificationChannelsUs
 import es.jvbabi.overmail.page.agent.AgentViewModel
 import es.jvbabi.overmail.page.email.EmailViewModel
 import es.jvbabi.overmail.page.email.components.attachments.AttachmentsViewModel
+import es.jvbabi.overmail.page.email.share.ShareViewModel
 import es.jvbabi.overmail.page.home.EmailStackViewModel
 import es.jvbabi.overmail.page.home.HomeViewModel
 import es.jvbabi.overmail.page.home.ViewSettingsViewModel
@@ -59,6 +62,7 @@ import kotlinx.serialization.json.Json
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.KoinAppDeclaration
@@ -159,6 +163,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         singleOf(::EmailsRepositoryImpl) bind EmailsRepository::class
         single<FileRepository> { FileRepositoryImpl() }
         singleOf(::AiChatRepositoryImpl) bind AiChatRepository::class
+        singleOf(::SharesRepositoryImpl) bind SharesRepository::class
 
         // What the platform was opened with, until the ui acts on it.
         single { AppIntents() }
@@ -183,6 +188,8 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
         // Takes the id of the mail as a parameter.
         viewModelOf(::EmailViewModel)
         viewModelOf(::AttachmentsViewModel)
+        // Takes the mail as a parameter; the clock and the clipboard stay the defaults.
+        viewModel { params -> ShareViewModel(email = params.get(), sharesRepository = get()) }
         viewModelOf(::SearchViewModel)
         viewModelOf(::AgentViewModel)
     })

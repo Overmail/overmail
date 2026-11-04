@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {contrast, fontSizeFor, nodeAt, parseHex, relativeLuminance, screenToWorld, textColorOn} from "./labelMapCanvas";
+import {contrast, fitCamera, fontSizeFor, nodeAt, parseHex, relativeLuminance, screenToWorld, textColorOn} from "./labelMapCanvas";
 import type {LabelMapNode} from "./LabelMapSimulation";
 
 function node(id: string, x: number, y: number, radius: number): LabelMapNode {
@@ -72,4 +72,23 @@ test("a longer name is written smaller, a larger circle larger", () => {
 
 test("a short name does not grow taller than the circle has room for", () => {
     expect(fontSizeFor(40, 0.5)).toBeCloseTo(40 * 0.82);
+});
+
+test("the map starts with every label in view, centred, with room around", () => {
+    const camera = fitCamera([node("a", -100, 0, 50), node("b", 300, 0, 50)], 1000, 500);
+
+    // 500 wide in the world, 840 of the 1000 pixels free for it.
+    expect(camera.zoom).toBeCloseTo(840 / 500);
+    // The middle of the labels, x = 100, is the middle of the view.
+    expect(screenToWorld(500, 250, 1000, 500, camera)[0]).toBeCloseTo(100);
+});
+
+test("a few labels are not blown up to fill the view", () => {
+    expect(fitCamera([node("a", 0, 0, 10)], 1000, 1000).zoom).toBe(2);
+});
+
+test("a tall map is fitted by its height", () => {
+    const camera = fitCamera([node("a", 0, -400, 50), node("b", 0, 400, 50)], 1000, 500);
+
+    expect(camera.zoom).toBeCloseTo((500 * 0.84) / 900);
 });

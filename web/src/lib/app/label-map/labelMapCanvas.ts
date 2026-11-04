@@ -115,3 +115,32 @@ export function fontSizeFor(radius: number, widthPerPixel: number): number {
 
     return Math.min(free, free / Math.hypot(halfWidth, halfHeight));
 }
+
+/**
+ * The camera that shows all of [nodes] in a viewport [width] by [height], with [margin] of it
+ * left free around them, and not closer than [maxZoom] -- a map of two labels is not a map of two
+ * screen-filling circles.
+ */
+export function fitCamera(
+    nodes: readonly LabelMapNode[],
+    width: number,
+    height: number,
+    margin = 0.08,
+    maxZoom = 2,
+): LabelMapCamera {
+    if (nodes.length === 0 || width === 0 || height === 0) return {cameraX: 0, cameraY: 0, zoom: 1};
+
+    const left = Math.min(...nodes.map((node) => (node.x ?? 0) - node.radius));
+    const right = Math.max(...nodes.map((node) => (node.x ?? 0) + node.radius));
+    const top = Math.min(...nodes.map((node) => (node.y ?? 0) - node.radius));
+    const bottom = Math.max(...nodes.map((node) => (node.y ?? 0) + node.radius));
+
+    const free = 1 - 2 * margin;
+    const zoom = Math.max(0.1, Math.min(maxZoom, (width * free) / (right - left), (height * free) / (bottom - top)));
+
+    return {
+        cameraX: -((left + right) / 2) * zoom,
+        cameraY: -((top + bottom) / 2) * zoom,
+        zoom,
+    };
+}

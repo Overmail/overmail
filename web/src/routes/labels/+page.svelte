@@ -19,7 +19,7 @@
     import {page} from "$app/state";
     import {_} from "svelte-i18n";
     import {type LabelMapLabel, type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
-    import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
+    import {fitCamera, fontSizeFor, nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
     import {
         buildHierarchy,
         type LabelHierarchy,
@@ -404,6 +404,24 @@
     /** The zoom the last change came from, to tell zooming in from zooming out. */
     let lastZoom = 1;
 
+    /** Whether the camera still has to be set to the whole map, see [fitCamera]. */
+    let needsFit = $state(false);
+
+    // Once the labels are laid out and the view has a size, whichever comes last.
+    $effect(() => {
+        if (!needsFit || width === 0 || height === 0) return;
+
+        untrack(() => {
+            const camera = fitCamera(nodes, width, height);
+            // Set first, so the zoom going in is not taken for zooming in on a label.
+            lastZoom = camera.zoom;
+            zoom = camera.zoom;
+            cameraX = camera.cameraX;
+            cameraY = camera.cameraY;
+            needsFit = false;
+        });
+    });
+
     $effect(() => {
         const currentZoom = zoom;
         untrack(() => {
@@ -527,9 +545,11 @@
                 hierarchy = buildHierarchy(simulation.labels);
                 labelsById = new Map(simulation.labels.map((label) => [label.id, label]));
                 simulation.calculate(visibleLabels(hierarchy, expanded));
+                simulation.settle();
                 allNodes = simulation.nodes;
                 nodes = simulation.visibleNodes;
                 simulation.simulation?.on("tick", scheduleDraw);
+                needsFit = true;
             })
             .catch((error) => console.error(error));
 

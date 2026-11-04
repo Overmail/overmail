@@ -175,6 +175,18 @@ export class LabelMapSimulation {
         );
     }
 
+    /**
+     * Runs the simulation to rest at once, without a frame drawn on the way: the layout the map
+     * opens on, so the camera can be set to it before anything moves.
+     */
+    settle() {
+        const simulation = this.simulation;
+        if (!simulation) return;
+
+        simulation.stop();
+        simulation.tick(Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())));
+    }
+
     stop() {
         this.simulation?.stop();
     }

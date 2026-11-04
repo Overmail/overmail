@@ -12,7 +12,7 @@
     import {page} from "$app/state";
     import {_} from "svelte-i18n";
     import {type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
-    import {nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
+    import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
     import {labelView} from "$lib/app/views/predefinedViews";
     import {inlineViewHref} from "$lib/app/views/viewPath";
     import Freecam from "$lib/components/freecam/Freecam.svelte";
@@ -31,12 +31,21 @@
     let canvas: HTMLCanvasElement | null = $state(null);
     let hovered = $state.raw<LabelMapNode | null>(null);
 
-    /** The colour of each label as `#rrggbb`, and what its name is written in on top of it. */
-    const colors = new Map<string, {fill: string; text: string}>();
+    /**
+     * How each label is drawn: its colour as `#rrggbb`, what its name is written in on top of it,
+     * and how large -- all of which only changes with the label, not from frame to frame.
+     */
+    const looks = new Map<string, {fill: string; text: string; fontSize: number}>();
 
     let frame = 0;
 
-    /** The page's font at the size a name is written in, see [draw]. */
+    /**
+     * The size every name is set in, and scaled from to its own: setting a font is costly enough
+     * that it is done once a frame rather than once a label.
+     */
+    const BASE_FONT_SIZE = 100;
+
+    /** The page's font at [BASE_FONT_SIZE], see [draw]. */
     let font: string | null = null;
 
     /** At most one draw per frame, however many ticks and camera moves ask for one. */
@@ -72,7 +81,7 @@
         const [right, bottom] = screenToWorld(width, height, width, height, {cameraX, cameraY, zoom});
 
         // Read once: a computed style in every frame can make Safari recalculate styles.
-        font ??= `500 12px ${getComputedStyle(canvas).fontFamily}`;
+        font ??= `500 ${BASE_FONT_SIZE}px ${getComputedStyle(canvas).fontFamily}`;
         context.font = font;
         context.textAlign = "center";
         context.textBaseline = "middle";
@@ -83,37 +92,44 @@
             const r = node.radius;
             if (x + r < left || x - r > right || y + r < top || y - r > bottom) continue;
 
-            const color = colorOf(context, node);
+            const look = lookOf(context, node);
 
             context.beginPath();
             context.arc(x, y, r, 0, Math.PI * 2);
-            context.fillStyle = color.fill;
+            context.fillStyle = look.fill;
             context.fill();
 
             if (node === hovered) {
                 context.lineWidth = 3 / zoom;
-                context.strokeStyle = color.text;
+                context.strokeStyle = look.text;
                 context.globalAlpha = 0.6;
                 context.stroke();
                 context.globalAlpha = 1;
             }
 
-            context.fillStyle = color.text;
-            context.fillText(node.label.name, x, y);
+            const scale = look.fontSize / BASE_FONT_SIZE;
+            context.save();
+            context.translate(x, y);
+            context.scale(scale, scale);
+            context.fillStyle = look.text;
+            context.fillText(node.label.name, 0, 0);
+            context.restore();
         }
     }
 
-    function colorOf(context: CanvasRenderingContext2D, node: LabelMapNode) {
-        let color = colors.get(node.id);
-        if (!color) {
+    /** Expects the context to be set to [font]. */
+    function lookOf(context: CanvasRenderingContext2D, node: LabelMapNode) {
+        let look = looks.get(node.id);
+        if (!look) {
             // The canvas reads any css colour and hands it back as `#rrggbb` when it is opaque.
             context.fillStyle = node.label.color;
             const fill = String(context.fillStyle);
-            color = {fill, text: textColorOn(fill)};
-            colors.set(node.id, color);
+            const widthPerPixel = context.measureText(node.label.name).width / BASE_FONT_SIZE;
+            look = {fill, text: textColorOn(fill), fontSize: fontSizeFor(node.radius, widthPerPixel)};
+            looks.set(node.id, look);
         }
 
-        return color;
+        return look;
     }
 
     function nodeUnder(event: MouseEvent): LabelMapNode | null {

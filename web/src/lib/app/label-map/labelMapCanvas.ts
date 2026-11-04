@@ -61,3 +61,23 @@ export function textColorOn(hex: string): string {
     return luminance > 0.179 ? "#111111" : "#ffffff";
 }
 
+/** How much of a circle's radius stays free around its name. */
+const NAME_PADDING = 0.18;
+
+/** How tall a line of text is for its font size, as far as fitting it into a circle goes. */
+const LINE_HEIGHT = 0.8;
+
+/**
+ * The font size a name is written in so that it fills a circle of [radius], with some room around
+ * it. [widthPerPixel] is how wide the name is per pixel of font size.
+ *
+ * The name is a box centred in the circle, and the box is as large as its corners allow. A short
+ * name would grow taller than looks right, so the size is capped at the free radius.
+ */
+export function fontSizeFor(radius: number, widthPerPixel: number): number {
+    const free = radius * (1 - NAME_PADDING);
+    const halfWidth = widthPerPixel / 2;
+    const halfHeight = LINE_HEIGHT / 2;
+
+    return Math.min(free, free / Math.hypot(halfWidth, halfHeight));
+}

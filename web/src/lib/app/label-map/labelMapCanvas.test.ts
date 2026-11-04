@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {nodeAt, screenToWorld, textColorOn} from "./labelMapCanvas";
+import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "./labelMapCanvas";
 import type {LabelMapNode} from "./LabelMapSimulation";
 
 function node(id: string, x: number, y: number, radius: number): LabelMapNode {
@@ -31,4 +31,23 @@ test("names go dark on light colours and light on dark ones", () => {
     expect(textColorOn("#ffeb3b")).toBe("#111111");
     expect(textColorOn("#1a237e")).toBe("#ffffff");
     expect(textColorOn("not a colour")).toBe("#ffffff");
+});
+
+test("a name's corners stay inside its circle, with room to spare", () => {
+    for (const widthPerPixel of [0.5, 2, 6, 15]) {
+        const radius = 40;
+        const size = fontSizeFor(radius, widthPerPixel);
+        const corner = Math.hypot((size * widthPerPixel) / 2, (size * 0.8) / 2);
+
+        expect(corner).toBeLessThan(radius * 0.9);
+    }
+});
+
+test("a longer name is written smaller, a larger circle larger", () => {
+    expect(fontSizeFor(40, 8)).toBeLessThan(fontSizeFor(40, 4));
+    expect(fontSizeFor(80, 4)).toBeCloseTo(fontSizeFor(40, 4) * 2);
+});
+
+test("a short name does not grow taller than the circle has room for", () => {
+    expect(fontSizeFor(40, 0.5)).toBeCloseTo(40 * 0.82);
 });

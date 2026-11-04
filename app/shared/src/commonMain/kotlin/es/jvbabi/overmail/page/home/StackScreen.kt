@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import es.jvbabi.overmail.hapticFirework
 import es.jvbabi.overmail.page.LocalBottomNavBarHeight
@@ -56,6 +57,13 @@ fun StackScreen(onOpenEmail: (Uuid) -> Unit = {}, onOpenArchive: () -> Unit = {}
     val emailStackViewModel = koinViewModel<EmailStackViewModel>()
     val stackContent by emailStackViewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Out of sight is another tab or the app in the background; a mail's page opened from the
+    // pile lies over it and leaves it composed, so reading a mail does not count as leaving.
+    LifecycleStartEffect(emailStackViewModel) {
+        emailStackViewModel.setVisible(true)
+        onStopOrDispose { emailStackViewModel.setVisible(false) }
+    }
 
     LaunchedEffect(emailStackViewModel) {
         emailStackViewModel.messages.collect { message ->

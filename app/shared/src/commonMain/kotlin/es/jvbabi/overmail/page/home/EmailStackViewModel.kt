@@ -18,6 +18,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -58,6 +63,12 @@ class EmailStackViewModel(
 
     /** Archive requests still on their way, so an undo comes after them rather than before. */
     private val archiving = mutableMapOf<Uuid, Deferred<Result<Unit>>>()
+
+    /** When the pile was last left, while it is out of sight; null while it is shown. */
+    private var hiddenSince: Instant? = null
+
+    /** Deals the pile anew once it has been out of sight for [RESET_AFTER]. */
+    private var resetJob: Job? = null
 
     private val bodies = EmailBodies(viewModelScope, emailsRepository::getBody)
 
@@ -110,6 +121,39 @@ class EmailStackViewModel(
         }
     }
 
+    /**
+     * Whether the pile is on screen. One left out of sight for [RESET_AFTER] forgets what was
+     * swiped off it: who comes back to the app hours later starts over with the whole inbox
+     * rather than in the middle of a round long done. One that is shown is never dealt anew under
+     * the hand -- its time only starts once it is left.
+     *
+     * The timer covers the app still running; the wall clock covers a process that was frozen in
+     * the background meanwhile, checked the moment the pile is shown again.
+     */
+    fun setVisible(visible: Boolean) {
+        resetJob?.cancel()
+        resetJob = null
+        if (visible) {
+            val since = hiddenSince ?: return
+            hiddenSince = null
+            if (Clock.System.now() - since >= RESET_AFTER) reset()
+        } else {
+            if (hiddenSince == null) hiddenSince = Clock.System.now()
+            resetJob = viewModelScope.launch {
+                delay(RESET_AFTER)
+                reset()
+            }
+        }
+    }
+
+    /**
+     * Lets everything swiped off back onto the pile, as far as it is still in the inbox. An archive
+     * still on its way stays held back, or its mail would be dealt again before it is gone.
+     */
+    private fun reset() {
+        handled.update { handled -> handled.filter { it.email.id in archiving } }
+    }
+
     /** Quietly: a failed request puts the mail back to unread, which is all the user needs to see. */
     private fun markRead(email: Email) {
         if (email.isRead) return
@@ -158,6 +202,9 @@ class EmailStackViewModel(
 /** How many mails from the top of the pile have their body fetched ahead: the cards that show, and the next. */
 private const val BODIES_AHEAD = 5
 
+/** How long the pile has to be out of sight to be dealt anew, see [EmailStackViewModel.setVisible]. */
+private val RESET_AFTER = 5.minutes
+
 /** The mailbox without its groups: the pile is one run of mails, not a listing. */
 private val INBOX = ViewState(
     filter = ViewState.Mailbox.filter,
@@ -171,7 +218,7 @@ data class EmailStackContentState(
     val bodies: Map<Uuid, StackCardBody> = emptyMap(),
     /**
      * What was swiped off the pile, archived or kept, since the app started, in the order it was
-     * swiped: the last one swiped last. Not in [emails].
+     * swiped: the last one swiped last, until the pile was out of sight for a while. Not in [emails].
      */
     val handled: List<HandledEmail> = emptyList(),
     val isLoading: Boolean = true,

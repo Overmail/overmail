@@ -40,6 +40,9 @@
      */
     const FOLD_BELOW = 0.5;
 
+    /** How much closer a click comes at the least. */
+    const NUDGE = 1.25;
+
     /** How long the flight to a clicked label takes, in milliseconds. */
     const FLIGHT = 650;
 
@@ -412,7 +415,9 @@
             return;
         }
 
-        const targetZoom = zoomFor(node);
+        // Always a little closer, even where the label would fit at the zoom there is: the view
+        // going in is what says the click went to it.
+        const targetZoom = Math.min(10, Math.max(zoomFor(node), zoom * NUDGE));
         focus = node.id;
         focusedAt = targetZoom;
         if (hierarchy.childrenOf.has(node.id) && !expanded.has(node.id)) {

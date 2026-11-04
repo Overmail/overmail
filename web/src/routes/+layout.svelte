@@ -148,6 +148,8 @@
 						// paints over it would show through the edge. Its own z is also the
 						// stacking context the grip lives in, which has to reach over the header.
 						"fixed inset-y-0 z-50 flex w-(--panel-width) flex-col border-s bg-background",
+						// The scrollbar a menu takes away while it locks the page, see MailDetailPanel.
+						"me-[var(--scrollbar-width,0px)]",
 						"transition-[left,right] duration-(--panel-duration) ease-linear",
 						panel.open ? "inset-e-0" : "-inset-e-(--panel-width)",
 					]}

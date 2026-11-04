@@ -18,7 +18,7 @@
     };
 </script>
 
-<div class="relative flex h-dvh w-screen flex-row max-sm:p-4">
+<div class="relative flex h-dvh w-full flex-row max-sm:p-4">
     <div class="relative z-10 min-h-0 flex-1 max-sm:overflow-hidden max-sm:rounded-2xl max-sm:bg-background">
         <Authentikt {config}>
             {@render children()}

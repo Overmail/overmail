@@ -128,7 +128,6 @@ import overmail.app.shared.generated.resources.share_delete_description
 import overmail.app.shared.generated.resources.share_delete_failed
 import overmail.app.shared.generated.resources.share_delete_title
 import overmail.app.shared.generated.resources.share_back
-import overmail.app.shared.generated.resources.share_description
 import overmail.app.shared.generated.resources.share_link
 import overmail.app.shared.generated.resources.share_new
 import overmail.app.shared.generated.resources.share_new_failed
@@ -246,16 +245,9 @@ internal actual fun PlatformShareSheet(viewModel: ShareViewModel, visible: Boole
 
 @Composable
 private fun ListPage(state: ShareState, onEvent: (ShareEvent) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = stringResource(Res.string.share_title), style = MaterialTheme.typography.headlineSmall)
-        Text(
-            text = stringResource(Res.string.share_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    Text(text = stringResource(Res.string.share_title), style = MaterialTheme.typography.headlineSmall)
 
-    Spacer(Modifier.height(24.dp))
+    Spacer(Modifier.height(16.dp))
 
     val creating = state.createState == ShareCreateState.Creating
     when {

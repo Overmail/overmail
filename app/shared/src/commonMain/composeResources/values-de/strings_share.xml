@@ -2,7 +2,6 @@
     <!-- Eine Mail über Links teilen, die jeder ohne Konto öffnen kann. -->
     <string name="share_open">Per Link teilen</string>
     <string name="share_title">Per Link teilen</string>
-    <string name="share_description">Wer den Link hat, kann diese E-Mail lesen – ganz ohne Konto.</string>
     <string name="share_new">Neuer Link</string>
     <string name="share_new_failed">Der Link konnte nicht erstellt werden.</string>
     <string name="share_back">Zurück</string>

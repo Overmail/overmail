@@ -2,7 +2,6 @@
     <!-- Sharing a mail through links that anyone without an account can open. -->
     <string name="share_open">Share via link</string>
     <string name="share_title">Share via link</string>
-    <string name="share_description">Anyone with the link can read this email, no account needed.</string>
     <string name="share_new">New link</string>
     <string name="share_new_failed">Couldn’t create the link.</string>
     <string name="share_back">Back</string>

@@ -22,8 +22,6 @@ struct ShareSheetView: View {
                 } footer: {
                     if state.createState == .failed {
                         Text("Couldn’t create the link.").foregroundStyle(.red)
-                    } else {
-                        Text("Anyone with the link can read this email, no account needed.")
                     }
                 }
             }

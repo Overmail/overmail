@@ -52,6 +52,12 @@
     /** The largest a label in focus is brought to by a click: its radius against the view. */
     const FOCUS_MAX = 0.15;
 
+    /**
+     * How large a label has to be zoomed to, its radius against the view, for it to take the
+     * focus while it covers the middle of the view -- zooming in on a label is going to it too.
+     */
+    const FOCUS_BY_ZOOM = 0.2;
+
     /** How long the flight to a clicked label takes, in milliseconds. */
     const FLIGHT = 650;
 
@@ -395,13 +401,44 @@
         if (changed) apply();
     }
 
+    /** The zoom the last change came from, to tell zooming in from zooming out. */
+    let lastZoom = 1;
+
     $effect(() => {
         const currentZoom = zoom;
-        // Not during a flight: on the way in it passes the zoom that would fold what it opened.
         untrack(() => {
-            if (flight === 0) relax(currentZoom);
+            // Not during a flight: on the way in it passes the zoom that would fold what it opened.
+            if (flight === 0) {
+                if (currentZoom > lastZoom) focusByZoom(currentZoom);
+                else relax(currentZoom);
+            }
+            lastZoom = currentZoom;
         });
     });
+
+    /**
+     * Zoomed in on a label until it is [FOCUS_BY_ZOOM] of the view, with the middle of the view on
+     * it: it takes the focus, as a click would, without the flight.
+     */
+    function focusByZoom(currentZoom: number) {
+        const candidates = focus === null ? nodes : nodes.filter((node) => related.has(node.id));
+        const node = nodeAt(candidates, -cameraX / currentZoom, -cameraY / currentZoom);
+        if (!node || node.id === focus) return;
+        if (node.radius * currentZoom < FOCUS_BY_ZOOM * Math.min(width, height)) return;
+
+        focusOn(node, currentZoom);
+    }
+
+    /** Puts [node] in focus at [atZoom], opening what is under it, see [apply]. */
+    function focusOn(node: LabelMapNode, atZoom: number) {
+        focus = node.id;
+        focusedAt = atZoom;
+        if (hierarchy.childrenOf.has(node.id) && !expanded.has(node.id)) {
+            expanded = toggleLabel(hierarchy, expanded, node.id);
+            openedAt.set(node.id, atZoom);
+        }
+        apply();
+    }
 
     function nodeUnder(event: MouseEvent): LabelMapNode | null {
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -457,13 +494,7 @@
         }
 
         const targetZoom = zoomFor(node);
-        focus = node.id;
-        focusedAt = targetZoom;
-        if (hierarchy.childrenOf.has(node.id) && !expanded.has(node.id)) {
-            expanded = toggleLabel(hierarchy, expanded, node.id);
-            openedAt.set(node.id, targetZoom);
-        }
-        apply();
+        focusOn(node, targetZoom);
         flyTo(node, targetZoom);
     }
 

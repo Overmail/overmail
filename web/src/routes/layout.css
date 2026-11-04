@@ -135,8 +135,12 @@
 	body {
 		@apply bg-background text-foreground;
 	}
+	/* A menu or dialog locks the page scroll with `overflow: hidden`, which takes the scrollbar
+	   away and shifts everything by its width. A stable gutter keeps the space reserved, and
+	   bits-ui's scroll lock sees it and skips its own padding compensation. */
 	html {
 		@apply font-sans;
+		scrollbar-gutter: stable;
 	}
 }
 

@@ -9,14 +9,18 @@ import es.jvbabi.overmail.domain.repository.ApplicationRepository
 import org.koin.dsl.module
 import platform.UIKit.UIViewController
 
-/** Entry point of the iOS app, called from `ContentView.swift`. */
+/**
+ * Entry point of the iOS app, called from `ContentView.swift`. [nativeViews] are the screens the
+ * Swift side draws itself.
+ */
 @Suppress("unused") // Used in SwiftUI
-fun MainViewController(): UIViewController {
+fun MainViewController(nativeViews: NativeViews): UIViewController {
     initKoin {
         modules(module {
             single<ApplicationRepository> { IosApplicationRepository() }
             // Android builds its controller in MainActivity, bound to the activity; iOS needs none.
             single<PermissionsController> { IosPermissionsController() }
+            single<NativeViews> { nativeViews }
         })
     }
 

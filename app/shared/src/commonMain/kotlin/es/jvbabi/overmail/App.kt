@@ -117,6 +117,9 @@ expect fun shareUrl(url: String, title: String?)
 
 expect fun getClipboardText(): String?
 
+/** Puts [text] on the clipboard, e.g. a share link that was just made. */
+expect fun setClipboardText(text: String)
+
 /**
  * A little firework felt in the hand: a burst of taps, a little different every time. Only on a
  * device whose vibration is precise enough for single taps; everywhere else nothing, rather than

@@ -28,7 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,6 +43,7 @@ import com.phosphor.icons.regular.Archive
 import com.phosphor.icons.regular.ArrowLeft
 import com.phosphor.icons.regular.EnvelopeSimple
 import com.phosphor.icons.regular.EnvelopeSimpleOpen
+import com.phosphor.icons.regular.LinkSimple
 import com.phosphor.icons.regular.Prohibit
 import com.phosphor.icons.regular.ShareNetwork
 import com.phosphor.icons.regular.TrayArrowDown
@@ -47,6 +51,7 @@ import es.jvbabi.overmail.domain.model.ArchivedState
 import es.jvbabi.overmail.domain.model.Email
 import es.jvbabi.overmail.page.email.components.EmailParticipants
 import es.jvbabi.overmail.page.email.components.attachments.AttachmentList
+import es.jvbabi.overmail.page.email.share.ShareSheet
 import es.jvbabi.overmail.page.home.PREVIEW_ITEMS
 import es.jvbabi.overmail.page.home.components.stack.StackCardBody
 import es.jvbabi.overmail.shareUrl
@@ -71,6 +76,7 @@ import overmail.app.shared.generated.resources.email_mark_unread
 import overmail.app.shared.generated.resources.email_no_subject
 import overmail.app.shared.generated.resources.email_share_link
 import overmail.app.shared.generated.resources.email_unarchive
+import overmail.app.shared.generated.resources.share_open
 import org.jetbrains.compose.resources.StringResource
 import kotlin.uuid.Uuid
 
@@ -85,6 +91,7 @@ fun EmailScreen(emailId: Uuid, onBack: () -> Unit) {
     val viewModel = koinViewModel<EmailViewModel> { parametersOf(emailId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var sharing by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
@@ -100,7 +107,12 @@ fun EmailScreen(emailId: Uuid, onBack: () -> Unit) {
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onEvent = viewModel::onEvent,
+        onShare = { sharing = true },
     )
+
+    state.email?.let { email ->
+        ShareSheet(email = email, visible = sharing, onDismiss = { sharing = false })
+    }
 }
 
 @Composable
@@ -110,6 +122,7 @@ private fun EmailContent(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onEvent: (EmailEvent) -> Unit,
+    onShare: () -> Unit,
 ) {
     // A background of its own, drawn by mailPage: it grows out of the row over the screen below.
     Box(
@@ -122,7 +135,7 @@ private fun EmailContent(
             )
     ) {
         Column(Modifier.fillMaxSize()) {
-            EmailTopBar(email = state.email, onBack = onBack, onEvent = onEvent)
+            EmailTopBar(email = state.email, onBack = onBack, onEvent = onEvent, onShare = onShare)
 
             val email = state.email
             if (email == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -177,7 +190,7 @@ private fun EmailContent(
 
 /** The way back, and what can be done with the mail -- once it is here. */
 @Composable
-private fun EmailTopBar(email: Email?, onBack: () -> Unit, onEvent: (EmailEvent) -> Unit) {
+private fun EmailTopBar(email: Email?, onBack: () -> Unit, onEvent: (EmailEvent) -> Unit, onShare: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -199,7 +212,9 @@ private fun EmailTopBar(email: Email?, onBack: () -> Unit, onEvent: (EmailEvent)
         }
         else ActionButton(PhIcons.Regular.TrayArrowDown, Res.string.email_unarchive) { onEvent(EmailEvent.SetArchivedState(ArchivedState.Unarchive)) }
 
-        ActionButton(PhIcons.Regular.ShareNetwork, Res.string.email_share_link) {
+        // A link for somebody without an account, as against the mail's own link below.
+        ActionButton(PhIcons.Regular.ShareNetwork, Res.string.share_open, onShare)
+        ActionButton(PhIcons.Regular.LinkSimple, Res.string.email_share_link) {
             shareUrl(emailWebUrl(email), email.subject)
         }
     }
@@ -249,6 +264,7 @@ private fun EmailContentPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onEvent = {},
+            onShare = {},
         )
     }
 }

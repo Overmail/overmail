@@ -1,0 +1,10 @@
+{
+  "title": "Share mails via link",
+  "description": "A mail can now be shared through a link right from the app: one tap makes the link and opens the share sheet. Name, password, expiry and what the link shows can be changed later, and links can be copied or deleted again.",
+  "localized": {
+    "de": {
+      "title": "E-Mails per Link teilen",
+      "description": "Eine E-Mail lässt sich jetzt direkt in der App per Link teilen: Ein Tipp erstellt den Link und öffnet das Teilen-Menü. Name, Passwort, Gültigkeit und was der Link zeigt, lassen sich danach ändern, und Links können kopiert oder wieder gelöscht werden."
+    }
+  }
+}

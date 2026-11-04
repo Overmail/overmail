@@ -171,7 +171,8 @@
       "download": "Download the mail",
       "share": "Share the mail",
       "copyLink": "Copy the mail’s link (only you can use it)",
-      "openInThisTab": "Open in this tab"
+      "openInThisTab": "Open in this tab",
+      "reimport": "Import again"
     },
     "attachments": {
       "title": "Attachments",

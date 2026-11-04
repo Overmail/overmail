@@ -42,6 +42,8 @@ import es.jvbabi.overmail.server.jobs.avatar.AvatarShapeBackfill
 import es.jvbabi.overmail.server.jobs.importer.ClassifyStep
 import es.jvbabi.overmail.server.jobs.importer.EmailImportPipeline
 import es.jvbabi.overmail.server.jobs.importer.EmailImportPipelineImpl
+import es.jvbabi.overmail.server.jobs.reimport.EmailReimportQueue
+import es.jvbabi.overmail.server.jobs.reimport.EmailReimporter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
@@ -267,6 +269,10 @@ internal fun overmailModule(application: CoroutineScope, serverConfig: ServerCon
         )
     }
 
+    single<EmailReimportQueue> {
+        EmailReimportQueue(EmailReimporter(database = get(), previewGenerator = get(), mailNotifier = get()))
+    }
+
     single<FolderSynchronizer> { FolderSynchronizerImpl(database = get(), telemetry = get(), pipeline = get()) }
 
     single<ImporterManager> {
@@ -325,5 +331,9 @@ private fun Application.startJobs() {
 
     launch {
         get<PushQueue>().consume()
+    }
+
+    launch {
+        get<EmailReimportQueue>().consume()
     }
 }

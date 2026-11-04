@@ -83,40 +83,8 @@ class EmailInserterImpl(
                 this.isRead = (mail.flagsValue as? Optional.Set)?.value.orEmpty().contains(KamelEmail.Flag.Seen)
             }
 
-            listOf(
-                to to EmailRecipientType.RECIPIENT,
-                cc to EmailRecipientType.CC,
-                bcc to EmailRecipientType.BCC,
-            )
-                .flatMap { (users, type) ->
-                    users.map { NewRecipient(emailUsers.getValue(it.address), it.name, type) }
-                }
-                // The unique index is (mail, address, field), so an address listed twice in the
-                // same field has to collapse into one row. Sorting first lets the named entry win.
-                .sortedBy { it.name == null }
-                .distinctBy { it.emailUserId to it.type }
-                .forEach { recipient ->
-                    EmailRecipients.insert {
-                        it[EmailRecipients.email] = email.id
-                        it[emailUser] = recipient.emailUserId
-                        it[name] = recipient.name?.take(255)
-                        it[type] = recipient.type
-                    }
-                }
-
-            val referencedContentIds = referencedContentIds(email.htmlContent)
-            content.attachments.forEachIndexed { index, attachment ->
-                val contentId = embeddedContentId(attachment.contentId, attachment.contentType, referencedContentIds)
-                Attachment.new {
-                    this.email = email
-                    this.filename = (attachment.fileName ?: "attachment-$index").take(255)
-                    this.contentType = attachment.contentType.take(255)
-                    this.data = ExposedBlob(attachment.data)
-                    this.size = attachment.data.size.toLong()
-                    this.contentId = contentId
-                    this.isEmbedded = contentId != null
-                }
-            }
+            writeRecipients(email, to, cc, bcc, emailUsers)
+            writeAttachments(email, content)
 
             Result.Imported(email)
         }
@@ -151,27 +119,4 @@ class EmailInserterImpl(
             logger.warn("The $part part of ${subject ?: "a mail without a subject"} did not decode cleanly; it is stored as it came out")
         }
     }
-
-    /**
-     * Resolves the header addresses to [EmailUsers] ids, inserting the ones this user has not seen
-     * before. `insertIgnore` returns null once the address is known -- including the row an
-     * importer of another account of the same user just committed -- and the lookup then finds it.
-     */
-    private fun findOrCreateEmailUsers(addresses: List<String>, userId: Uuid): Map<String, Uuid> =
-        addresses.associateWith { address ->
-            EmailUsers.insertIgnoreAndGetId {
-                it[user] = userId
-                it[EmailUsers.address] = address
-            }?.value
-                ?: EmailUsers
-                    .select(EmailUsers.id)
-                    .where { (EmailUsers.user eq userId) and (EmailUsers.address eq address) }
-                    .single()[EmailUsers.id].value
-        }
-
-    private data class NewRecipient(
-        val emailUserId: Uuid,
-        val name: String?,
-        val type: EmailRecipientType,
-    )
 }

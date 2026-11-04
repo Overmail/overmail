@@ -171,7 +171,8 @@
       "download": "E-Mail herunterladen",
       "share": "E-Mail teilen",
       "copyLink": "E-Mail-Link kopieren (nur du kannst ihn verwenden)",
-      "openInThisTab": "In diesem Tab öffnen"
+      "openInThisTab": "In diesem Tab öffnen",
+      "reimport": "Erneut importieren"
     },
     "attachments": {
       "title": "Anhänge",

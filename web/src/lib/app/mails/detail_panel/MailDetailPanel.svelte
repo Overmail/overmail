@@ -191,11 +191,16 @@
     route around it goes away; and it is skipped outright while a morph runs (see slide), because
     an outro would leave two elements carrying that name at once, which is not a thing the browser
     can morph -- it drops the transition and throws.
+
+    The margin is the scrollbar a menu or dialog takes away while it locks the page scroll: the
+    page keeps its width through bits-ui's padding on the body, which a fixed element does not
+    see, so the panel steps aside by `--scrollbar-width` itself. A margin rather than part of
+    `inset-e`, which transitions and would slide the panel instead of keeping it in place.
 -->
 <div
         style:width="{PANEL_COVER.width}px"
         style:view-transition-name={MAIL_BOX_TRANSITION}
-        class="fixed inset-y-0 inset-e-(--panel-offset) z-40 flex flex-col border-s bg-background
+        class="fixed inset-y-0 inset-e-(--panel-offset) me-[var(--scrollbar-width,0px)] z-40 flex flex-col border-s bg-background
                shadow-[-8px_0_24px_-8px_rgb(0_0_0/0.18)]
                transition-[left,right] duration-(--panel-duration) ease-linear"
         transition:slide|local

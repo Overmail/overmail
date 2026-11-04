@@ -45,10 +45,25 @@ impl NetProvider for DataUrlsOnly {
     }
 }
 
-/// Where Blitz and a browser disagree on what mails are made of. A height on a table row or cell
-/// is the least it is in a browser, and mails rely on that: a row with a height of a line holds a
-/// whole newsletter. Blitz takes it as the height, so the rows run into each other.
-const FIXES: &str = "<style>tr, td, th { height: auto !important; }</style>";
+/// Where Blitz and a browser disagree on what mails are made of.
+///
+/// A height on a table row or cell is the least it is in a browser, and mails rely on that: a row
+/// with a height of a line holds a whole newsletter. Blitz takes it as the height, so the rows run
+/// into each other.
+///
+/// A cell given another display inline (`<td style="display: block">`, how templates centre their
+/// content column) is wrapped in an anonymous cell by a browser and laid out as usual. Blitz drops
+/// it from the row, and the whole mail with it, so it is made a cell again. Only the values that
+/// show something are matched, so a cell hidden with `display: none` stays hidden.
+const FIXES: &str = "<style>\
+tr, td, th { height: auto !important; }\
+:is(td, th):is(\
+[style*='display:block' i], [style*='display: block' i],\
+[style*='display:inline' i], [style*='display: inline' i],\
+[style*='display:flex' i], [style*='display: flex' i],\
+[style*='display:grid' i], [style*='display: grid' i]\
+) { display: table-cell !important; }\
+</style>";
 
 /// Styles and lays [document] out until its size settles -- the images come in as messages, taken
 /// up by the next pass -- and returns how wide and tall its content is, in css px. What overflows

@@ -1,0 +1,8 @@
+{
+  "description": "Some newsletters showed only their header; they now show in full.",
+  "localized": {
+    "de": {
+      "description": "Manche Newsletter zeigten nur ihre Kopfzeile, jetzt werden sie vollständig angezeigt."
+    }
+  }
+}

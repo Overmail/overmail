@@ -16,6 +16,34 @@
     },
     "user": {
       "logout": "Abmelden"
+    },
+    "fileDrop": {
+      "eml": "{count, plural, one {Ablegen in} other {# Mails ablegen in}}",
+      "unknown": "{count, plural, one {Ablegen in} other {# Dateien ablegen in}}",
+      "target": {
+        "inbox": "dein Postfach",
+        "choose": "ein Postfach deiner Wahl"
+      }
+    },
+    "emlImport": {
+      "title": "{count, plural, one {Mail importieren} other {# Mails importieren}}",
+      "loading": "Deine Postfächer werden geladen…",
+      "choose": {
+        "description": "In welches Postfach {count, plural, one {soll die Mail} other {sollen die Mails}} importiert werden?"
+      },
+      "importing": "Import in {inbox}… {done} von {count}",
+      "done": "In {inbox} importiert.",
+      "noInbox": "Verbinde zuerst ein Postfach; eine importierte Mail gehört immer zu einem.",
+      "loadFailed": "Deine Postfächer konnten nicht geladen werden. Versuch es gleich noch einmal.",
+      "result": {
+        "imported": "Importiert",
+        "already_exists": "Schon in diesem Postfach",
+        "rejected": "Keine Mail, die importiert werden kann",
+        "failed": "Konnte nicht importiert werden"
+      },
+      "open": "Öffnen",
+      "cancel": "Abbrechen",
+      "close": "Schließen"
     }
   },
   "auth": {

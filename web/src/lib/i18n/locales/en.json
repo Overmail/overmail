@@ -16,6 +16,34 @@
     },
     "user": {
       "logout": "Sign out"
+    },
+    "fileDrop": {
+      "eml": "{count, plural, one {Drop into} other {Drop # mails into}}",
+      "unknown": "{count, plural, one {Drop into} other {Drop # files into}}",
+      "target": {
+        "inbox": "your inbox",
+        "choose": "an inbox of your choice"
+      }
+    },
+    "emlImport": {
+      "title": "{count, plural, one {Import a mail} other {Import # mails}}",
+      "loading": "Looking up your inboxes…",
+      "choose": {
+        "description": "Which inbox should {count, plural, one {the mail} other {the mails}} go to?"
+      },
+      "importing": "Importing into {inbox}… {done} of {count}",
+      "done": "Imported into {inbox}.",
+      "noInbox": "Connect an inbox first; an imported mail always belongs to one.",
+      "loadFailed": "Your inboxes could not be loaded. Try again in a moment.",
+      "result": {
+        "imported": "Imported",
+        "already_exists": "Already in this inbox",
+        "rejected": "Not a mail that can be imported",
+        "failed": "Could not be imported"
+      },
+      "open": "Open",
+      "cancel": "Cancel",
+      "close": "Close"
     }
   },
   "auth": {

@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
     import {FlexRender, createTable} from "@tanstack/svelte-table";
+    import FileDropZone from "$lib/app/file-drop/FileDropZone.svelte";
     import {createHotkey} from "@tanstack/svelte-hotkeys";
     import {_} from "svelte-i18n";
     import {untrack, type Snippet} from "svelte";
@@ -489,7 +490,10 @@
     });
 </script>
 
-<section class="flex flex-col">
+<!-- Relative for the drop zone, which covers the list while a mail is dragged onto it. -->
+<section class="relative flex flex-col">
+    <FileDropZone/>
+
     <!-- Stays under the app header while the rows run past it: this is the bar the filters go
          into, and a filter that scrolls out of reach is one nobody uses. `top-12` is that
          header's height, and the background is its own -- rows would show through it.

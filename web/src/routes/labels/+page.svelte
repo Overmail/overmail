@@ -485,10 +485,6 @@
             }}
     />
 
-    <p class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
-        {$_("labels.map.hint")}
-    </p>
-
     <!-- What the canvas shows, for whoever does not see it. -->
     <nav class="sr-only" aria-label={$_("labels.map.title")}>
         <ul>

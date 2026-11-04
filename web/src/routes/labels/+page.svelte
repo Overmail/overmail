@@ -2,6 +2,10 @@
     The label map: every label on a mail as a circle, pulled towards the labels it shares mails
     with. Double-clicking one opens the listing of its mails.
 
+    It starts with the labels that belong under no other, see `labelHierarchy`. A click on one
+    brings out the labels under it, the next click folds them away again -- so a broad label like
+    "Newsletter" does not bury the map under everything it is related to.
+
     Drawn on a canvas, not as an element per label: the simulation moves every circle on every
     frame, and Safari repainted the whole scaled layer they sat in each time. `Freecam` still owns
     the camera; the canvas sits under it and draws with the same transform.
@@ -13,14 +17,31 @@
     import {_} from "svelte-i18n";
     import {type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
     import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
+    import {
+        buildHierarchy,
+        type LabelHierarchy,
+        toggleLabel,
+        visibleLabels,
+    } from "$lib/app/label-map/labelHierarchy";
     import {labelView} from "$lib/app/views/predefinedViews";
     import {inlineViewHref} from "$lib/app/views/viewPath";
     import Freecam from "$lib/components/freecam/Freecam.svelte";
 
     const simulation = new LabelMapSimulation();
 
-    /** Raw: the simulation moves these on every tick, and nothing in the markup reads a position. */
+    /**
+     * The labels on the map. Raw: the simulation moves these on every tick, and nothing in the
+     * markup reads a position.
+     */
     let nodes = $state.raw<LabelMapNode[]>([]);
+
+    /** Every label, for the links below the canvas: those folded away are on the map as well. */
+    let allNodes = $state.raw<LabelMapNode[]>([]);
+
+    let hierarchy: LabelHierarchy = {parentOf: new Map(), childrenOf: new Map(), roots: []};
+
+    /** The labels that have been opened, see `toggleLabel`. */
+    let expanded = new Set<string>();
 
     let zoom = $state(1);
     let cameraX = $state(0);
@@ -86,6 +107,22 @@
         context.textAlign = "center";
         context.textBaseline = "middle";
 
+        // From each opened label to the labels it brought out, under the circles.
+        const visibleById = new Map(nodes.map((node) => [node.id, node]));
+        context.lineWidth = 2 / zoom;
+        context.globalAlpha = 0.4;
+        for (const node of nodes) {
+            const parent = visibleById.get(hierarchy.parentOf.get(node.id) ?? "");
+            if (!parent) continue;
+
+            context.beginPath();
+            context.moveTo(parent.x ?? 0, parent.y ?? 0);
+            context.lineTo(node.x ?? 0, node.y ?? 0);
+            context.strokeStyle = lookOf(context, parent).fill;
+            context.stroke();
+        }
+        context.globalAlpha = 1;
+
         for (const node of nodes) {
             const x = node.x ?? 0;
             const y = node.y ?? 0;
@@ -114,7 +151,42 @@
             context.fillStyle = look.text;
             context.fillText(node.label.name, 0, 0);
             context.restore();
+
+            const folded = expanded.has(node.id) ? 0 : (hierarchy.childrenOf.get(node.id)?.length ?? 0);
+            if (folded > 0) drawBadge(context, node, look, folded);
         }
+    }
+
+    /**
+     * How many labels are folded away behind [node]: a small circle on its rim, in the colours of
+     * the label turned around.
+     */
+    function drawBadge(
+        context: CanvasRenderingContext2D,
+        node: LabelMapNode,
+        look: {fill: string; text: string},
+        count: number,
+    ) {
+        const angle = -Math.PI / 4;
+        const x = (node.x ?? 0) + Math.cos(angle) * node.radius;
+        const y = (node.y ?? 0) + Math.sin(angle) * node.radius;
+        const r = Math.max(9, node.radius * 0.24);
+
+        context.beginPath();
+        context.arc(x, y, r, 0, Math.PI * 2);
+        context.fillStyle = look.text;
+        context.fill();
+        context.lineWidth = Math.max(1.5, r * 0.15);
+        context.strokeStyle = look.fill;
+        context.stroke();
+
+        const scale = r / BASE_FONT_SIZE;
+        context.save();
+        context.translate(x, y);
+        context.scale(scale, scale);
+        context.fillStyle = look.fill;
+        context.fillText(`+${count}`, 0, 0);
+        context.restore();
     }
 
     /** Expects the context to be set to [font]. */
@@ -149,6 +221,28 @@
         return inlineViewHref(labelView(node.id), page.url);
     }
 
+    /** Where the pointer went down, so a click at the end of a drag opens nothing. */
+    let pressedAt: [number, number] | null = null;
+
+    function onClick(event: MouseEvent) {
+        const start = pressedAt;
+        pressedAt = null;
+        if (start && Math.hypot(event.clientX - start[0], event.clientY - start[1]) > 4) return;
+        // The second click of a double click: that one opens the mails, it does not fold back.
+        if (event.detail > 1) return;
+
+        const node = nodeUnder(event);
+        if (!node || !hierarchy.childrenOf.has(node.id)) return;
+
+        expanded = toggleLabel(hierarchy, expanded, node.id);
+        // Each label coming out starts at the one it belongs under.
+        const byId = new Map(allNodes.map((other) => [other.id, other]));
+        const origins = new Map<string, LabelMapNode>();
+        for (const [child, parent] of hierarchy.parentOf) origins.set(child, byId.get(parent)!);
+        simulation.show(visibleLabels(hierarchy, expanded), origins);
+        nodes = simulation.visibleNodes;
+    }
+
     function onDoubleClick(event: MouseEvent) {
         const node = nodeUnder(event);
         if (node) void goto(hrefOf(node));
@@ -175,7 +269,9 @@
             .then(() => {
                 if (!mounted) return;
 
-                nodes = simulation.calculate();
+                hierarchy = buildHierarchy(simulation.labels);
+                allNodes = simulation.nodes;
+                nodes = simulation.calculate(visibleLabels(hierarchy, expanded));
                 simulation.simulation?.on("tick", scheduleDraw);
             })
             .catch((error) => console.error(error));
@@ -192,10 +288,12 @@
     <title>{$_("labels.map.title")}</title>
 </svelte:head>
 
-<!-- svelte-ignore a11y_no_static_element_interactions: the labels are reachable as the links below -->
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events: the labels are reachable as the links below -->
 <div
         class="relative h-full w-full"
         class:cursor-pointer={hovered !== null}
+        onpointerdown={(event) => (pressedAt = [event.clientX, event.clientY])}
+        onclick={onClick}
         ondblclick={onDoubleClick}
         onpointermove={onPointerMove}
         onpointerleave={() => (hovered = null)}
@@ -220,7 +318,7 @@
     <!-- What the canvas shows, for whoever does not see it. -->
     <nav class="sr-only" aria-label={$_("labels.map.title")}>
         <ul>
-            {#each nodes as node (node.id)}
+            {#each allNodes as node (node.id)}
                 <li><a href={hrefOf(node)}>{node.label.name}</a></li>
             {/each}
         </ul>

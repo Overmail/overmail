@@ -328,7 +328,7 @@
     },
     "map": {
       "title": "Label map",
-      "hint": "Double-click a label to see its mails"
+      "hint": "Click a label to show the labels under it, double-click to see its mails"
     }
   },
   "views": {

@@ -5,6 +5,7 @@ import {
     forceSimulation,
     forceX,
     forceY,
+    type ForceLink,
     type Simulation,
     type SimulationLinkDatum,
     type SimulationNodeDatum,
@@ -14,7 +15,10 @@ export class LabelMapSimulation {
     labels: LabelMapLabel[] = [];
     nodes: LabelMapNode[] = [];
     links: LabelMapLink[] = [];
+    /** The nodes on the map right now, see [show]; [nodes] holds every label. */
+    visibleNodes: LabelMapNode[] = [];
     simulation?: Simulation<LabelMapNode, LabelMapLink>;
+    private linkForce?: ForceLink<LabelMapNode, LabelMapLink>;
 
     async fetchLabels() {
         const response = await fetch('/api/labels/map');
@@ -26,7 +30,8 @@ export class LabelMapSimulation {
         this.labels = (await response.json()).labels;
     }
 
-    calculate() {
+    /** Sets up the simulation with every label, and shows those in [visible]. */
+    calculate(visible: ReadonlySet<string>) {
         const labelById = new Map(
             this.labels.map(label => [label.id, label])
         );
@@ -63,20 +68,19 @@ export class LabelMapSimulation {
             }
         }
 
-        this.simulation = forceSimulation<LabelMapNode>(this.nodes)
+        this.linkForce = forceLink<LabelMapNode, LabelMapLink>([])
+            .id(node => node.id)
+            .distance(link => this.getLinkDistance(link))
+            .strength(link => this.getLinkStrength(link));
+
+        this.simulation = forceSimulation<LabelMapNode>([])
             .force(
                 'charge',
                 forceManyBody<LabelMapNode>()
                     .strength(node => -80 - node.radius * 8)
                     .distanceMax(this.nodes.length * 3.5) // This makes a somewhat acceptable layout to allow for more exclusive clusters whithout having to zoom out too much. The more nodes, the more distance is needed to avoid overlap.
             )
-            .force(
-                'link',
-                forceLink<LabelMapNode, LabelMapLink>(this.links)
-                    .id(node => node.id)
-                    .distance(link => this.getLinkDistance(link))
-                    .strength(link => this.getLinkStrength(link))
-            )
+            .force('link', this.linkForce)
             .force(
                 'x',
                 forceX<LabelMapNode>(0)
@@ -95,7 +99,39 @@ export class LabelMapSimulation {
                     .iterations(2)
             );
 
-        return this.nodes;
+        this.show(visible, new Map());
+
+        return this.visibleNodes;
+    }
+
+    /**
+     * Simulates only the labels in [visible] and the links between them. A label that comes onto
+     * the map starts beside the one in [origins] it came out of, rather than wherever it was left.
+     */
+    show(visible: ReadonlySet<string>, origins: ReadonlyMap<string, LabelMapNode>) {
+        if (!this.simulation || !this.linkForce) return;
+
+        const wasVisible = new Set(this.visibleNodes.map(node => node.id));
+        this.visibleNodes = this.nodes.filter(node => visible.has(node.id));
+
+        for (const node of this.visibleNodes) {
+            const origin = origins.get(node.id);
+            if (wasVisible.has(node.id) || !origin) continue;
+
+            const angle = Math.random() * Math.PI * 2;
+            const distance = origin.radius + node.radius + 16;
+            node.x = (origin.x ?? 0) + Math.cos(angle) * distance;
+            node.y = (origin.y ?? 0) + Math.sin(angle) * distance;
+            node.vx = 0;
+            node.vy = 0;
+        }
+
+        this.simulation.nodes(this.visibleNodes);
+        // Once the force has seen a link, its ends are the nodes rather than their ids.
+        this.linkForce.links(
+            this.links.filter(link => visible.has(endId(link.source)) && visible.has(endId(link.target)))
+        );
+        this.simulation.alpha(wasVisible.size === 0 ? 1 : 0.5).restart();
     }
 
     private getRadius(emailCount: number): number {
@@ -139,15 +175,18 @@ export class LabelMapSimulation {
     }
 }
 
+function endId(end: string | number | LabelMapNode): string {
+    return typeof end === 'object' ? end.id : String(end);
+}
+
 export type LabelMapNode = SimulationNodeDatum & {
     id: string;
     label: LabelMapLabel;
     radius: number;
 };
 
+/** Its ends are ids until the link force replaces them with the nodes. */
 export type LabelMapLink = SimulationLinkDatum<LabelMapNode> & {
-    source: string;
-    target: string;
     count: number;
 };
 

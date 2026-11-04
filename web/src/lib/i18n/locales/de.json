@@ -328,7 +328,7 @@
     },
     "map": {
       "title": "Label-Karte",
-      "hint": "Klick zeigt die Labels darunter, Doppelklick die Mails des Labels"
+      "hint": "Klick fokussiert ein Label und zeigt die Labels darunter, Doppelklick seine Mails. Rauszoomen zeigt wieder alles."
     }
   },
   "views": {

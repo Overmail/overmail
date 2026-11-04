@@ -3,23 +3,26 @@
     with. Double-clicking one opens the listing of its mails.
 
     It starts with the labels that belong under no other, see `labelHierarchy`. A click on one
-    brings out the labels under it, the next click folds them away again -- so a broad label like
-    "Newsletter" does not bury the map under everything it is related to.
+    flies to it, brings out the labels under it and fades whatever it has nothing to do with --
+    the label is in focus, and only it and what belongs to it push each other around. Zooming back
+    out undoes that a layer at a time: the focus lets go, and what was brought out at a closer zoom
+    folds away again, so the far view shows the broad labels and the close one the details.
 
     Drawn on a canvas, not as an element per label: the simulation moves every circle on every
     frame, and Safari repainted the whole scaled layer they sat in each time. `Freecam` still owns
     the camera; the canvas sits under it and draws with the same transform.
 -->
 <script lang="ts">
-    import {onMount} from "svelte";
+    import {onMount, untrack} from "svelte";
     import {goto} from "$app/navigation";
     import {page} from "$app/state";
     import {_} from "svelte-i18n";
-    import {type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
+    import {type LabelMapLabel, type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
     import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
     import {
         buildHierarchy,
         type LabelHierarchy,
+        relatedLabels,
         toggleLabel,
         visibleLabels,
     } from "$lib/app/label-map/labelHierarchy";
@@ -27,21 +30,40 @@
     import {inlineViewHref} from "$lib/app/views/viewPath";
     import Freecam from "$lib/components/freecam/Freecam.svelte";
 
-    const simulation = new LabelMapSimulation();
+    /** How opaque a label is that has nothing to do with the one in focus. */
+    const FADED = 0.12;
 
     /**
-     * The labels on the map. Raw: the simulation moves these on every tick, and nothing in the
-     * markup reads a position.
+     * How far below the zoom a label was opened at the view has to go before it folds away again,
+     * and before the focus lets go of it. Well below, so a little zooming does not undo a click.
      */
-    let nodes = $state.raw<LabelMapNode[]>([]);
+    const FOLD_BELOW = 0.5;
+
+    /** How long the flight to a clicked label takes, in milliseconds. */
+    const FLIGHT = 650;
+
+    const simulation = new LabelMapSimulation();
 
     /** Every label, for the links below the canvas: those folded away are on the map as well. */
     let allNodes = $state.raw<LabelMapNode[]>([]);
 
-    let hierarchy: LabelHierarchy = {parentOf: new Map(), childrenOf: new Map(), roots: []};
+    /**
+     * The labels drawn: what is not folded away. Raw: the simulation moves these on every tick,
+     * and nothing in the markup reads a position.
+     */
+    let nodes = $state.raw<LabelMapNode[]>([]);
 
-    /** The labels that have been opened, see `toggleLabel`. */
+    let hierarchy: LabelHierarchy = {parentOf: new Map(), childrenOf: new Map(), roots: []};
+    let labelsById = new Map<string, LabelMapLabel>();
+
+    /** The labels that have been opened, see `toggleLabel`, and the zoom each was opened at. */
     let expanded = new Set<string>();
+    const openedAt = new Map<string, number>();
+
+    /** The label in focus, what stays in sight with it, and the zoom it was focused at. */
+    let focus = $state.raw<string | null>(null);
+    let related = new Set<string>();
+    let focusedAt = 0;
 
     let zoom = $state(1);
     let cameraX = $state(0);
@@ -58,7 +80,11 @@
      */
     const looks = new Map<string, {fill: string; text: string; fontSize: number}>();
 
+    /** How opaque each label is right now, on its way to what the focus asks of it. */
+    const opacities = new Map<string, number>();
+
     let frame = 0;
+    let lastFrameAt = 0;
 
     /**
      * The size every name is set in, and scaled from to its own: setting a font is costly enough
@@ -72,15 +98,20 @@
     /** At most one draw per frame, however many ticks and camera moves ask for one. */
     function scheduleDraw() {
         if (frame !== 0) return;
-        frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame((now) => {
             frame = 0;
-            draw();
+            const elapsed = lastFrameAt === 0 ? 16 : Math.min(now - lastFrameAt, 100);
+            lastFrameAt = now;
+            // Still fading: the next frame carries on, even with nothing else moving.
+            if (draw(elapsed)) scheduleDraw();
+            else lastFrameAt = 0;
         });
     }
 
-    function draw() {
+    /** Whether a label is still fading. */
+    function draw(elapsed: number): boolean {
         const context = canvas?.getContext("2d");
-        if (!canvas || !context || width === 0 || height === 0) return;
+        if (!canvas || !context || width === 0 || height === 0) return false;
 
         const ratio = window.devicePixelRatio || 1;
         const pixelWidth = Math.round(width * ratio);
@@ -107,41 +138,56 @@
         context.textAlign = "center";
         context.textBaseline = "middle";
 
+        let fading = false;
+        const step = elapsed / 250;
+        for (const node of nodes) {
+            const target = focus === null || related.has(node.id) ? 1 : FADED;
+            const current = opacities.get(node.id) ?? target;
+            const next = current < target ? Math.min(target, current + step) : Math.max(target, current - step);
+            opacities.set(node.id, next);
+            if (next !== target) fading = true;
+        }
+        const opacityOf = (node: LabelMapNode) => opacities.get(node.id) ?? 1;
+
+        // Faded labels first, so those in focus lie on top of them.
+        const ordered = [...nodes].sort((a, b) => opacityOf(a) - opacityOf(b));
+
         // From each opened label to the labels it brought out, under the circles.
         const visibleById = new Map(nodes.map((node) => [node.id, node]));
         context.lineWidth = 2 / zoom;
-        context.globalAlpha = 0.4;
-        for (const node of nodes) {
+        for (const node of ordered) {
             const parent = visibleById.get(hierarchy.parentOf.get(node.id) ?? "");
             if (!parent) continue;
 
+            context.globalAlpha = 0.4 * Math.min(opacityOf(node), opacityOf(parent));
             context.beginPath();
             context.moveTo(parent.x ?? 0, parent.y ?? 0);
             context.lineTo(node.x ?? 0, node.y ?? 0);
             context.strokeStyle = lookOf(context, parent).fill;
             context.stroke();
         }
-        context.globalAlpha = 1;
 
-        for (const node of nodes) {
+        for (const node of ordered) {
             const x = node.x ?? 0;
             const y = node.y ?? 0;
             const r = node.radius;
             if (x + r < left || x - r > right || y + r < top || y - r > bottom) continue;
 
             const look = lookOf(context, node);
+            const opacity = opacityOf(node);
+            context.globalAlpha = opacity;
 
             context.beginPath();
             context.arc(x, y, r, 0, Math.PI * 2);
             context.fillStyle = look.fill;
             context.fill();
 
-            if (node === hovered) {
+            if (node === hovered || node.id === focus) {
                 context.lineWidth = 3 / zoom;
                 context.strokeStyle = look.text;
-                context.globalAlpha = 0.6;
+                context.globalAlpha = 0.6 * opacity;
                 context.stroke();
-                context.globalAlpha = 1;
+                context.globalAlpha = opacity;
             }
 
             const scale = look.fontSize / BASE_FONT_SIZE;
@@ -155,6 +201,9 @@
             const folded = expanded.has(node.id) ? 0 : (hierarchy.childrenOf.get(node.id)?.length ?? 0);
             if (folded > 0) drawBadge(context, node, look, folded);
         }
+        context.globalAlpha = 1;
+
+        return fading;
     }
 
     /**
@@ -204,6 +253,103 @@
         return look;
     }
 
+    /**
+     * Brings the map in line with [expanded] and [focus]: what is drawn, and what of it is
+     * simulated -- with a label in focus only it and what belongs to it, the rest stands still.
+     */
+    function apply() {
+        const previous = new Set(nodes.map((node) => node.id));
+        const visible = visibleLabels(hierarchy, expanded);
+        related = focus === null ? new Set() : relatedLabels(hierarchy, labelsById, focus);
+
+        nodes = allNodes.filter((node) => visible.has(node.id));
+
+        // Each label coming out starts at the one it belongs under.
+        const byId = new Map(allNodes.map((node) => [node.id, node]));
+        const appearing = new Map<string, LabelMapNode>();
+        for (const id of visible) {
+            const parent = hierarchy.parentOf.get(id);
+            if (!previous.has(id) && parent !== undefined) appearing.set(id, byId.get(parent)!);
+        }
+
+        const simulated = focus === null ? visible : new Set([...visible].filter((id) => related.has(id)));
+        simulation.show(simulated, appearing);
+        scheduleDraw();
+    }
+
+    /** How close to come to [node]: it and the ring of labels under it fill a good part of the view. */
+    function zoomFor(node: LabelMapNode): number {
+        const children = hierarchy.childrenOf.get(node.id) ?? [];
+        const largestChild = Math.max(0, ...allNodes.filter((n) => children.includes(n.id)).map((n) => n.radius));
+        const extent = children.length > 0 ? node.radius + 2 * largestChild + 48 : node.radius * 3;
+
+        return Math.max(0.1, Math.min(4, (0.32 * Math.min(width, height)) / extent));
+    }
+
+    let flight = 0;
+
+    /**
+     * Moves the camera onto [node] at [targetZoom]: the point in the middle of the view slides
+     * over while the zoom changes by the same factor every frame, which reads as an even zoom.
+     * It follows the label, which is still being pushed into place by what came out of it.
+     */
+    function flyTo(node: LabelMapNode, targetZoom: number) {
+        cancelAnimationFrame(flight);
+
+        const startZoom = zoom;
+        const startX = -cameraX / zoom;
+        const startY = -cameraY / zoom;
+        const startedAt = performance.now();
+
+        const step = (now: number) => {
+            const t = Math.min(1, (now - startedAt) / FLIGHT);
+            const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+
+            const z = startZoom * (targetZoom / startZoom) ** eased;
+            const x = startX + ((node.x ?? 0) - startX) * eased;
+            const y = startY + ((node.y ?? 0) - startY) * eased;
+
+            zoom = z;
+            cameraX = -x * z;
+            cameraY = -y * z;
+
+            flight = t < 1 ? requestAnimationFrame(step) : 0;
+        };
+        flight = requestAnimationFrame(step);
+    }
+
+    /**
+     * Zoomed out far enough, the closer layers give way: the focus lets go, and every label
+     * opened at a closer zoom folds away again -- the deepest first, as they were opened.
+     */
+    function relax(currentZoom: number) {
+        let changed = false;
+
+        if (focus !== null && currentZoom < focusedAt * FOLD_BELOW) {
+            focus = null;
+            changed = true;
+        }
+
+        const byZoom = [...openedAt].sort(([, a], [, b]) => b - a);
+        for (const [id, at] of byZoom) {
+            if (currentZoom >= at * FOLD_BELOW || !expanded.has(id)) continue;
+
+            expanded = toggleLabel(hierarchy, expanded, id);
+            changed = true;
+        }
+        for (const id of openedAt.keys()) if (!expanded.has(id)) openedAt.delete(id);
+
+        if (changed) apply();
+    }
+
+    $effect(() => {
+        const currentZoom = zoom;
+        // Not during a flight: on the way in it passes the zoom that would fold what it opened.
+        untrack(() => {
+            if (flight === 0) relax(currentZoom);
+        });
+    });
+
     function nodeUnder(event: MouseEvent): LabelMapNode | null {
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         const [x, y] = screenToWorld(
@@ -224,6 +370,12 @@
     /** Where the pointer went down, so a click at the end of a drag opens nothing. */
     let pressedAt: [number, number] | null = null;
 
+    /**
+     * The label the last click was on. The click already set off the flight to it, so by the
+     * second click of a double click it may have moved out from under the pointer.
+     */
+    let clicked: LabelMapNode | null = null;
+
     function onClick(event: MouseEvent) {
         const start = pressedAt;
         pressedAt = null;
@@ -232,19 +384,38 @@
         if (event.detail > 1) return;
 
         const node = nodeUnder(event);
-        if (!node || !hierarchy.childrenOf.has(node.id)) return;
+        clicked = node;
 
-        expanded = toggleLabel(hierarchy, expanded, node.id);
-        // Each label coming out starts at the one it belongs under.
-        const byId = new Map(allNodes.map((other) => [other.id, other]));
-        const origins = new Map<string, LabelMapNode>();
-        for (const [child, parent] of hierarchy.parentOf) origins.set(child, byId.get(parent)!);
-        simulation.show(visibleLabels(hierarchy, expanded), origins);
-        nodes = simulation.visibleNodes;
+        // Beside every label: nothing is in focus any more.
+        if (!node) {
+            if (focus !== null) {
+                focus = null;
+                apply();
+            }
+            return;
+        }
+
+        // The label in focus once more: it lets go and folds away what it brought out.
+        if (node.id === focus) {
+            if (expanded.has(node.id)) expanded = toggleLabel(hierarchy, expanded, node.id);
+            focus = null;
+            apply();
+            return;
+        }
+
+        const targetZoom = zoomFor(node);
+        focus = node.id;
+        focusedAt = targetZoom;
+        if (hierarchy.childrenOf.has(node.id) && !expanded.has(node.id)) {
+            expanded = toggleLabel(hierarchy, expanded, node.id);
+            openedAt.set(node.id, targetZoom);
+        }
+        apply();
+        flyTo(node, targetZoom);
     }
 
     function onDoubleClick(event: MouseEvent) {
-        const node = nodeUnder(event);
+        const node = clicked ?? nodeUnder(event);
         if (node) void goto(hrefOf(node));
     }
 
@@ -258,7 +429,7 @@
 
     // Whatever the picture depends on that is not the simulation's own tick.
     $effect(() => {
-        void [zoom, cameraX, cameraY, width, height, hovered, nodes, canvas];
+        void [zoom, cameraX, cameraY, width, height, hovered, nodes, focus, canvas];
         scheduleDraw();
     });
 
@@ -270,8 +441,10 @@
                 if (!mounted) return;
 
                 hierarchy = buildHierarchy(simulation.labels);
+                labelsById = new Map(simulation.labels.map((label) => [label.id, label]));
+                simulation.calculate(visibleLabels(hierarchy, expanded));
                 allNodes = simulation.nodes;
-                nodes = simulation.calculate(visibleLabels(hierarchy, expanded));
+                nodes = simulation.visibleNodes;
                 simulation.simulation?.on("tick", scheduleDraw);
             })
             .catch((error) => console.error(error));
@@ -280,6 +453,7 @@
             mounted = false;
             simulation.stop();
             cancelAnimationFrame(frame);
+            cancelAnimationFrame(flight);
         };
     });
 </script>

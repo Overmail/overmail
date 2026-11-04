@@ -109,3 +109,23 @@ export function toggleLabel(hierarchy: LabelHierarchy, expanded: ReadonlySet<str
 
     return next;
 }
+
+/**
+ * What stays in sight while [id] is in focus: the label, the labels it belongs under all the way
+ * up, those under it, and every label that shares a mail with it. Everything else fades.
+ */
+export function relatedLabels(
+    hierarchy: LabelHierarchy,
+    labels: ReadonlyMap<string, LabelMapLabel>,
+    id: string,
+): Set<string> {
+    const related = new Set([id]);
+
+    for (let parent = hierarchy.parentOf.get(id); parent !== undefined; parent = hierarchy.parentOf.get(parent)) {
+        related.add(parent);
+    }
+    for (const child of hierarchy.childrenOf.get(id) ?? []) related.add(child);
+    for (const relation of labels.get(id)?.relations ?? []) related.add(relation.label_id);
+
+    return related;
+}

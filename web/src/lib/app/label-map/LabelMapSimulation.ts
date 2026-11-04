@@ -15,7 +15,7 @@ export class LabelMapSimulation {
     labels: LabelMapLabel[] = [];
     nodes: LabelMapNode[] = [];
     links: LabelMapLink[] = [];
-    /** The nodes on the map right now, see [show]; [nodes] holds every label. */
+    /** The nodes being simulated right now, see [show]; [nodes] holds every label. */
     visibleNodes: LabelMapNode[] = [];
     simulation?: Simulation<LabelMapNode, LabelMapLink>;
     private linkForce?: ForceLink<LabelMapNode, LabelMapLink>;
@@ -105,18 +105,19 @@ export class LabelMapSimulation {
     }
 
     /**
-     * Simulates only the labels in [visible] and the links between them. A label that comes onto
-     * the map starts beside the one in [origins] it came out of, rather than wherever it was left.
+     * Simulates only the labels in [simulated] and the links between them; every other label
+     * stays where it is and pushes nothing. The labels in [appearing] are coming onto the map and
+     * start beside the label they map to, rather than wherever they were left.
      */
-    show(visible: ReadonlySet<string>, origins: ReadonlyMap<string, LabelMapNode>) {
+    show(simulated: ReadonlySet<string>, appearing: ReadonlyMap<string, LabelMapNode>) {
         if (!this.simulation || !this.linkForce) return;
 
-        const wasVisible = new Set(this.visibleNodes.map(node => node.id));
-        this.visibleNodes = this.nodes.filter(node => visible.has(node.id));
+        const isFirst = this.visibleNodes.length === 0;
+        this.visibleNodes = this.nodes.filter(node => simulated.has(node.id));
 
         for (const node of this.visibleNodes) {
-            const origin = origins.get(node.id);
-            if (wasVisible.has(node.id) || !origin) continue;
+            const origin = appearing.get(node.id);
+            if (!origin) continue;
 
             const angle = Math.random() * Math.PI * 2;
             const distance = origin.radius + node.radius + 16;
@@ -129,9 +130,9 @@ export class LabelMapSimulation {
         this.simulation.nodes(this.visibleNodes);
         // Once the force has seen a link, its ends are the nodes rather than their ids.
         this.linkForce.links(
-            this.links.filter(link => visible.has(endId(link.source)) && visible.has(endId(link.target)))
+            this.links.filter(link => simulated.has(endId(link.source)) && simulated.has(endId(link.target)))
         );
-        this.simulation.alpha(wasVisible.size === 0 ? 1 : 0.5).restart();
+        this.simulation.alpha(isFirst ? 1 : 0.5).restart();
     }
 
     private getRadius(emailCount: number): number {

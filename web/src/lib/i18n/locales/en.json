@@ -328,7 +328,7 @@
     },
     "map": {
       "title": "Label map",
-      "hint": "Click a label to show the labels under it, double-click to see its mails"
+      "hint": "Click a label to focus it and show the labels under it, double-click to see its mails. Zoom out to see the whole map again."
     }
   },
   "views": {

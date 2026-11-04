@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {buildHierarchy, toggleLabel, visibleLabels} from "./labelHierarchy";
+import {buildHierarchy, relatedLabels, toggleLabel, visibleLabels} from "./labelHierarchy";
 import type {LabelMapLabel} from "./LabelMapSimulation";
 
 function label(id: string, emailCount: number, relations: Record<string, number> = {}): LabelMapLabel {
@@ -93,4 +93,22 @@ test("folding a label folds everything opened under it", () => {
     expect(visibleLabels(hierarchy, toggleLabel(hierarchy, folded, "newsletter"))).toEqual(
         new Set(["newsletter", "amazon"])
     );
+});
+
+test("in focus, a label keeps its parents, its children and what it shares mails with", () => {
+    // Relations come from the server both ways round.
+    const all = [
+        ...labels.filter((each) => each.id !== "amazon"),
+        label("amazon", 20, {newsletter: 20, prime: 5, "prime-video": 2}),
+        label("unrelated", 3),
+        label("prime-video", 2, {prime: 2, amazon: 2, newsletter: 2}),
+    ];
+    const hierarchy = buildHierarchy(all);
+    const byId = new Map(all.map((each) => [each.id, each]));
+
+    const related = relatedLabels(hierarchy, byId, "amazon");
+
+    expect(related).toEqual(new Set(["amazon", "newsletter", "prime", "prime-video"]));
+    expect(related.has("unrelated")).toBe(false);
+    expect(related.has("spiegel")).toBe(false);
 });

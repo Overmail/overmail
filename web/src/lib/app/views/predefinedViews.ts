@@ -104,6 +104,26 @@ export function accountView(accountId: string): ViewSettings {
     };
 }
 
+/**
+ * Every mail that carries the label [labelId], wherever it was filed: what the label map opens.
+ *
+ * Settings and not a [PredefinedView] for the same reason as [accountView]: one per label.
+ */
+export function labelView(labelId: string): ViewSettings {
+    return {
+        groupings: [{kind: "date_smart", reversed: false}],
+        filter: {
+            readState: null,
+            archivedState: null,
+            imapAccountIds: null,
+            sentBy: null,
+            sentTo: null,
+            hasLabels: [labelId],
+        },
+        sorting: {kind: "date", reversed: false},
+    };
+}
+
 /** The predefined view [id] names, or the inbox for anything else. */
 export function predefinedView(id: string | null | undefined): PredefinedView {
     const views = predefinedViews();

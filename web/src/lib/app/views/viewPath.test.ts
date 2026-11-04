@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {accountView} from "./predefinedViews";
+import {accountView, labelView} from "./predefinedViews";
 import {
     inlineViewHref,
     openInlineView,
@@ -68,6 +68,16 @@ test("a listing nothing names is spelled out in the url, and read back whole", (
     expect(openInlineView(url)).toEqual(settings);
     // It names no view: neither one the app brings nor a stored one.
     expect(openViewId(url)).toBeNull();
+});
+
+test("a label's listing is spelled out too, with every mail that carries it", () => {
+    const settings = labelView(id);
+    const url = new URL(inlineViewHref(settings, new URL("http://localhost/labels")), "http://localhost");
+
+    expect(url.pathname).toBe("/");
+    expect(openInlineView(url)).toEqual(settings);
+    expect(openInlineView(url)?.filter.hasLabels).toEqual([id]);
+    expect(openInlineView(url)?.filter.archivedState).toBeNull();
 });
 
 test("a name or a slug is not a listing spelled out", () => {

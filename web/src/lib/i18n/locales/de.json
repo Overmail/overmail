@@ -325,6 +325,9 @@
     "filter": {
       "title": "Labels",
       "titleActive": "Labels:"
+    },
+    "map": {
+      "title": "Label-Karte"
     }
   },
   "views": {

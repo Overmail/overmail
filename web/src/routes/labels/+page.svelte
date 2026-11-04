@@ -31,8 +31,11 @@
     import {inlineViewHref} from "$lib/app/views/viewPath";
     import Freecam from "$lib/components/freecam/Freecam.svelte";
 
-    /** How opaque a label is that has nothing to do with the one in focus. */
-    const FADED = 0.12;
+    /**
+     * How opaque the outline and the name are of a label that has nothing to do with the one in
+     * focus. It has no background then.
+     */
+    const FADED = 0.35;
 
     /**
      * How far below the zoom a label was opened at the view has to go before it folds away again,
@@ -84,8 +87,8 @@
      */
     const looks = new Map<string, {fill: string; text: string; fontSize: number}>();
 
-    /** How opaque each label is right now, on its way to what the focus asks of it. */
-    const opacities = new Map<string, number>();
+    /** How present each label is right now, on its way to what the focus asks of it; see [draw]. */
+    const presences = new Map<string, number>();
 
     let frame = 0;
     let lastFrameAt = 0;
@@ -142,19 +145,22 @@
         context.textAlign = "center";
         context.textBaseline = "middle";
 
+        // How present each label is: 1 is a filled circle, 0 a faded one -- only its outline and
+        // its name, in its colour.
         let fading = false;
         const step = elapsed / 250;
         for (const node of nodes) {
-            const target = focus === null || related.has(node.id) ? 1 : FADED;
-            const current = opacities.get(node.id) ?? target;
+            const target = focus === null || related.has(node.id) ? 1 : 0;
+            const current = presences.get(node.id) ?? target;
             const next = current < target ? Math.min(target, current + step) : Math.max(target, current - step);
-            opacities.set(node.id, next);
+            presences.set(node.id, next);
             if (next !== target) fading = true;
         }
-        const opacityOf = (node: LabelMapNode) => opacities.get(node.id) ?? 1;
+        const presenceOf = (node: LabelMapNode) => presences.get(node.id) ?? 1;
+        const alphaOf = (presence: number) => FADED + (1 - FADED) * presence;
 
         // Faded labels first, so those in focus lie on top of them.
-        const ordered = [...nodes].sort((a, b) => opacityOf(a) - opacityOf(b));
+        const ordered = [...nodes].sort((a, b) => presenceOf(a) - presenceOf(b));
 
         // From each opened label to the labels it brought out, under the circles.
         const visibleById = new Map(nodes.map((node) => [node.id, node]));
@@ -163,7 +169,7 @@
             const parent = visibleById.get(hierarchy.parentOf.get(node.id) ?? "");
             if (!parent) continue;
 
-            context.globalAlpha = 0.4 * Math.min(opacityOf(node), opacityOf(parent));
+            context.globalAlpha = 0.4 * alphaOf(Math.min(presenceOf(node), presenceOf(parent)));
             context.beginPath();
             context.moveTo(parent.x ?? 0, parent.y ?? 0);
             context.lineTo(node.x ?? 0, node.y ?? 0);
@@ -178,32 +184,54 @@
             if (x + r < left || x - r > right || y + r < top || y - r > bottom) continue;
 
             const look = lookOf(context, node);
-            const opacity = opacityOf(node);
-            context.globalAlpha = opacity;
+            const presence = presenceOf(node);
+            const alpha = alphaOf(presence);
 
             context.beginPath();
             context.arc(x, y, r, 0, Math.PI * 2);
-            context.fillStyle = look.fill;
-            context.fill();
+
+            // The background goes as the label fades; the outline takes its place.
+            if (presence > 0) {
+                context.globalAlpha = presence;
+                context.fillStyle = look.fill;
+                context.fill();
+            }
+            if (presence < 1) {
+                context.globalAlpha = FADED * (1 - presence);
+                context.lineWidth = 1.5 / zoom;
+                context.strokeStyle = look.fill;
+                context.stroke();
+            }
 
             if (node === hovered || node.id === focus) {
                 context.lineWidth = 3 / zoom;
-                context.strokeStyle = look.text;
-                context.globalAlpha = 0.6 * opacity;
+                context.strokeStyle = presence > 0.5 ? look.text : look.fill;
+                context.globalAlpha = 0.6 * alpha;
                 context.stroke();
-                context.globalAlpha = opacity;
             }
 
+            // On its background in its own text colour, without one in the label's colour.
             const scale = look.fontSize / BASE_FONT_SIZE;
             context.save();
             context.translate(x, y);
             context.scale(scale, scale);
-            context.fillStyle = look.text;
-            context.fillText(node.label.name, 0, 0);
+            if (presence > 0) {
+                context.globalAlpha = presence;
+                context.fillStyle = look.text;
+                context.fillText(node.label.name, 0, 0);
+            }
+            if (presence < 1) {
+                context.globalAlpha = FADED * (1 - presence);
+                context.fillStyle = look.fill;
+                context.fillText(node.label.name, 0, 0);
+            }
             context.restore();
 
             const folded = expanded.has(node.id) ? 0 : (hierarchy.childrenOf.get(node.id)?.length ?? 0);
-            if (folded > 0) drawBadge(context, node, look, folded);
+            if (folded > 0) {
+                context.globalAlpha = alpha;
+                drawBadge(context, node, look, folded);
+            }
         }
         context.globalAlpha = 1;
 

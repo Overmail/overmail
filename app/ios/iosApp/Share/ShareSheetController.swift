@@ -17,6 +17,7 @@ final class ShareSheetController: UIHostingController<ShareSheetView> {
         // The view closes through the controller, so the Compose side hears of it either way.
         rootView = ShareSheetView(model: model, onDone: { [weak self] in self?.dismiss(animated: true) })
         model.presentShareSheet = { [weak self] url in self?.presentActivity(for: url) }
+        model.onShareDeleted = { [weak self] in self?.shrinkToMedium() }
 
         modalPresentationStyle = .pageSheet
         if let sheet = sheetPresentationController {
@@ -29,6 +30,12 @@ final class ShareSheetController: UIHostingController<ShareSheetView> {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is not supported")
+    }
+
+    /** Back to half height after a delete: a sheet pulled up for a longer list has less to show now. */
+    private func shrinkToMedium() {
+        guard let sheet = sheetPresentationController, sheet.selectedDetentIdentifier == .large else { return }
+        sheet.animateChanges { sheet.selectedDetentIdentifier = .medium }
     }
 
     /** The system's share sheet, over whatever this sheet has on top of it. */

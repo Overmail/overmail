@@ -14,6 +14,9 @@ final class ShareSheetModel: ObservableObject {
     /** Opens the system's share sheet; set by the controller, which knows what to present it from. */
     var presentShareSheet: ((URL) -> Void)?
 
+    /** Called once a link is deleted, so the sheet can shrink back to what is left in it. */
+    var onShareDeleted: (() -> Void)?
+
     init(viewModel: ShareViewModel) {
         self.viewModel = viewModel
         self.state = viewModel.state.value as! ShareState
@@ -34,7 +37,10 @@ final class ShareSheetModel: ObservableObject {
     }
 
     private func apply(_ state: ShareState) {
+        // A delete that was running and is over without a failure took the link away.
+        let deleted = self.state.deleteState == .deleting && state.deleting == nil
         self.state = state
+        if deleted { onShareDeleted?() }
         // A link to hand on: once, and told back so it is not handed on again.
         if let share = state.linkToShare {
             viewModel.onEvent(event: ShareEvent.LinkShared.shared)

@@ -82,7 +82,10 @@ modules are entry points and nothing else.
   `ui/components/blitz/BlitzMailView.kt` draws the tiles as Compose images -- so a mail moves,
   fades and blurs with its card, which a web view does not. A card and its page share one layout
   (the window width in dp, at least 640 css px) and each rasterises at its own pixel width, so
-  nothing reflows on the way between them. `cargo run --release --example render -- mail.html`
+  nothing reflows on the way between them. What it renders is kept on disk across starts
+  (`BlitzDiskCache.kt`), keyed by a hash of every input; a mail found there is drawn without being
+  laid out. **Bump `BLITZ_CACHE_GENERATION` whenever the rendering changes** -- the crate or its
+  `FIXES` -- or the app keeps showing the old renders. `cargo run --release --example render -- mail.html`
   in the crate renders a mail to a png on the desktop.
   The Gradle build compiles it, so building the app needs rustup with the targets
   `aarch64-linux-android x86_64-linux-android` (plus `cargo install cargo-ndk` and an NDK in the

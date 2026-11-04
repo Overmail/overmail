@@ -1,0 +1,10 @@
+{
+  "title": "Html mails show up faster",
+  "description": "Rendered html mails are kept on the device, so after the app starts they show up right away and are not rendered again.",
+  "localized": {
+    "de": {
+      "title": "HTML-Mails erscheinen schneller",
+      "description": "Gerenderte HTML-Mails werden auf dem Gerät gespeichert. Nach dem Start der App erscheinen sie sofort und müssen nicht neu gerendert werden."
+    }
+  }
+}

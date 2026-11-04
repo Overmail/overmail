@@ -43,8 +43,14 @@
      */
     const FOLD_BELOW = 0.5;
 
-    /** How much closer a click comes at the least. */
-    const NUDGE = 1.25;
+    /**
+     * How much further in the flight swings halfway, on top of where it is going: what says the
+     * view went to the label, also where the zoom it ends at is the zoom it started from.
+     */
+    const PULSE = 0.08;
+
+    /** The largest a label in focus is brought to by a click: its radius against the view. */
+    const FOCUS_MAX = 0.15;
 
     /** How long the flight to a clicked label takes, in milliseconds. */
     const FLIGHT = 650;
@@ -311,13 +317,26 @@
         scheduleDraw();
     }
 
-    /** How close to come to [node]: it and the ring of labels under it fill a good part of the view. */
+    /**
+     * How close to come to [node]: it, the ring of labels under it and the nearer half of its
+     * peers on the map fill the view -- but the label itself grows to no more than [FOCUS_MAX],
+     * so going from label to label does not blow each one up further.
+     */
     function zoomFor(node: LabelMapNode): number {
-        const children = hierarchy.childrenOf.get(node.id) ?? [];
-        const largestChild = Math.max(0, ...allNodes.filter((n) => children.includes(n.id)).map((n) => n.radius));
-        const extent = children.length > 0 ? node.radius + 2 * largestChild + 48 : node.radius * 3;
+        const view = Math.min(width, height);
+        const children = new Set(hierarchy.childrenOf.get(node.id) ?? []);
+        const largestChild = Math.max(0, ...allNodes.filter((n) => children.has(n.id)).map((n) => n.radius));
+        const ring = children.size > 0 ? node.radius + 2 * largestChild + 48 : node.radius * 3;
 
-        return Math.max(0.1, Math.min(4, (0.32 * Math.min(width, height)) / extent));
+        const peers = relatedLabels(hierarchy, labelsById, node.id);
+        const distances = nodes
+            .filter((other) => other !== node && peers.has(other.id) && !children.has(other.id))
+            .map((other) => Math.hypot((other.x ?? 0) - (node.x ?? 0), (other.y ?? 0) - (node.y ?? 0)) + other.radius)
+            .sort((a, b) => a - b);
+        const nearerHalf = distances.length > 0 ? distances[Math.floor((distances.length - 1) / 2)] : 0;
+
+        const fit = (0.45 * view) / Math.max(ring, nearerHalf);
+        return Math.max(0.1, Math.min(fit, (FOCUS_MAX * view) / node.radius));
     }
 
     let flight = 0;
@@ -339,7 +358,7 @@
             const t = Math.min(1, (now - startedAt) / FLIGHT);
             const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-            const z = startZoom * (targetZoom / startZoom) ** eased;
+            const z = startZoom * (targetZoom / startZoom) ** eased * (1 + PULSE * Math.sin(Math.PI * t));
             const x = startX + ((node.x ?? 0) - startX) * eased;
             const y = startY + ((node.y ?? 0) - startY) * eased;
 
@@ -437,9 +456,7 @@
             return;
         }
 
-        // Always a little closer, even where the label would fit at the zoom there is: the view
-        // going in is what says the click went to it.
-        const targetZoom = Math.min(10, Math.max(zoomFor(node), zoom * NUDGE));
+        const targetZoom = zoomFor(node);
         focus = node.id;
         focusedAt = targetZoom;
         if (hierarchy.childrenOf.has(node.id) && !expanded.has(node.id)) {

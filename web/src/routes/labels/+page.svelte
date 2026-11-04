@@ -4,7 +4,8 @@
 
     It starts with the labels that belong under no other, see `labelHierarchy`. A click on one
     flies to it, brings out the labels under it and fades whatever it has nothing to do with --
-    the label is in focus, and only it and what belongs to it push each other around. Zooming back
+    the label is in focus. It stands still, and only the labels it brought out move, arranging
+    themselves around it and what it is related to; the faded ones are left out. Zooming back
     out undoes that a layer at a time: the focus lets go, and what was brought out at a closer zoom
     folds away again, so the far view shows the broad labels and the close one the details.
 
@@ -255,7 +256,9 @@
 
     /**
      * Brings the map in line with [expanded] and [focus]: what is drawn, and what of it is
-     * simulated -- with a label in focus only it and what belongs to it, the rest stands still.
+     * simulated. With a label in focus only the labels under it move; it and what it is related to
+     * hold still for them to arrange around, and the faded labels are not simulated at all -- the
+     * labels coming out may lie on top of them.
      */
     function apply() {
         const previous = new Set(nodes.map((node) => node.id));
@@ -272,8 +275,14 @@
             if (!previous.has(id) && parent !== undefined) appearing.set(id, byId.get(parent)!);
         }
 
-        const simulated = focus === null ? visible : new Set([...visible].filter((id) => related.has(id)));
-        simulation.show(simulated, appearing);
+        if (focus === null) {
+            simulation.show(visible, appearing);
+        } else {
+            const moving = new Set(hierarchy.childrenOf.get(focus) ?? []);
+            const simulated = new Set([...visible].filter((id) => related.has(id)));
+            const pinned = new Set([...simulated].filter((id) => !moving.has(id)));
+            simulation.show(simulated, appearing, pinned);
+        }
         scheduleDraw();
     }
 
@@ -291,7 +300,7 @@
     /**
      * Moves the camera onto [node] at [targetZoom]: the point in the middle of the view slides
      * over while the zoom changes by the same factor every frame, which reads as an even zoom.
-     * It follows the label, which is still being pushed into place by what came out of it.
+     * It runs alongside the simulation pushing the labels under it out.
      */
     function flyTo(node: LabelMapNode, targetZoom: number) {
         cancelAnimationFrame(flight);

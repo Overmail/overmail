@@ -106,21 +106,29 @@ export class LabelMapSimulation {
 
     /**
      * Simulates only the labels in [simulated] and the links between them; every other label
-     * stays where it is and pushes nothing. The labels in [appearing] are coming onto the map and
-     * start beside the label they map to, rather than wherever they were left.
+     * stays where it is and pushes nothing. Those in [pinned] are simulated without moving: the
+     * others are pushed and pulled by them, they are not. The labels in [appearing] are coming
+     * onto the map and start inside the label they map to, to be pushed out of it.
      */
-    show(simulated: ReadonlySet<string>, appearing: ReadonlyMap<string, LabelMapNode>) {
+    show(
+        simulated: ReadonlySet<string>,
+        appearing: ReadonlyMap<string, LabelMapNode>,
+        pinned: ReadonlySet<string> = new Set(),
+    ) {
         if (!this.simulation || !this.linkForce) return;
 
         const isFirst = this.visibleNodes.length === 0;
         this.visibleNodes = this.nodes.filter(node => simulated.has(node.id));
 
         for (const node of this.visibleNodes) {
+            node.fx = pinned.has(node.id) ? node.x : null;
+            node.fy = pinned.has(node.id) ? node.y : null;
+
             const origin = appearing.get(node.id);
             if (!origin) continue;
 
             const angle = Math.random() * Math.PI * 2;
-            const distance = origin.radius + node.radius + 16;
+            const distance = origin.radius * 0.3;
             node.x = (origin.x ?? 0) + Math.cos(angle) * distance;
             node.y = (origin.y ?? 0) + Math.sin(angle) * distance;
             node.vx = 0;

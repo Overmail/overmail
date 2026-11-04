@@ -1,3 +1,5 @@
+import type {LabelMapNode} from "$lib/app/label-map/LabelMapSimulation";
+
 /**
  * Where the camera of the map stands, in the terms `Freecam` keeps it: an offset of the world's
  * origin from the middle of the viewport, and a scale around that point.
@@ -23,6 +25,22 @@ export function screenToWorld(
         (offsetX - width / 2 - camera.cameraX) / camera.zoom,
         (offsetY - height / 2 - camera.cameraY) / camera.zoom,
     ];
+}
+
+/**
+ * The node whose circle holds the world point [x]/[y], or null.
+ *
+ * Not d3's `simulation.find`: that is the nearest centre, and next to a large label a small one's
+ * centre can be nearer than the large one's although the point is inside the large circle.
+ */
+export function nodeAt(nodes: readonly LabelMapNode[], x: number, y: number): LabelMapNode | null {
+    for (const node of nodes) {
+        const dx = x - (node.x ?? 0);
+        const dy = y - (node.y ?? 0);
+        if (dx * dx + dy * dy <= node.radius * node.radius) return node;
+    }
+
+    return null;
 }
 
 /**

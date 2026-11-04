@@ -1,6 +1,6 @@
 <!--
     The label map: every label on a mail as a circle, pulled towards the labels it shares mails
-    with.
+    with. Double-clicking one opens the listing of its mails.
 
     Drawn on a canvas, not as an element per label: the simulation moves every circle on every
     frame, and Safari repainted the whole scaled layer they sat in each time. `Freecam` still owns
@@ -8,9 +8,13 @@
 -->
 <script lang="ts">
     import {onMount} from "svelte";
+    import {goto} from "$app/navigation";
+    import {page} from "$app/state";
     import {_} from "svelte-i18n";
     import {type LabelMapNode, LabelMapSimulation} from "$lib/app/label-map/LabelMapSimulation";
-    import {screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
+    import {nodeAt, screenToWorld, textColorOn} from "$lib/app/label-map/labelMapCanvas";
+    import {labelView} from "$lib/app/views/predefinedViews";
+    import {inlineViewHref} from "$lib/app/views/viewPath";
     import Freecam from "$lib/components/freecam/Freecam.svelte";
 
     const simulation = new LabelMapSimulation();
@@ -25,6 +29,7 @@
     let height = $state(0);
 
     let canvas: HTMLCanvasElement | null = $state(null);
+    let hovered = $state.raw<LabelMapNode | null>(null);
 
     /** The colour of each label as `#rrggbb`, and what its name is written in on top of it. */
     const colors = new Map<string, {fill: string; text: string}>();
@@ -85,6 +90,14 @@
             context.fillStyle = color.fill;
             context.fill();
 
+            if (node === hovered) {
+                context.lineWidth = 3 / zoom;
+                context.strokeStyle = color.text;
+                context.globalAlpha = 0.6;
+                context.stroke();
+                context.globalAlpha = 1;
+            }
+
             context.fillStyle = color.text;
             context.fillText(node.label.name, x, y);
         }
@@ -103,9 +116,39 @@
         return color;
     }
 
+    function nodeUnder(event: MouseEvent): LabelMapNode | null {
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const [x, y] = screenToWorld(
+            event.clientX - rect.left,
+            event.clientY - rect.top,
+            rect.width,
+            rect.height,
+            {cameraX, cameraY, zoom},
+        );
+
+        return nodeAt(nodes, x, y);
+    }
+
+    function hrefOf(node: LabelMapNode): string {
+        return inlineViewHref(labelView(node.id), page.url);
+    }
+
+    function onDoubleClick(event: MouseEvent) {
+        const node = nodeUnder(event);
+        if (node) void goto(hrefOf(node));
+    }
+
+    function onPointerMove(event: PointerEvent) {
+        // A drag moves the camera, not the pointer over a label.
+        if (event.buttons !== 0) return;
+
+        const node = nodeUnder(event);
+        if (node !== hovered) hovered = node;
+    }
+
     // Whatever the picture depends on that is not the simulation's own tick.
     $effect(() => {
-        void [zoom, cameraX, cameraY, width, height, nodes, canvas];
+        void [zoom, cameraX, cameraY, width, height, hovered, nodes, canvas];
         scheduleDraw();
     });
 
@@ -133,7 +176,15 @@
     <title>{$_("labels.map.title")}</title>
 </svelte:head>
 
-<div class="relative h-full w-full">
+<!-- svelte-ignore a11y_no_static_element_interactions: the labels are reachable as the links below -->
+<div
+        class="relative h-full w-full"
+        class:cursor-pointer={hovered !== null}
+        ondblclick={onDoubleClick}
+        onpointermove={onPointerMove}
+        onpointerleave={() => (hovered = null)}
+        title={hovered ? `${hovered.label.name} · ${$_("labels.emailCount", {values: {count: hovered.label.email_count}})}` : undefined}
+>
     <canvas bind:this={canvas} class="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
 
     <Freecam
@@ -145,4 +196,17 @@
                 height = h;
             }}
     />
+
+    <p class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
+        {$_("labels.map.hint")}
+    </p>
+
+    <!-- What the canvas shows, for whoever does not see it. -->
+    <nav class="sr-only" aria-label={$_("labels.map.title")}>
+        <ul>
+            {#each nodes as node (node.id)}
+                <li><a href={hrefOf(node)}>{node.label.name}</a></li>
+            {/each}
+        </ul>
+    </nav>
 </div>

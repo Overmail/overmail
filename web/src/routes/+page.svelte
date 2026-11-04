@@ -118,9 +118,27 @@
      */
     const accountName = $derived(accountId === null ? null : (accountNames?.[accountId] ?? null));
 
+    const {labels} = useRepositories();
+
+    /**
+     * The label this is the listing of, when the url spells out one label and nothing else to
+     * filter by -- which is what the label map opens.
+     */
+    const labelId = $derived(
+        accountId === null && inline?.filter.hasLabels?.length === 1 ? inline.filter.hasLabels[0] : null
+    );
+
+    // In an effect, not while rendering: asking starts a load and writes state.
+    $effect(() => {
+        if (labelId !== null) labels.request(labelId);
+    });
+
+    /** The name over a label's listing, which is what the label is called. */
+    const labelName = $derived(labelId === null ? null : (labels.peek(labelId).value?.name ?? null));
+
     /** What the tab is called: the view, because that is what the page is showing. */
     const viewName = $derived(
-        stored?.name ?? accountName ?? $_(inline === null ? predefinedView(viewId).label : "app.name")
+        stored?.name ?? accountName ?? labelName ?? $_(inline === null ? predefinedView(viewId).label : "app.name")
     );
 
     /**
@@ -269,7 +287,7 @@
     <div class="px-4 pb-16">
         <MailTable
                 bind:view={current}
-                name={stored?.name ?? accountName}
+                name={stored?.name ?? accountName ?? labelName}
                 onRename={stored === null ? undefined : rename}
                 bind:renaming={renamingName}
                 actions={viewActions}

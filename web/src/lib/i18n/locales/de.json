@@ -327,7 +327,8 @@
       "titleActive": "Labels:"
     },
     "map": {
-      "title": "Label-Karte"
+      "title": "Label-Karte",
+      "hint": "Doppelklick auf ein Label zeigt seine Mails"
     }
   },
   "views": {

@@ -44,21 +44,55 @@ export function nodeAt(nodes: readonly LabelMapNode[], x: number, y: number): La
 }
 
 /**
- * What a label's name is written in on top of its colour [hex] (`#rrggbb`): dark on a light one,
- * light on a dark one. Anything that is not a hex colour is taken as dark.
+ * What a label's name is written in on top of its colour [hex] (`#rrggbb`): the same colour, much
+ * darker on a light label and much lighter on a dark one, so the name keeps the label's hue.
+ *
+ * It goes only as far towards black or white as it takes to be readable -- a contrast of
+ * [MIN_CONTRAST] -- and all the way where nothing short of that is. Anything that is not a hex
+ * colour is taken as dark.
  */
 export function textColorOn(hex: string): string {
-    const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-    if (!match) return "#ffffff";
+    const background = parseHex(hex);
+    if (background === null) return "#ffffff";
 
-    const [r, g, b] = match.slice(1).map((channel) => {
-        const value = parseInt(channel, 16) / 255;
+    const backgroundLuminance = relativeLuminance(background);
+    // Where black and white have the same contrast against the colour.
+    const target = backgroundLuminance > 0.179 ? [0, 0, 0] : [255, 255, 255];
+
+    let text = target;
+    for (let amount = 0.6; amount < 1; amount += 0.05) {
+        const mixed = background.map((channel, i) => Math.round(channel + (target[i] - channel) * amount));
+        if (contrast(relativeLuminance(mixed), backgroundLuminance) >= MIN_CONTRAST) {
+            text = mixed;
+            break;
+        }
+    }
+
+    return "#" + text.map((channel) => channel.toString(16).padStart(2, "0")).join("");
+}
+
+/** What WCAG asks of normal text. */
+const MIN_CONTRAST = 4.5;
+
+export function parseHex(hex: string): number[] | null {
+    const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+
+    return match ? match.slice(1).map((channel) => parseInt(channel, 16)) : null;
+}
+
+/** The relative luminance of an sRGB colour with channels from 0 to 255. */
+export function relativeLuminance(rgb: number[]): number {
+    const [r, g, b] = rgb.map((channel) => {
+        const value = channel / 255;
         return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
     });
-    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-    // Where black and white have the same contrast against the colour.
-    return luminance > 0.179 ? "#111111" : "#ffffff";
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The contrast ratio between two relative luminances. */
+export function contrast(a: number, b: number): number {
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 /** How much of a circle's radius stays free around its name. */

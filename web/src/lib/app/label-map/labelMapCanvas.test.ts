@@ -1,5 +1,5 @@
 import {expect, test} from "bun:test";
-import {fontSizeFor, nodeAt, screenToWorld, textColorOn} from "./labelMapCanvas";
+import {contrast, fontSizeFor, nodeAt, parseHex, relativeLuminance, screenToWorld, textColorOn} from "./labelMapCanvas";
 import type {LabelMapNode} from "./LabelMapSimulation";
 
 function node(id: string, x: number, y: number, radius: number): LabelMapNode {
@@ -27,10 +27,32 @@ test("a point between the circles is no label", () => {
     expect(nodeAt([node("a", 0, 0, 10), node("b", 50, 0, 10)], 25, 0)).toBeNull();
 });
 
+function contrastOf(text: string, background: string): number {
+    return contrast(relativeLuminance(parseHex(text)!), relativeLuminance(parseHex(background)!));
+}
+
 test("names go dark on light colours and light on dark ones", () => {
-    expect(textColorOn("#ffeb3b")).toBe("#111111");
-    expect(textColorOn("#1a237e")).toBe("#ffffff");
+    const onYellow = parseHex(textColorOn("#ffeb3b"))!;
+    const onNavy = parseHex(textColorOn("#1a237e"))!;
+
+    expect(relativeLuminance(onYellow)).toBeLessThan(relativeLuminance(parseHex("#ffeb3b")!));
+    expect(relativeLuminance(onNavy)).toBeGreaterThan(relativeLuminance(parseHex("#1a237e")!));
     expect(textColorOn("not a colour")).toBe("#ffffff");
+});
+
+test("a name keeps the hue of its label", () => {
+    // A red label's name is a dark red, not black: red stays the strongest channel.
+    const [r, g, b] = parseHex(textColorOn("#ff8a80"))!;
+
+    expect(r).toBeGreaterThan(g);
+    expect(r).toBeGreaterThan(b);
+    expect(textColorOn("#ff8a80")).not.toBe("#000000");
+});
+
+test("a name is readable on every colour", () => {
+    for (const color of ["#ffeb3b", "#1a237e", "#767676", "#4caf50", "#e91e63", "#00bcd4", "#ffffff", "#000000"]) {
+        expect(contrastOf(textColorOn(color), color)).toBeGreaterThanOrEqual(4.5);
+    }
 });
 
 test("a name's corners stay inside its circle, with room to spare", () => {

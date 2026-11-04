@@ -32,8 +32,8 @@
     import Freecam from "$lib/components/freecam/Freecam.svelte";
 
     /**
-     * How opaque the outline and the name are of a label that has nothing to do with the one in
-     * focus. It has no background then.
+     * How opaque the name is of a label that has nothing to do with the one in focus. It has no
+     * background and no outline then.
      */
     const FADED = 0.35;
 
@@ -145,8 +145,8 @@
         context.textAlign = "center";
         context.textBaseline = "middle";
 
-        // How present each label is: 1 is a filled circle, 0 a faded one -- only its outline and
-        // its name, in its colour.
+        // How present each label is: 1 is a filled circle, 0 a faded one -- only its name, in its
+        // colour.
         let fading = false;
         const step = elapsed / 250;
         for (const node of nodes) {
@@ -190,17 +190,11 @@
             context.beginPath();
             context.arc(x, y, r, 0, Math.PI * 2);
 
-            // The background goes as the label fades; the outline takes its place.
+            // The background goes as the label fades, and only its name is left.
             if (presence > 0) {
                 context.globalAlpha = presence;
                 context.fillStyle = look.fill;
                 context.fill();
-            }
-            if (presence < 1) {
-                context.globalAlpha = FADED * (1 - presence);
-                context.lineWidth = 1.5 / zoom;
-                context.strokeStyle = look.fill;
-                context.stroke();
             }
 
             if (node === hovered || node.id === focus) {

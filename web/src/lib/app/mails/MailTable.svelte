@@ -272,6 +272,28 @@
         void goto(url);
     }
 
+    /**
+     * The mail's own page in a tab of its own, the way a link opens with Cmd/Ctrl or the middle
+     * button -- the list stays as it is. No [FROM_PARAM]: there is no list behind it in that tab,
+     * so the page's back button goes to the mailbox.
+     */
+    function openEmailPageInNewTab(id: string, subject: string | null | undefined) {
+        window.open(new URL(emailPath(id, subject), page.url), "_blank", "noopener");
+    }
+
+    function onRowClick(event: MouseEvent, id: string, subject: string | null | undefined) {
+        if (event.metaKey || event.ctrlKey) openEmailPageInNewTab(id, subject);
+        else showEmail(id, "push");
+    }
+
+    // The middle button: auxclick is what a link opens on, and its mousedown would otherwise
+    // start the browser's autoscroll on the row.
+    function onRowMiddleButton(event: MouseEvent, id: string, subject: string | null | undefined) {
+        if (event.button !== 1) return;
+        event.preventDefault();
+        if (event.type === "auxclick") openEmailPageInNewTab(id, subject);
+    }
+
     function closeEmail() {
         const url = new URL(page.url);
         url.searchParams.delete(EMAIL_PARAM);
@@ -686,7 +708,8 @@
                              hover, which is enough for one clipped line per mail. -->
                         <!-- mousemove rather than mouseenter: the preview follows the cursor
                              along the row, and the wait for it runs from the first move on. -->
-                        <!-- A click opens the mail beside the list, a double click goes to its own
+                        <!-- A click opens the mail beside the list, Cmd/Ctrl or the middle button
+                             open its page in a new tab, a double click goes to its own
                              page -- here, not in a new tab: the click that came first has pushed
                              the panel into the history, so the page's back button leads to the
                              list with that mail still open. The query is what puts it there. -->
@@ -706,7 +729,9 @@
                                 )}
                                 onmousemove={(event) => rowPreview?.hover(event, modelRow.id)}
                                 onmouseleave={() => rowPreview?.leave()}
-                                onclick={() => showEmail(modelRow.id, "push")}
+                                onclick={(event) => onRowClick(event, modelRow.id, row?.mail.subject)}
+                                onmousedown={(event) => onRowMiddleButton(event, modelRow.id, row?.mail.subject)}
+                                onauxclick={(event) => onRowMiddleButton(event, modelRow.id, row?.mail.subject)}
                                 ondblclick={() => openEmailPage(modelRow.id, row?.mail.subject)}
                         >
                             <!-- The indent goes on the first cell: the columns are fixed, so a

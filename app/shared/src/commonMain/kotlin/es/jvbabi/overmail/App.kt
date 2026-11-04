@@ -149,6 +149,12 @@ expect fun imageCacheDirectory(context: PlatformContext): Path
 expect fun emailBodyCacheDirectory(): Path
 
 /**
+ * Where html mails rendered by Blitz are kept, see `BlitzDiskCache`: in the platform's cache, so
+ * the system may clear it.
+ */
+expect fun blitzCacheDirectory(): Path
+
+/**
  * Where downloaded attachments are kept, see `FileRepositoryImpl`: in the platform's cache as well,
  * so the system may clear it. On Android it is also what the FileProvider may hand out.
  */

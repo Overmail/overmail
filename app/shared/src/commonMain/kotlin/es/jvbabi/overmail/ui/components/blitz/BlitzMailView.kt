@@ -31,12 +31,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import co.touchlab.kermit.Logger
+import es.jvbabi.overmail.blitzCacheDirectory
 import es.jvbabi.overmail.openUrl
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
@@ -105,9 +108,18 @@ internal expect fun rgbaToImageBitmap(rgba: ByteArray, width: Int, height: Int):
 /** A mail laid out [layoutWidth] css px wide, to be rasterised [rasterWidth] px wide. */
 internal data class BlitzKey(val document: String, val layoutWidth: Int, val rasterWidth: Int)
 
-/** A mail laid out by Blitz, [width] × [height] px of raster. */
-internal class BlitzMail(val key: BlitzKey, val handle: Long, val width: Int, val height: Int) {
+/**
+ * A mail [width] × [height] px of raster, stored under [cacheId] in the [BlitzDiskCache]. It is
+ * laid out by Blitz only once a tile is not on disk or a link is asked for, see [BlitzMails.layoutOf].
+ */
+internal class BlitzMail(val key: BlitzKey, val cacheId: String, val width: Int, val height: Int) {
     val tiles: Int get() = ceil(height.toFloat() / TILE).toInt()
+
+    /** The Blitz layout, once one was asked for: a handle, or 0 when it would not lay out. Main thread only. */
+    var layout: Deferred<Long>? = null
+
+    /** Let go of by [BlitzMails]: no layout is opened for it any more, as nobody would close it. */
+    var forgotten = false
 }
 
 /** What a view draws of one raster: its mail and the tiles of it it has. */
@@ -117,12 +129,28 @@ private class Raster(val mail: BlitzMail, val tiles: Map<Int, ImageBitmap>)
  * The mails laid out and the tiles rendered, shared by every view that shows them -- what a card
  * rendered, the page that grows out of it draws from its first frame. The least recently used go
  * first. Touched on the main thread only; the native calls are made off it.
+ *
+ * Behind the memory sits the [BlitzDiskCache]: a mail rendered in an earlier run is read from
+ * there, and only what is not on disk is laid out and rendered -- and then written back.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal object BlitzMails {
     private val mails = LinkedHashMap<BlitzKey, Deferred<BlitzMail?>>()
     private val tiles = LinkedHashMap<Pair<BlitzKey, Int>, ImageBitmap>()
     private var tileBytes = 0L
+
+    private val disk by lazy { BlitzDiskCache(blitzCacheDirectory()) }
+
+    /**
+     * Tiles on their way to the disk, written one at a time off the main thread. A few at most:
+     * one that does not fit any more is skipped, and rendered again next time.
+     */
+    private val writes = Channel<Triple<String, Int, ByteArray>>(capacity = 4).also { writes ->
+        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            for ((id, index, rgba) in writes) disk.putTile(id, index, rgba)
+        }
+    }
 
     /** The mail of [key] if it is laid out already, so a view can draw it in its first frame. */
     fun peek(key: BlitzKey): BlitzMail? = mails[key]?.takeIf { it.isCompleted }?.getCompleted()
@@ -141,15 +169,36 @@ internal object BlitzMails {
         val opening = CompletableDeferred<BlitzMail?>()
         mails[key] = opening
         while (mails.size > KEPT_MAILS) forget(mails.keys.first())
-        val scale = key.rasterWidth.toFloat() / key.layoutWidth
-        val mail = withContext(Dispatchers.Default) {
-            val viewportHeight = (key.layoutWidth * VIEWPORT_ASPECT).roundToInt()
-            val handle = BlitzNative.open(key.document, key.layoutWidth, viewportHeight, scale)
-            if (handle == 0L) null else BlitzMail(key, handle, key.rasterWidth, BlitzNative.height(handle))
+        val (mail, handle) = withContext(Dispatchers.Default + NonCancellable) {
+            val viewportHeight = viewportHeightOf(key)
+            val id = BlitzDiskCache.id(key.document, key.layoutWidth, key.rasterWidth, viewportHeight, TILE)
+            // Rendered in an earlier run: its size is all it takes until a tile is missing.
+            disk.height(id)?.let { return@withContext BlitzMail(key, id, key.rasterWidth, it) to null }
+            val handle = BlitzNative.open(key.document, key.layoutWidth, viewportHeight, scaleOf(key))
+            if (handle == 0L) return@withContext null to null
+            val height = BlitzNative.height(handle)
+            disk.putHeight(id, height)
+            BlitzMail(key, id, key.rasterWidth, height) to handle
         }
         if (mail == null) logger.w { "A mail would not lay out" }
+        if (handle != null) mail?.layout = CompletableDeferred(handle)
         opening.complete(mail)
         return mail
+    }
+
+    /** The Blitz layout of [mail], laid out now if it was read from disk; null when it would not be. */
+    private suspend fun layoutOf(mail: BlitzMail): Long? {
+        mail.layout?.let { return it.await().takeIf { handle -> handle != 0L } }
+        if (mail.forgotten) return null
+        val layout = CompletableDeferred<Long>()
+        mail.layout = layout
+        // Completed even when whoever asked has moved on, or [forget] would wait on it for good.
+        val handle = withContext(Dispatchers.Default + NonCancellable) {
+            BlitzNative.open(mail.key.document, mail.key.layoutWidth, viewportHeightOf(mail.key), scaleOf(mail.key))
+        }
+        layout.complete(handle)
+        if (handle == 0L) logger.w { "A mail would not lay out" }
+        return handle.takeIf { it != 0L }
     }
 
     suspend fun tile(mail: BlitzMail, index: Int): ImageBitmap? {
@@ -158,9 +207,18 @@ internal object BlitzMails {
         val top = index * TILE
         val height = minOf(TILE, mail.height - top)
         if (height <= 0) return null
+        val byteCount = mail.width * height * 4
         // Kept even when whoever asked has moved on: the next to ask finds it rendered.
         val bitmap = withContext(Dispatchers.Default + NonCancellable) {
-            BlitzNative.render(mail.handle, top, height)?.let { rgbaToImageBitmap(it, mail.width, height) }
+            disk.tile(mail.cacheId, index, byteCount)?.let { rgbaToImageBitmap(it, mail.width, height) }
+        } ?: run {
+            val handle = layoutOf(mail) ?: return null
+            withContext(Dispatchers.Default + NonCancellable) {
+                BlitzNative.render(handle, top, height)?.let { rgba ->
+                    writes.trySend(Triple(mail.cacheId, index, rgba))
+                    rgbaToImageBitmap(rgba, mail.width, height)
+                }
+            }
         } ?: return null
         // Let go of in the meantime: it is rendered, but not kept for a mail nobody holds.
         if (peek(mail.key) !== mail) return bitmap
@@ -170,8 +228,14 @@ internal object BlitzMails {
         return bitmap
     }
 
-    suspend fun linkAt(mail: BlitzMail, x: Float, y: Float): String? =
-        withContext(Dispatchers.Default) { BlitzNative.linkAt(mail.handle, x, y) }
+    suspend fun linkAt(mail: BlitzMail, x: Float, y: Float): String? {
+        val handle = layoutOf(mail) ?: return null
+        return withContext(Dispatchers.Default) { BlitzNative.linkAt(handle, x, y) }
+    }
+
+    private fun viewportHeightOf(key: BlitzKey) = (key.layoutWidth * VIEWPORT_ASPECT).roundToInt()
+
+    private fun scaleOf(key: BlitzKey) = key.rasterWidth.toFloat() / key.layoutWidth
 
     private val ImageBitmap.bytes: Long get() = width.toLong() * height * 4
 
@@ -181,7 +245,10 @@ internal object BlitzMails {
         // Closed once it is laid out, which one still opening is about to be.
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
-            mail.await()?.let { withContext(Dispatchers.Default) { BlitzNative.close(it.handle) } }
+            val forgotten = mail.await() ?: return@launch
+            forgotten.forgotten = true
+            val handle = forgotten.layout?.await()?.takeIf { it != 0L } ?: return@launch
+            withContext(Dispatchers.Default) { BlitzNative.close(handle) }
         }
     }
 }

@@ -48,6 +48,9 @@ import es.jvbabi.overmail.server.jobs.importer.EmailInserter
 import es.jvbabi.overmail.server.jobs.importer.EmailInserterImpl
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGenerator
 import es.jvbabi.overmail.server.jobs.importer.EmbeddedImageBackfill
+import es.jvbabi.overmail.server.jobs.importer.DownloadRemoteImagesStep
+import es.jvbabi.overmail.server.data.images.RemoteImageDownloader
+import es.jvbabi.overmail.server.data.images.RemoteImageFetcher
 import es.jvbabi.overmail.server.jobs.importer.EmailPreviewGeneratorImpl
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizer
 import es.jvbabi.overmail.server.jobs.importer.FolderSynchronizerImpl
@@ -253,6 +256,8 @@ internal fun overmailModule(application: CoroutineScope, serverConfig: ServerCon
 
     single<EmailInserter> { EmailInserterImpl(database = get()) }
     single<EmbeddedImageBackfill> { EmbeddedImageBackfill(database = get()) }
+    single<RemoteImageFetcher> { RemoteImageFetcher() }
+    single<RemoteImageDownloader> { RemoteImageDownloader(database = get(), fetcher = get()) }
     single<EmailPreviewGenerator> { EmailPreviewGeneratorImpl(database = get()) }
 
     // What happens to one mail: stored, then everything that follows from that, in this order.
@@ -262,6 +267,7 @@ internal fun overmailModule(application: CoroutineScope, serverConfig: ServerCon
             steps = listOf(
                 GeneratePreviewStep(generator = get()),
                 ClassifyStep(enqueue = get<EmailClassificationQueue>()::enqueue),
+                DownloadRemoteImagesStep(downloader = get()),
                 NotifyStep(mailNotifier = get()),
                 PushStep(push = get<PushNotifications>()::newEmail),
             ),

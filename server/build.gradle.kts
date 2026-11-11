@@ -127,6 +127,7 @@ dependencies {
     testImplementation(kotlin("test"))
     // Drives routes through the real plugin pipeline without binding a port.
     testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.client.mock)
     // In-memory database for tests that need real rows; the schema is created per test class.
     testImplementation(libs.h2)
     testImplementation(libs.kotlinx.coroutines.test)

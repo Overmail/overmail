@@ -1,8 +1,10 @@
 package es.jvbabi.overmail.server.jobs.importer
 
+import es.jvbabi.overmail.server.data.images.RemoteImageDownloader
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -74,6 +76,21 @@ class GeneratePreviewStep(private val generator: EmailPreviewGenerator) : Import
 class ClassifyStep(private val enqueue: (Email.Id) -> Unit) : ImportStep {
     override suspend fun run(email: Email, context: ImportContext) {
         if (context.folder.wantsAssistant(email.sent)) enqueue(email.id.value)
+    }
+}
+
+/**
+ * Downloads the images the mail loads from the web, see `util/RemoteImages.kt`. Before the mail is
+ * announced: a device that is told about it fetches its body right away and keeps it, and the
+ * images would be missing from that for good.
+ */
+class DownloadRemoteImagesStep(private val downloader: RemoteImageDownloader) : ImportStep {
+    override suspend fun run(email: Email, context: ImportContext) =
+        downloader.downloadMissing(email.id.value, email.htmlContent, IMPORT_BUDGET)
+
+    private companion object {
+        /** How long a new mail waits for its images before it is announced without the rest. */
+        val IMPORT_BUDGET = 10.seconds
     }
 }
 

@@ -48,6 +48,7 @@ class OvermailDatabase(private val database: Database) {
             SchemaUtils.create(Emails, Attachments)
             exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS content_id VARCHAR(255)")
             exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS is_embedded BOOLEAN")
+            SchemaUtils.create(RemoteImages)
             SchemaUtils.create(EmailPreviews)
             SchemaUtils.create(EmailRecipients)
             SchemaUtils.create(EmailAiClassificationEvents)

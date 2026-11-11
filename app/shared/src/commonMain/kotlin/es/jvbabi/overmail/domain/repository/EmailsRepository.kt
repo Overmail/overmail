@@ -16,7 +16,7 @@ interface EmailsRepository {
         viewSettingsState: ViewState,
         instantLocalEmission: Boolean = false,
         user: OvermailAccount
-    ): Flow<List<ViewResult>>
+    ): Flow<ViewSnapshot>
 
     /**
      * The mail of [emailId], and again whenever it changes, for as long as it is collected; null
@@ -84,6 +84,13 @@ enum class FetchPolicy {
     /** Asked for on the server first; when that fails, the flow fails with the [es.jvbabi.overmail.domain.model.NetworkException]. */
     NetworkOnly,
 }
+
+/**
+ * What a view holds right now, as the local database has it. [isSettled] says whether the server
+ * has answered the view yet and the mails it named are loaded -- until then a search shows what
+ * the device happens to hold, which may be nothing of what the server finds.
+ */
+data class ViewSnapshot(val results: List<ViewResult>, val isSettled: Boolean)
 
 sealed class ViewResult {
     data class Item(val email: Email): ViewResult()

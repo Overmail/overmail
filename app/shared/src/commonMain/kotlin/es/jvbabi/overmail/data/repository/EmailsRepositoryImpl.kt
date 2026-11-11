@@ -27,6 +27,7 @@ import es.jvbabi.overmail.domain.repository.EmailsRepository
 import es.jvbabi.overmail.domain.repository.FetchPolicy
 import es.jvbabi.overmail.domain.repository.ImapAccountsRepository
 import es.jvbabi.overmail.domain.repository.ViewResult
+import es.jvbabi.overmail.domain.repository.ViewSnapshot
 import es.jvbabi.overmail.utils.TextSearch
 import es.jvbabi.overmail.utils.takeFrom
 import io.ktor.client.HttpClient
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -90,11 +92,13 @@ class EmailsRepositoryImpl(
         viewSettingsState: ViewState,
         instantLocalEmission: Boolean,
         user: OvermailAccount
-    ): Flow<List<ViewResult>> = channelFlow {
+    ): Flow<ViewSnapshot> = channelFlow {
         // What the server answered for the view. Only read for a search: the cache holds the
         // preview of a mail, not its text, so a mail the server found by its text would be
         // filtered out here again without it.
         val serverMatches = MutableStateFlow(emptySet<Uuid>())
+        // Whether the server answered the view and the mails it named are stored, see ViewSnapshot.
+        val settled = MutableStateFlow(false)
 
         launch {
             overmailDatabase.imapAccountsDao.allForAccount(user.id).collectLatest { imapAccountsForUser ->
@@ -105,8 +109,9 @@ class EmailsRepositoryImpl(
                         combine(
                             overmailDatabase.emailsDao.getAllEmailsForAccount(user.id),
                             serverMatches,
-                            ::Pair,
-                        ).collectLatest { (rawEmails, serverMatches) ->
+                            settled,
+                            ::Triple,
+                        ).collectLatest { (rawEmails, serverMatches, settled) ->
                             val filtered = rawEmails.applyFilter(
                                 filter = viewSettingsState.filter,
                                 usersParticipantIds = participantIdsWhichAreCurrentUser,
@@ -116,7 +121,7 @@ class EmailsRepositoryImpl(
                             val emails = filtered.map { it.toModel() }
                             lastRead = lastRead + emails.associateBy { it.id }
                             val arranged = emails.arrange(viewSettingsState.groupings, viewSettingsState.sorting)
-                            send(arranged)
+                            send(ViewSnapshot(arranged, settled))
                         }
                     }
             }
@@ -129,12 +134,15 @@ class EmailsRepositoryImpl(
             // Conflated rather than latest: a snapshot arriving mid-load must not throw away the
             // chunk in flight, or a view that changes faster than a chunk loads never gets it.
             // What is stored stays stored, so the next round only asks for what is still missing.
-            followViewIds(viewSettingsState, user).conflate().collect { groups ->
+            // A stream the server refused ends here and is not asked again: nothing more is coming,
+            // so the view is as settled as it gets. One that keeps reconnecting is not.
+            followViewIds(viewSettingsState, user).onCompletion { settled.value = true }.conflate().collect { groups ->
                 if (viewSettingsState.filter.query != null) serverMatches.value = groups.flatMap { it.ids }.toSet()
                 groups.filter { it.total > it.ids.size }.forEach { group ->
                     logger.w { "Group ${group.keys} holds ${group.total} mails, the server sent ${group.ids.size} of them" }
                 }
                 emailSync.loadMissing(user, groups.flatMap { it.ids })
+                settled.value = true
             }
         }
     }

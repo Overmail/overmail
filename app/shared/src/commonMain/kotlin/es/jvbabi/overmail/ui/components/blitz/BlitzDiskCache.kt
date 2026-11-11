@@ -19,7 +19,7 @@ private val logger = Logger.withTag("BlitzDiskCache")
  * Bumped whenever the renderer draws differently -- a new Blitz, a rule in `FIXES` -- so every
  * mail is rendered again once. What an older generation left is deleted.
  */
-internal const val BLITZ_CACHE_GENERATION = 2
+internal const val BLITZ_CACHE_GENERATION = 3
 
 /** How much the rendered mails may take on disk; the least recently used go first. */
 private const val MAX_SIZE_BYTES = 256L shl 20

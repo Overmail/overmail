@@ -39,10 +39,13 @@ fun embeddedContentId(contentId: String?, contentType: String, referenced: Set<S
 
 /**
  * [html] with every `cid:` url of an image of mail [emailId] replaced by that image as a `data:`
- * url. One that names nothing stays as it is and shows as a broken image, as in any other client.
- * Runs in the caller's transaction.
+ * url, and the images it loads from the web as they were downloaded, see [withRemoteImages]. One
+ * that names nothing stays as it is and shows as a broken image, as in any other client. Runs in
+ * the caller's transaction.
  */
-fun withEmbeddedImages(emailId: Uuid, html: String): String {
+fun withEmbeddedImages(emailId: Uuid, html: String): String = withRemoteImages(emailId, withContentIdImages(emailId, html))
+
+private fun withContentIdImages(emailId: Uuid, html: String): String {
     // Most mails have none, and those need no query.
     if (!html.contains("cid:", ignoreCase = true)) return html
 

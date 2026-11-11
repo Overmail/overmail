@@ -438,7 +438,7 @@ tested on its own:
 | `MailboxImporter` | *when* a folder is read: the poll timer and, with push, `IDLE` | the database |
 | `FolderSynchronizer` | *which* mails of a folder are new, by UID | what happens to a mail |
 | `EmailImportPipeline` | what happens to one mail: `EmailInserter`, then every `ImportStep` | IMAP |
-| `EmailInserter`, `ImportStep`s | one thing each: store, preview, classify, notify | each other |
+| `EmailInserter`, `ImportStep`s | one thing each: store, preview, classify, download images, notify | each other |
 
 - **A pass reads only what is new.** `ImapFolderCursors` holds the last UID dealt with per account
   and folder; a pass fetches `UID n+1:*`. No cursor, or a changed `UIDVALIDITY`, reads the folder

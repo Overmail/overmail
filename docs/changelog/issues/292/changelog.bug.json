@@ -1,0 +1,8 @@
+{
+  "description": "Html mails that link a web font no longer stay blank or load forever, and mails wider than the screen are zoomed out instead of cut off.",
+  "localized": {
+    "de": {
+      "description": "HTML-Mails, die eine Web-Schrift einbinden, bleiben nicht mehr leer und laden nicht mehr endlos. Mails, die breiter als der Bildschirm sind, werden verkleinert statt abgeschnitten."
+    }
+  }
+}

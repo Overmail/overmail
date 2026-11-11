@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use anyrender::{PaintScene as _, render_to_buffer};
 use anyrender_vello_cpu::VelloCpuImageRenderer;
-use blitz_dom::{DocumentConfig, util::Color};
+use blitz_dom::{DocumentConfig, Node, util::Color};
 use blitz_html::HtmlDocument;
 use blitz_paint::paint_scene;
 use blitz_traits::net::{Bytes, NetHandler, NetProvider, Request};
@@ -22,6 +22,7 @@ use data_url::DataUrl;
 use markup5ever::local_name;
 use peniko::Fill;
 use peniko::kurbo::Rect;
+use taffy::{CoreStyle as _, Overflow};
 
 #[cfg(target_os = "android")]
 mod jni;
@@ -29,21 +30,29 @@ mod jni;
 mod ffi;
 pub mod worker;
 
-/// Answers `data:` urls right away and nothing else.
+/// Answers `data:` urls with what they hold and everything else with nothing.
+///
+/// Every request is answered, right away: Blitz does not lay a document out while a stylesheet
+/// linked in its head is outstanding, so one that is never answered -- a web font from Google, say
+/// -- leaves the mail empty. Nothing is a stylesheet without rules, and an image or a font that
+/// fails to decode, so a remote one is left out all the same.
 struct DataUrlsOnly;
 
 impl NetProvider for DataUrlsOnly {
     fn fetch(&self, _doc_id: usize, request: Request, handler: Box<dyn NetHandler>) {
-        // Anything else is simply never answered: it stays as unloaded as a blocked image.
-        if request.url.scheme() != "data" {
-            return;
-        }
-        let Ok(decoded) = DataUrl::process(request.url.as_str()) else { return };
-        if let Ok((bytes, _)) = decoded.decode_to_vec() {
-            handler.bytes(request.url.to_string(), Bytes::from(bytes));
-        }
+        let bytes = (request.url.scheme() == "data")
+            .then(|| DataUrl::process(request.url.as_str()).ok()?.decode_to_vec().ok())
+            .flatten()
+            .map(|(bytes, _)| bytes)
+            .unwrap_or_default();
+        handler.bytes(request.url.to_string(), Bytes::from(bytes));
     }
 }
+
+/// What the urls of a mail are resolved against. Without one, Blitz takes a `data:` url, which
+/// nothing resolves against -- and panics at the first protocol-relative link (`//fonts.…`).
+/// `.invalid` is reserved: it names no host, and nothing is fetched from it anyway.
+const BASE_URL: &str = "https://mail.invalid/";
 
 /// Where Blitz and a browser disagree on what mails are made of.
 ///
@@ -73,13 +82,37 @@ fn settle(document: &mut HtmlDocument) -> (f32, f32) {
     for _ in 0..6 {
         document.resolve(0.0);
         let root = document.as_ref().root_element();
-        let settled = (root.scroll_width(), root.scroll_height());
+        let settled = (root.scroll_width().max(right_edge(root, 0.0)), root.scroll_height());
         if settled == size {
             break;
         }
         size = settled;
     }
     size
+}
+
+/// The right edge of the widest box in [node], in css px from the left of the document, when
+/// [node] starts at [left].
+///
+/// The root's scroll width misses what hangs out of a table cell: a table `width="100%"` with a
+/// 775 px table in it is as wide as the viewport for Blitz -- a browser grows it to its content --
+/// and the inner one runs out of it uncounted. A box that clips its content (`overflow: hidden`,
+/// the hidden preview line of a newsletter) counts with its own width only.
+fn right_edge(node: &Node, left: f32) -> f32 {
+    let layout = node.final_layout();
+    let left = left + layout.location.x;
+    let own = left + layout.size.width;
+    let clips = node.layout_style().overflow().x != Overflow::Visible;
+    if clips {
+        return own;
+    }
+    let children = node.layout_children.borrow();
+    // Out of the flow a box is placed against its containing block, and listed with it instead.
+    let in_flow = children.iter().flatten().map(|&id| node.with(id))
+        .filter(|child| child.oof_containing_block.get().is_none());
+    let hoisted = node.hoisted_children.borrow();
+    let out_of_flow = hoisted.iter().map(|&id| node.with(id));
+    in_flow.chain(out_of_flow).fold(own, |right, child| right.max(right_edge(child, left)))
 }
 
 /// A mail laid out, ready to be rendered a tile at a time.
@@ -101,7 +134,7 @@ impl Mail {
         let mut document = HtmlDocument::from_html(
             &format!("{FIXES}{html}"),
             DocumentConfig {
-                base_url: None,
+                base_url: Some(BASE_URL.into()),
                 net_provider: Some(Arc::new(DataUrlsOnly) as _),
                 viewport: Some(Viewport::new(
                     width,

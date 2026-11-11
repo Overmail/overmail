@@ -17,7 +17,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 import es.jvbabi.overmail.kamel.Email as KamelEmail
 
 /** Images a mail loads from the web: found in its body, downloaded once, handed out in it. */
@@ -82,7 +81,7 @@ class RemoteImagesTest {
         val html = """<img alt="@wi-wissen" src="https://cdn.example.com/avatar?s=120&amp;v=4"><img src="https://cdn.example.com/page"><img src="https://cdn.example.com/down">"""
         val email = assertIs<Result.Imported>(inserter.importEmailIntoDatabase(mail(html), account)).email
 
-        downloader.downloadMissing(email.id.value, html, 5.seconds)
+        downloader.downloadMissing(email.id.value, html)
         val shown = database.query { withEmbeddedImages(email.id.value, html) }
 
         assertEquals(
@@ -97,8 +96,8 @@ class RemoteImagesTest {
         val html = """<img src="https://cdn.example.com/avatar"><img src="https://cdn.example.com/page"><img src="https://cdn.example.com/down">"""
         val email = assertIs<Result.Imported>(inserter.importEmailIntoDatabase(mail(html), account)).email
 
-        downloader.downloadMissing(email.id.value, html, 5.seconds)
-        downloader.downloadMissing(email.id.value, html, 5.seconds)
+        downloader.downloadMissing(email.id.value, html)
+        downloader.downloadMissing(email.id.value, html)
 
         assertEquals(
             mapOf("https://cdn.example.com/avatar" to 1, "https://cdn.example.com/page" to 1, "https://cdn.example.com/down" to 2),
@@ -112,7 +111,7 @@ class RemoteImagesTest {
         val html = """<p>Hi</p><img src="cid:logo">"""
         val email = assertIs<Result.Imported>(inserter.importEmailIntoDatabase(mail(html), account)).email
 
-        downloader.downloadMissing(email.id.value, html, 5.seconds)
+        downloader.downloadMissing(email.id.value, html)
 
         assertTrue(asked.isEmpty())
         assertEquals(html, database.query { withEmbeddedImages(email.id.value, html) })

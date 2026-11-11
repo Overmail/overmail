@@ -13,15 +13,16 @@ use std::sync::Arc;
 
 use anyrender::{PaintScene as _, render_to_buffer};
 use anyrender_vello_cpu::VelloCpuImageRenderer;
-use blitz_dom::{DocumentConfig, Node, util::Color};
+use blitz_dom::{DocumentConfig, Node, NodeId, util::Color};
 use blitz_html::HtmlDocument;
 use blitz_paint::paint_scene;
 use blitz_traits::net::{Bytes, NetHandler, NetProvider, Request};
 use blitz_traits::shell::{ColorScheme, Viewport};
 use data_url::DataUrl;
-use markup5ever::local_name;
+use markup5ever::{QualName, local_name, ns};
 use peniko::Fill;
 use peniko::kurbo::Rect;
+use style::values::specified::box_::{DisplayInside, DisplayOutside};
 use taffy::{CoreStyle as _, Overflow};
 
 #[cfg(target_os = "android")]
@@ -64,8 +65,13 @@ const BASE_URL: &str = "https://mail.invalid/";
 /// content column) is wrapped in an anonymous cell by a browser and laid out as usual. Blitz drops
 /// it from the row, and the whole mail with it, so it is made a cell again. Only the values that
 /// show something are matched, so a cell hidden with `display: none` stays hidden.
+///
+/// A cell as wide as its table (`width: 100%`) holds its padding in a browser: no column grows
+/// past the table. Blitz adds the padding on top in a fixed table with collapsed borders, so the
+/// text runs out of the mail on the right; counted in, as a browser does.
 const FIXES: &str = "<style>\
 tr, td, th { height: auto !important; }\
+:is(td, th):is([width='100%'], [style*='width:100%' i], [style*='width: 100%' i]) { box-sizing: border-box !important; }\
 :is(td, th):is(\
 [style*='display:block' i], [style*='display: block' i],\
 [style*='display:inline' i], [style*='display: inline' i],\
@@ -89,6 +95,62 @@ fn settle(document: &mut HtmlDocument) -> (f32, f32) {
         size = settled;
     }
     size
+}
+
+/// The tables in [document] with nothing a table is made of in them, each with the `style` that
+/// lays it out as a block instead, see [lay_out_as_blocks].
+///
+/// A browser wraps what stands in a table without a row and a cell around it -- a `<div>` that a
+/// media query took from `display: table-cell` to `block`, text -- in an anonymous row and cell,
+/// and lays it out as usual. Blitz leaves it out (`collect_table_cells`, "probably a table
+/// caption"), and with it the whole mail: Unlayer's templates build every row as a
+/// `<div style="display: table">` around such a column. A single anonymous cell stacks its content
+/// like a block does, so a table that has no row, row group or cell at all becomes one. Found by
+/// the computed styles: which display a child ends up with is up to the stylesheet.
+fn tables_without_cells(document: &HtmlDocument) -> Vec<(NodeId, String)> {
+    let display_of = |node: &Node| node.primary_styles().map(|style| style.clone_display());
+
+    let doc = document.as_ref();
+    let mut tables = Vec::new();
+    let mut stack = vec![doc.root_element().id];
+    while let Some(id) = stack.pop() {
+        let Some(node) = doc.get_node(id) else { continue };
+        stack.extend(node.children.iter().copied());
+
+        let Some(display) = display_of(node) else { continue };
+        if display.inside() != DisplayInside::Table {
+            continue;
+        }
+        let has_parts = node.children.iter().filter_map(|&child| doc.get_node(child)).any(|child| {
+            display_of(child).is_some_and(|display| {
+                matches!(
+                    display.inside(),
+                    DisplayInside::TableRowGroup
+                        | DisplayInside::TableHeaderGroup
+                        | DisplayInside::TableFooterGroup
+                        | DisplayInside::TableRow
+                        | DisplayInside::TableCell
+                        | DisplayInside::TableColumn
+                        | DisplayInside::TableColumnGroup
+                )
+            })
+        });
+        if !has_parts {
+            let block = if display.outside() == DisplayOutside::Inline { "inline-block" } else { "block" };
+            let style = node.attr(local_name!("style")).unwrap_or_default();
+            tables.push((id, format!("{style}; display: {block} !important")));
+        }
+    }
+    tables
+}
+
+/// Gives the [tables] their style, see [tables_without_cells]. Only before [document] is laid out
+/// for the first time: Blitz does not build the boxes of a table that turns into a block later.
+fn lay_out_as_blocks(document: &mut HtmlDocument, tables: &[(NodeId, String)]) {
+    let mut mutator = document.as_mut().mutate();
+    for (id, style) in tables {
+        mutator.set_attribute(*id, QualName::new(None, ns!(), local_name!("style")), style);
+    }
 }
 
 /// The right edge of the widest box in [node], in css px from the left of the document, when
@@ -131,22 +193,33 @@ impl Mail {
     /// rendered at [scale] device px per css px.
     pub fn open(html: &str, css_width: u32, viewport_height: u32, scale: f32) -> Mail {
         let width = (css_width as f32 * scale).round() as u32;
-        let mut document = HtmlDocument::from_html(
-            &format!("{FIXES}{html}"),
-            DocumentConfig {
-                base_url: Some(BASE_URL.into()),
-                net_provider: Some(Arc::new(DataUrlsOnly) as _),
-                viewport: Some(Viewport::new(
-                    width,
-                    (viewport_height as f32 * scale).round() as u32,
-                    scale,
-                    ColorScheme::Light,
-                )),
-                ..Default::default()
-            },
-        );
+        let new_document = || {
+            HtmlDocument::from_html(
+                &format!("{FIXES}{html}"),
+                DocumentConfig {
+                    base_url: Some(BASE_URL.into()),
+                    net_provider: Some(Arc::new(DataUrlsOnly) as _),
+                    viewport: Some(Viewport::new(
+                        width,
+                        (viewport_height as f32 * scale).round() as u32,
+                        scale,
+                        ColorScheme::Light,
+                    )),
+                    ..Default::default()
+                },
+            )
+        };
 
-        let (content_width, mut content_height) = settle(&mut document);
+        let mut document = new_document();
+        let (mut content_width, mut content_height) = settle(&mut document);
+        // Made anew from the same html, so its nodes have the same ids, and given the styles
+        // before it is laid out, see lay_out_as_blocks.
+        let tables = tables_without_cells(&document);
+        if !tables.is_empty() {
+            document = new_document();
+            lay_out_as_blocks(&mut document, &tables);
+            (content_width, content_height) = settle(&mut document);
+        }
 
         // Wider than it was laid out for -- a table of a fixed width, a picture -- it is laid out
         // again as wide as it is and zoomed out into the same px, the way a browser shows a page

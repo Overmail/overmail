@@ -19,6 +19,7 @@ peniko = "0.6.0"
 data-url = "0.3.1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 markup5ever = "0.40.0"
+stylo = "=0.22.0"
 stylo_static_prefs = "0.22.0"
 taffy = { version = "=0.15.1", default-features = false }
 

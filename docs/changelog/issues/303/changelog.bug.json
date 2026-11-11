@@ -1,0 +1,8 @@
+{
+  "description": "Mails laid out as rows of boxes, like OVH's support mails, show their text instead of an empty bar.",
+  "localized": {
+    "de": {
+      "description": "Mails, die aus Zeilen von Kästen aufgebaut sind, etwa die Support-Mails von OVH, zeigen ihren Text statt eines leeren Balkens."
+    }
+  }
+}

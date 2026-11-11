@@ -1,0 +1,8 @@
+{
+  "description": "App updates now download on slow connections too, instead of failing and starting over.",
+  "localized": {
+    "de": {
+      "description": "App-Updates lassen sich jetzt auch über langsame Verbindungen herunterladen, statt abzubrechen und neu zu starten."
+    }
+  }
+}

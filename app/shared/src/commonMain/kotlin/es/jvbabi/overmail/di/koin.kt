@@ -48,6 +48,7 @@ import es.jvbabi.overmail.page.onboarding.auth.OnboardingAuthViewModel
 import es.jvbabi.overmail.page.onboarding.permissions.OnboardingPermissionsViewModel
 import es.jvbabi.overmail.page.onboarding.success.OnboardingSuccessViewModel
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.sse.SSE
@@ -151,6 +152,13 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
 
                 install(ContentNegotiation) {
                     json(jsonInstance)
+                }
+
+                // What the engine would time out on its own, but as the plugin, so a single request
+                // can lift it: CIO counts the body into its request timeout, and a large download
+                // like an update's APK takes longer than that on a slow connection.
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 15.seconds.inWholeMilliseconds
                 }
             }
         }

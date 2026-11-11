@@ -17,6 +17,8 @@ import es.jvbabi.overmail.domain.model.UpdateDownload
 import es.jvbabi.overmail.domain.model.UpdateDownloadTarget
 import es.jvbabi.overmail.domain.repository.UpdateRepository
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.contentLength
@@ -84,7 +86,14 @@ class UpdateRepositoryImpl(
 
         try {
             withContext(Dispatchers.IO) {
-                httpClient.prepareGet(url).execute { response ->
+                httpClient.prepareGet(url) {
+                    // As long as it takes to arrive, so a slow connection gets there in the end; a
+                    // connection that stops delivering altogether is still given up on.
+                    timeout {
+                        requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                        socketTimeoutMillis = DOWNLOAD_STALL_TIMEOUT_MILLIS
+                    }
+                }.execute { response ->
                     if (!response.status.isSuccess()) {
                         throw IOException("Download failed with ${response.status}")
                     }
@@ -305,6 +314,9 @@ private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 private const val APK_EXTENSION = ".apk"
 
 private const val FALLBACK_FILE_NAME = "Overmail$APK_EXTENSION"
+
+/** How long the download may go without a single byte arriving before it counts as failed. */
+private const val DOWNLOAD_STALL_TIMEOUT_MILLIS = 30_000L
 
 /** Large enough that the copy loop is not the bottleneck, small enough to stay off the heap. */
 private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024

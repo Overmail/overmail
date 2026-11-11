@@ -1,0 +1,10 @@
+{
+  "title": "Pictures in mails",
+  "description": "The pictures a mail loads from the web, like profile pictures or product photos, now show in the app. The server downloads them when the mail arrives, so the sender does not learn when you read it.",
+  "localized": {
+    "de": {
+      "title": "Bilder in Mails",
+      "description": "Bilder, die eine Mail aus dem Netz lädt, etwa Profilbilder oder Produktfotos, erscheinen jetzt in der App. Der Server lädt sie beim Eingang der Mail herunter, so erfährt der Absender nicht, wann du sie liest."
+    }
+  }
+}

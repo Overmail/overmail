@@ -20,7 +20,7 @@ private val logger = Logger.withTag("EmailBodyCache")
  * Bumped whenever the server hands out a body differently -- the images it embeds -- so the old
  * ones are fetched again; they are left for the system to clear.
  */
-private const val BODY_VERSION = 2
+private const val BODY_VERSION = 3
 
 /**
  * The bodies of mails, one file each in [directory]. A file rather than the database: a body is

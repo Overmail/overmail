@@ -12,6 +12,7 @@ import io.ktor.server.response.cacheControl
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.SerialName
@@ -44,8 +45,10 @@ fun Route.getEmailBody() {
             )
 
             // A mail imported before images were downloaded gets them now, and one whose host was
-            // down at import another try. Briefly: the body is what the page waits for.
-            call.dependency<RemoteImageDownloader>().downloadMissing(email.id.value, email.htmlContent, OPEN_BUDGET)
+            // down at import another try. Not for ever: the body is what the page waits for, and
+            // one without some of its images is better than none.
+            val downloader = call.dependency<RemoteImageDownloader>()
+            withTimeoutOrNull(OPEN_TIMEOUT) { downloader.downloadMissing(email.id.value, email.htmlContent) }
             val html = email.htmlContent?.let { html -> call.database().query { withEmbeddedImages(email.id.value, html) } }
             call.respond(GetEmailBodyResponse(text = email.textContent, html = html))
         }
@@ -53,7 +56,7 @@ fun Route.getEmailBody() {
 }
 
 /** How long opening a mail waits for the images it does not have yet. */
-private val OPEN_BUDGET = 4.seconds
+private val OPEN_TIMEOUT = 30.seconds
 
 @Serializable
 private data class GetEmailBodyResponse(

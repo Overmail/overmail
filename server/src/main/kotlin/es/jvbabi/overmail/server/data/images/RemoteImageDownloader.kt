@@ -8,21 +8,19 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
-/** The most images of one mail that are downloaded; a newsletter has a few dozen. */
-private const val MAX_IMAGES_PER_MAIL = 50
+/** The most images of one mail that are downloaded; a long newsletter has a hundred or more. */
+private const val MAX_IMAGES_PER_MAIL = 250
 
 /** How much all images of one mail may come to, as they go into its body. */
-private const val MAX_BYTES_PER_MAIL = 15L * 1024 * 1024
+private const val MAX_BYTES_PER_MAIL = 25L * 1024 * 1024
 
 /** How many images of a mail are on their way at once. */
 private const val PARALLEL_DOWNLOADS = 6
@@ -41,10 +39,11 @@ class RemoteImageDownloader(
     private val logger = LoggerFactory.getLogger(RemoteImageDownloader::class.java)
 
     /**
-     * Downloads the images of [html], the body of mail [emailId], that are not stored yet, for no
-     * longer than [budget]. What is not in by then is left for the next time.
+     * Downloads the images of [html], the body of mail [emailId], that are not stored yet, all of
+     * them. How long that may take is the caller's to bound, with a timeout around the call: what
+     * is stored when it strikes stays stored, and the rest is asked for the next time.
      */
-    suspend fun downloadMissing(emailId: Uuid, html: String?, budget: Duration) {
+    suspend fun downloadMissing(emailId: Uuid, html: String?) {
         val urls = remoteImageUrls(html).take(MAX_IMAGES_PER_MAIL)
         if (urls.isEmpty()) return
 
@@ -62,14 +61,11 @@ class RemoteImageDownloader(
         val room = AtomicLong(MAX_BYTES_PER_MAIL - stored)
         val permits = Semaphore(PARALLEL_DOWNLOADS)
 
-        val finished = withTimeoutOrNull(budget) {
-            coroutineScope {
-                missing.forEach { url ->
-                    launch { permits.withPermit { store(emailId, url, fetcher.fetch(url), room) } }
-                }
+        coroutineScope {
+            missing.forEach { url ->
+                launch { permits.withPermit { store(emailId, url, fetcher.fetch(url), room) } }
             }
         }
-        if (finished == null) logger.debug("Not every image of mail {} came in within {}", emailId, budget)
     }
 
     private suspend fun store(emailId: Uuid, url: String, fetched: FetchedImage, room: AtomicLong) {

@@ -4,6 +4,7 @@ import es.jvbabi.overmail.server.data.images.RemoteImageDownloader
 import es.jvbabi.overmail.server.data.notifier.MailNotifier
 import es.jvbabi.overmail.server.database.models.Email
 import es.jvbabi.overmail.server.database.models.ImapAccountFolderSync
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -85,12 +86,14 @@ class ClassifyStep(private val enqueue: (Email.Id) -> Unit) : ImportStep {
  * images would be missing from that for good.
  */
 class DownloadRemoteImagesStep(private val downloader: RemoteImageDownloader) : ImportStep {
-    override suspend fun run(email: Email, context: ImportContext) =
-        downloader.downloadMissing(email.id.value, email.htmlContent, IMPORT_BUDGET)
+    override suspend fun run(email: Email, context: ImportContext) {
+        // What is not in by then is asked for again when the body is.
+        withTimeoutOrNull(IMPORT_TIMEOUT) { downloader.downloadMissing(email.id.value, email.htmlContent) }
+    }
 
     private companion object {
         /** How long a new mail waits for its images before it is announced without the rest. */
-        val IMPORT_BUDGET = 10.seconds
+        val IMPORT_TIMEOUT = 30.seconds
     }
 }
 

@@ -82,7 +82,7 @@ class EmailStackViewModel(
                 .flatMapLatest { account ->
                     if (account == null) flowOf(null to emptyList())
                     else emailsRepository.getView(INBOX, instantLocalEmission = true, user = account)
-                        .map { results -> results.filterIsInstance<ViewResult.Item>().map { it.email } }
+                        .map { view -> view.results.filterIsInstance<ViewResult.Item>().map { it.email } }
                         // A write that leaves the inbox as it was -- most of a first sync, which
                         // loads the archive too -- does not deal the pile anew.
                         .distinctUntilChanged()

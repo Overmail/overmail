@@ -1,0 +1,10 @@
+{
+  "title": "The search shows that it is searching",
+  "description": "While the server is still searching, a spinner turns in the search field instead of the magnifying glass.",
+  "localized": {
+    "de": {
+      "title": "Die Suche zeigt, dass sie sucht",
+      "description": "Solange der Server noch sucht, dreht sich im Suchfeld ein Kreis statt der Lupe."
+    }
+  }
+}

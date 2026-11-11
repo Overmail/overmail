@@ -267,6 +267,10 @@ private fun ListContent(
                             value = searchState.query,
                             onValueChange = { onSearchEvent(SearchEvent.SetQuery(it)) },
                             placeholder = stringResource(Res.string.home_search_placeholder),
+                            // Until the server has answered the search, not only until the list
+                            // has something: the device's own matches come first, and may be all
+                            // there is to see for a while.
+                            loading = searchState.isActive && !content.isSettled,
                             modifier = Modifier
                                 .weight(1f)
                                 .onFocusChanged { isSearchFocused = it.hasFocus }

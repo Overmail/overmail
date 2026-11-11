@@ -74,18 +74,18 @@ class ViewViewModel(
             ) { account, view, search, query -> account to view.withSearch(search.copy(query = query)) }
                 .distinctUntilChanged()
                 .flatMapLatest { (account, view) ->
-                    if (account == null) flowOf(ViewContentState(isLoading = false))
+                    if (account == null) flowOf(ViewContentState(isLoading = false, isSettled = true))
                     // A view that changed shows what it had until the new one is read, marked
                     // as loading rather than emptied.
                     else emailsRepository.getView(view, instantLocalEmission = true, user = account)
-                        .flatMapLatest { results ->
+                        .flatMapLatest { (results, isSettled) ->
                             val senderIds = results.senderIds()
-                            if (senderIds.isEmpty()) flowOf(ViewContentState(results = results, isLoading = false))
+                            if (senderIds.isEmpty()) flowOf(ViewContentState(results = results, isLoading = false, isSettled = isSettled))
                             else participantsRepository.getByIds(senderIds.toList(), account).map { senders ->
-                                ViewContentState(results = results, senders = senders.associateBy { it.id }, isLoading = false)
+                                ViewContentState(results = results, senders = senders.associateBy { it.id }, isLoading = false, isSettled = isSettled)
                             }
                         }
-                        .onStart { content.update { it.copy(isLoading = true) } }
+                        .onStart { content.update { it.copy(isLoading = true, isSettled = false) } }
                 }
                 .collect { content.value = it }
         }
@@ -117,6 +117,8 @@ data class ViewContentState(
     val senders: Map<Uuid, Participant> = emptyMap(),
     /** Until the first answer for the current view is in. */
     val isLoading: Boolean = true,
+    /** Until the server has answered the current view, see [es.jvbabi.overmail.domain.repository.ViewSnapshot]. */
+    val isSettled: Boolean = false,
 )
 
 /** Every sender a group in here stands for, however deep it is nested. */

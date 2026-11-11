@@ -1,5 +1,6 @@
 package es.jvbabi.overmail.page.home.components
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,6 +32,9 @@ private val SEARCH_FIELD_HEIGHT = 40.dp
 /**
  * A single filled line, lower than a Material text field: it sits in the header of the
  * list, where every dp it takes is one less of the mails.
+ *
+ * While [loading], a spinner stands where the magnifying glass is: the list below keeps what it
+ * showed until the answer is in, and would look as if nothing was happening.
  */
 @Composable
 fun SearchField(
@@ -37,6 +42,7 @@ fun SearchField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    loading: Boolean = false,
 ) {
     val textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
 
@@ -57,12 +63,19 @@ fun SearchField(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = PhIcons.Regular.MagnifyingGlass,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
+                Crossfade(targetState = loading, modifier = Modifier.size(16.dp)) { loading ->
+                    if (loading) CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    else Icon(
+                        imageVector = PhIcons.Regular.MagnifyingGlass,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (value.isEmpty()) Text(
                         text = placeholder,
@@ -83,7 +96,8 @@ private fun SearchFieldPreview() {
     AppTheme(dynamicColor = false) {
         Surface {
             SearchField(
-                value = "",
+                value = "Rechnung",
+                loading = true,
                 onValueChange = {},
                 placeholder = "Q2 Budget report",
                 modifier = Modifier

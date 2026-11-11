@@ -117,9 +117,25 @@
          */
         function measure(root: HTMLElement) {
             el!.style.height = `${probeHeight()}px`;
-            const content = Math.ceil(root.scrollHeight);
+            fitWidth(root);
+            // The box as the frame sees it, zoom included; scrollHeight is in the mail's own px.
+            const content = Math.ceil(root.getBoundingClientRect().height);
             el!.style.height = `${content}px`;
             rememberHeight(source, content);
+        }
+
+        /**
+         * Zooms a mail that is wider than the frame out until it fits, the way a phone shows a
+         * page that does not: a cell of `width: 775px; min-width: 775px` is wider than any
+         * `max-width` above lets its table be, and `overflow: hidden` would cut it off on the
+         * right. The zoom lays the mail out wider as well, so a table of 100% grows with it.
+         * Measured without a zoom every time, so the same mail lands on the same zoom.
+         */
+        function fitWidth(root: HTMLElement) {
+            root.style.zoom = "";
+            const fits = root.clientWidth;
+            const needs = root.scrollWidth;
+            if (fits > 0 && needs > fits + 1) root.style.zoom = String(fits / needs);
         }
 
         function attach() {

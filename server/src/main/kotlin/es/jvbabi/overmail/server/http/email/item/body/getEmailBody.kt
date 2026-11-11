@@ -1,6 +1,8 @@
 package es.jvbabi.overmail.server.http.email.item.body
 
+import es.jvbabi.overmail.server.data.images.RemoteImageDownloader
 import es.jvbabi.overmail.server.http.api.database
+import es.jvbabi.overmail.server.http.api.dependency
 import es.jvbabi.overmail.server.http.api.requireOwnedEmailFromUrl
 import es.jvbabi.overmail.server.util.withEmbeddedImages
 import io.ktor.http.CacheControl
@@ -11,6 +13,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -18,7 +21,7 @@ import kotlinx.serialization.Serializable
  * What one mail says: `GET /api/emails/{emailId}/body`.
  *
  * Both parts as they were imported, the images the html shows written into it (see
- * `util/EmbeddedImages.kt`); which of them is rendered is the client's call. A stored mail is
+ * `util/EmbeddedImages.kt` and `util/RemoteImages.kt`); which of them is rendered is the client's call. A stored mail is
  * never rewritten, so this may sit in a cache for a while.
  */
 fun Route.getEmailBody() {
@@ -40,11 +43,17 @@ fun Route.getEmailBody() {
                 CacheControl.MaxAge(maxAgeSeconds = 1.hours.inWholeSeconds.toInt())
             )
 
+            // A mail imported before images were downloaded gets them now, and one whose host was
+            // down at import another try. Briefly: the body is what the page waits for.
+            call.dependency<RemoteImageDownloader>().downloadMissing(email.id.value, email.htmlContent, OPEN_BUDGET)
             val html = email.htmlContent?.let { html -> call.database().query { withEmbeddedImages(email.id.value, html) } }
             call.respond(GetEmailBodyResponse(text = email.textContent, html = html))
         }
     }
 }
+
+/** How long opening a mail waits for the images it does not have yet. */
+private val OPEN_BUDGET = 4.seconds
 
 @Serializable
 private data class GetEmailBodyResponse(
